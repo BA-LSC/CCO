@@ -90,7 +90,7 @@ cd cco
 
 ### Cloudflare (do this first)
 
-Domain on Cloudflare (free). Run `./deploy/setup.sh` — it creates a **Cloudflare Tunnel** (automated with API token or manual). No A records to your Vultr IP required.
+Domain on Cloudflare (free). Run `./deploy/setup.sh` — it walks through creating a **Cloudflare Tunnel** in the dashboard step by step. No A records to your Vultr IP required.
 
 See [Cloudflare Tunnel](#4-cloudflare-tunnel).
 
@@ -323,7 +323,7 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 | `SESSION_SECRET` | 32+ random characters |
 | `POSTGRES_PASSWORD` | Strong password (bundled DB only; not used with Vultr managed DB) |
 | `DATABASE_URL` | Bundled: `@postgres:5432`. Vultr: `./deploy/configure-vultr-db.sh` ([managed DB](#5-optional-vultr-managed-postgresql-vpc)) |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Run token from Zero Trust → Tunnels (or created by setup API automation) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Run token from Zero Trust → Tunnels → Install connector (Docker) |
 
 > **Important:** `NEXT_PUBLIC_*` values are baked into the web image at **build time**. After changing them:
 >
@@ -342,29 +342,22 @@ Production uses **Cloudflare Tunnel only** — no A records to your VPS IP and n
 1. Domain on Cloudflare (Free plan).
 2. [Zero Trust](https://one.dash.cloudflare.com/) enabled (free).
 
-### Automated (recommended)
+### Setup (wizard walkthrough)
 
-Run `./deploy/setup.sh` and choose **Automate tunnel setup with a Cloudflare API token**.
+Run `./deploy/setup.sh`. Step 2 walks through the Cloudflare dashboard:
 
-Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) with:
-
-- **Account** — Cloudflare Tunnel: Edit
-- **Zone** — DNS: Edit (for your domain)
-
-The wizard creates the tunnel, ingress routes (`http://web:3000`, `http://api:3001`), proxied CNAME records, and saves `CLOUDFLARE_TUNNEL_TOKEN`.
-
-### Manual
-
-1. **Zero Trust** → **Networks** → **Connectors** → **Cloudflare Tunnels** → **Create**
-2. Name: `cco` → choose **Docker** → copy the run token
-3. Add **Public Hostnames**:
+1. **Zero Trust** → **Networks** → **Connectors** → **Cloudflare Tunnels** → create tunnel `cco`
+2. Add **Public Hostnames**:
 
    | Hostname | Service |
    |----------|---------|
    | `chat.example.com` | `http://web:3000` |
    | `api.chat.example.com` | `http://api:3001` |
 
-4. Paste the token when `./deploy/setup.sh` prompts
+3. **Install connector** → Docker → copy the **run token** and paste when prompted
+4. Confirm both DNS records are **Proxied** (orange cloud)
+
+The wizard confirms each sub-step before continuing.
 
 ### Security hardening (free)
 
@@ -570,7 +563,7 @@ If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in or
 | `deploy/docker-compose.external-db.yml` | Overlay when `DATABASE_URL` is external |
 | `deploy/Dockerfile.api` | API image |
 | `deploy/Dockerfile.web` | Web image (Next.js standalone) |
-| `deploy/lib/cloudflare-tunnel.sh` | Tunnel API automation + hardening prompts |
+| `deploy/lib/cloudflare-tunnel.sh` | Cloudflare dashboard tunnel walkthrough |
 | `deploy/lib/firewall.sh` | VPS + provider firewall walkthrough |
 | `deploy/harden-server.sh` | UFW apply (SSH only) |
 | `deploy/.env.production.example` | Environment template |
