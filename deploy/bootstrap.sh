@@ -6,6 +6,8 @@ cd "$ROOT"
 
 # shellcheck disable=SC1091
 source deploy/lib/database.sh
+# shellcheck disable=SC1091
+source deploy/lib/cloudflare-tunnel.sh
 
 if [[ ! -f .env ]]; then
   cp deploy/.env.production.example .env
@@ -67,6 +69,8 @@ if cco_should_use_external_db; then
   fi
   echo "  Connection OK. Bundled postgres container will be skipped."
 fi
+
+cco_stop_setup_connector
 
 echo "Building and starting CCO production stack..."
 "${COMPOSE[@]}" up -d --build

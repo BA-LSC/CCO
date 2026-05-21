@@ -1,4 +1,189 @@
-# Cloudflare Tunnel walkthrough for deploy/setup.sh (dashboard only — no API tokens).
+# Cloudflare Tunnel setup — API automation (primary) with optional manual fallback.
+
+CCO_SETUP_CLOUDFLARED_CONTAINER="${CCO_SETUP_CLOUDFLARED_CONTAINER:-cco-cloudflared-setup}"
+
+cco_cf_require_tools() {
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl is required for Cloudflare API setup." >&2
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is required for Cloudflare API setup." >&2
+    return 1
+  fi
+}
+
+cco_cf_api() {
+  local method="$1" path="$2" data="${3:-}"
+  local response
+  if [[ -n "$data" ]]; then
+    response="$(curl -sS -X "$method" "https://api.cloudflare.com/client/v4${path}" \
+      -H "Authorization: Bearer ${CF_API_TOKEN}" \
+      -H "Content-Type: application/json" \
+      --data "$data")"
+  else
+    response="$(curl -sS -X "$method" "https://api.cloudflare.com/client/v4${path}" \
+      -H "Authorization: Bearer ${CF_API_TOKEN}" \
+      -H "Content-Type: application/json")"
+  fi
+  printf '%s' "$response"
+}
+
+cco_cf_json_success() {
+  local json="$1"
+  JSON="$json" python3 -c 'import json, os, sys; sys.exit(0 if json.loads(os.environ["JSON"]).get("success") else 1)'
+}
+
+cco_cf_json_field() {
+  local json="$1" expr="$2"
+  JSON="$json" EXPR="$expr" python3 -c '
+import json, os
+data = json.loads(os.environ["JSON"])
+cur = data
+for part in os.environ["EXPR"].split("."):
+    if part == "":
+        continue
+    if isinstance(cur, dict):
+        cur = cur.get(part)
+    elif isinstance(cur, list) and part.isdigit():
+        cur = cur[int(part)]
+    else:
+        cur = None
+        break
+if cur is None:
+    raise SystemExit(1)
+print(cur)
+'
+}
+
+cco_cf_resolve_account_id() {
+  local response account_id
+  response="$(cco_cf_api GET "/accounts?per_page=1")"
+  if ! cco_cf_json_success "$response"; then
+    echo "Cloudflare API token could not list accounts. Check token permissions." >&2
+    return 1
+  fi
+  account_id="$(cco_cf_json_field "$response" "result.0.id" 2>/dev/null || true)"
+  if [[ -z "$account_id" ]]; then
+    echo "No Cloudflare account found for this API token." >&2
+    return 1
+  fi
+  printf '%s' "$account_id"
+}
+
+cco_cf_find_zone_id() {
+  local hostname="$1" candidate="$hostname" response zone_id
+  while [[ "$candidate" == *.* ]]; do
+    response="$(cco_cf_api GET "/zones?name=${candidate}")"
+    if cco_cf_json_success "$response"; then
+      zone_id="$(cco_cf_json_field "$response" "result.0.id" 2>/dev/null || true)"
+      if [[ -n "$zone_id" ]]; then
+        printf '%s' "$zone_id"
+        return 0
+      fi
+    fi
+    candidate="${candidate#*.}"
+  done
+  echo "Could not find a Cloudflare zone for ${hostname}." >&2
+  return 1
+}
+
+cco_cf_upsert_cname() {
+  local zone_id="$1" fqdn="$2" target="$3"
+  local response record_id payload
+  response="$(cco_cf_api GET "/zones/${zone_id}/dns_records?type=CNAME&name=${fqdn}")"
+  if ! cco_cf_json_success "$response"; then
+    echo "Failed to list DNS records for ${fqdn}." >&2
+    return 1
+  fi
+  record_id="$(JSON="$response" python3 -c '
+import json, os
+for row in json.loads(os.environ["JSON"]).get("result", []):
+    print(row["id"])
+    break
+' 2>/dev/null || true)"
+
+  payload="$(FQDN="$fqdn" TARGET="$target" python3 -c '
+import json, os
+print(json.dumps({
+  "type": "CNAME",
+  "name": os.environ["FQDN"],
+  "content": os.environ["TARGET"],
+  "proxied": True,
+  "comment": "CCO Cloudflare Tunnel",
+}))
+')"
+
+  if [[ -n "$record_id" ]]; then
+    response="$(cco_cf_api PUT "/zones/${zone_id}/dns_records/${record_id}" "$payload")"
+  else
+    response="$(cco_cf_api POST "/zones/${zone_id}/dns_records" "$payload")"
+  fi
+  if ! cco_cf_json_success "$response"; then
+    echo "Failed to create/update CNAME for ${fqdn}." >&2
+    JSON="$response" python3 -c 'import json, os; print(json.loads(os.environ["JSON"]).get("errors", []))' >&2 || true
+    return 1
+  fi
+}
+
+cco_cf_provision_tunnel() {
+  local account_id="$1" cco_domain="$2" api_domain="$3"
+  local response tunnel_id tunnel_name token payload api_zone_id cname_target
+
+  cco_cf_require_tools || return 1
+
+  tunnel_name="cco-$(echo "$cco_domain" | tr '.:' '-')"
+  response="$(cco_cf_api POST "/accounts/${account_id}/cfd_tunnel" \
+    "{\"name\":\"${tunnel_name}\",\"config_src\":\"cloudflare\"}")"
+  if ! cco_cf_json_success "$response"; then
+    echo "Failed to create Cloudflare Tunnel." >&2
+    JSON="$response" python3 -c 'import json, os; print(json.loads(os.environ["JSON"]).get("errors", []))' >&2 || true
+    return 1
+  fi
+  tunnel_id="$(cco_cf_json_field "$response" "result.id")"
+
+  payload="$(CCO="$cco_domain" API="$api_domain" python3 -c '
+import json, os
+print(json.dumps({
+  "config": {
+    "ingress": [
+      {
+        "hostname": os.environ["CCO"],
+        "service": "http://web:3000",
+        "originRequest": {"http2Origin": True, "connectTimeout": 30},
+      },
+      {
+        "hostname": os.environ["API"],
+        "service": "http://api:3001",
+        "originRequest": {"http2Origin": True, "connectTimeout": 30},
+      },
+      {"service": "http_status:404"},
+    ]
+  }
+}))
+')"
+  response="$(cco_cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/configurations" "$payload")"
+  if ! cco_cf_json_success "$response"; then
+    echo "Failed to configure tunnel ingress." >&2
+    return 1
+  fi
+
+  zone_id="$(cco_cf_find_zone_id "$cco_domain")" || return 1
+  cname_target="${tunnel_id}.cfargotunnel.com"
+  cco_cf_upsert_cname "$zone_id" "$cco_domain" "$cname_target" || return 1
+  if [[ "$api_domain" != "$cco_domain" ]]; then
+    api_zone_id="$(cco_cf_find_zone_id "$api_domain")" || return 1
+    cco_cf_upsert_cname "$api_zone_id" "$api_domain" "$cname_target" || return 1
+  fi
+
+  response="$(cco_cf_api GET "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/token")"
+  if ! cco_cf_json_success "$response"; then
+    echo "Failed to fetch tunnel run token." >&2
+    return 1
+  fi
+  token="$(cco_cf_json_field "$response" "result")"
+  printf '%s' "$token"
+}
 
 cco_print_cloudflare_prerequisites() {
   cat <<'EOF'
@@ -22,6 +207,42 @@ cco_prompt_cloudflare_prerequisites() {
     cco_press_enter "Press Enter when the domain is Active on Cloudflare"
   done
   echo ""
+}
+
+cco_print_api_token_walkthrough() {
+  local cco="$1" api="$2"
+  cat <<EOF
+Create a Cloudflare API token (one time):
+
+  1. Open https://dash.cloudflare.com/profile/api-tokens
+  2. Create Token → Create Custom Token
+  3. Permissions:
+       Account  | Cloudflare One Connectors  | Edit
+       Zone     | DNS                        | Edit
+     Zone Resources: Include → Specific zone → your domain
+  4. Create Token → copy the token (shown once)
+
+The wizard will automatically:
+  • Create a Cloudflare Tunnel
+  • Route ${cco}  → http://web:3000
+  • Route ${api}  → http://api:3001
+  • Create proxied (orange cloud) CNAME records
+  • Start cloudflared on this server so the connector shows as connected
+
+EOF
+}
+
+cco_print_tunnel_api_summary() {
+  local cco="$1" api="$2"
+  cat <<EOF
+Tunnel created via API. Verify in Cloudflare (optional):
+
+  Zero Trust → Networks → Tunnels — connector should show Healthy
+  DNS → Records:
+    ${cco}  → CNAME → *.cfargotunnel.com  (Proxied)
+    ${api}  → CNAME → *.cfargotunnel.com  (Proxied)
+
+EOF
 }
 
 cco_print_cloudflare_hardening_guide() {
@@ -70,15 +291,132 @@ cco_prompt_hardening_confirmations() {
   echo ""
 }
 
+cco_extract_tunnel_token() {
+  local input="$1" token=""
+  input="${input//\"/}"
+  input="${input//\'/}"
+  if [[ "$input" =~ --token[=[:space:]]+([^[:space:]]+) ]]; then
+    token="${BASH_REMATCH[1]}"
+  elif [[ "$input" =~ TUNNEL_TOKEN=([^[:space:]]+) ]]; then
+    token="${BASH_REMATCH[1]}"
+  elif [[ "$input" =~ ^eyJ[^[:space:]]+$ ]]; then
+    token="$input"
+  fi
+  if [[ -z "$token" ]]; then
+    echo "Could not find a tunnel token in that input." >&2
+    return 1
+  fi
+  printf '%s' "$token"
+}
+
+cco_stop_setup_connector() {
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$CCO_SETUP_CLOUDFLARED_CONTAINER"; then
+    docker rm -f "$CCO_SETUP_CLOUDFLARED_CONTAINER" >/dev/null 2>&1 || true
+  fi
+}
+
+cco_start_setup_connector() {
+  local token="$1"
+  cco_stop_setup_connector
+  echo "Starting cloudflared on this server..."
+  if ! docker run -d \
+    --name "$CCO_SETUP_CLOUDFLARED_CONTAINER" \
+    --restart unless-stopped \
+    cloudflare/cloudflared:latest \
+    tunnel --no-autoupdate run --token "$token" >/dev/null; then
+    echo "Failed to start cloudflared. Is Docker running?" >&2
+    return 1
+  fi
+  sleep 4
+  echo ""
+  echo "Recent cloudflared logs:"
+  docker logs "$CCO_SETUP_CLOUDFLARED_CONTAINER" 2>&1 | tail -8
+  echo ""
+}
+
+cco_wait_for_connector_healthy() {
+  until cco_prompt_yes_no "Cloudflare shows the tunnel connector as Healthy / Connected?" "Y"; do
+    echo "  Check Zero Trust → Networks → Tunnels"
+    echo "  Logs: docker logs ${CCO_SETUP_CLOUDFLARED_CONTAINER}"
+    if cco_prompt_yes_no "Retry starting cloudflared?" "Y"; then
+      cco_start_setup_connector "$1" || true
+    fi
+  done
+  echo ""
+}
+
+cco_provision_tunnel_via_api() {
+  local env_file="$1" cco_domain="$2" api_domain="$3"
+  local token account_id
+
+  cco_print_api_token_walkthrough "$cco_domain" "$api_domain"
+  cco_press_enter "Press Enter when you have created the API token"
+
+  CF_API_TOKEN="$(cco_prompt_secret "Paste Cloudflare API token" "")"
+  if [[ -z "$CF_API_TOKEN" ]]; then
+    echo "API token is required." >&2
+    return 1
+  fi
+  export CF_API_TOKEN
+
+  echo ""
+  echo "Creating tunnel, routes, and DNS via Cloudflare API..."
+  account_id="$(cco_cf_resolve_account_id)" || return 1
+  token="$(cco_cf_provision_tunnel "$account_id" "$cco_domain" "$api_domain")" || return 1
+
+  echo ""
+  echo "  ✓ Tunnel created"
+  echo "  ✓ Ingress routes configured"
+  echo "  ✓ Proxied CNAME records created"
+  cco_print_tunnel_api_summary "$cco_domain" "$api_domain"
+
+  cco_env_upsert "CLOUDFLARE_TUNNEL_TOKEN" "$token" "$env_file"
+  cco_start_setup_connector "$token" || return 1
+  cco_wait_for_connector_healthy "$token"
+
+  printf '%s' "$token"
+}
+
+cco_provision_tunnel_manual() {
+  local env_file="$1" cco_domain="$2" api_domain="$3"
+  local token="" pasted=""
+
+  cat <<EOF
+Manual fallback — create the tunnel in Cloudflare, then paste the Docker command.
+
+  1. https://one.dash.cloudflare.com/ → Networks → Tunnels → Create (name: cco)
+  2. Install connector → Docker — copy the full docker run … --token eyJ… command
+  3. Add public hostnames:
+       ${cco_domain} → http://web:3000
+       ${api_domain} → http://api:3001
+
+EOF
+  while [[ -z "$token" ]]; do
+    echo "Paste the full Docker command from Cloudflare (or the eyJ… token alone):"
+    cco_read -r -p "> " pasted
+    token="$(cco_extract_tunnel_token "$pasted" 2>/dev/null || true)"
+    if [[ -z "$token" ]]; then
+      echo "Could not extract token — paste the full docker run command."
+    fi
+  done
+
+  cco_env_upsert "CLOUDFLARE_TUNNEL_TOKEN" "$token" "$env_file"
+  cco_start_setup_connector "$token" || return 1
+  cco_wait_for_connector_healthy "$token"
+
+  until cco_prompt_yes_no "Both hostnames configured in Zero Trust?" "Y"; do
+    echo "  Tunnels → cco → Public Hostnames"
+  done
+
+  printf '%s' "$token"
+}
+
 cco_run_tunnel_setup() {
   local env_file="$1" cco_domain="$2" api_domain="$3"
   local token=""
 
   echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare."
   echo "This server does not need ports 80/443 open to the internet."
-  echo ""
-  echo "You will create the tunnel in the Cloudflare dashboard, then paste"
-  echo "the run token here. Follow each sub-step below."
   echo ""
 
   token="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$env_file")"
@@ -91,99 +429,13 @@ cco_run_tunnel_setup() {
   fi
 
   if [[ -z "$token" ]]; then
-    cat <<EOF
-── A. Create the tunnel ─────────────────────────────────────────────────────
-
-  1. Open https://one.dash.cloudflare.com/
-  2. Go to Networks → Connectors → Cloudflare Tunnels
-  3. Click Create a tunnel
-  4. Name it: cco
-  5. Click Save tunnel
-
-EOF
-    cco_press_enter "Press Enter when the tunnel named cco is created"
-
-    cat <<EOF
-── B. Add the web hostname ──────────────────────────────────────────────────
-
-  In the tunnel setup, go to Public Hostnames → Add a public hostname:
-
-    Subdomain / hostname:  ${cco_domain}
-    Service type:          HTTP
-    URL:                   web:3000
-
-  (Cloudflare may show separate fields — use the full hostname above and
-   service URL exactly as: web:3000)
-
-  Do NOT use localhost — CCO's Docker network uses the service name web.
-
-EOF
-    until cco_prompt_yes_no "Public hostname ${cco_domain} → http://web:3000 saved?" "Y"; do
-      echo "  Zero Trust → Networks → Tunnels → cco → Public Hostnames"
-    done
-    echo ""
-
-    cat <<EOF
-── C. Add the API hostname ──────────────────────────────────────────────────
-
-  Add another public hostname:
-
-    Subdomain / hostname:  ${api_domain}
-    Service type:          HTTP
-    URL:                   api:3001
-
-EOF
-    until cco_prompt_yes_no "Public hostname ${api_domain} → http://api:3001 saved?" "Y"; do
-      echo "  Zero Trust → Networks → Tunnels → cco → Public Hostnames"
-    done
-    echo ""
-
-    cat <<EOF
-── D. Copy the tunnel run token (do not run Cloudflare's command) ───────────
-
-  1. In the tunnel page, open Install connector (or Configure)
-  2. Select Docker — this matches how CCO runs cloudflared
-  3. Cloudflare shows a command like:
-       docker run cloudflare/cloudflared:latest tunnel run --token eyJ...
-     Do NOT run that command on your server during setup.
-  4. Copy only the token (the long eyJ… string after --token)
-  5. Paste it when prompted below — CCO starts cloudflared automatically
-     when you deploy (./deploy/bootstrap.sh → docker compose)
-
-  Why: CCO's stack already includes a cloudflared container on the same
-  Docker network as web and api. Running Cloudflare's one-off docker command
-  would start a second connector and can fail to reach web:3000 / api:3001.
-
-  Do not choose Debian unless you plan to run cloudflared outside Docker
-  (not supported by CCO's default deploy).
-
-EOF
-    cco_press_enter "Press Enter when you have copied the run token"
-    while [[ -z "$token" ]]; do
-      token="$(cco_prompt_secret "Paste Cloudflare tunnel run token" "")"
-      if [[ -z "$token" ]]; then
-        echo "Tunnel token is required."
-      fi
-    done
-    echo ""
-
-    cat <<EOF
-── E. Verify DNS ────────────────────────────────────────────────────────────
-
-  Open https://dash.cloudflare.com/ → your zone → DNS → Records.
-
-  You should see CNAME records for:
-    ${cco_domain}
-    ${api_domain}
-
-  Both must show Proxied (orange cloud). Do NOT add A records to this
-  server's IP address.
-
-EOF
-    until cco_prompt_yes_no "Both hostnames show Proxied (orange cloud) in DNS?" "Y"; do
-      echo "  DNS → Records → enable proxy (orange cloud) for both hostnames"
-    done
-    echo ""
+    if cco_prompt_yes_no "Create tunnel automatically with a Cloudflare API token?" "Y"; then
+      token="$(cco_provision_tunnel_via_api "$env_file" "$cco_domain" "$api_domain")" || return 1
+    else
+      token="$(cco_provision_tunnel_manual "$env_file" "$cco_domain" "$api_domain")" || return 1
+    fi
+  elif ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CCO_SETUP_CLOUDFLARED_CONTAINER"; then
+    cco_start_setup_connector "$token" || true
   fi
 
   printf '%s' "$token"

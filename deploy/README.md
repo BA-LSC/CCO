@@ -323,7 +323,7 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 | `SESSION_SECRET` | 32+ random characters |
 | `POSTGRES_PASSWORD` | Strong password (bundled DB only; not used with Vultr managed DB) |
 | `DATABASE_URL` | Bundled: `@postgres:5432`. Vultr: `./deploy/configure-vultr-db.sh` ([managed DB](#5-optional-vultr-managed-postgresql-vpc)) |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Run token from Zero Trust → Tunnels → Install connector (Docker) |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Run token (created by setup API automation, or pasted manually) |
 
 > **Important:** `NEXT_PUBLIC_*` values are baked into the web image at **build time**. After changing them:
 >
@@ -342,22 +342,21 @@ Production uses **Cloudflare Tunnel only** — no A records to your VPS IP and n
 1. Domain on Cloudflare (Free plan).
 2. [Zero Trust](https://one.dash.cloudflare.com/) enabled (free).
 
-### Setup (wizard walkthrough)
+### Setup (API — recommended)
 
-Run `./deploy/setup.sh`. Step 2 walks through the Cloudflare dashboard:
+Run `./deploy/setup.sh`. Step 2 uses a **Cloudflare API token** to automatically:
 
-1. **Zero Trust** → **Networks** → **Connectors** → **Cloudflare Tunnels** → create tunnel `cco`
-2. Add **Public Hostnames**:
+1. Create a Cloudflare Tunnel
+2. Configure ingress (`http://web:3000`, `http://api:3001`)
+3. Create proxied CNAME records for both hostnames
+4. Start `cloudflared` on the server so the connector shows as connected
 
-   | Hostname | Service |
-   |----------|---------|
-   | `chat.example.com` | `http://web:3000` |
-   | `api.chat.example.com` | `http://api:3001` |
+Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) with:
 
-3. **Install connector** → Docker → copy the **run token** and paste when prompted
-4. Confirm both DNS records are **Proxied** (orange cloud)
+- **Account** — Cloudflare One Connectors: Edit
+- **Zone** — DNS: Edit (for your domain)
 
-The wizard confirms each sub-step before continuing.
+Manual fallback: say **No** at the API prompt and paste the Docker install command from Zero Trust instead.
 
 ### Security hardening (free)
 
@@ -563,7 +562,7 @@ If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in or
 | `deploy/docker-compose.external-db.yml` | Overlay when `DATABASE_URL` is external |
 | `deploy/Dockerfile.api` | API image |
 | `deploy/Dockerfile.web` | Web image (Next.js standalone) |
-| `deploy/lib/cloudflare-tunnel.sh` | Cloudflare dashboard tunnel walkthrough |
+| `deploy/lib/cloudflare-tunnel.sh` | Tunnel API automation + connector bootstrap |
 | `deploy/lib/firewall.sh` | VPS + provider firewall walkthrough |
 | `deploy/harden-server.sh` | UFW apply (SSH only) |
 | `deploy/.env.production.example` | Environment template |
