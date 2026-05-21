@@ -1,12 +1,49 @@
-# Interactive prompts for deploy scripts.
+# Interactive prompts for deploy scripts (reads from /dev/tty when piped via curl | bash).
+
+cco_attach_tty() {
+  if [[ -r /dev/tty ]]; then
+    exec </dev/tty
+  elif [[ ! -t 0 ]]; then
+    echo ""
+    echo "Error: setup needs an interactive terminal."
+    echo "  After install:  cd ~/cco && ./deploy/setup.sh"
+    echo ""
+    exit 1
+  fi
+}
+
+cco_read() {
+  read -r "$@"
+}
+
+cco_step_banner() {
+  local step="$1" title="$2"
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  Step ${step} of 6 — ${title}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+}
+
+cco_press_enter() {
+  local msg="${1:-Press Enter to continue}"
+  echo ""
+  cco_read -r -p "${msg}... "
+  echo ""
+}
+
+cco_confirm_step() {
+  local msg="${1:-Ready for the next step?}"
+  cco_prompt_yes_no "$msg" "Y"
+}
 
 cco_prompt() {
   local label="$1" default="${2:-}" var
   if [[ -n "$default" ]]; then
-    read -r -p "${label} [${default}]: " var
+    cco_read -r -p "${label} [${default}]: " var
     printf '%s' "${var:-$default}"
   else
-    read -r -p "${label}: " var
+    cco_read -r -p "${label}: " var
     printf '%s' "$var"
   fi
 }
@@ -14,11 +51,11 @@ cco_prompt() {
 cco_prompt_secret() {
   local label="$1" current="${2:-}" var
   if [[ -n "$current" ]]; then
-    read -r -s -p "${label} [Enter to keep current]: " var
+    cco_read -r -s -p "${label} [Enter to keep current]: " var
     echo ""
     printf '%s' "${var:-$current}"
   else
-    read -r -s -p "${label}: " var
+    cco_read -r -s -p "${label}: " var
     echo ""
     printf '%s' "$var"
   fi
@@ -26,7 +63,7 @@ cco_prompt_secret() {
 
 cco_prompt_yes_no() {
   local label="$1" default="${2:-Y}" answer
-  read -r -p "${label} [${default}]: " answer
+  cco_read -r -p "${label} [${default}]: " answer
   answer="${answer:-$default}"
   [[ "$answer" =~ ^[Yy] ]]
 }
