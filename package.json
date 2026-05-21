@@ -1,0 +1,22 @@
+{
+  "name": "cco",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": ["apps/*", "packages/*", "services/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:api": "bun run --cwd services/api dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:all": "bun run dev:api & bun run dev:web",
+    "test": "turbo run test",
+    "test:unit": "bun test packages services/api",
+    "lint": "turbo run lint",
+    "db:migrate": "bun run --cwd services/api db:migrate",
+    "deploy:install": "./deploy/install.sh",
+    "deploy:setup": "./deploy/setup.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.9.14",
+    "typescript": "^6.0.3"
+  }
+}

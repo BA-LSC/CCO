@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "CCO",
+    "slug": "connect",
+    "scheme": "connect",
+    "extra": {
+      "apiUrl": "http://localhost:3001"
+    },
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.connect.app"
+    },
+    "android": {
+      "package": "com.connect.app"
+    },
+    "plugins": ["expo-router"]
+  }
+}

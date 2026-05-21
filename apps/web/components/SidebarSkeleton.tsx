@@ -1,0 +1,77 @@
+const GROUP_ROWS = 2;
+const CHANNEL_ROWS = 2;
+const DM_ROWS = 3;
+const TEAM_ROWS = 2;
+
+export function SidebarSkeleton() {
+  return (
+    <div className="sidebar-skeleton" role="status" aria-live="polite">
+      <span className="visually-hidden">Loading sidebar</span>
+
+      <section className="sidebar-section sidebar-section-indented" aria-hidden>
+        <div className="sidebar-section-header">
+          <h2 className="sidebar-section-title">Groups</h2>
+        </div>
+        <ul className="sidebar-list">
+          {Array.from({ length: GROUP_ROWS }, (_, groupIndex) => (
+            <li key={groupIndex} className="sidebar-group">
+              <div className="sidebar-group-block">
+                <div className="sidebar-group-name-row">
+                  <div className="sidebar-group-header">
+                    <span className="sidebar-skeleton-avatar sidebar-group-avatar" />
+                    <span className="sidebar-skeleton-label sidebar-skeleton-label-group" />
+                  </div>
+                </div>
+              </div>
+              <ul className="sidebar-nested">
+                {Array.from({ length: CHANNEL_ROWS }, (_, channelIndex) => (
+                  <li key={channelIndex}>
+                    <div className="sidebar-item sidebar-nested-item sidebar-skeleton-nested-row">
+                      <span className="sidebar-hash">#</span>
+                      <span className="sidebar-skeleton-label sidebar-skeleton-label-channel" />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="sidebar-section sidebar-section-messages" aria-hidden>
+        <div className="sidebar-section-header">
+          <h2 className="sidebar-section-title">Messages</h2>
+          <span className="sidebar-add-channel-icon sidebar-skeleton-icon" aria-hidden />
+        </div>
+        <ul className="sidebar-list">
+          {Array.from({ length: DM_ROWS }, (_, dmIndex) => (
+            <li key={dmIndex}>
+              <div className="sidebar-item sidebar-dm-item sidebar-skeleton-dm-row">
+                <div className="sidebar-dm-row">
+                  <span className="sidebar-skeleton-avatar sidebar-dm-avatar" />
+                  <span className="sidebar-skeleton-label sidebar-skeleton-label-dm" />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="sidebar-section sidebar-section-teams" aria-hidden>
+        <div className="sidebar-section-header">
+          <h2 className="sidebar-section-title">Teams</h2>
+        </div>
+        <ul className="sidebar-list">
+          {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
+            <li key={teamIndex}>
+              <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
+                <span className="sidebar-team-leader-slot" />
+                <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}

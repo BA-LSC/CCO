@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { UserAvatar } from "@/components/UserAvatar";
+import { apiFetch, type GroupDetail } from "@/lib/api";
+
+type SessionInfo = { userId: string; displayName?: string };
+
+type Props = {
+  groupId: string;
+};
+
+
+export function GroupMembersPanel({ groupId }: Props) {
+  const [detail, setDetail] = useState<GroupDetail | null>(null);
+  const [session, setSession] = useState<SessionInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const isLeader =
+    detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
+
+  async function reload() {
+    const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`);
+    setDetail(data);
+    return data;
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`),
+      apiFetch<SessionInfo>("/api/v1/session/me").catch(() => null),
+    ])
+      .then(([groupData, sessionData]) => {
+        setDetail(groupData);
+        setSession(sessionData);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load members"))
+      .finally(() => setLoading(false));
+  }, [groupId]);
+
+  async function syncRoster() {
+    setSyncing(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/groups/${groupId}/roster/sync`, { method: "POST" });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Roster sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function removeFromGroup(userId: string, displayName: string) {
+    if (!confirm(`Remove ${displayName} from this group in Planning Center?`)) return;
+    setRemovingMemberId(userId);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/groups/${groupId}/members/${userId}`, { method: "DELETE" });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove member");
+    } finally {
+      setRemovingMemberId(null);
+    }
+  }
+
+  if (loading) {
+    return <p className="group-members-loading">Loading members…</p>;
+  }
+
+  if (!detail) {
+    return <p className="group-members-loading">{error ?? "Group not found"}</p>;
+  }
+
+  return (
+    <div className="group-members-panel">
+      <div className="group-members-panel-header">
+        <p className="group-members-panel-desc">
+          Everyone in {detail.group.name}. Channel access is managed separately in each channel&apos;s
+          settings.
+        </p>
+        {isLeader && (
+          <button
+            type="button"
+            className="link-btn"
+            disabled={syncing}
+            onClick={() => void syncRoster()}
+          >
+            {syncing ? "Refreshing…" : "Refresh from Planning Center"}
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="alert alert-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <ul className="group-members-list">
+        {detail.members.map((m) => (
+          <li key={m.id} className="member-row member-row-actions">
+            <UserAvatar
+              displayName={m.displayName}
+              avatarUrl={m.avatarUrl}
+              className="member-avatar"
+            />
+            <span className="member-row-name">{m.displayName}</span>
+            {m.role !== "member" && <span className="member-role">{m.role}</span>}
+            {isLeader && m.id && m.id !== session?.userId && (
+              <button
+                type="button"
+                className="link-btn danger"
+                disabled={removingMemberId === m.id}
+                onClick={() => void removeFromGroup(m.id!, m.displayName ?? "Member")}
+              >
+                {removingMemberId === m.id ? "Removing…" : "Remove"}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

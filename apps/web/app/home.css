@@ -1,0 +1,295 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+.home {
+  /* Defaults match Signal; overridden per theme in themes.css */
+  --home-bg: #090b10;
+  --home-surface: #111620;
+  --home-text: #e8edf5;
+  --home-muted: #7b8496;
+  --home-accent: #3b9eff;
+  --home-accent-dim: rgba(59, 158, 255, 0.12);
+  --home-border: rgba(232, 237, 245, 0.08);
+  --home-success: #34d399;
+  --home-max: 960px;
+
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--home-bg);
+  color: var(--home-text);
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+.home-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-bg-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -10%,
+      color-mix(in srgb, var(--home-accent) 14%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 40% 30% at 100% 20%,
+      color-mix(in srgb, var(--home-accent) 6%, transparent),
+      transparent 50%
+    );
+}
+
+.home-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--home-text) 7%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, black 30%, transparent 90%);
+}
+
+.home-hero,
+.home-features,
+.home-footer {
+  position: relative;
+  z-index: 1;
+  width: min(100%, var(--home-max));
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2rem);
+}
+
+.home-hero {
+  padding-top: clamp(4rem, 14vh, 7rem);
+  padding-bottom: 3.5rem;
+}
+
+.home-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.55rem;
+  border: 1px solid var(--home-border);
+  border-radius: 6px;
+  background: rgba(17, 22, 32, 0.8);
+}
+
+.home-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--home-success);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+}
+
+.home-badge-text {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--home-muted);
+  text-transform: lowercase;
+}
+
+.home-headline {
+  margin: 0 0 1rem;
+  font-size: clamp(3rem, 10vw, 4.75rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.home-headline-sub {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--home-muted);
+}
+
+.home-desc {
+  margin: 0 0 1.75rem;
+  max-width: 32rem;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--home-muted);
+}
+
+.home-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 1.75rem;
+}
+
+.home-cta-loading {
+  min-height: 44px;
+}
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid rgba(59, 158, 255, 0.45);
+  border-radius: 8px;
+  background: var(--home-accent-dim);
+  color: var(--home-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.home-btn:hover {
+  background: rgba(59, 158, 255, 0.2);
+  border-color: var(--home-accent);
+  box-shadow: 0 0 20px rgba(59, 158, 255, 0.15);
+  text-decoration: none;
+  color: var(--home-text);
+}
+
+.home-cta-hint {
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--home-muted);
+}
+
+.home-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.home-tag {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--home-border);
+  border-radius: 4px;
+  background: var(--home-surface);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--home-muted);
+}
+
+.home-features {
+  padding-bottom: 3rem;
+}
+
+.home-features-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--home-border);
+}
+
+.home-features-title {
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+.home-features-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--home-muted);
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.home-panel {
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--home-border);
+  border-radius: 10px;
+  background: var(--home-surface);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.home-panel:hover {
+  border-color: rgba(59, 158, 255, 0.25);
+  background: #141a26;
+}
+
+.home-panel-tag {
+  display: inline-block;
+  margin-bottom: 0.65rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.65rem;
+  color: var(--home-accent);
+  text-transform: lowercase;
+}
+
+.home-panel-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.home-panel-body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--home-muted);
+}
+
+.home-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-block: 1.5rem 2rem;
+  border-top: 1px solid var(--home-border);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--home-muted);
+}
+
+.home-footer-muted {
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-features-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-btn:hover {
+    box-shadow: none;
+  }
+}

@@ -1,0 +1,309 @@
+"use client";
+
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
+import { EMOJI_PICKER_GROUPS, QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-data";
+import type { Reaction } from "@/lib/api";
+
+type EmojiToggleProps = {
+  messageId: string;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+};
+
+function computePickerStyle(anchor: HTMLElement): CSSProperties {
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(320, window.innerWidth * 0.7);
+  const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+  const top = Math.max(8, rect.top - 8);
+
+  return {
+    position: "fixed",
+    top,
+    left,
+    width,
+    transform: "translateY(-100%)",
+  };
+}
+
+function useEmojiPicker(messageId: string, onToggleReaction: (messageId: string, emoji: string) => void) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    let removeListeners = () => {};
+
+    const id = window.setTimeout(() => {
+      function onPointerDown(event: MouseEvent) {
+        const target = event.target as Node;
+        if (anchorRef.current?.contains(target)) return;
+        if (popoverRef.current?.contains(target)) return;
+        setPickerOpen(false);
+      }
+
+      function onKeyDown(event: KeyboardEvent) {
+        if (event.key === "Escape") setPickerOpen(false);
+      }
+
+      document.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("keydown", onKeyDown);
+      removeListeners = () => {
+        document.removeEventListener("mousedown", onPointerDown);
+        document.removeEventListener("keydown", onKeyDown);
+      };
+    }, 0);
+
+    return () => {
+      window.clearTimeout(id);
+      removeListeners();
+    };
+  }, [pickerOpen]);
+
+  function pickEmoji(emoji: string) {
+    setPickerOpen(false);
+    onToggleReaction(messageId, emoji);
+  }
+
+  return { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji };
+}
+
+function MessageEmojiPickerPopover({
+  pickerOpen,
+  pickEmoji,
+  anchorRef,
+  popoverRef,
+}: {
+  pickerOpen: boolean;
+  pickEmoji: (emoji: string) => void;
+  anchorRef: RefObject<HTMLElement | null>;
+  popoverRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [style, setStyle] = useState<CSSProperties>({});
+
+  useLayoutEffect(() => {
+    if (!pickerOpen || !anchorRef.current) {
+      setStyle({});
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!anchorRef.current) return;
+      setStyle(computePickerStyle(anchorRef.current));
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [pickerOpen, anchorRef]);
+
+  if (!pickerOpen || typeof document === "undefined" || !anchorRef.current) return null;
+
+  return createPortal(
+    <div
+      ref={popoverRef}
+      className="message-emoji-picker message-emoji-picker--floating"
+      style={style}
+      role="dialog"
+      aria-label="Emoji picker"
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      {EMOJI_PICKER_GROUPS.map((group) => (
+        <div key={group.label} className="message-emoji-picker-group">
+          <p className="message-emoji-picker-label">{group.label}</p>
+          <div className="message-emoji-picker-grid">
+            {group.emojis.map((emoji) => (
+              <button
+                key={`${group.label}-${emoji}`}
+                type="button"
+                className="message-emoji-picker-item"
+                aria-label={`React with ${emoji}`}
+                onClick={() => pickEmoji(emoji)}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+export function MessageEmojiActions({ messageId, onToggleReaction }: EmojiToggleProps) {
+  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
+    messageId,
+    onToggleReaction,
+  );
+
+  return (
+    <>
+      {QUICK_REACTION_EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          className="message-action-emoji"
+          aria-label={`React with ${emoji}`}
+          onClick={() => pickEmoji(emoji)}
+        >
+          {emoji}
+        </button>
+      ))}
+      <div className="message-action-picker" ref={anchorRef}>
+        <button
+          type="button"
+          className="message-action-emoji message-action-emoji-more"
+          aria-expanded={pickerOpen}
+          aria-haspopup="dialog"
+          aria-label="Choose emoji"
+          onClick={() => setPickerOpen((open) => !open)}
+        >
+          +
+        </button>
+        <MessageEmojiPickerPopover
+          pickerOpen={pickerOpen}
+          pickEmoji={pickEmoji}
+          anchorRef={anchorRef}
+          popoverRef={popoverRef}
+        />
+      </div>
+    </>
+  );
+}
+
+export function MessageAddReactionButton({ messageId, onToggleReaction }: EmojiToggleProps) {
+  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
+    messageId,
+    onToggleReaction,
+  );
+
+  return (
+    <div className="message-action-picker message-reaction-add-picker" ref={anchorRef}>
+      <button
+        type="button"
+        className="message-reaction-add"
+        aria-expanded={pickerOpen}
+        aria-haspopup="dialog"
+        aria-label="Add reaction"
+        onClick={() => setPickerOpen((open) => !open)}
+      >
+        +
+      </button>
+      <MessageEmojiPickerPopover
+        pickerOpen={pickerOpen}
+        pickEmoji={pickEmoji}
+        anchorRef={anchorRef}
+        popoverRef={popoverRef}
+      />
+    </div>
+  );
+}
+
+type PillsProps = {
+  messageId: string;
+  reactions: Reaction[];
+  currentUserId?: string;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+};
+
+export function MessageReactionPills({
+  messageId,
+  reactions,
+  currentUserId,
+  onToggleReaction,
+}: PillsProps) {
+  const grouped = Array.from(
+    reactions.reduce((map, reaction) => {
+      const list = map.get(reaction.emoji) ?? [];
+      list.push(reaction);
+      map.set(reaction.emoji, list);
+      return map;
+    }, new Map<string, Reaction[]>()),
+  );
+
+  if (grouped.length === 0) return null;
+
+  return (
+    <div className="message-reaction-pills" role="group" aria-label="Reactions">
+      {grouped.map(([emoji, list]) => {
+        const mine = list.some((reaction) => reaction.userId === currentUserId);
+        const title = list.map((reaction) => reaction.userName).join(", ");
+        const count = list.length;
+        return (
+          <button
+            key={emoji}
+            type="button"
+            className={`message-reaction-pill${mine ? " message-reaction-pill--mine" : ""}`}
+            title={title}
+            aria-label={
+              count > 1 ? `${emoji}, ${count} reactions, ${title}` : `${emoji}, ${title}`
+            }
+            onClick={() => onToggleReaction(messageId, emoji)}
+          >
+            <span className="message-reaction-emoji" aria-hidden>
+              {emoji}
+            </span>
+            {count >= 2 && <span className="message-reaction-count">{count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+type StackProps = {
+  messageId: string;
+  reactions: Reaction[];
+  currentUserId?: string;
+  onToggleReaction: (messageId: string, emoji: string) => void;
+  children: ReactNode;
+};
+
+export function MessageBubbleStack({
+  messageId,
+  reactions,
+  currentUserId,
+  onToggleReaction,
+  children,
+}: StackProps) {
+  const hasReactions = reactions.length > 0;
+
+  return (
+    <div
+      className={[
+        "message-bubble-stack",
+        hasReactions ? "message-bubble-stack--has-reactions" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+      {hasReactions && (
+        <div className="message-reaction-row">
+          <MessageAddReactionButton messageId={messageId} onToggleReaction={onToggleReaction} />
+          <MessageReactionPills
+            messageId={messageId}
+            reactions={reactions}
+            currentUserId={currentUserId}
+            onToggleReaction={onToggleReaction}
+          />
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,382 @@
+import { and, eq } from "drizzle-orm";
+import {
+  fetchMyServiceTeams,
+  fetchServiceTeamRoster,
+  PlanningCenterClient,
+  removePersonFromServiceTeam,
+  resolveServicesPersonId,
+  type ServiceTeamWithRole,
+} from "@cco/pco-client";
+import { db } from "../db";
+import {
+  conversationMembers,
+  conversations,
+  serviceTeamMemberships,
+  serviceTeams,
+  userPcoCredentials,
+  users,
+} from "../db/schema";
+import { isLeaderRole } from "../permissions";
+
+async function upsertServiceTeamMembership(params: {
+  teamId: string;
+  userId: string;
+  role: string;
+}): Promise<void> {
+  await db
+    .insert(serviceTeamMemberships)
+    .values({ teamId: params.teamId, userId: params.userId, role: params.role })
+    .onConflictDoUpdate({
+      target: [serviceTeamMemberships.teamId, serviceTeamMemberships.userId],
+      set: { role: params.role, syncedAt: new Date() },
+    });
+}
+
+export async function persistServiceTeamSync(params: {
+  organizationId: string;
+  userId: string;
+  incoming: ServiceTeamWithRole[];
+}): Promise<{ created: number; removed: number }> {
+  let created = 0;
+  const incomingPcoIds = params.incoming.map((t) => t.pcoTeamId);
+
+  for (const team of params.incoming) {
+    const existing = await db
+      .select({ id: serviceTeams.id })
+      .from(serviceTeams)
+      .where(eq(serviceTeams.pcoTeamId, team.pcoTeamId))
+      .limit(1);
+
+    let teamId = existing[0]?.id;
+    if (!teamId) {
+      const [row] = await db
+        .insert(serviceTeams)
+        .values({
+          organizationId: params.organizationId,
+          pcoTeamId: team.pcoTeamId,
+          name: team.name,
+        })
+        .returning({ id: serviceTeams.id });
+      teamId = row.id;
+      created += 1;
+    } else {
+      await db.update(serviceTeams).set({ name: team.name }).where(eq(serviceTeams.id, teamId));
+    }
+
+    await upsertServiceTeamMembership({ teamId, userId: params.userId, role: team.role });
+
+    const conv = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(eq(conversations.serviceTeamId, teamId))
+      .limit(1);
+
+    if (!conv[0]) {
+      const [newConv] = await db
+        .insert(conversations)
+        .values({
+          serviceTeamId: teamId,
+          slug: "general",
+          title: `${team.name} Chat`,
+        })
+        .returning({ id: conversations.id });
+      await db
+        .insert(conversationMembers)
+        .values({ conversationId: newConv.id, userId: params.userId })
+        .onConflictDoNothing();
+    } else {
+      await db
+        .insert(conversationMembers)
+        .values({ conversationId: conv[0].id, userId: params.userId })
+        .onConflictDoNothing();
+    }
+  }
+
+  const userTeams = await db
+    .select({ teamId: serviceTeamMemberships.teamId, pcoTeamId: serviceTeams.pcoTeamId })
+    .from(serviceTeamMemberships)
+    .innerJoin(serviceTeams, eq(serviceTeams.id, serviceTeamMemberships.teamId))
+    .where(eq(serviceTeamMemberships.userId, params.userId));
+
+  let removed = 0;
+  for (const row of userTeams) {
+    if (incomingPcoIds.includes(row.pcoTeamId)) continue;
+
+    const convs = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(eq(conversations.serviceTeamId, row.teamId));
+
+    for (const conv of convs) {
+      await db
+        .delete(conversationMembers)
+        .where(
+          and(
+            eq(conversationMembers.conversationId, conv.id),
+            eq(conversationMembers.userId, params.userId),
+          ),
+        );
+    }
+
+    await db
+      .delete(serviceTeamMemberships)
+      .where(
+        and(eq(serviceTeamMemberships.teamId, row.teamId), eq(serviceTeamMemberships.userId, params.userId)),
+      );
+    removed += 1;
+  }
+
+  return { created, removed };
+}
+
+export async function syncServiceTeamsFromPco(params: {
+  organizationId: string;
+  userId: string;
+  accessToken: string;
+  pcoPersonId: string;
+}): Promise<{ created: number; removed: number; total: number }> {
+  const client = new PlanningCenterClient({ accessToken: params.accessToken });
+  const incoming = await fetchMyServiceTeams(client, params.pcoPersonId);
+  const result = await persistServiceTeamSync({
+    organizationId: params.organizationId,
+    userId: params.userId,
+    incoming,
+  });
+  return { ...result, total: incoming.length };
+}
+
+export async function listServiceTeamsForUser(userId: string) {
+  return db
+    .select({
+      id: serviceTeams.id,
+      name: serviceTeams.name,
+      pcoTeamId: serviceTeams.pcoTeamId,
+      role: serviceTeamMemberships.role,
+    })
+    .from(serviceTeams)
+    .innerJoin(serviceTeamMemberships, eq(serviceTeamMemberships.teamId, serviceTeams.id))
+    .where(eq(serviceTeamMemberships.userId, userId));
+}
+
+export type TeamMemberView = {
+  id?: string;
+  pcoPersonId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  role: string;
+  onCco: boolean;
+  email?: string | null;
+};
+
+async function listSignedUpPcoPersonIds(organizationId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ pcoPersonId: users.pcoPersonId })
+    .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(users.organizationId, organizationId));
+
+  return new Set(rows.map((row) => row.pcoPersonId));
+}
+
+function sortTeamMembersByName(members: TeamMemberView[]): TeamMemberView[] {
+  return [...members].sort((a, b) =>
+    a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }),
+  );
+}
+
+async function listTeamMembersForDetail(params: {
+  teamId: string;
+  organizationId: string;
+  membershipRole: string;
+  pcoTeamId: string;
+  accessToken?: string;
+}): Promise<TeamMemberView[]> {
+  const ccoMembers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+      role: serviceTeamMemberships.role,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .where(eq(serviceTeamMemberships.teamId, params.teamId));
+
+  const signedUpPcoIds = await listSignedUpPcoPersonIds(params.organizationId);
+  const isLeader = isLeaderRole(params.membershipRole);
+
+  if (!isLeader || !params.accessToken) {
+    return sortTeamMembersByName(
+      ccoMembers.map((member) => ({
+        id: member.id,
+        pcoPersonId: member.pcoPersonId,
+        displayName: member.displayName,
+        avatarUrl: member.avatarUrl,
+        role: member.role,
+        onCco: true,
+        email: null,
+      })),
+    );
+  }
+
+  try {
+    const client = new PlanningCenterClient({ accessToken: params.accessToken });
+    const roster = await fetchServiceTeamRoster(client, params.pcoTeamId);
+    const memberByPcoId = new Map(ccoMembers.map((member) => [member.pcoPersonId, member]));
+
+    return sortTeamMembersByName(
+      roster.map((person) => {
+        const local = memberByPcoId.get(person.pcoPersonId);
+        const onCco = signedUpPcoIds.has(person.pcoPersonId);
+        return {
+          id: local?.id,
+          pcoPersonId: person.pcoPersonId,
+          displayName: local?.displayName ?? person.displayName,
+          avatarUrl: local?.avatarUrl ?? person.avatarUrl,
+          role: local?.role ?? person.role,
+          onCco,
+          email: person.email,
+        };
+      }),
+    );
+  } catch (err) {
+    console.warn(
+      "Team roster lookup failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return sortTeamMembersByName(
+      ccoMembers.map((member) => ({
+        id: member.id,
+        pcoPersonId: member.pcoPersonId,
+        displayName: member.displayName,
+        avatarUrl: member.avatarUrl,
+        role: member.role,
+        onCco: signedUpPcoIds.has(member.pcoPersonId),
+        email: null,
+      })),
+    );
+  }
+}
+
+export async function getServiceTeamDetail(
+  teamId: string,
+  userId: string,
+  options?: { accessToken?: string; organizationId?: string },
+) {
+  const membership = await db
+    .select({ id: serviceTeamMemberships.id, role: serviceTeamMemberships.role })
+    .from(serviceTeamMemberships)
+    .where(and(eq(serviceTeamMemberships.teamId, teamId), eq(serviceTeamMemberships.userId, userId)))
+    .limit(1);
+
+  if (!membership[0]) return null;
+
+  const team = await db
+    .select({ id: serviceTeams.id, name: serviceTeams.name, pcoTeamId: serviceTeams.pcoTeamId })
+    .from(serviceTeams)
+    .where(eq(serviceTeams.id, teamId))
+    .limit(1);
+
+  if (!team[0]) return null;
+
+  let organizationId = options?.organizationId;
+  if (!organizationId) {
+    const userRow = await db
+      .select({ organizationId: users.organizationId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    organizationId = userRow[0]?.organizationId ?? "";
+  }
+
+  const conv = await db
+    .select({
+      id: conversations.id,
+      title: conversations.title,
+      slug: conversations.slug,
+      muted: conversationMembers.muted,
+    })
+    .from(conversations)
+    .leftJoin(
+      conversationMembers,
+      and(
+        eq(conversationMembers.conversationId, conversations.id),
+        eq(conversationMembers.userId, userId),
+      ),
+    )
+    .where(eq(conversations.serviceTeamId, teamId))
+    .limit(1);
+
+  const members = await listTeamMembersForDetail({
+    teamId,
+    organizationId,
+    membershipRole: membership[0].role,
+    pcoTeamId: team[0].pcoTeamId,
+    accessToken: options?.accessToken,
+  });
+
+  return {
+    team: team[0],
+    conversation: conv[0]
+      ? {
+          id: conv[0].id,
+          title: conv[0].title,
+          slug: conv[0].slug,
+          muted: conv[0].muted ?? false,
+        }
+      : null,
+    members,
+    membershipRole: membership[0].role,
+  };
+}
+
+export async function removeMemberFromServiceTeamWithPco(params: {
+  teamId: string;
+  pcoTeamId: string;
+  targetUserId: string;
+  accessToken: string;
+}): Promise<{ pcoRemoved: boolean }> {
+  const userRow = await db
+    .select({ pcoPersonId: users.pcoPersonId })
+    .from(users)
+    .where(eq(users.id, params.targetUserId))
+    .limit(1);
+
+  let pcoRemoved = false;
+  if (userRow[0]) {
+    const client = new PlanningCenterClient({ accessToken: params.accessToken });
+    const servicesPersonId = await resolveServicesPersonId(client, userRow[0].pcoPersonId);
+    if (servicesPersonId) {
+      const result = await removePersonFromServiceTeam(client, params.pcoTeamId, servicesPersonId);
+      pcoRemoved = result.removedAssignments > 0;
+    }
+  }
+
+  await db
+    .delete(serviceTeamMemberships)
+    .where(
+      and(
+        eq(serviceTeamMemberships.teamId, params.teamId),
+        eq(serviceTeamMemberships.userId, params.targetUserId),
+      ),
+    );
+
+  const conv = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(eq(conversations.serviceTeamId, params.teamId));
+
+  for (const row of conv) {
+    await db
+      .delete(conversationMembers)
+      .where(
+        and(
+          eq(conversationMembers.conversationId, row.id),
+          eq(conversationMembers.userId, params.targetUserId),
+        ),
+      );
+  }
+
+  return { pcoRemoved };
+}

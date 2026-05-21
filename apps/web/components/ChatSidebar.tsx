@@ -1,0 +1,296 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useChatLayout } from "@/components/ChatLayoutContext";
+import { GroupSidebarSection } from "@/components/GroupSidebarSection";
+import { SidebarSkeleton } from "@/components/SidebarSkeleton";
+import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
+import { UserAvatar } from "@/components/UserAvatar";
+import { UserMenu } from "@/components/UserMenu";
+import {
+  apiFetch,
+  type DmParticipant,
+  type DmSummary,
+  type GroupSidebarItem,
+  type ServiceTeamSummary,
+} from "@/lib/api";
+import { subscribeUnreadChanged } from "@/lib/sidebar-events";
+
+export function ChatSidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { sidebarOpen, closeSidebar, realtimeConnected } = useChatLayout();
+
+  const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
+  const [dms, setDms] = useState<DmSummary[]>([]);
+  const [teams, setTeams] = useState<ServiceTeamSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const pcoSync = usePlanningCenterSync();
+
+  const [showNewDm, setShowNewDm] = useState(false);
+  const [dmSearch, setDmSearch] = useState("");
+  const [dmPeople, setDmPeople] = useState<DmParticipant[]>([]);
+  const [dmSearching, setDmSearching] = useState(false);
+  const [creatingDm, setCreatingDm] = useState<string | null>(null);
+
+  const loadSidebar = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const [groupsData, dmsData, teamsData] = await Promise.all([
+        apiFetch<{ groups: GroupSidebarItem[] }>("/api/v1/groups/sidebar"),
+        apiFetch<{ conversations: DmSummary[] }>("/api/v1/dms"),
+        apiFetch<{ teams: ServiceTeamSummary[] }>("/api/v1/services/teams"),
+      ]);
+      setGroups(groupsData.groups);
+      setDms(dmsData.conversations);
+      setTeams(teamsData.teams);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load sidebar");
+    } finally {
+      if (!options?.silent) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSidebar();
+  }, [loadSidebar]);
+
+  useEffect(() => {
+    if (!pcoSync) return;
+    return pcoSync.registerSidebarReload(() => loadSidebar({ silent: true }));
+  }, [pcoSync, loadSidebar]);
+
+  useEffect(() => {
+    const onReload = () => void loadSidebar({ silent: true });
+    window.addEventListener("cco:sidebar-reload", onReload);
+    return () => window.removeEventListener("cco:sidebar-reload", onReload);
+  }, [loadSidebar]);
+
+  useEffect(() => {
+    return subscribeUnreadChanged(({ conversationId, hasUnread }) => {
+      setDms((prev) =>
+        prev.map((dm) => (dm.id === conversationId ? { ...dm, hasUnread } : dm)),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    closeSidebar();
+  }, [pathname, closeSidebar]);
+
+  const activeDmId = pathname.match(/^\/dms\/([^/]+)/)?.[1] ?? null;
+
+  useEffect(() => {
+    if (!activeDmId) return;
+    setDms((prev) =>
+      prev.map((dm) => (dm.id === activeDmId ? { ...dm, hasUnread: false } : dm)),
+    );
+  }, [activeDmId]);
+
+  useEffect(() => {
+    if (!showNewDm) return;
+
+    const timer = setTimeout(async () => {
+      setDmSearching(true);
+      try {
+        const q = dmSearch.trim();
+        const path = q ? `/api/v1/dms/people?q=${encodeURIComponent(q)}` : "/api/v1/dms/people";
+        const data = await apiFetch<{ people: DmParticipant[] }>(path);
+        setDmPeople(data.people);
+      } catch {
+        setDmPeople([]);
+      } finally {
+        setDmSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [showNewDm, dmSearch]);
+
+  async function startDm(userId: string) {
+    setCreatingDm(userId);
+    setError(null);
+    try {
+      const result = await apiFetch<{ id: string }>("/api/v1/dms", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setShowNewDm(false);
+      setDmSearch("");
+      await loadSidebar();
+      router.push(`/dms/${result.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start conversation");
+    } finally {
+      setCreatingDm(null);
+    }
+  }
+
+  const activeTeamId = pathname.match(/^\/teams\/([^/]+)/)?.[1] ?? null;
+
+  return (
+    <>
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="chat-sidebar-overlay"
+          aria-label="Close sidebar"
+          onClick={closeSidebar}
+        />
+      )}
+
+      <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar-open" : ""}`} aria-label="Chat navigation">
+        <div className="sidebar-scroll">
+        {(error || pcoSync?.syncError) && (
+          <div className="sidebar-alert" role="alert">
+            {error ?? pcoSync?.syncError}
+          </div>
+        )}
+
+        {loading ? (
+          <SidebarSkeleton />
+        ) : (
+          <>
+            <GroupSidebarSection groups={groups} onGroupsReload={loadSidebar} />
+
+            <section className="sidebar-section sidebar-section-messages" aria-label="Messages">
+              <div className="sidebar-section-header">
+                <h2 className="sidebar-section-title">Messages</h2>
+                <button
+                  type="button"
+                  className={`sidebar-add-channel-icon ${showNewDm ? "sidebar-add-channel-icon-active" : ""}`}
+                  aria-label={showNewDm ? "Cancel new message" : "New message"}
+                  aria-expanded={showNewDm}
+                  title={showNewDm ? "Cancel" : "New message"}
+                  onClick={() => {
+                    setShowNewDm((v) => !v);
+                    setDmSearch("");
+                    setDmPeople([]);
+                  }}
+                >
+                  {showNewDm ? "×" : "+"}
+                </button>
+              </div>
+
+              {showNewDm && (
+                <div className="sidebar-new-dm">
+                  <input
+                    type="search"
+                    className="sidebar-search"
+                    placeholder="Search by name…"
+                    value={dmSearch}
+                    onChange={(e) => setDmSearch(e.target.value)}
+                    aria-label="Search people"
+                    autoFocus
+                  />
+                  {dmSearching ? (
+                    <p className="sidebar-empty">Searching…</p>
+                  ) : dmPeople.length === 0 ? (
+                    <p className="sidebar-empty">No matches found.</p>
+                  ) : (
+                    <ul className="sidebar-list sidebar-new-dm-list">
+                      {dmPeople.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            className="sidebar-item"
+                            disabled={creatingDm === p.id}
+                            onClick={() => void startDm(p.id)}
+                          >
+                            {creatingDm === p.id ? "Opening…" : p.displayName}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {dms.length === 0 ? (
+                <p className="sidebar-empty">No direct messages yet.</p>
+              ) : (
+                <ul className="sidebar-list">
+                  {dms.map((dm) => (
+                    <li key={dm.id}>
+                      <Link
+                        href={`/dms/${dm.id}`}
+                        className={`sidebar-item sidebar-dm-item ${
+                          activeDmId === dm.id ? "sidebar-item-active" : ""
+                        }`}
+                      >
+                        <div className="sidebar-dm-row">
+                          <UserAvatar
+                            displayName={dm.participant.displayName}
+                            avatarUrl={dm.participant.avatarUrl}
+                            className="sidebar-dm-avatar"
+                          />
+                          <span className="sidebar-item-label">{dm.participant.displayName}</span>
+                          {dm.hasUnread && activeDmId !== dm.id && (
+                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                          )}
+                          {dm.muted && <span className="sidebar-badge" title="Muted">🔕</span>}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="sidebar-section sidebar-section-teams" aria-label="Teams">
+              <div className="sidebar-section-header">
+                <h2 className="sidebar-section-title">Teams</h2>
+              </div>
+
+              {teams.length === 0 ? (
+                <p className="sidebar-empty">No teams yet.</p>
+              ) : (
+                <ul className="sidebar-list">
+                  {teams.map((team) => (
+                    <li key={team.id}>
+                      <Link
+                        href={`/teams/${team.id}`}
+                        className={`sidebar-item sidebar-team-item ${
+                          activeTeamId === team.id ? "sidebar-item-active" : ""
+                        }`}
+                      >
+                        <span className="sidebar-team-leader-slot" aria-hidden>
+                          {team.role === "leader" && (
+                            <span className="sidebar-team-leader-star" title="Team leader">
+                              ★
+                            </span>
+                          )}
+                        </span>
+                        <span className="sidebar-item-label sidebar-team-label">
+                          <span className="sidebar-team-name">{team.name}</span>
+                          {team.serviceTypeNames && team.serviceTypeNames.length > 0 && (
+                            <span className="sidebar-team-service-type">
+                              {team.serviceTypeNames.join(" · ")}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
+        )}
+        </div>
+
+        <div className="sidebar-footer">
+          <UserMenu variant="sidebar" online={realtimeConnected} />
+        </div>
+      </aside>
+    </>
+  );
+}

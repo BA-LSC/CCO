@@ -1,0 +1,424 @@
+/* Theme 1 — Signal */
+html[data-theme="1"] {
+  color-scheme: dark;
+  --color-bg: #090b10;
+  --color-surface: #111620;
+  --color-surface-2: #141a26;
+  --color-border: rgba(232, 237, 245, 0.08);
+  --color-text: #e8edf5;
+  --color-muted: #7b8496;
+  --color-primary: #3b9eff;
+  --color-primary-hover: #61b3ff;
+  --color-primary-soft: rgba(59, 158, 255, 0.12);
+  --color-danger: #f87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.14);
+  --color-success: #34d399;
+  --color-success-soft: rgba(52, 211, 153, 0.14);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="1"] .app:has(.chat-shell) {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color: var(--color-text);
+}
+
+/* Theme 2 — Midnight */
+html[data-theme="2"] {
+  color-scheme: dark;
+  --color-bg: #0b1220;
+  --color-surface: #111827;
+  --color-surface-2: #1f2937;
+  --color-border: #374151;
+  --color-text: #f3f4f6;
+  --color-muted: #9ca3af;
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-primary-soft: #1e3a5f;
+  --color-danger: #f87171;
+  --color-danger-soft: #450a0a;
+  --color-success: #34d399;
+  --color-success-soft: #064e3b;
+}
+
+html[data-theme="2"] .alert-info {
+  border-color: #1e40af;
+}
+
+html[data-theme="2"] .alert-error {
+  border-color: #7f1d1d;
+}
+
+html[data-theme="2"] .alert-success {
+  border-color: #065f46;
+}
+
+/* Theme 3 — Forest */
+html[data-theme="3"] {
+  color-scheme: light;
+  --color-bg: #ecfdf5;
+  --color-surface: #f0fdf4;
+  --color-surface-2: #dcfce7;
+  --color-border: #a7f3d0;
+  --color-text: #14532d;
+  --color-muted: #3f6212;
+  --color-primary: #15803d;
+  --color-primary-hover: #166534;
+  --color-primary-soft: #bbf7d0;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-success: #047857;
+  --color-success-soft: #d1fae5;
+}
+
+/* Theme 4 — Sunset */
+html[data-theme="4"] {
+  color-scheme: light;
+  --color-bg: #fff7ed;
+  --color-surface: #ffedd5;
+  --color-surface-2: #fed7aa;
+  --color-border: #fdba74;
+  --color-text: #431407;
+  --color-muted: #9a3412;
+  --color-primary: #c2410c;
+  --color-primary-hover: #9a3412;
+  --color-primary-soft: #ffedd5;
+  --color-danger: #be123c;
+  --color-danger-soft: #ffe4e6;
+  --color-success: #b45309;
+  --color-success-soft: #fef3c7;
+}
+
+/* Theme 5 — Paper */
+html[data-theme="5"] {
+  color-scheme: light;
+  --color-bg: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f5f5f4;
+  --color-border: #d6d3d1;
+  --color-text: #1c1917;
+  --color-muted: #78716c;
+  --color-primary: #44403c;
+  --color-primary-hover: #292524;
+  --color-primary-soft: #e7e5e4;
+  --color-danger: #991b1b;
+  --color-danger-soft: #fee2e2;
+  --color-success: #365314;
+  --color-success-soft: #ecfccb;
+}
+
+/* Theme 6 — CHAOS (unlock by spam-clicking theme 1) */
+@keyframes chaos-rainbow-bg {
+  0% {
+    background-position: 0% 50%;
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: hue-rotate(180deg);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes chaos-wobble {
+  0%,
+  100% {
+    transform: rotate(-1.5deg) scale(1);
+  }
+  25% {
+    transform: rotate(2deg) scale(1.02);
+  }
+  50% {
+    transform: rotate(-2.5deg) scale(0.98);
+  }
+  75% {
+    transform: rotate(1.5deg) scale(1.01);
+  }
+}
+
+@keyframes chaos-border-dance {
+  0% {
+    border-color: #ff00ff;
+    box-shadow: 0 0 12px #ff00ff, inset 0 0 8px #00ffff;
+  }
+  33% {
+    border-color: #00ff00;
+    box-shadow: 0 0 16px #ffff00, inset 0 0 10px #ff00ff;
+  }
+  66% {
+    border-color: #00ffff;
+    box-shadow: 0 0 20px #ff0000, inset 0 0 12px #00ff00;
+  }
+  100% {
+    border-color: #ff00ff;
+    box-shadow: 0 0 12px #ff00ff, inset 0 0 8px #00ffff;
+  }
+}
+
+@keyframes chaos-text-glow {
+  0%,
+  100% {
+    text-shadow:
+      2px 0 #ff00ff,
+      -2px 0 #00ffff,
+      0 2px #ffff00;
+  }
+  50% {
+    text-shadow:
+      -2px 0 #ff0000,
+      2px 0 #00ff00,
+      0 -2px #0000ff;
+  }
+}
+
+@keyframes chaos-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes chaos-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(-24px) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+html[data-theme="6"] {
+  --color-bg: #12001a;
+  --color-surface: rgba(20, 0, 40, 0.85);
+  --color-surface-2: rgba(80, 0, 120, 0.5);
+  --color-border: #ff00ff;
+  --color-text: #fff200;
+  --color-muted: #ff6ec7;
+  --color-primary: #00ffff;
+  --color-primary-hover: #ff00ff;
+  --color-primary-soft: rgba(255, 0, 255, 0.35);
+  --color-danger: #ff0040;
+  --color-danger-soft: rgba(255, 0, 64, 0.4);
+  --color-success: #39ff14;
+  --color-success-soft: rgba(57, 255, 20, 0.35);
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+}
+
+html.theme-chaos-active {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ctext y='24' font-size='24'%3E%F0%9F%8C%88%3C/text%3E%3C/svg%3E")
+      4 4,
+    auto;
+}
+
+html[data-theme="6"] body {
+  font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive, sans-serif;
+  background: linear-gradient(
+    124deg,
+    #ff0000,
+    #ff7f00,
+    #ffff00,
+    #00ff00,
+    #0000ff,
+    #4b0082,
+    #9400d3,
+    #ff0000
+  );
+  background-size: 400% 400%;
+  animation: chaos-rainbow-bg 4s ease infinite;
+}
+
+html[data-theme="6"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background-image:
+    radial-gradient(circle, #fff 1px, transparent 1px),
+    radial-gradient(circle, #ff00ff 1px, transparent 1px);
+  background-size:
+    48px 48px,
+    72px 72px;
+  background-position:
+    0 0,
+    24px 36px;
+  opacity: 0.25;
+  animation: chaos-rainbow-bg 8s linear infinite reverse;
+}
+
+html[data-theme="6"] body::after {
+  content: "✦ ★ ✧ ☆ ✦ ★ ✧";
+  position: fixed;
+  top: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 2rem;
+  pointer-events: none;
+  z-index: 9997;
+  color: #fff;
+  animation: chaos-float 3s ease-in-out infinite, chaos-text-glow 1.2s ease-in-out infinite;
+  letter-spacing: 0.5em;
+}
+
+html[data-theme="6"] .chat-sidebar,
+html[data-theme="6"] .card,
+html[data-theme="6"] .chat-thread,
+html[data-theme="6"] .feature-card,
+html[data-theme="6"] .loading-screen,
+html[data-theme="6"] .state-card,
+html[data-theme="6"] .user-menu-dropdown {
+  animation: chaos-wobble 2.5s ease-in-out infinite, chaos-border-dance 1.5s linear infinite;
+  backdrop-filter: blur(2px) saturate(2);
+}
+
+html[data-theme="6"] .app-brand,
+html[data-theme="6"] h1,
+html[data-theme="6"] h2,
+html[data-theme="6"] h3,
+html[data-theme="6"] .page-header h1 {
+  animation: chaos-text-glow 0.8s ease-in-out infinite alternate;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html[data-theme="6"] .app-brand::after {
+  content: " !!!";
+  display: inline-block;
+  animation: chaos-spin-slow 2s linear infinite;
+}
+
+html[data-theme="6"] .btn-primary {
+  background: linear-gradient(90deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+  background-size: 300% 100%;
+  animation: chaos-rainbow-bg 2s linear infinite;
+  color: #000;
+  font-weight: 900;
+  text-shadow: 1px 1px 0 #fff;
+}
+
+html[data-theme="6"] a {
+  color: #00ffff;
+  text-decoration-style: wavy;
+  animation: chaos-text-glow 1.5s ease-in-out infinite;
+}
+
+html[data-theme="6"] .spinner {
+  border-top-color: #ff00ff;
+  border-right-color: #00ffff;
+  border-bottom-color: #ffff00;
+  border-left-color: #39ff14;
+  animation: chaos-spin-slow 0.4s linear infinite;
+}
+
+html[data-theme="6"] .user-menu-trigger:hover,
+html[data-theme="6"] .user-menu-trigger[aria-expanded="true"] {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+html[data-theme="6"] .chat-thread .composer {
+  border-top-color: #ff00ff;
+  animation: chaos-border-dance 1.2s linear infinite;
+}
+
+html[data-theme="6"] .chat-thread textarea {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff200;
+  border-width: 2px;
+  font-weight: 700;
+  animation: chaos-border-dance 0.9s linear infinite, chaos-wobble 3s ease-in-out infinite;
+  box-shadow:
+    0 0 12px #ff00ff,
+    inset 0 0 8px rgba(0, 255, 255, 0.25);
+}
+
+html[data-theme="6"] .chat-thread textarea::placeholder {
+  color: #ff6ec7;
+  animation: chaos-text-glow 1s ease-in-out infinite alternate;
+}
+
+html[data-theme="6"] .chat-thread textarea:focus {
+  outline-color: #00ffff;
+  box-shadow:
+    0 0 20px #ffff00,
+    0 0 40px #ff00ff,
+    inset 0 0 12px rgba(255, 0, 255, 0.35);
+}
+
+html[data-theme="6"] .chat-thread .composer-attach-trigger {
+  animation: chaos-wobble 2s ease-in-out infinite;
+  border-color: #00ffff;
+  color: #fff200;
+}
+
+html[data-theme="6"] .chat-thread .composer-send {
+  animation: chaos-rainbow-bg 1.5s linear infinite, chaos-wobble 2.5s ease-in-out infinite;
+}
+
+/* Auth / setup / welcome — use the active theme palette */
+html[data-theme] .home {
+  --home-bg: var(--color-bg);
+  --home-surface: var(--color-surface);
+  --home-text: var(--color-text);
+  --home-muted: var(--color-muted);
+  --home-accent: var(--color-primary);
+  --home-accent-dim: var(--color-primary-soft);
+  --home-border: var(--color-border);
+  --home-success: var(--color-success);
+}
+
+html[data-theme] .app:has(.home) {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+html[data-theme] .app:has(.home) .app-body {
+  background: var(--color-bg);
+}
+
+html[data-theme] body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="6"] body,
+  html[data-theme="6"] body::before,
+  html[data-theme="6"] body::after,
+  html[data-theme="6"] .chat-sidebar,
+  html[data-theme="6"] .card,
+  html[data-theme="6"] .chat-thread,
+  html[data-theme="6"] .feature-card,
+  html[data-theme="6"] .loading-screen,
+html[data-theme="6"] .state-card,
+  html[data-theme="6"] .user-menu-dropdown,
+  html[data-theme="6"] .app-brand,
+  html[data-theme="6"] h1,
+  html[data-theme="6"] h2,
+  html[data-theme="6"] h3,
+  html[data-theme="6"] .btn-primary,
+  html[data-theme="6"] a,
+  html[data-theme="6"] .spinner,
+  html[data-theme="6"] .chat-thread .composer,
+  html[data-theme="6"] .chat-thread textarea,
+  html[data-theme="6"] .chat-thread textarea::placeholder,
+  html[data-theme="6"] .chat-thread .composer-attach-trigger,
+  html[data-theme="6"] .chat-thread .composer-send {
+    animation: none;
+  }
+
+  html[data-theme="6"] body {
+    background: #12001a;
+  }
+}

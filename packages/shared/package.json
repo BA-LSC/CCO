@@ -1,0 +1,15 @@
+{
+  "name": "@cco/shared",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}
