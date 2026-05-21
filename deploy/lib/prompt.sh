@@ -20,7 +20,7 @@ cco_step_banner() {
   local step="$1" title="$2"
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "  Step ${step} of 6 — ${title}"
+  echo "  Step ${step} — ${title}"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
 }

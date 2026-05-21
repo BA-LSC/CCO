@@ -189,39 +189,102 @@ print(json.dumps({
   printf '%s' "$token"
 }
 
+cco_print_cloudflare_prerequisites() {
+  cat <<'EOF'
+Before the tunnel, your domain must use Cloudflare DNS (free plan is fine):
+
+  1. https://dash.cloudflare.com/ → Add a site → enter your root domain
+  2. Choose the Free plan
+  3. Cloudflare shows two nameservers — at your domain registrar, replace
+     the existing NS records with Cloudflare's nameservers
+  4. Wait until the site status is Active in Cloudflare
+
+EOF
+}
+
+cco_prompt_cloudflare_prerequisites() {
+  cco_print_cloudflare_prerequisites
+  until cco_prompt_yes_no "Is your domain Active on Cloudflare?" "Y"; do
+    echo ""
+    echo "  Finish nameserver setup at your registrar, then continue."
+    cco_press_enter "Press Enter when the domain is Active on Cloudflare"
+  done
+  echo ""
+}
+
+cco_print_api_token_walkthrough() {
+  local cco="$1" api="$2"
+  cat <<EOF
+Create a Cloudflare API token for automated tunnel setup:
+
+  1. Open https://dash.cloudflare.com/profile/api-tokens
+  2. Create Token → Create Custom Token
+  3. Permissions (minimum):
+       Account  | Cloudflare One Connectors  | Edit
+       Zone     | DNS                        | Edit
+     Zone Resources: Include → Specific zone → your domain zone
+  4. Continue → Create Token → copy the token (shown once)
+
+The wizard will then:
+  • Create a Cloudflare Tunnel named for your deployment
+  • Route ${cco}  → http://web:3000
+  • Route ${api}  → http://api:3001
+  • Create proxied (orange cloud) CNAME records for both hostnames
+  • Save the tunnel run token to .env
+
+EOF
+}
+
+cco_print_tunnel_automation_summary() {
+  local cco="$1" api="$2"
+  cat <<EOF
+Tunnel automation complete. Verify in Cloudflare:
+
+  Zero Trust → Networks → Connectors → Cloudflare Tunnels
+    • Status should show Healthy after deploy
+
+  DNS → Records (both hostnames):
+    • ${cco}  → CNAME → *.cfargotunnel.com  (Proxied / orange cloud)
+    • ${api}  → CNAME → *.cfargotunnel.com  (Proxied / orange cloud)
+
+  Do NOT create A records pointing at this server's IP.
+
+EOF
+}
+
 cco_print_tunnel_manual_guide() {
   local cco="$1" api="$2"
   cat <<EOF
-Create a Cloudflare Tunnel (free) so traffic never hits this server directly.
+── Manual Cloudflare Tunnel setup ───────────────────────────────────────────
 
   1. Open https://one.dash.cloudflare.com/
      → Networks → Connectors → Cloudflare Tunnels → Create a tunnel
 
   2. Name the tunnel: cco
 
-  3. Choose Docker as the connector environment and copy the install token
-     (a long string). You will paste it in the next step.
+  3. Select Docker as the connector environment.
+     Copy the tunnel run token (long string) — paste it when prompted below.
 
-  4. Before closing the wizard, add two Public Hostnames:
+  4. Add two Public Hostnames (before finishing the tunnel wizard):
 
        Public hostname                    Service (Docker network)
        ─────────────────────────────────  ─────────────────────────
        ${cco}                             http://web:3000
        ${api}                             http://api:3001
 
-     Cloudflare creates proxied CNAME records automatically when you save
-     these hostnames (no A record to this server's IP).
+     Saving these creates proxied CNAME records automatically.
+     Do NOT add A records to this server's IP.
 
-  5. Do NOT open ports 80/443 on this VPS — cloudflared connects outbound only.
+  5. In DNS → Records, confirm both hostnames show Proxied (orange cloud).
 
 EOF
 }
 
 cco_print_cloudflare_hardening_guide() {
   cat <<'EOF'
-Cloudflare security hardening (free plan — do this in the Cloudflare dashboard):
+── Cloudflare dashboard hardening (free plan) ────────────────────────────────
 
-  Security → Settings
+  Security → Settings  (https://dash.cloudflare.com/ → your zone → Security)
     • Security Level: High
     • Bot Fight Mode: On
     • Browser Integrity Check: On
@@ -231,20 +294,17 @@ Cloudflare security hardening (free plan — do this in the Cloudflare dashboard
     • Minimum TLS Version: TLS 1.2 (or 1.3)
     • Automatic HTTPS Rewrites: On
 
-  Network
-    • WebSockets: enabled (required for chat — on by default)
+  Network → WebSockets
+    • Enabled (required for chat — on by default)
 
-  Security → Bots (optional)
-    • Enable Bot Fight Mode if not already on from Settings
-
-  DNS
-    • Confirm both hostnames show the orange cloud (Proxied)
+  DNS → Records
+    • Both CCO hostnames must show Proxied (orange cloud)
 
 EOF
 }
 
 cco_prompt_hardening_confirmations() {
-  echo "Confirm each hardening item in the Cloudflare dashboard:"
+  echo "Open the Cloudflare dashboard and confirm each item:"
   echo ""
   local items=(
     "Security Level set to High"
@@ -252,7 +312,8 @@ cco_prompt_hardening_confirmations() {
     "Browser Integrity Check enabled"
     "Always Use HTTPS enabled"
     "Minimum TLS 1.2 or higher"
-    "Both hostnames proxied (orange cloud)"
+    "WebSockets enabled (Network)"
+    "Both hostnames Proxied (orange cloud) in DNS"
   )
   local item
   for item in "${items[@]}"; do
@@ -262,3 +323,64 @@ cco_prompt_hardening_confirmations() {
   done
   echo ""
 }
+
+cco_run_tunnel_setup() {
+  local env_file="$1" cco_domain="$2" api_domain="$3"
+  local token=""
+
+  echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare."
+  echo "This server does not need ports 80/443 open to the internet."
+  echo ""
+
+  token="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$env_file")"
+  if cco_env_is_placeholder "$token"; then
+    token=""
+  fi
+
+  if [[ -n "$token" ]] && cco_prompt_yes_no "A tunnel token exists in .env. Keep it?" "N"; then
+    token=""
+  fi
+
+  if [[ -z "$token" ]]; then
+    if cco_prompt_yes_no "Automate tunnel + DNS with a Cloudflare API token?" "Y"; then
+      cco_print_api_token_walkthrough "$cco_domain" "$api_domain"
+      cco_press_enter "Press Enter when you have created the API token"
+      CF_API_TOKEN="$(cco_prompt_secret "Paste Cloudflare API token" "")"
+      if [[ -z "$CF_API_TOKEN" ]]; then
+        echo "API token is required for automation." >&2
+        return 1
+      fi
+      export CF_API_TOKEN
+      cco_cf_require_tools || return 1
+      echo ""
+      echo "Creating tunnel, ingress routes, and proxied DNS records..."
+      account_id="$(cco_cf_resolve_account_id)" || return 1
+      token="$(cco_cf_provision_tunnel "$account_id" "$cco_domain" "$api_domain")" || return 1
+      echo ""
+      echo "  ✓ Tunnel created"
+      echo "  ✓ Ingress routes configured"
+      echo "  ✓ Proxied CNAME records created"
+      cco_print_tunnel_automation_summary "$cco_domain" "$api_domain"
+      cco_press_enter "Press Enter to continue"
+    else
+      cco_print_tunnel_manual_guide "$cco_domain" "$api_domain"
+      cco_press_enter "Press Enter after you created the tunnel and both public hostnames"
+      while [[ -z "$token" ]]; do
+        token="$(cco_prompt_secret "Paste Cloudflare tunnel run token" "")"
+        if [[ -z "$token" ]]; then
+          echo "Tunnel token is required."
+        fi
+      done
+      echo ""
+      until cco_prompt_yes_no "Both public hostnames saved in Zero Trust with services http://web:3000 and http://api:3001?" "Y"; do
+        echo "  Fix hostnames in Zero Trust → your tunnel → Public Hostnames"
+      done
+      until cco_prompt_yes_no "Both DNS records show Proxied (orange cloud)?" "Y"; do
+        echo "  Cloudflare → DNS → Records → enable proxy for both hostnames"
+      done
+    fi
+  fi
+
+  printf '%s' "$token"
+}
+

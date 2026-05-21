@@ -17,8 +17,11 @@ source deploy/lib/docker.sh
 source deploy/lib/vultr-db.sh
 # shellcheck disable=SC1091
 source deploy/lib/cloudflare-tunnel.sh
+# shellcheck disable=SC1091
+source deploy/lib/firewall.sh
 
 ENV_FILE=".env"
+TOTAL_STEPS=7
 
 cco_attach_tty
 cco_ensure_docker
@@ -33,12 +36,13 @@ echo ""
 echo "This wizard walks through production setup one step at a time."
 echo "Traffic enters through Cloudflare Tunnel only — no public web ports."
 echo ""
-echo "  1. Domains (web + API hostnames)"
-echo "  2. Cloudflare Tunnel"
-echo "  3. Cloudflare security hardening"
-echo "  4. Database"
-echo "  5. Secrets and .env"
-echo "  6. Test connection and deploy"
+echo "  1. Domains + Cloudflare account"
+echo "  2. Cloudflare Tunnel (create routes + DNS)"
+echo "  3. Cloudflare security hardening (dashboard)"
+echo "  4. VPS + cloud provider firewall"
+echo "  5. Database"
+echo "  6. Secrets and .env"
+echo "  7. Test connection and deploy"
 echo ""
 echo "Planning Center OAuth is configured in the browser at /setup after deploy."
 echo ""
@@ -46,11 +50,11 @@ cco_press_enter "Press Enter to begin"
 
 # ── Step 1: Domains ──────────────────────────────────────────────────────────
 
-cco_step_banner 1 "Domains"
+cco_step_banner "1/${TOTAL_STEPS}" "Domains + Cloudflare account"
 
-echo "Your domain must already be on Cloudflare (free plan is fine)."
-echo ""
-echo "CCO needs two public hostnames:"
+cco_prompt_cloudflare_prerequisites
+
+echo "CCO needs two public hostnames on your Cloudflare zone:"
 echo ""
 echo "  • Web domain  — where users open the app in a browser"
 echo "  • API domain  — WebSockets, OAuth callbacks, webhooks"
@@ -92,70 +96,39 @@ done
 
 # ── Step 2: Cloudflare Tunnel ────────────────────────────────────────────────
 
-cco_step_banner 2 "Cloudflare Tunnel"
+cco_step_banner "2/${TOTAL_STEPS}" "Cloudflare Tunnel"
 
-echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare —"
-echo "this server does not need ports 80/443 open to the internet."
-echo ""
-
-CLOUDFLARE_TUNNEL_TOKEN="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$ENV_FILE")"
-if cco_env_is_placeholder "$CLOUDFLARE_TUNNEL_TOKEN"; then
-  CLOUDFLARE_TUNNEL_TOKEN=""
-fi
-
-if cco_prompt_yes_no "Automate tunnel setup with a Cloudflare API token?" "Y"; then
-  echo ""
-  echo "Create an API token at https://dash.cloudflare.com/profile/api-tokens"
-  echo "Template: Edit Cloudflare Tunnel + Edit zone DNS (for your domain zone)."
-  echo ""
-  CF_API_TOKEN="$(cco_prompt_secret "Cloudflare API token" "")"
-  if [[ -z "$CF_API_TOKEN" ]]; then
-    echo "API token is required for automation."
-    exit 1
-  fi
-  export CF_API_TOKEN
-  cco_cf_require_tools || exit 1
-  echo ""
-  echo "Creating tunnel, ingress routes, and proxied DNS records..."
-  account_id="$(cco_cf_resolve_account_id)" || exit 1
-  CLOUDFLARE_TUNNEL_TOKEN="$(cco_cf_provision_tunnel "$account_id" "$CCO_DOMAIN" "$API_DOMAIN")" || exit 1
-  echo ""
-  echo "  ✓ Tunnel created and configured in Cloudflare"
-  echo "  ✓ Proxied CNAME records point to the tunnel"
-  cco_press_enter "Press Enter to continue"
-else
-  cco_print_tunnel_manual_guide "$CCO_DOMAIN" "$API_DOMAIN"
-  cco_press_enter "Press Enter after you have created the tunnel and public hostnames"
-  while [[ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]]; do
-    CLOUDFLARE_TUNNEL_TOKEN="$(cco_prompt_secret "Paste Cloudflare tunnel run token" "")"
-    if [[ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]]; then
-      echo "Tunnel token is required."
-    fi
-  done
-fi
+CLOUDFLARE_TUNNEL_TOKEN="$(cco_run_tunnel_setup "$ENV_FILE" "$CCO_DOMAIN" "$API_DOMAIN")" || exit 1
 
 # ── Step 3: Cloudflare hardening ─────────────────────────────────────────────
 
-cco_step_banner 3 "Cloudflare security hardening"
+cco_step_banner "3/${TOTAL_STEPS}" "Cloudflare security hardening"
 
 cco_print_cloudflare_hardening_guide
 cco_prompt_hardening_confirmations
-cco_press_enter "Press Enter after hardening settings are saved in Cloudflare"
+cco_press_enter "Press Enter after saving hardening settings in Cloudflare"
 
-if cco_prompt_yes_no "Run VPS firewall hardening now? (UFW: SSH only, no public HTTP/S)" "Y"; then
-  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
-    ./deploy/harden-server.sh
-  else
-    echo ""
-    echo "Run as root when ready:"
-    echo "  sudo ./deploy/harden-server.sh"
-    echo ""
-  fi
+# ── Step 4: VPS + cloud firewall ─────────────────────────────────────────────
+
+cco_step_banner "4/${TOTAL_STEPS}" "VPS + cloud provider firewall"
+
+cco_print_vps_firewall_guide
+cco_press_enter "Press Enter to review your provider firewall, then confirm each item"
+cco_prompt_vps_firewall_confirmations
+
+echo "Configuring UFW on this server (SSH only, no public HTTP/S)..."
+echo ""
+if ! cco_apply_server_firewall "$ROOT"; then
+  echo ""
+  echo "Automatic UFW setup failed. Run manually, then confirm:"
+  echo "  sudo ./deploy/harden-server.sh"
+  echo ""
 fi
+cco_prompt_ufw_confirmation "$ROOT"
 
-# ── Step 4: Database ─────────────────────────────────────────────────────────
+# ── Step 5: Database ─────────────────────────────────────────────────────────
 
-cco_step_banner 4 "Database"
+cco_step_banner "5/${TOTAL_STEPS}" "Database"
 
 echo "Choose where PostgreSQL runs:"
 echo ""
@@ -180,9 +153,9 @@ while [[ ! "$db_choice" =~ ^[123]$ ]]; do
   fi
 done
 
-# ── Step 5: Write .env and secrets ───────────────────────────────────────────
+# ── Step 6: Write .env and secrets ───────────────────────────────────────────
 
-cco_step_banner 5 "Secrets and .env"
+cco_step_banner "6/${TOTAL_STEPS}" "Secrets and .env"
 
 echo "Writing ${ENV_FILE} with your settings and generating secure secrets:"
 echo "  • CLOUDFLARE_TUNNEL_TOKEN"
@@ -243,9 +216,9 @@ echo "Configuration saved to ${ENV_FILE}."
 echo ""
 cco_press_enter "Press Enter to test the database connection"
 
-# ── Step 6: Test and deploy ──────────────────────────────────────────────────
+# ── Step 7: Test and deploy ──────────────────────────────────────────────────
 
-cco_step_banner 6 "Test and deploy"
+cco_step_banner "7/${TOTAL_STEPS}" "Test and deploy"
 
 echo "Testing database connection..."
 echo ""

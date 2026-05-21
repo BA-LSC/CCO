@@ -23,9 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/BA-LSC/CCO/main/deploy/install.sh |
 
 That installs Docker if needed, clones CCO, and runs an interactive wizard for:
 
-- Domains (must be on Cloudflare)
-- Cloudflare Tunnel (API token automation or manual token paste)
-- Cloudflare security hardening (free plan settings)
+- Cloudflare account, tunnel, security hardening, and VPS firewall (step-by-step)
 - Database: bundled Postgres, Vultr VPC, or external URL
 - Deploy
 
@@ -573,7 +571,8 @@ If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in or
 | `deploy/Dockerfile.api` | API image |
 | `deploy/Dockerfile.web` | Web image (Next.js standalone) |
 | `deploy/lib/cloudflare-tunnel.sh` | Tunnel API automation + hardening prompts |
-| `deploy/harden-server.sh` | Optional UFW (SSH only) |
+| `deploy/lib/firewall.sh` | VPS + provider firewall walkthrough |
+| `deploy/harden-server.sh` | UFW apply (SSH only) |
 | `deploy/.env.production.example` | Environment template |
 | `deploy/setup.sh` | Guided setup wizard |
 | `deploy/bootstrap.sh` | Validate `.env`, test DB, start stack |
