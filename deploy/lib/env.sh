@@ -25,6 +25,18 @@ cco_env_is_placeholder() {
 }
 
 # chat.example.com → api.chat.example.com
+cco_normalize_hostname() {
+  local h="$1"
+  h="${h#https://}"
+  h="${h#http://}"
+  h="${h%%/*}"
+  h="${h#"${h%%[![:space:]]*}"}"
+  h="${h%"${h##*[![:space:]]}"}"
+  h="${h//$'\r'/}"
+  h="${h//$'\n'/}"
+  printf '%s' "$h"
+}
+
 cco_default_api_domain() {
   local cco="$1"
   if [[ "$cco" == chat.* ]]; then
@@ -37,6 +49,8 @@ cco_default_api_domain() {
 # Set URL and PCO redirect variables from CCO_DOMAIN + API_DOMAIN.
 cco_env_apply_domains() {
   local cco="$1" api="$2" file="$3"
+  cco="$(cco_normalize_hostname "$cco")"
+  api="$(cco_normalize_hostname "$api")"
   cco_env_upsert "CCO_DOMAIN" "$cco" "$file"
   cco_env_upsert "API_DOMAIN" "$api" "$file"
   cco_env_upsert "WEB_URL" "https://${cco}" "$file"

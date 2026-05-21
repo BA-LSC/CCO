@@ -19,15 +19,44 @@ cco_cf_normalize_token() {
   t="${t//$'\n'/}"
   t="${t#"${t%%[![:space:]]*}"}"
   t="${t%"${t##*[![:space:]]}"}"
+  if [[ "$t" == Bearer\ * ]]; then
+    t="${t#Bearer }"
+    t="$(cco_cf_normalize_token "$t")"
+  fi
   printf '%s' "$t"
 }
 
-cco_cf_api() {
-  local method="$1" path="$2" data="${3:-}"
+cco_cf_normalize_account_id() {
+  local id="$1"
+  id="$(cco_cf_normalize_token "$id")"
+  id="${id//-}" 
+  id="$(printf '%s' "$id" | tr -cd 'a-fA-F0-9')"
+  printf '%s' "$id"
+}
+
+cco_cf_curl() {
+  local method="$1" path="$2"
+  shift 2
   local url="https://api.cloudflare.com/client/v4${path}"
   local err_file response curl_status
+
   err_file="$(mktemp)"
-  if [[ -n "$data" ]]; then
+  if [[ "$method" == GET && $# -gt 0 ]]; then
+    local curl_args=( -sS --http1.1 -4 --connect-timeout 30 --max-time 120 -G "$url" )
+    local q
+    for q in "$@"; do
+      curl_args+=( --data-urlencode "$q" )
+    done
+    curl_args+=( -H "Authorization: Bearer ${CF_API_TOKEN}" )
+    response="$(curl "${curl_args[@]}" 2>"$err_file")"
+  elif [[ "$method" == GET ]]; then
+    response="$(curl -sS --http1.1 -4 \
+      --connect-timeout 30 --max-time 120 \
+      -X GET "$url" \
+      -H "Authorization: Bearer ${CF_API_TOKEN}" \
+      2>"$err_file")"
+  else
+    local data="$1"
     response="$(curl -sS --http1.1 -4 \
       --connect-timeout 30 --max-time 120 \
       -X "$method" "$url" \
@@ -35,21 +64,15 @@ cco_cf_api() {
       -H "Content-Type: application/json" \
       --data "$data" \
       2>"$err_file")"
-  else
-    response="$(curl -sS --http1.1 -4 \
-      --connect-timeout 30 --max-time 120 \
-      -X "$method" "$url" \
-      -H "Authorization: Bearer ${CF_API_TOKEN}" \
-      -H "Content-Type: application/json" \
-      2>"$err_file")"
   fi
   curl_status=$?
   if ((curl_status != 0)); then
     echo "Cloudflare API HTTP request failed (curl exit ${curl_status})." >&2
+    echo "  Request: ${method} https://api.cloudflare.com/client/v4${path}" >&2
     if [[ -s "$err_file" ]]; then
       sed 's/^/  /' "$err_file" >&2
     fi
-    echo "  Check: token pasted completely, no extra spaces/lines, server can reach api.cloudflare.com" >&2
+    echo "  Check: domains are hostnames only (no https://), token is complete, server can reach api.cloudflare.com" >&2
     rm -f "$err_file"
     return 1
   fi
@@ -59,6 +82,25 @@ cco_cf_api() {
     return 1
   fi
   printf '%s' "$response"
+}
+
+cco_cf_api() {
+  local method="$1" path="$2" data="${3:-}"
+  if [[ "$method" == GET && "$path" == *'?'* ]]; then
+    local base="${path%%\?*}" query_string="${path#*\?}"
+    local -a query_args=() pair
+    IFS='&' read -ra pairs <<<"$query_string"
+    for pair in "${pairs[@]}"; do
+      query_args+=( "$pair" )
+    done
+    cco_cf_curl GET "$base" "${query_args[@]}"
+    return $?
+  fi
+  if [[ -n "$data" ]]; then
+    cco_cf_curl "$method" "$path" "$data"
+  else
+    cco_cf_curl "$method" "$path"
+  fi
 }
 
 cco_cf_json_success() {
@@ -132,7 +174,7 @@ cco_cf_resolve_account_id() {
   echo "Or add permission Account → Account Settings → Read and create a new token."
   echo ""
   manual_id="$(cco_prompt "Cloudflare Account ID" "")"
-  manual_id="$(cco_cf_normalize_token "$manual_id")"
+  manual_id="$(cco_cf_normalize_account_id "$manual_id")"
   if [[ -z "$manual_id" ]]; then
     echo "Account ID is required." >&2
     return 1
@@ -141,7 +183,9 @@ cco_cf_resolve_account_id() {
 }
 
 cco_cf_find_zone_id() {
-  local hostname="$1" candidate="$hostname" response zone_id
+  local hostname="$1" candidate response zone_id
+  hostname="$(cco_normalize_hostname "$hostname")"
+  candidate="$hostname"
   while [[ "$candidate" == *.* ]]; do
     response="$(cco_cf_api GET "/zones?name=${candidate}")"
     if cco_cf_json_success "$response"; then
@@ -160,6 +204,9 @@ cco_cf_find_zone_id() {
 cco_cf_upsert_cname() {
   local zone_id="$1" fqdn="$2" target="$3"
   local response record_id payload
+  zone_id="$(cco_cf_normalize_account_id "$zone_id")"
+  fqdn="$(cco_normalize_hostname "$fqdn")"
+  target="$(cco_cf_normalize_token "$target")"
   response="$(cco_cf_api GET "/zones/${zone_id}/dns_records?type=CNAME&name=${fqdn}")"
   if ! cco_cf_json_success "$response"; then
     echo "Failed to list DNS records for ${fqdn}." >&2
@@ -197,9 +244,12 @@ print(json.dumps({
 
 cco_cf_provision_tunnel() {
   local account_id="$1" cco_domain="$2" api_domain="$3"
-  local response tunnel_id tunnel_name token payload api_zone_id cname_target
+  local response tunnel_id tunnel_name token payload api_zone_id cname_target zone_id
 
   cco_cf_require_tools || return 1
+  account_id="$(cco_cf_normalize_account_id "$account_id")"
+  cco_domain="$(cco_normalize_hostname "$cco_domain")"
+  api_domain="$(cco_normalize_hostname "$api_domain")"
 
   tunnel_name="cco-$(echo "$cco_domain" | tr '.:' '-')"
   response="$(cco_cf_api POST "/accounts/${account_id}/cfd_tunnel" \
