@@ -78,34 +78,3 @@ cco_env_apply_defaults() {
   cco_env_upsert "ORGANIZATION_NAME" "My Church" "$file"
   cco_env_upsert "UPLOAD_DIR" "/data/uploads" "$file"
 }
-
-cco_print_cloudflare_checklist() {
-  local cco="$1" api="$2" server_ip="${3:-<server-ip>}"
-  cat <<EOF
-Do this in Cloudflare before users can sign in:
-
-  1. Open https://dash.cloudflare.com/ and select your domain zone.
-
-  2. Go to DNS → Records → Add record (twice):
-
-       Type   Name              Content           Proxy
-       ────   ───────────────   ───────────────   ─────────────────
-       A      ${cco}            ${server_ip}      DNS only (grey cloud)
-       A      ${api}            ${server_ip}      DNS only (grey cloud)
-
-     Use the full hostnames above if your zone is the root domain.
-     If Cloudflare asks for only the subdomain label, use the part before your zone.
-
-  3. Open firewall ports on this server (and Vultr/cloud firewall):
-       80/tcp   HTTP  (Let's Encrypt)
-       443/tcp  HTTPS
-
-  4. Verify from any machine:
-
-       dig +short ${cco}
-       dig +short ${api}
-
-     Both should return ${server_ip} while records are DNS only.
-
-EOF
-}

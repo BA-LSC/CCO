@@ -10,7 +10,7 @@ Groups chat app integrated with Planning Center (hybrid model: PCO identity + in
 
 ## Production deployment
 
-One command on any Linux server — installs Docker, clones CCO, and walks through Cloudflare, database, and deploy. Planning Center OAuth is configured at `/setup` in the browser after deploy:
+One command on any Linux server — installs Docker, clones CCO, and walks through Cloudflare Tunnel, database, and deploy. No public web ports; traffic enters through Cloudflare. Planning Center OAuth is configured at `/setup` in the browser after deploy:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BA-LSC/CCO/main/deploy/install.sh | bash

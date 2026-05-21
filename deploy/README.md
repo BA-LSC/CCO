@@ -1,6 +1,6 @@
 # Production deployment
 
-Deploy **CCO (Chat Center Online)** on a single Linux server with Docker, [Caddy](https://caddyserver.com/) (automatic HTTPS), PostgreSQL, Redis, and containerized API + web services.
+Deploy **CCO (Chat Center Online)** on a single Linux server with Docker, **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** (no public HTTP/S ports), PostgreSQL, Redis, and containerized API + web services.
 
 **Time:** ~30 minutes (excluding DNS propagation)
 
@@ -23,10 +23,13 @@ curl -fsSL https://raw.githubusercontent.com/BA-LSC/CCO/main/deploy/install.sh |
 
 That installs Docker if needed, clones CCO, and runs an interactive wizard for:
 
-- Domains and Let's Encrypt email
-- Cloudflare DNS (with your server IP)
+- Domains (must be on Cloudflare)
+- Cloudflare Tunnel (API token automation or manual token paste)
+- Cloudflare security hardening (free plan settings)
 - Database: bundled Postgres, Vultr VPC, or external URL
 - Deploy
+
+Traffic flows: **User → Cloudflare edge → cloudflared → Docker (web/api)**. The VPS does not expose ports 80/443.
 
 Planning Center OAuth is configured in the browser at `/setup` after deploy.
 
@@ -65,6 +68,7 @@ Open `https://chat.example.com/setup` and complete first-time app setup.
 | `deploy/compose.sh` | Day-two `docker compose` (auto picks DB mode) |
 | `deploy/check-database.sh` | Test `DATABASE_URL` only |
 | `deploy/configure-vultr-db.sh` | Vultr `DATABASE_URL` only (also in setup) |
+| `deploy/harden-server.sh` | Optional UFW: SSH only, no public web ports |
 
 External PostgreSQL is auto-detected from `DATABASE_URL`. Set `BUNDLED_DATABASE=1` to force the container.
 
@@ -88,14 +92,9 @@ cd cco
 
 ### Cloudflare (do this first)
 
-In [Cloudflare](https://dash.cloudflare.com/) → **DNS** → **Records** (grey cloud / **DNS only** on first deploy):
+Domain on Cloudflare (free). Run `./deploy/setup.sh` — it creates a **Cloudflare Tunnel** (automated with API token or manual). No A records to your Vultr IP required.
 
-| Type | Name | Content |
-|------|------|---------|
-| A | `chat` | `<Vultr IPv4>` |
-| A | `api.chat` | `<Vultr IPv4>` |
-
-Verify: `dig +short chat.example.com` → your Vultr IP.
+See [Cloudflare Tunnel](#4-cloudflare-tunnel).
 
 ### Option A — VPS + bundled PostgreSQL
 
@@ -111,7 +110,7 @@ chmod +x deploy/*.sh
 ./deploy/setup.sh
 ```
 
-At the database prompt, choose **1** (bundled). Open firewall ports 80/443 in Vultr and UFW ([server firewall](#4-configure-dns-cloudflare)).
+At the database prompt, choose **1** (bundled). Optional: `sudo ./deploy/harden-server.sh` (SSH only — no public HTTP/S).
 
 ### Option B — VPS + managed PostgreSQL (VPC)
 
@@ -189,16 +188,14 @@ Use the [Vultr easy commands](#vultr--easy-commands) above for copy-paste deploy
 | Protocol | Port | Notes |
 |----------|------|--------|
 | TCP | 22 | SSH (restrict source IPs if possible) |
-| TCP | 80 | HTTP (Let’s Encrypt + redirects) |
-| TCP | 443 | HTTPS |
 
-**On the server** (after SSH), also allow HTTP/HTTPS with UFW (step in [Configure DNS (Cloudflare)](#4-configure-dns-cloudflare)).
+Do **not** open 80/443 — CCO uses Cloudflare Tunnel (outbound only). Optional: `sudo ./deploy/harden-server.sh` on the server.
+
+**On the server** (after SSH), run `./deploy/harden-server.sh` or configure UFW manually ([Cloudflare Tunnel](#4-cloudflare-tunnel)).
 
 ### 3. DNS (Cloudflare)
 
-Point both hostnames at the Vultr instance IPv4 in [Cloudflare](#4-configure-dns-cloudflare) (same records as any other server).
-
-Wait for propagation (`dig +short chat.example.com` should return your server IP) before `./deploy/setup.sh`.
+Use a Cloudflare Tunnel — see [section 4](#4-cloudflare-tunnel). Proxied CNAME records point to the tunnel, not your Vultr IP.
 
 ### 4. Deploy on the server
 
@@ -256,17 +253,20 @@ Backups: use **Vultr Managed Database** automated backups in the panel, not loca
 Internet
    │
    ▼
+┌──────────────┐     outbound only
+│  Cloudflare  │◀──── cloudflared (Docker)
+│     edge     │
+└──────┬───────┘
+       │ tunnel
+       ▼
 ┌─────────┐     ┌─────┐     ┌──────────┐
-│  Caddy  │────▶│ web │────▶│   api    │
-│  :443   │     │:3000│     │  :3001   │
-└─────────┘     └─────┘     └────┬─────┘
-   │                              │
-   │                              ├──▶ postgres
-   │                              └──▶ redis
-   │
-   └──▶ api (direct for WS, uploads, webhooks)
+│ web     │────▶│ api │────▶│ postgres │
+│ :3000   │     │:3001│     └──────────┘
+└─────────┘     └──┬──┘
+                   └──▶ redis
 ```
 
+- **cloudflared** connects outbound to Cloudflare — no public ports on the VPS.
 - **Web** serves the Next.js UI; browser calls `/api/v1/*` on the web host, proxied to the API on the internal Docker network.
 - **WebSocket clients** connect to the API domain (`NEXT_PUBLIC_WS_URL`).
 - **OAuth:** web callback on the web host; API handles exchange and mobile callbacks on the API host.
@@ -325,7 +325,7 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 | `SESSION_SECRET` | 32+ random characters |
 | `POSTGRES_PASSWORD` | Strong password (bundled DB only; not used with Vultr managed DB) |
 | `DATABASE_URL` | Bundled: `@postgres:5432`. Vultr: `./deploy/configure-vultr-db.sh` ([managed DB](#5-optional-vultr-managed-postgresql-vpc)) |
-| `CADDY_EMAIL` | Email for Let’s Encrypt notifications |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Run token from Zero Trust → Tunnels (or created by setup API automation) |
 
 > **Important:** `NEXT_PUBLIC_*` values are baked into the web image at **build time**. After changing them:
 >
@@ -335,54 +335,57 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 
 ---
 
-## 4. Configure DNS (Cloudflare)
+## 4. Cloudflare Tunnel
 
-Set up DNS in [Cloudflare](https://dash.cloudflare.com/) **before** starting Caddy (Let’s Encrypt must reach your server on ports 80/443).
+Production uses **Cloudflare Tunnel only** — no A records to your VPS IP and no Caddy/Let’s Encrypt on the server.
 
-### Add your domain
+### Prerequisites
 
-1. **Websites** → **Add a site** → enter `example.com` → choose a plan (Free is fine).
-2. Cloudflare shows two nameservers — at your domain registrar, replace existing NS records with those nameservers.
-3. Wait until the site status is **Active** in Cloudflare.
+1. Domain on Cloudflare (Free plan).
+2. [Zero Trust](https://one.dash.cloudflare.com/) enabled (free).
 
-### Create records
+### Automated (recommended)
 
-**DNS** → **Records** → add:
+Run `./deploy/setup.sh` and choose **Automate tunnel setup with a Cloudflare API token**.
 
-| Type | Name | Content | Proxy status |
-|------|------|---------|----------------|
-| A | `chat` | Your server IPv4 | **DNS only** (grey cloud) |
-| A | `api.chat` | Your server IPv4 | **DNS only** (grey cloud) |
+Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) with:
 
-Use **DNS only** on the first deploy so Caddy can complete the Let’s Encrypt HTTP challenge directly to your origin. After HTTPS works, you may switch to **Proxied** (orange cloud) on both records and set **SSL/TLS** → **Overview** → **Full (strict)**.
+- **Account** — Cloudflare Tunnel: Edit
+- **Zone** — DNS: Edit (for your domain)
 
-Optional: add AAAA records with the same names if your server has IPv6.
+The wizard creates the tunnel, ingress routes (`http://web:3000`, `http://api:3001`), proxied CNAME records, and saves `CLOUDFLARE_TUNNEL_TOKEN`.
 
-### Verify propagation
+### Manual
+
+1. **Zero Trust** → **Networks** → **Connectors** → **Cloudflare Tunnels** → **Create**
+2. Name: `cco` → choose **Docker** → copy the run token
+3. Add **Public Hostnames**:
+
+   | Hostname | Service |
+   |----------|---------|
+   | `chat.example.com` | `http://web:3000` |
+   | `api.chat.example.com` | `http://api:3001` |
+
+4. Paste the token when `./deploy/setup.sh` prompts
+
+### Security hardening (free)
+
+During setup, confirm these in the Cloudflare dashboard:
+
+- **Security → Settings:** Security Level High, Bot Fight Mode, Browser Integrity Check
+- **SSL/TLS → Edge Certificates:** Always Use HTTPS, TLS 1.2+, Automatic HTTPS Rewrites
+- **DNS:** both hostnames **Proxied** (orange cloud)
+
+Optional on the VPS: `sudo ./deploy/harden-server.sh` (UFW: SSH only).
+
+### Verify
 
 ```bash
-dig +short chat.example.com
-dig +short api.chat.example.com
+./deploy/compose.sh logs cloudflared
+curl -s "https://api.chat.example.com/health"
 ```
 
-Both should return your server IP (not Cloudflare edge IPs) while records are DNS only.
-
-### Cloudflare tips (after go-live)
-
-- **WebSockets:** required for chat — enabled by default on proxied zones; keep `api.chat` proxied if you use orange cloud for that host.
-- **Always Use HTTPS:** **SSL/TLS** → **Edge Certificates** → enable after origin certificates are working.
-- **OAuth / webhooks:** PCO must reach your public URLs; proxied `api.chat` is fine once SSL mode is **Full (strict)**.
-
-### Server firewall
-
-Open ports **80** and **443** on the host (and your cloud provider firewall, e.g. Vultr):
-
-```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-```
+`cloudflared` should show registered connections. Health check returns `{"ok":true}`.
 
 ---
 
@@ -471,7 +474,7 @@ Use `./deploy/compose.sh` for all commands below (picks bundled vs external Post
 ```bash
 ./deploy/compose.sh logs -f api
 ./deploy/compose.sh logs -f web
-./deploy/compose.sh logs -f caddy
+./deploy/compose.sh logs -f cloudflared
 ```
 
 ### Run migrations after pulling updates
@@ -528,12 +531,13 @@ Rebuild the web image (standalone output requires `prepare-standalone.mjs`):
 ./deploy/compose.sh up -d --build web
 ```
 
-### Caddy fails to obtain certificates
+### Tunnel / HTTPS not working
 
-- `dig +short chat.example.com` must return your **origin** IP while records are **DNS only** in Cloudflare
-- If records are **Proxied**, set SSL/TLS to **Full (strict)** only after Caddy has a certificate, or temporarily set both hosts to **DNS only** and redeploy
-- Ports 80/443 must be open on the host and cloud firewall (Vultr, etc.)
-- `./deploy/compose.sh logs caddy`
+- `./deploy/compose.sh logs cloudflared` — look for `Registered tunnel connection`
+- Confirm public hostnames in Zero Trust match `CCO_DOMAIN` and `API_DOMAIN`
+- Services must be `http://web:3000` and `http://api:3001` (Docker network names)
+- DNS records should be **Proxied** (orange cloud) CNAMEs to `*.cfargotunnel.com`
+- Confirm Cloudflare hardening did not block legitimate traffic (try Security Level **High**, not **I'm Under Attack** during setup)
 
 ### OAuth redirect mismatch
 
@@ -568,7 +572,8 @@ If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in or
 | `deploy/docker-compose.external-db.yml` | Overlay when `DATABASE_URL` is external |
 | `deploy/Dockerfile.api` | API image |
 | `deploy/Dockerfile.web` | Web image (Next.js standalone) |
-| `deploy/Caddyfile` | Reverse proxy + TLS |
+| `deploy/lib/cloudflare-tunnel.sh` | Tunnel API automation + hardening prompts |
+| `deploy/harden-server.sh` | Optional UFW (SSH only) |
 | `deploy/.env.production.example` | Environment template |
 | `deploy/setup.sh` | Guided setup wizard |
 | `deploy/bootstrap.sh` | Validate `.env`, test DB, start stack |

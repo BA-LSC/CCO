@@ -103,25 +103,17 @@ services:
     expose:
       - "3000"
 
-  caddy:
-    image: caddy:2-alpine
+  cloudflared:
+    image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    env_file:
-      - ../.env
+    command: tunnel --no-autoupdate run
     environment:
-      CCO_DOMAIN: ${CCO_DOMAIN:?Set CCO_DOMAIN in .env}
-      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env}
-      CADDY_EMAIL: ${CADDY_EMAIL:-internal@localhost}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env}
     depends_on:
-      - web
-      - api
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
 
   reconcile:
     profiles: ["jobs"]
@@ -143,5 +135,3 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
-  caddy_data:
-  caddy_config:

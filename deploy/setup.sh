@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Guided production setup — domains, Cloudflare, database, deploy.
+# Guided production setup — domains, Cloudflare Tunnel, database, deploy.
 # Fresh server: curl -fsSL .../deploy/install.sh | bash
 # From repo:     ./deploy/install.sh   or   ./deploy/setup.sh
 set -euo pipefail
@@ -15,6 +15,8 @@ source deploy/lib/prompt.sh
 source deploy/lib/docker.sh
 # shellcheck disable=SC1091
 source deploy/lib/vultr-db.sh
+# shellcheck disable=SC1091
+source deploy/lib/cloudflare-tunnel.sh
 
 ENV_FILE=".env"
 
@@ -29,11 +31,11 @@ echo "  CCO server setup"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "This wizard walks through production setup one step at a time."
-echo "You will confirm each step before continuing."
+echo "Traffic enters through Cloudflare Tunnel only — no public web ports."
 echo ""
 echo "  1. Domains (web + API hostnames)"
-echo "  2. Cloudflare DNS"
-echo "  3. TLS email (Let's Encrypt)"
+echo "  2. Cloudflare Tunnel"
+echo "  3. Cloudflare security hardening"
 echo "  4. Database"
 echo "  5. Secrets and .env"
 echo "  6. Test connection and deploy"
@@ -46,6 +48,8 @@ cco_press_enter "Press Enter to begin"
 
 cco_step_banner 1 "Domains"
 
+echo "Your domain must already be on Cloudflare (free plan is fine)."
+echo ""
 echo "CCO needs two public hostnames:"
 echo ""
 echo "  • Web domain  — where users open the app in a browser"
@@ -86,63 +90,68 @@ until cco_confirm_step "Continue with these domains?"; do
   echo ""
 done
 
-# ── Step 2: Cloudflare DNS ───────────────────────────────────────────────────
+# ── Step 2: Cloudflare Tunnel ────────────────────────────────────────────────
 
-cco_step_banner 2 "Cloudflare DNS"
+cco_step_banner 2 "Cloudflare Tunnel"
 
-detected_ip="$(cco_detect_public_ip)"
-echo "This server's public IPv4 (auto-detected): ${detected_ip:-unknown}"
+echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare —"
+echo "this server does not need ports 80/443 open to the internet."
 echo ""
-SERVER_IP="$(cco_prompt "Confirm server IPv4 for DNS A records" "${detected_ip:-}")"
 
-if [[ -z "$SERVER_IP" ]]; then
-  echo "Server IP is required for DNS instructions."
-  exit 1
+CLOUDFLARE_TUNNEL_TOKEN="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$ENV_FILE")"
+if cco_env_is_placeholder "$CLOUDFLARE_TUNNEL_TOKEN"; then
+  CLOUDFLARE_TUNNEL_TOKEN=""
 fi
 
-cco_print_cloudflare_checklist "$CCO_DOMAIN" "$API_DOMAIN" "$SERVER_IP"
-
-echo "When the records are saved in Cloudflare, run the dig commands above."
-echo ""
-if cco_prompt_yes_no "Have you added both DNS A records (or will before go-live)?" "Y"; then
+if cco_prompt_yes_no "Automate tunnel setup with a Cloudflare API token?" "Y"; then
   echo ""
-  echo "Optional: verify now on this server:"
-  echo "  dig +short ${CCO_DOMAIN}"
-  echo "  dig +short ${API_DOMAIN}"
-  cco_press_enter "Press Enter after you have checked (or skipped) DNS"
+  echo "Create an API token at https://dash.cloudflare.com/profile/api-tokens"
+  echo "Template: Edit Cloudflare Tunnel + Edit zone DNS (for your domain zone)."
+  echo ""
+  CF_API_TOKEN="$(cco_prompt_secret "Cloudflare API token" "")"
+  if [[ -z "$CF_API_TOKEN" ]]; then
+    echo "API token is required for automation."
+    exit 1
+  fi
+  export CF_API_TOKEN
+  cco_cf_require_tools || exit 1
+  echo ""
+  echo "Creating tunnel, ingress routes, and proxied DNS records..."
+  account_id="$(cco_cf_resolve_account_id)" || exit 1
+  CLOUDFLARE_TUNNEL_TOKEN="$(cco_cf_provision_tunnel "$account_id" "$CCO_DOMAIN" "$API_DOMAIN")" || exit 1
+  echo ""
+  echo "  ✓ Tunnel created and configured in Cloudflare"
+  echo "  ✓ Proxied CNAME records point to the tunnel"
+  cco_press_enter "Press Enter to continue"
 else
-  echo ""
-  echo "You can finish setup now and add DNS before users sign in."
-  echo "Caddy will obtain certificates once DNS points here."
-  cco_press_enter "Press Enter to continue anyway"
+  cco_print_tunnel_manual_guide "$CCO_DOMAIN" "$API_DOMAIN"
+  cco_press_enter "Press Enter after you have created the tunnel and public hostnames"
+  while [[ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]]; do
+    CLOUDFLARE_TUNNEL_TOKEN="$(cco_prompt_secret "Paste Cloudflare tunnel run token" "")"
+    if [[ -z "$CLOUDFLARE_TUNNEL_TOKEN" ]]; then
+      echo "Tunnel token is required."
+    fi
+  done
 fi
 
-# ── Step 3: TLS email ────────────────────────────────────────────────────────
+# ── Step 3: Cloudflare hardening ─────────────────────────────────────────────
 
-cco_step_banner 3 "TLS email"
+cco_step_banner 3 "Cloudflare security hardening"
 
-echo "Caddy uses Let's Encrypt for HTTPS. Enter an email for:"
-echo "  • Certificate expiry notices"
-echo "  • Account recovery with Let's Encrypt"
-echo ""
-echo "This address is not shown to your users."
-echo ""
+cco_print_cloudflare_hardening_guide
+cco_prompt_hardening_confirmations
+cco_press_enter "Press Enter after hardening settings are saved in Cloudflare"
 
-current_email="$(cco_env_get CADDY_EMAIL "$ENV_FILE")"
-if cco_env_is_placeholder "$current_email" || [[ "$current_email" == you@example.com ]]; then
-  current_email=""
+if cco_prompt_yes_no "Run VPS firewall hardening now? (UFW: SSH only, no public HTTP/S)" "Y"; then
+  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+    ./deploy/harden-server.sh
+  else
+    echo ""
+    echo "Run as root when ready:"
+    echo "  sudo ./deploy/harden-server.sh"
+    echo ""
+  fi
 fi
-CADDY_EMAIL="$(cco_prompt "Email for Let's Encrypt (CADDY_EMAIL)" "$current_email")"
-
-while [[ -z "$CADDY_EMAIL" ]]; do
-  echo "Email is required."
-  CADDY_EMAIL="$(cco_prompt "Email for Let's Encrypt (CADDY_EMAIL)" "")"
-done
-
-echo ""
-echo "TLS contact: ${CADDY_EMAIL}"
-echo ""
-cco_press_enter "Press Enter to confirm and continue"
 
 # ── Step 4: Database ─────────────────────────────────────────────────────────
 
@@ -176,6 +185,7 @@ done
 cco_step_banner 5 "Secrets and .env"
 
 echo "Writing ${ENV_FILE} with your settings and generating secure secrets:"
+echo "  • CLOUDFLARE_TUNNEL_TOKEN"
 echo "  • SESSION_SECRET"
 echo "  • TOKEN_ENCRYPTION_KEY  (required — loss makes DB secrets unrecoverable)"
 echo "  • REDIS_PASSWORD"
@@ -186,7 +196,8 @@ echo ""
 
 cco_env_apply_domains "$CCO_DOMAIN" "$API_DOMAIN" "$ENV_FILE"
 cco_env_apply_defaults "$ENV_FILE"
-cco_env_upsert "CADDY_EMAIL" "$CADDY_EMAIL" "$ENV_FILE"
+cco_env_upsert "CLOUDFLARE_TUNNEL_TOKEN" "$CLOUDFLARE_TUNNEL_TOKEN" "$ENV_FILE"
+echo "  ✓ CLOUDFLARE_TUNNEL_TOKEN"
 
 current_session="$(cco_env_get SESSION_SECRET "$ENV_FILE")"
 current_token="$(cco_env_get TOKEN_ENCRYPTION_KEY "$ENV_FILE")"
@@ -249,8 +260,8 @@ echo ""
 echo "Database connection OK."
 echo ""
 
-if [[ -z "$CCO_DOMAIN" || -z "$API_DOMAIN" || -z "$CADDY_EMAIL" ]]; then
-  echo "Domains and Let's Encrypt email are required."
+if [[ -z "$CCO_DOMAIN" || -z "$API_DOMAIN" || -z "$CLOUDFLARE_TUNNEL_TOKEN" ]]; then
+  echo "Domains and Cloudflare tunnel token are required."
   exit 1
 fi
 
@@ -266,6 +277,9 @@ echo ""
 echo "  3. Optional webhooks (also configurable in /setup):"
 echo "     https://${API_DOMAIN}/webhooks/pco"
 echo ""
+echo "Verify tunnel:"
+echo "  ./deploy/compose.sh logs -f cloudflared"
+echo ""
 
 if cco_prompt_yes_no "Deploy now? (runs ./deploy/bootstrap.sh)" "Y"; then
   exec ./deploy/bootstrap.sh
@@ -277,5 +291,6 @@ echo "  ./deploy/bootstrap.sh"
 echo ""
 echo "Day-two commands:"
 echo "  ./deploy/compose.sh ps"
+echo "  ./deploy/compose.sh logs -f cloudflared"
 echo "  ./deploy/compose.sh logs -f api"
 echo ""

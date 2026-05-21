@@ -30,7 +30,7 @@ cco_compose_files files
 COMPOSE=(docker compose "${files[@]}")
 
 missing=()
-for key in SESSION_SECRET TOKEN_ENCRYPTION_KEY CCO_DOMAIN API_DOMAIN REDIS_PASSWORD; do
+for key in SESSION_SECRET TOKEN_ENCRYPTION_KEY CCO_DOMAIN API_DOMAIN REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN; do
   val="${!key:-}"
   if [[ -z "$val" || "$val" == CHANGE_ME* ]]; then
     missing+=("$key")
@@ -82,7 +82,7 @@ echo "  Web: https://${CCO_DOMAIN}"
 echo "  API: https://${API_DOMAIN}"
 echo ""
 echo "Next steps:"
-echo "  1. Confirm DNS for ${CCO_DOMAIN} and ${API_DOMAIN} points to this server."
+echo "  1. Confirm cloudflared is connected: ./deploy/compose.sh logs cloudflared"
 echo "  2. Open https://${CCO_DOMAIN}/setup and enter Planning Center OAuth credentials."
 echo "  3. Configure PCO webhooks at https://${API_DOMAIN}/webhooks/pco (optional)."
 echo ""
