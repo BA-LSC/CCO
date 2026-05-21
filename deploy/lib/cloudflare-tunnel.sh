@@ -212,24 +212,58 @@ cco_prompt_cloudflare_prerequisites() {
 cco_print_api_token_walkthrough() {
   local cco="$1" api="$2"
   cat <<EOF
-Create a Cloudflare API token (one time):
+── Create a Cloudflare API token (one time) ─────────────────────────────────
 
   1. Open https://dash.cloudflare.com/profile/api-tokens
   2. Create Token → Create Custom Token
-  3. Permissions:
-       Account  | Cloudflare One Connectors  | Edit
-       Zone     | DNS                        | Edit
-     Zone Resources: Include → Specific zone → your domain
-  4. Create Token → copy the token (shown once)
 
-The wizard will automatically:
-  • Create a Cloudflare Tunnel
-  • Route ${cco}  → http://web:3000
-  • Route ${api}  → http://api:3001
-  • Create proxied (orange cloud) CNAME records
-  • Start cloudflared on this server so the connector shows as connected
+  3. Token name (suggested): CCO tunnel setup
+
+  4. Permissions — add exactly these two rows:
+
+       Scope     | Permission                  | Access
+       ──────────|─────────────────────────────|────────
+       Account   | Cloudflare One Connectors   | Edit
+       Zone      | DNS                         | Edit
+
+  5. Zone Resources (under the Zone permission):
+       Include → Specific zone → pick the zone for your domains
+       (e.g. the zone containing ${cco} and ${api})
+
+     If web and API are on different zones, include both zones — or use
+     All zones on this account (broader than needed, but works).
+
+  6. Account Resources: leave as default (this account only)
+
+  7. Continue to summary → Create Token → copy the token (shown once)
+
+  Not required: WARP, Zero Trust Access, Workers, R2, or pkg.cloudflareclient.com
+  (that URL is for the WARP client — CCO uses cloudflared in Docker).
+
+  What this token does:
+    • Cloudflare One Connectors — create tunnel, set routes, get run token
+    • DNS — create proxied CNAME records for:
+        ${cco}  → http://web:3000
+        ${api}  → http://api:3001
 
 EOF
+}
+
+cco_prompt_api_token_permissions_checklist() {
+  echo "Confirm your custom token includes:"
+  echo ""
+  local items=(
+    "Account → Cloudflare One Connectors → Edit"
+    "Zone → DNS → Edit"
+    "Zone Resources includes your domain zone(s)"
+  )
+  local item
+  for item in "${items[@]}"; do
+    until cco_prompt_yes_no "  ✓ ${item}?" "Y"; do
+      echo "    Update the token at https://dash.cloudflare.com/profile/api-tokens"
+    done
+  done
+  echo ""
 }
 
 cco_print_tunnel_api_summary() {
@@ -350,7 +384,9 @@ cco_provision_tunnel_via_api() {
   local token account_id
 
   cco_print_api_token_walkthrough "$cco_domain" "$api_domain"
-  cco_press_enter "Press Enter when you have created the API token"
+  cco_press_enter "Press Enter to open Cloudflare and create the token"
+  cco_prompt_api_token_permissions_checklist
+  cco_press_enter "Press Enter when the token is created and copied"
 
   CF_API_TOKEN="$(cco_prompt_secret "Paste Cloudflare API token" "")"
   if [[ -z "$CF_API_TOKEN" ]]; then

@@ -351,10 +351,16 @@ Run `./deploy/setup.sh`. Step 2 uses a **Cloudflare API token** to automatically
 3. Create proxied CNAME records for both hostnames
 4. Start `cloudflared` on the server so the connector shows as connected
 
-Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) with:
+Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) — **Create Custom Token** with:
 
-- **Account** — Cloudflare One Connectors: Edit
-- **Zone** — DNS: Edit (for your domain)
+| Scope | Permission | Access |
+|-------|------------|--------|
+| Account | Cloudflare One Connectors | Edit |
+| Zone | DNS | Edit |
+
+**Zone Resources:** Include → Specific zone → your domain (both hostnames’ zone).
+
+Not required: WARP, Access, Workers, or `pkg.cloudflareclient.com` (WARP client — CCO uses `cloudflared` in Docker).
 
 Manual fallback: say **No** at the API prompt and paste the Docker install command from Zero Trust instead.
 
