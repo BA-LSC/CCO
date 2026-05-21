@@ -113,20 +113,31 @@ print(cur)
 }
 
 cco_cf_resolve_account_id() {
-  local response account_id
-  response="$(cco_cf_api GET "/accounts?per_page=1")" || return 1
-  if ! cco_cf_json_success "$response"; then
-    echo "Cloudflare API token could not list accounts." >&2
-    echo "Check token permissions (Cloudflare One Connectors + DNS Edit)." >&2
-    cco_cf_json_errors "$response"
+  local response account_id manual_id
+  response="$(cco_cf_api GET "/accounts?per_page=1")" || true
+  if [[ -n "$response" ]] && cco_cf_json_success "$response"; then
+    account_id="$(cco_cf_json_field "$response" "result.0.id" 2>/dev/null || true)"
+    if [[ -n "$account_id" ]]; then
+      printf '%s' "$account_id"
+      return 0
+    fi
+  fi
+
+  echo ""
+  echo "This token cannot list accounts (that is OK if DNS + Connectors are correct)."
+  echo "Paste your Account ID from Cloudflare:"
+  echo "  https://dash.cloudflare.com/ → pick your domain → Overview"
+  echo "  → Account ID in the right-hand column (32-character hex)"
+  echo ""
+  echo "Or add permission Account → Account Settings → Read and create a new token."
+  echo ""
+  manual_id="$(cco_prompt "Cloudflare Account ID" "")"
+  manual_id="$(cco_cf_normalize_token "$manual_id")"
+  if [[ -z "$manual_id" ]]; then
+    echo "Account ID is required." >&2
     return 1
   fi
-  account_id="$(cco_cf_json_field "$response" "result.0.id" 2>/dev/null || true)"
-  if [[ -z "$account_id" ]]; then
-    echo "No Cloudflare account found for this API token." >&2
-    return 1
-  fi
-  printf '%s' "$account_id"
+  printf '%s' "$manual_id"
 }
 
 cco_cf_find_zone_id() {
@@ -279,14 +290,22 @@ cco_print_api_token_walkthrough() {
 
   3. Token name (suggested): CCO tunnel setup
 
-  4. Permissions — add exactly these two rows:
+  4. Permissions — add these rows (pick the exact names from the dropdowns):
 
        Scope     | Permission                  | Access
        ──────────|─────────────────────────────|────────
        Account   | Cloudflare One Connectors   | Edit
        Zone      | DNS                         | Edit
 
-  5. Zone Resources (under the Zone permission):
+     WRONG — do not use these instead:
+       ✗ Zone → DNS Settings   (zone settings, not DNS records)
+       ✗ Zone → Zone Settings
+       ✗ Read-only / Read access on either row
+
+     Optional if "could not list accounts" appears later:
+       Account   | Account Settings            | Read
+
+  5. Zone Resources (on the Zone → DNS row):
        Include → Specific zone → pick the zone for your domains
        (e.g. the zone containing ${cco} and ${api})
 
@@ -310,11 +329,15 @@ EOF
 }
 
 cco_prompt_api_token_permissions_checklist() {
-  echo "Confirm your custom token includes:"
+  echo "Confirm your custom token matches exactly:"
+  echo ""
+  echo "  RIGHT:  Account | Cloudflare One Connectors | Edit"
+  echo "  RIGHT:  Zone     | DNS                       | Edit"
+  echo "  WRONG:  Zone     | DNS Settings              | (any access)"
   echo ""
   local items=(
-    "Account → Cloudflare One Connectors → Edit"
-    "Zone → DNS → Edit"
+    "Account row is Cloudflare One Connectors (not Cloudflare Tunnel only) with Edit"
+    "Zone row is DNS (NOT DNS Settings) with Edit"
     "Zone Resources includes your domain zone(s)"
   )
   local item

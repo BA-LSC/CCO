@@ -355,10 +355,12 @@ Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) �
 
 | Scope | Permission | Access |
 |-------|------------|--------|
-| Account | Cloudflare One Connectors | Edit |
-| Zone | DNS | Edit |
+| Account | Cloudflare One Connectors | **Edit** |
+| Zone | **DNS** (not DNS Settings) | **Edit** |
 
-**Zone Resources:** Include → Specific zone → your domain (both hostnames’ zone).
+**Zone Resources:** Include → Specific zone → your domain.
+
+If the wizard cannot find your account automatically, add **Account → Account Settings → Read**, or paste Account ID from the dashboard when prompted.
 
 Not required: WARP, Access, Workers, or `pkg.cloudflareclient.com` (WARP client — CCO uses `cloudflared` in Docker).
 
