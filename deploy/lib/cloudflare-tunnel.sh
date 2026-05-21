@@ -139,13 +139,23 @@ EOF
     echo ""
 
     cat <<EOF
-── D. Copy the tunnel run token ─────────────────────────────────────────────
+── D. Copy the tunnel run token (do not run Cloudflare's command) ───────────
 
-  1. In the same tunnel page, open the Install connector step
-  2. Choose Docker as the environment
-  3. Copy the tunnel run token (long string starting with eyJ…)
+  1. In the tunnel page, open Install connector (or Configure)
+  2. Select Docker — this matches how CCO runs cloudflared
+  3. Cloudflare shows a command like:
+       docker run cloudflare/cloudflared:latest tunnel run --token eyJ...
+     Do NOT run that command on your server during setup.
+  4. Copy only the token (the long eyJ… string after --token)
+  5. Paste it when prompted below — CCO starts cloudflared automatically
+     when you deploy (./deploy/bootstrap.sh → docker compose)
 
-  CCO stores this in .env — it is not your Cloudflare account password.
+  Why: CCO's stack already includes a cloudflared container on the same
+  Docker network as web and api. Running Cloudflare's one-off docker command
+  would start a second connector and can fail to reach web:3000 / api:3001.
+
+  Do not choose Debian unless you plan to run cloudflared outside Docker
+  (not supported by CCO's default deploy).
 
 EOF
     cco_press_enter "Press Enter when you have copied the run token"
