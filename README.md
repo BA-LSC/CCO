@@ -209,3 +209,7 @@ cd apps/web && bunx playwright install chromium && bun run test:e2e
 
 - Design: `docs/superpowers/specs/2026-05-19-pco-chat-groups-design.md`
 - Plan: `docs/superpowers/plans/2026-05-19-pco-chat-groups.md`
+
+## License
+
+[MIT](LICENSE)
