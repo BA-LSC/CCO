@@ -13,25 +13,81 @@ cco_cf_require_tools() {
   fi
 }
 
+cco_cf_normalize_token() {
+  local t="$1"
+  t="${t//$'\r'/}"
+  t="${t//$'\n'/}"
+  t="${t#"${t%%[![:space:]]*}"}"
+  t="${t%"${t##*[![:space:]]}"}"
+  printf '%s' "$t"
+}
+
 cco_cf_api() {
   local method="$1" path="$2" data="${3:-}"
-  local response
+  local url="https://api.cloudflare.com/client/v4${path}"
+  local err_file response curl_status
+  err_file="$(mktemp)"
   if [[ -n "$data" ]]; then
-    response="$(curl -sS -X "$method" "https://api.cloudflare.com/client/v4${path}" \
+    response="$(curl -sS --http1.1 -4 \
+      --connect-timeout 30 --max-time 120 \
+      -X "$method" "$url" \
       -H "Authorization: Bearer ${CF_API_TOKEN}" \
       -H "Content-Type: application/json" \
-      --data "$data")"
+      --data "$data" \
+      2>"$err_file")"
   else
-    response="$(curl -sS -X "$method" "https://api.cloudflare.com/client/v4${path}" \
+    response="$(curl -sS --http1.1 -4 \
+      --connect-timeout 30 --max-time 120 \
+      -X "$method" "$url" \
       -H "Authorization: Bearer ${CF_API_TOKEN}" \
-      -H "Content-Type: application/json")"
+      -H "Content-Type: application/json" \
+      2>"$err_file")"
+  fi
+  curl_status=$?
+  if ((curl_status != 0)); then
+    echo "Cloudflare API HTTP request failed (curl exit ${curl_status})." >&2
+    if [[ -s "$err_file" ]]; then
+      sed 's/^/  /' "$err_file" >&2
+    fi
+    echo "  Check: token pasted completely, no extra spaces/lines, server can reach api.cloudflare.com" >&2
+    rm -f "$err_file"
+    return 1
+  fi
+  rm -f "$err_file"
+  if [[ -z "$response" ]]; then
+    echo "Cloudflare API returned an empty response." >&2
+    return 1
   fi
   printf '%s' "$response"
 }
 
 cco_cf_json_success() {
   local json="$1"
-  JSON="$json" python3 -c 'import json, os, sys; sys.exit(0 if json.loads(os.environ["JSON"]).get("success") else 1)'
+  [[ -n "$json" ]] || return 1
+  JSON="$json" python3 -c '
+import json, os, sys
+try:
+    data = json.loads(os.environ["JSON"])
+except json.JSONDecodeError:
+    sys.exit(1)
+sys.exit(0 if data.get("success") else 1)
+' 2>/dev/null
+}
+
+cco_cf_json_errors() {
+  local json="$1"
+  JSON="$json" python3 -c '
+import json, os
+try:
+    data = json.loads(os.environ["JSON"])
+except json.JSONDecodeError:
+    print("Invalid JSON response from Cloudflare API")
+    raise SystemExit(0)
+for err in data.get("errors") or []:
+    code = err.get("code", "")
+    msg = err.get("message", err)
+    print(f"  [{code}] {msg}")
+' 2>/dev/null || true
 }
 
 cco_cf_json_field() {
@@ -58,9 +114,11 @@ print(cur)
 
 cco_cf_resolve_account_id() {
   local response account_id
-  response="$(cco_cf_api GET "/accounts?per_page=1")"
+  response="$(cco_cf_api GET "/accounts?per_page=1")" || return 1
   if ! cco_cf_json_success "$response"; then
-    echo "Cloudflare API token could not list accounts. Check token permissions." >&2
+    echo "Cloudflare API token could not list accounts." >&2
+    echo "Check token permissions (Cloudflare One Connectors + DNS Edit)." >&2
+    cco_cf_json_errors "$response"
     return 1
   fi
   account_id="$(cco_cf_json_field "$response" "result.0.id" 2>/dev/null || true)"
@@ -134,10 +192,10 @@ cco_cf_provision_tunnel() {
 
   tunnel_name="cco-$(echo "$cco_domain" | tr '.:' '-')"
   response="$(cco_cf_api POST "/accounts/${account_id}/cfd_tunnel" \
-    "{\"name\":\"${tunnel_name}\",\"config_src\":\"cloudflare\"}")"
+    "{\"name\":\"${tunnel_name}\",\"config_src\":\"cloudflare\"}")" || return 1
   if ! cco_cf_json_success "$response"; then
     echo "Failed to create Cloudflare Tunnel." >&2
-    JSON="$response" python3 -c 'import json, os; print(json.loads(os.environ["JSON"]).get("errors", []))' >&2 || true
+    cco_cf_json_errors "$response"
     return 1
   fi
   tunnel_id="$(cco_cf_json_field "$response" "result.id")"
@@ -162,9 +220,10 @@ print(json.dumps({
   }
 }))
 ')"
-  response="$(cco_cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/configurations" "$payload")"
+  response="$(cco_cf_api PUT "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/configurations" "$payload")" || return 1
   if ! cco_cf_json_success "$response"; then
     echo "Failed to configure tunnel ingress." >&2
+    cco_cf_json_errors "$response"
     return 1
   fi
 
@@ -176,9 +235,10 @@ print(json.dumps({
     cco_cf_upsert_cname "$api_zone_id" "$api_domain" "$cname_target" || return 1
   fi
 
-  response="$(cco_cf_api GET "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/token")"
+  response="$(cco_cf_api GET "/accounts/${account_id}/cfd_tunnel/${tunnel_id}/token")" || return 1
   if ! cco_cf_json_success "$response"; then
     echo "Failed to fetch tunnel run token." >&2
+    cco_cf_json_errors "$response"
     return 1
   fi
   token="$(cco_cf_json_field "$response" "result")"
@@ -264,6 +324,34 @@ cco_prompt_api_token_permissions_checklist() {
     done
   done
   echo ""
+}
+
+cco_prompt_cloudflare_api_token() {
+  local token=""
+  echo ""
+  echo "Paste the API token only — not a curl command or URL."
+  echo "The token is one long string (often 40+ characters)."
+  echo ""
+  while [[ -z "$token" ]]; do
+    token="$(cco_prompt_secret "Cloudflare API token" "")"
+    token="$(cco_cf_normalize_token "$token")"
+    if [[ -z "$token" ]]; then
+      echo "Token is required."
+      continue
+    fi
+    if [[ "$token" == curl* ]] || [[ "$token" == *"api.cloudflare.com"* ]]; then
+      echo "That looks like a command, not a token. Copy only the token from Cloudflare."
+      token=""
+      continue
+    fi
+    if ((${#token} < 30)); then
+      echo "Token seems short (${#token} characters). It may be incomplete."
+      if ! cco_prompt_yes_no "Use this token anyway?" "N"; then
+        token=""
+      fi
+    fi
+  done
+  printf '%s' "$token"
 }
 
 cco_print_tunnel_api_summary() {
@@ -388,16 +476,15 @@ cco_provision_tunnel_via_api() {
   cco_prompt_api_token_permissions_checklist
   cco_press_enter "Press Enter when the token is created and copied"
 
-  CF_API_TOKEN="$(cco_prompt_secret "Paste Cloudflare API token" "")"
-  if [[ -z "$CF_API_TOKEN" ]]; then
-    echo "API token is required." >&2
-    return 1
-  fi
+  CF_API_TOKEN="$(cco_prompt_cloudflare_api_token)"
   export CF_API_TOKEN
 
   echo ""
-  echo "Creating tunnel, routes, and DNS via Cloudflare API..."
+  echo "Verifying API token with Cloudflare..."
   account_id="$(cco_cf_resolve_account_id)" || return 1
+  echo "  ✓ API token valid"
+  echo ""
+  echo "Creating tunnel, routes, and DNS..."
   token="$(cco_cf_provision_tunnel "$account_id" "$cco_domain" "$api_domain")" || return 1
 
   echo ""

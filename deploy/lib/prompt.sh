@@ -51,12 +51,22 @@ cco_prompt() {
 cco_prompt_secret() {
   local label="$1" current="${2:-}" var
   if [[ -n "$current" ]]; then
-    cco_read -r -s -p "${label} [Enter to keep current]: " var
-    echo ""
+    if [[ -r /dev/tty ]]; then
+      read -r -s -p "${label} [Enter to keep current]: " var </dev/tty
+      echo "" >/dev/tty
+    else
+      read -r -s -p "${label} [Enter to keep current]: " var
+      echo ""
+    fi
     printf '%s' "${var:-$current}"
   else
-    cco_read -r -s -p "${label}: " var
-    echo ""
+    if [[ -r /dev/tty ]]; then
+      read -r -s -p "${label}: " var </dev/tty
+      echo "" >/dev/tty
+    else
+      read -r -s -p "${label}: " var
+      echo ""
+    fi
     printf '%s' "$var"
   fi
 }
