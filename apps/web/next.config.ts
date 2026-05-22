@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@cco/pco-client", "@cco/shared"],
   outputFileTracingRoot: path.resolve(__dirname, "../.."),
   output: "standalone",
+  // proxy.ts runs for /api/v1/*; Next.js buffers those bodies (default 10MB).
+  experimental: {
+    proxyClientMaxBodySize: "100mb",
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: appVersion,
   },

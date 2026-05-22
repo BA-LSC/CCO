@@ -80,7 +80,10 @@ export async function uploadImage(file: File): Promise<string> {
     body: form,
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(parseApiError(text, res.status));
+  }
   const data = (await res.json()) as { url: string };
   return data.url;
 }
@@ -94,7 +97,10 @@ export async function uploadVideo(file: File): Promise<string> {
     body: form,
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(parseApiError(text, res.status));
+  }
   const data = (await res.json()) as { url: string };
   return data.url;
 }
