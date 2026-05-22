@@ -11,8 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  normalizeUserStatusPreset,
   parseUserStatusPreset,
   resolveEffectivePreset,
+  isPresenceConnected,
   resolvePresenceDotState,
   type UserStatus,
   type UserStatusPreset,
@@ -153,7 +155,7 @@ export function PresenceProvider({
   }, [refreshPresence]);
 
   useEffect(() => {
-    if (!userId || !pageActive) return;
+    if (!userId || !pageActive || normalizeUserStatusPreset(myStatus.preset) === "offline") return;
 
     const ping = () => {
       void apiFetch("/api/v1/presence/heartbeat", { method: "POST" }).catch(() => {
@@ -164,7 +166,7 @@ export function PresenceProvider({
     ping();
     const intervalId = window.setInterval(ping, HEARTBEAT_MS);
     return () => window.clearInterval(intervalId);
-  }, [pageActive, userId]);
+  }, [myStatus.preset, pageActive, userId]);
 
   useEffect(() => {
     if (!pageActive) return;
@@ -177,10 +179,15 @@ export function PresenceProvider({
   const isUserOnline = useCallback(
     (targetUserId: string | null | undefined) => {
       if (!targetUserId) return false;
-      if (targetUserId === userId) return pageActive;
-      return onlineByUserId[targetUserId] ?? false;
+      if (targetUserId === userId) {
+        return isPresenceConnected(myStatus.preset, pageActive);
+      }
+      const status = statusByUserId[targetUserId];
+      const connected = onlineByUserId[targetUserId] ?? false;
+      if (!status) return connected;
+      return isPresenceConnected(status.preset, connected);
     },
-    [onlineByUserId, pageActive, userId],
+    [myStatus.preset, onlineByUserId, pageActive, statusByUserId, userId],
   );
 
   const effectivePreset = useMemo(
@@ -192,11 +199,11 @@ export function PresenceProvider({
     (targetUserId: string | null | undefined): UserStatus => {
       if (!targetUserId) return DEFAULT_STATUS;
       if (targetUserId === userId) {
-        return { ...myStatus, preset: effectivePreset };
+        return { ...myStatus, preset: normalizeUserStatusPreset(myStatus.preset) };
       }
       return statusByUserId[targetUserId] ?? DEFAULT_STATUS;
     },
-    [effectivePreset, myStatus, statusByUserId, userId],
+    [myStatus, statusByUserId, userId],
   );
 
   const setMyStatus = useCallback(

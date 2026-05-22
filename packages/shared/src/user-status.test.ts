@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   isManualUserStatus,
+  isPresenceConnected,
   normalizeUserStatusPreset,
   parseUserStatusPreset,
   resolveEffectivePreset,
@@ -41,6 +42,13 @@ describe("user status", () => {
     expect(
       resolveEffectivePreset({ preset: "offline", message: null }, { pageActive: true, idle: false }),
     ).toBe("offline");
+  });
+
+  test("isPresenceConnected follows connection only in active mode", () => {
+    expect(isPresenceConnected("active", true)).toBe(true);
+    expect(isPresenceConnected("active", false)).toBe(false);
+    expect(isPresenceConnected("offline", true)).toBe(false);
+    expect(isPresenceConnected("offline", false)).toBe(false);
   });
 
   test("resolvePresenceDotState uses online/offline for active mode", () => {

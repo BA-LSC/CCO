@@ -36,7 +36,7 @@ type Props = {
 };
 
 export function UserMenu({ variant = "default" }: Props) {
-  const { pageActive, myStatus, setMyStatus, markUserActive } = usePresence();
+  const { myStatus, setMyStatus, markUserActive, isUserOnline } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -172,7 +172,10 @@ export function UserMenu({ variant = "default" }: Props) {
 
   const menuClass = variant === "sidebar" ? "user-menu user-menu-sidebar" : "user-menu";
   const selectedPreset = normalizeUserStatusPreset(myStatus.preset);
-  const presenceState = resolvePresenceDotState(myStatus.preset, pageActive);
+  const presenceState = resolvePresenceDotState(
+    myStatus.preset,
+    isUserOnline(user.userId),
+  );
   const statusMessage = myStatus.message?.trim() ?? "";
 
   return (

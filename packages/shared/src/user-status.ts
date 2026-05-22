@@ -35,6 +35,7 @@ export function isManualUserStatus(status: UserStatus): boolean {
   return status.preset === "offline" || status.message != null;
 }
 
+/** Picker choice only — not connection state. Active auto-follows presence; Offline is manual. */
 export function resolveEffectivePreset(
   status: UserStatus,
   _activity: { pageActive: boolean; idle: boolean },
@@ -43,10 +44,18 @@ export function resolveEffectivePreset(
   return normalizeUserStatusPreset(status.preset);
 }
 
+/** Whether the user should appear connected (Active follows heartbeat; Offline never). */
+export function isPresenceConnected(
+  preset: UserStatusPreset,
+  connected: boolean,
+): boolean {
+  if (normalizeUserStatusPreset(preset) === "offline") return false;
+  return connected;
+}
+
 export function resolvePresenceDotState(
   preset: UserStatusPreset,
-  online: boolean,
+  connected: boolean,
 ): PresenceDotState {
-  if (normalizeUserStatusPreset(preset) === "offline") return "offline";
-  return online ? "online" : "offline";
+  return isPresenceConnected(preset, connected) ? "online" : "offline";
 }
