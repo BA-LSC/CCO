@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { downloadAttachment } from "@/lib/download-attachment";
 
 export type AttachmentLightboxImage = {
   src: string;
@@ -31,6 +32,8 @@ function clampScale(scale: number): number {
 export function AttachmentLightbox({ src, alt, onClose }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, x: 0, y: 0 });
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
@@ -60,6 +63,19 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
     }
     applyTransform({ scale: 2.5, x: 0, y: 0 });
   }, [applyTransform]);
+
+  const handleDownload = useCallback(async () => {
+    if (downloading) return;
+    setDownloadError(null);
+    setDownloading(true);
+    try {
+      await downloadAttachment(src, alt);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }, [alt, downloading, src]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -171,9 +187,50 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
 
   return (
     <div className="attachment-lightbox" role="dialog" aria-modal="true" aria-label="Image preview">
-      <button type="button" className="attachment-lightbox-close" onClick={onClose} aria-label="Close">
-        ×
-      </button>
+      <div className="attachment-lightbox-toolbar">
+        <button
+          type="button"
+          className="attachment-lightbox-action"
+          onClick={() => void handleDownload()}
+          disabled={downloading}
+          aria-label={downloading ? "Downloading image" : "Download image"}
+        >
+          <svg
+            className="attachment-lightbox-action-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M12 3v10.2l3.2-3.2 1.4 1.4L12 17.4 7.4 12.8l1.4-1.4 3.2 3.2V3h1z"
+              fill="currentColor"
+            />
+            <path d="M5 19h14v2H5z" fill="currentColor" />
+          </svg>
+          <span className="attachment-lightbox-action-label">
+            {downloading ? "Saving…" : "Download"}
+          </span>
+        </button>
+        <button type="button" className="attachment-lightbox-action" onClick={onClose} aria-label="Close">
+          <svg
+            className="attachment-lightbox-action-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="attachment-lightbox-action-label">Close</span>
+        </button>
+      </div>
+      {downloadError ? (
+        <p className="attachment-lightbox-error" role="status">
+          {downloadError}
+        </p>
+      ) : null}
       <div
         ref={stageRef}
         className="attachment-lightbox-stage"
