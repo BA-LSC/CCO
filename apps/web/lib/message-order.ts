@@ -6,8 +6,21 @@ export function compareMessagesByCreatedAt(a: Message, b: Message): number {
   return a.id.localeCompare(b.id);
 }
 
+/** Keep the first occurrence when the same message id appears more than once. */
+export function dedupeMessagesById(messages: Message[]): Message[] {
+  const seen = new Set<string>();
+  const deduped: Message[] = [];
+  for (const message of messages) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    deduped.push(message);
+  }
+  return deduped;
+}
+
 /** Chronological order (oldest first) for the message list. */
 export function sortMessagesByCreatedAt(messages: Message[]): Message[] {
-  if (messages.length < 2) return messages;
-  return [...messages].sort(compareMessagesByCreatedAt);
+  const deduped = dedupeMessagesById(messages);
+  if (deduped.length < 2) return deduped;
+  return deduped.sort(compareMessagesByCreatedAt);
 }

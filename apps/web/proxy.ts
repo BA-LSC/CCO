@@ -19,7 +19,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(signIn);
   }
 
-  if (!pathname.startsWith("/api/v1/")) {
+  const isApiProxy =
+    pathname.startsWith("/api/v1/") || pathname.startsWith("/api/uploads/");
+
+  if (!isApiProxy) {
     return NextResponse.next();
   }
 
@@ -43,6 +46,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/api/v1/:path*",
+    "/api/uploads/:path*",
     "/groups/:path*",
     "/groups",
     "/teams/:path*",

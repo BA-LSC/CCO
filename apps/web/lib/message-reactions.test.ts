@@ -59,4 +59,10 @@ describe("mergeConversationMessages", () => {
     const next = mergeConversationMessages([older], [newer, older]);
     expect(next.map((m) => m.id)).toEqual(["m1", "m2"]);
   });
+
+  test("does not duplicate ids when polled batch repeats messages", () => {
+    const other: Message = { ...baseMessage, id: "m2", body: "yo" };
+    const next = mergeConversationMessages([baseMessage], [baseMessage, other, other]);
+    expect(next.map((m) => m.id)).toEqual(["m1", "m2"]);
+  });
 });

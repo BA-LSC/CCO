@@ -67,6 +67,8 @@ a:hover {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
 }
 
 .app:has(.chat-shell) {
@@ -81,7 +83,7 @@ a:hover {
   top: 0;
   z-index: 20;
   flex-shrink: 0;
-  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+  padding: 8px 12px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
@@ -4001,7 +4003,7 @@ html[data-theme="6"] .user-menu-dropdown {
   --chat-inset-x: 144px;
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
-  --chat-composer-bottom-padding: max(20px, calc(8px + env(safe-area-inset-bottom, 0px)));
+  --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
   --chat-scroll-fade-height: 48px;
   flex: 1;
   min-height: 0;
@@ -4140,6 +4142,23 @@ html[data-theme="6"] .user-menu-dropdown {
     transform 0.15s ease;
 }
 
+.chat-scroll-to-bottom-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-sizing: content-box;
+  pointer-events: none;
+}
+
+.chat-scroll-to-bottom--has-new {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+
 .chat-scroll-to-bottom:hover {
   background: var(--color-surface-2);
   border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
@@ -4177,9 +4196,9 @@ html[data-theme="6"] .user-menu-dropdown {
 @media (max-width: 768px) {
   .chat-sidebar {
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     left: 0;
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
     z-index: 20;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
@@ -4248,7 +4267,7 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 16px;
     --chat-messages-bottom-gap: 36px;
     --chat-composer-top-padding: 6px;
-    --chat-composer-bottom-padding: max(24px, calc(12px + env(safe-area-inset-bottom, 0px)));
+    --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
     --chat-scroll-fade-height: 40px;
   }
 
@@ -4357,7 +4376,7 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 12px;
     --chat-messages-bottom-gap: 28px;
     --chat-composer-top-padding: 4px;
-    --chat-composer-bottom-padding: max(28px, calc(14px + env(safe-area-inset-bottom, 0px)));
+    --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
     --chat-scroll-fade-height: 32px;
   }
 }

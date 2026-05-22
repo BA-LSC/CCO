@@ -16,12 +16,12 @@ describe("extractUploadFilename", () => {
 });
 
 describe("resolveAttachmentDisplayUrl", () => {
-  test("rewrites API upload URLs to same-origin proxy without signed params", () => {
+  test("rewrites API upload URLs to same-origin proxy and keeps signed params", () => {
     expect(
       resolveAttachmentDisplayUrl(
         "https://api.cco.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
-    ).toBe("/api/uploads/abc.jpeg");
+    ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
 
   test("rewrites same-origin /api/uploads URLs from PUBLIC_UPLOAD_URL", () => {
@@ -29,7 +29,7 @@ describe("resolveAttachmentDisplayUrl", () => {
       resolveAttachmentDisplayUrl(
         "https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
-    ).toBe("/api/uploads/abc.jpeg");
+    ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
 
   test("leaves non-upload URLs unchanged", () => {
@@ -37,7 +37,13 @@ describe("resolveAttachmentDisplayUrl", () => {
     expect(resolveAttachmentDisplayUrl(url)).toBe(url);
   });
 
-  test("normalizes already-proxied paths", () => {
-    expect(resolveAttachmentDisplayUrl("/api/uploads/abc.jpeg?sig=x")).toBe("/api/uploads/abc.jpeg");
+  test("normalizes already-proxied paths and keeps signed params", () => {
+    expect(resolveAttachmentDisplayUrl("/api/uploads/abc.jpeg?sig=x&exp=999")).toBe(
+      "/api/uploads/abc.jpeg?sig=x&exp=999",
+    );
+  });
+
+  test("returns proxy path without params when signature is absent", () => {
+    expect(resolveAttachmentDisplayUrl("/api/uploads/abc.jpeg")).toBe("/api/uploads/abc.jpeg");
   });
 });

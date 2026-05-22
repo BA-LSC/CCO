@@ -1,6 +1,20 @@
 import { type NextRequest } from "next/server";
 import { buildUpstreamAuthHeaders } from "@/lib/upstream-auth";
 
+const UPLOAD_CONTENT_TYPES: Record<string, string> = {
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+function uploadContentTypeForFilename(filename: string): string | undefined {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (!ext) return undefined;
+  return UPLOAD_CONTENT_TYPES[ext];
+}
+
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 
 type RouteContext = { params: Promise<{ filename: string }> };
@@ -18,7 +32,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     });
 
     const outHeaders = new Headers();
-    const contentType = upstream.headers.get("content-type");
+    const contentType =
+      upstream.headers.get("content-type") ?? uploadContentTypeForFilename(filename);
     if (contentType) outHeaders.set("content-type", contentType);
     outHeaders.set("cache-control", "private, no-store");
 

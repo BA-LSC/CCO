@@ -23,7 +23,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
-import { applyReactionChange } from "@/lib/message-reactions";
+import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
   maxScrollTop,
@@ -159,10 +159,17 @@ export function ChatThread({
   loadingMoreRef.current = loadingMore;
   const autoScrollToBottomRef = useRef(true);
   const pinnedToBottomRef = useRef(true);
+  const bottomSeenMessageIdRef = useRef<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
 
   const scrollBottomThresholdPx = 72;
   const identityPending = !resolvedUserId && sessionLoading && messages.length > 0;
+
+  const markBottomSeen = useCallback(() => {
+    bottomSeenMessageIdRef.current = messagesRef.current.at(-1)?.id ?? null;
+    setHasNewMessagesBelow(false);
+  }, []);
 
   const markConversationRead = useCallback(() => {
     if (!conversationId || hasMarkedReadRef.current) return;
@@ -222,18 +229,27 @@ export function ChatThread({
       pinnedToBottomRef.current = true;
       autoScrollToBottomRef.current = true;
       setShowScrollToBottom(false);
+      markBottomSeen();
       return;
     }
+    const wasPinned = pinnedToBottomRef.current;
     const atBottom = isAtScrollBottom(container);
     pinnedToBottomRef.current = atBottom;
     if (atBottom) {
       autoScrollToBottomRef.current = true;
+      markBottomSeen();
       markConversationRead();
     } else {
       autoScrollToBottomRef.current = false;
+      if (wasPinned) {
+        bottomSeenMessageIdRef.current = messagesRef.current.at(-1)?.id ?? null;
+        setHasNewMessagesBelow(false);
+      } else if (bottomSeenMessageIdRef.current === null) {
+        bottomSeenMessageIdRef.current = messagesRef.current.at(-1)?.id ?? null;
+      }
     }
     setShowScrollToBottom(!atBottom && messages.length > 0);
-  }, [layout, messages.length, markConversationRead]);
+  }, [layout, messages.length, markBottomSeen, markConversationRead]);
 
   const handleScrollContainer = useCallback(() => {
     updateScrollPinned();
@@ -243,6 +259,7 @@ export function ChatThread({
     autoScrollToBottomRef.current = true;
     pinnedToBottomRef.current = true;
     setShowScrollToBottom(false);
+    markBottomSeen();
     scrollToBottom();
     markConversationRead();
   }
@@ -276,6 +293,7 @@ export function ChatThread({
       pinnedToBottomRef.current = true;
       autoScrollToBottomRef.current = true;
       setShowScrollToBottom(false);
+      markBottomSeen();
     };
 
     followLatest();
@@ -292,29 +310,56 @@ export function ChatThread({
       cancelScheduled();
       resizeObserver.disconnect();
     };
-  }, [lastMessageId, messages.length, messagesLoading, identityPending, layout]);
+  }, [lastMessageId, messages.length, messagesLoading, identityPending, layout, markBottomSeen]);
 
   useEffect(() => {
-    autoScrollToBottomRef.current = !initialFirstUnreadMessageId;
-    pinnedToBottomRef.current = !initialFirstUnreadMessageId;
-    setShowScrollToBottom(false);
-    setBody("");
-    setMentionQuery(null);
-    setSendError(null);
-    setEditingId(null);
-    setEditBody("");
-    setFirstUnreadMessageId(initialFirstUnreadMessageId);
-    hasMarkedReadRef.current = false;
-  }, [conversationId, initialFirstUnreadMessageId]);
+    const latestId = messages.at(-1)?.id;
+    if (!latestId || pinnedToBottomRef.current) return;
 
-  useEffect(() => {
-    setMessages(sortMessagesByCreatedAt(initialMessages));
-    setHasMore(initialHasMore);
-    if (!initialFirstUnreadMessageId) {
-      autoScrollToBottomRef.current = true;
-      pinnedToBottomRef.current = true;
+    const seenId = bottomSeenMessageIdRef.current;
+    if (seenId && latestId !== seenId) {
+      setHasNewMessagesBelow(true);
     }
-  }, [conversationId, initialFirstUnreadMessageId, initialHasMore, initialMessages]);
+  }, [lastMessageId, messages]);
+
+  const prevConversationIdRef = useRef(conversationId);
+
+  useEffect(() => {
+    const switchedConversation = prevConversationIdRef.current !== conversationId;
+    prevConversationIdRef.current = conversationId;
+
+    if (switchedConversation) {
+      autoScrollToBottomRef.current = !initialFirstUnreadMessageId;
+      pinnedToBottomRef.current = !initialFirstUnreadMessageId;
+      setShowScrollToBottom(false);
+      setHasNewMessagesBelow(false);
+      bottomSeenMessageIdRef.current = null;
+      setBody("");
+      setMentionQuery(null);
+      setSendError(null);
+      setEditingId(null);
+      setEditBody("");
+      setFirstUnreadMessageId(initialFirstUnreadMessageId);
+      hasMarkedReadRef.current = false;
+      setMessages(sortMessagesByCreatedAt(initialMessages));
+      setHasMore(initialHasMore);
+      return;
+    }
+
+    if (messagesLoading) return;
+
+    setMessages((prev) => mergeConversationMessages(prev, initialMessages));
+    setHasMore((prev) =>
+      messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
+    );
+    setFirstUnreadMessageId((prev) => prev ?? initialFirstUnreadMessageId);
+  }, [
+    conversationId,
+    initialMessages,
+    initialHasMore,
+    initialFirstUnreadMessageId,
+    messagesLoading,
+  ]);
 
   useLayoutEffect(() => {
     if (messagesLoading || identityPending || !firstUnreadMessageId) return;
@@ -329,6 +374,8 @@ export function ChatThread({
     target.scrollIntoView({ block: "center" });
     autoScrollToBottomRef.current = false;
     pinnedToBottomRef.current = false;
+    bottomSeenMessageIdRef.current = messages.at(-1)?.id ?? null;
+    setHasNewMessagesBelow(false);
     setShowScrollToBottom(true);
   }, [firstUnreadMessageId, messagesLoading, identityPending, messages, layout]);
 
@@ -354,18 +401,6 @@ export function ChatThread({
     if (firstUnreadMessageId || messagesLoading || messages.length === 0) return;
     markConversationRead();
   }, [firstUnreadMessageId, messagesLoading, messages.length, markConversationRead]);
-
-  useEffect(() => {
-    setMessages((prev) => {
-      if (initialMessages.length === 0) return prev;
-      if (prev.length > initialMessages.length) return prev;
-      return sortMessagesByCreatedAt(initialMessages);
-    });
-    setHasMore((prev) =>
-      messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
-    );
-    setFirstUnreadMessageId((prev) => prev ?? initialFirstUnreadMessageId);
-  }, [initialMessages, initialHasMore, initialFirstUnreadMessageId]);
 
   useEffect(() => {
     const container = getScrollContainer();
@@ -435,7 +470,7 @@ export function ChatThread({
   );
 
   const { connected } = useConversationSocket(conversationId, onEvent);
-  useConversationPollFallback(conversationId, connected, setMessages);
+  useConversationPollFallback(conversationId, connected, messagesLoading, setMessages);
   const messageActions = useMessageActionsReveal();
 
   useEffect(() => {
@@ -936,8 +971,17 @@ export function ChatThread({
         {showScrollToBottom && (
           <button
             type="button"
-            className="chat-scroll-to-bottom"
-            aria-label="Scroll to latest messages"
+            className={[
+              "chat-scroll-to-bottom",
+              hasNewMessagesBelow ? "chat-scroll-to-bottom--has-new" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label={
+              hasNewMessagesBelow
+                ? "New messages — scroll to latest"
+                : "Scroll to latest messages"
+            }
             onClick={handleJumpToBottom}
           >
             <svg viewBox="0 0 24 24" aria-hidden className="chat-scroll-to-bottom-icon">
@@ -950,6 +994,9 @@ export function ChatThread({
                 strokeLinejoin="round"
               />
             </svg>
+            {hasNewMessagesBelow ? (
+              <span className="chat-scroll-to-bottom-badge" aria-hidden />
+            ) : null}
           </button>
         )}
 

@@ -68,6 +68,21 @@ export function buildSignedUploadUrl(
 
 const UPLOAD_PATH_RE = /\/(?:api\/)?uploads\/([^/]+)$/;
 
+const UPLOAD_CONTENT_TYPES: Record<string, string> = {
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+/** MIME type for a stored upload filename, when known. */
+export function uploadContentTypeForFilename(filename: string): string | undefined {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (!ext) return undefined;
+  return UPLOAD_CONTENT_TYPES[ext];
+}
+
 /** Extract the stored filename from a public or relative upload URL. */
 export function extractUploadFilename(urlOrPath: string): string | null {
   if (!urlOrPath) return null;

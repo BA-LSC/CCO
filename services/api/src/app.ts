@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { tryAuth } from "./middleware/auth";
-import { getUploadDir, safeUploadPath, verifyUploadSignature } from "./lib/uploads";
+import { getUploadDir, safeUploadPath, uploadContentTypeForFilename, verifyUploadSignature } from "./lib/uploads";
 import { authRouter } from "./routes/auth";
 import { mountPcoOAuth } from "./auth/pco-oauth";
 import type { AuthVariables } from "./middleware/auth";
@@ -66,6 +66,12 @@ app.get("/uploads/:filename", async (c) => {
 
   const file = Bun.file(filePath);
   if (!(await file.exists())) return c.notFound();
+
+  const contentType = file.type || uploadContentTypeForFilename(filename);
+  if (contentType) {
+    return c.body(file, 200, { "Content-Type": contentType });
+  }
+
   return new Response(file);
 });
 app.route("/v1/uploads", uploadsRouter);

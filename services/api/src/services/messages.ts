@@ -267,7 +267,14 @@ export async function listMessages(
 
   const reactionMap = await attachReactions(rows.map((r) => r.id));
 
-  const messagesDto = rows.map((row) => ({
+  const seenIds = new Set<string>();
+  const uniqueRows = rows.filter((row) => {
+    if (seenIds.has(row.id)) return false;
+    seenIds.add(row.id);
+    return true;
+  });
+
+  const messagesDto = uniqueRows.map((row) => ({
     ...toDto(row),
     reactions: reactionMap.get(row.id) ?? [],
   }));

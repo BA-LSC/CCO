@@ -12,10 +12,11 @@ const POLL_MS_CONNECTED = 8000;
 export function useConversationPollFallback(
   conversationId: string | null,
   connected: boolean,
+  messagesLoading: boolean,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
 ): void {
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || messagesLoading) return;
 
     const activeConversationId = conversationId;
     let cancelled = false;
@@ -41,5 +42,5 @@ export function useConversationPollFallback(
       cancelled = true;
       clearInterval(interval);
     };
-  }, [conversationId, connected, setMessages]);
+  }, [conversationId, connected, messagesLoading, setMessages]);
 }
