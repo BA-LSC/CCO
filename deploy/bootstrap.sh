@@ -83,16 +83,17 @@ fi
 
 cco_stop_setup_connector
 
+DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-4}"
+DEPLOY_DRAINING_TTL_SEC="${DEPLOY_DRAINING_TTL_SEC:-600}"
+
 mark_deploy_draining() {
-  echo "  Signaling connected clients before container swap..."
-  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX 120 >/dev/null 2>&1 || true
+  echo "  Signaling connected clients to show the update screen..."
+  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX "${DEPLOY_DRAINING_TTL_SEC}" >/dev/null 2>&1 || true
 }
 
 clear_deploy_draining() {
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
 }
-
-DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-4}"
 
 echo "Building CCO production images..."
 CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
@@ -100,11 +101,13 @@ export CCO_BUILD_ID
 echo "  Web build id: ${CCO_BUILD_ID}"
 "${COMPOSE[@]}" build
 
-cco_run_migrations files
-
 mark_deploy_draining
 echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
 sleep "$DEPLOY_DRAIN_WAIT_SEC"
+
+cco_run_migrations files
+
+mark_deploy_draining
 
 echo "Recreating containers with new images..."
 "${COMPOSE[@]}" up -d --no-build

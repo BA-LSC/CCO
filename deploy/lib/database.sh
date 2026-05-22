@@ -104,7 +104,7 @@ cco_run_migrations() {
   local -n _files=$1
   echo "Running database migrations..."
   if ! cco_should_use_external_db; then
-    cco_wait_for_bundled_postgres _files 60
+    cco_wait_for_bundled_postgres "$1" 60
   fi
   docker compose "${_files[@]}" run --rm migrate
   echo "  Migrations complete."
