@@ -16,7 +16,11 @@ import { apiFetch } from "@/lib/api";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { resolveActiveConversationId } from "@/lib/active-conversation-id";
 
-export type ChatSessionInfo = { userId: string; displayName?: string };
+export type ChatSessionInfo = {
+  userId: string;
+  displayName?: string;
+  avatarUrl?: string | null;
+};
 
 const SESSION_CACHE_KEY = "cco:session";
 

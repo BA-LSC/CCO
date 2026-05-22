@@ -73,11 +73,13 @@ setupRouter.get("/status", async (c) => {
   const org = configured ? await getConfiguredOrganization() : orgWithOAuth;
   const churchName =
     org?.name && org.name !== "Pending setup" ? org.name.trim() : null;
+  const webhookSecrets = org ? decryptWebhookSecrets(org.pcoWebhookSecretEnc) : [];
   return c.json({
     configured,
     churchName,
     signInAvailable: Boolean(credentials),
-    credentialsInDb: Boolean(orgWithOAuth?.pcoClientId && orgWithOAuth.pcoClientSecretEnc),
+    credentialsInDb: Boolean(orgWithOAuth?.pcoClientId && orgWithOAuth?.pcoClientSecretEnc),
+    webhooksEnabled: webhookSecrets.length > 0,
   });
 });
 

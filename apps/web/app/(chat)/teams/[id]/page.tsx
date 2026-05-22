@@ -10,9 +10,8 @@ import { ChatThread } from "@/components/ChatThread";
 import { ErrorState } from "@/components/PageStates";
 import { PanelSettingsButton } from "@/components/PanelSettingsButton";
 import { dispatchSidebarReload } from "@/lib/sidebar-events";
-import { apiFetch, type Message, type MessageListResponse } from "@/lib/api";
-import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
-import { conversationMessagesPath } from "@/lib/messages";
+import { useLoadConversationMessages } from "@/hooks/useLoadConversationMessages";
+import { apiFetch } from "@/lib/api";
 
 type TeamDetail = {
   team: { id: string; name: string; pcoTeamId: string };
@@ -35,26 +34,24 @@ export default function TeamChatPage() {
   const [detail, setDetail] = useState<TeamDetail | null>(null);
   const conversationId = detail?.conversation?.id ?? null;
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
-  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
-    null,
-  );
-  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [syncingRoster, setSyncingRoster] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
+  const {
+    threadMessages,
+    threadHasMore,
+    firstUnreadMessageId,
+    messagesLoading,
+    loadError,
+  } = useLoadConversationMessages(conversationId);
+
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
-
-  const threadMessages =
-    messagesForConversationId === conversationId ? messages : [];
-  const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
+  const displayError = error ?? loadError;
 
   async function reloadDetail(options?: { sync?: boolean }) {
     const query = options?.sync ? "?sync=1" : "";
@@ -76,57 +73,6 @@ export default function TeamChatPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load team"))
       .finally(() => setDetailLoading(false));
   }, [teamId]);
-
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      setHasMore(false);
-      setMessagesLoading(false);
-      return;
-    }
-
-    const cached = getCachedMessages(conversationId);
-    if (cached) {
-      setMessages(cached.messages);
-      setHasMore(cached.hasMore);
-      setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
-      setMessagesForConversationId(conversationId);
-      setMessagesLoading(true);
-    } else {
-      setMessages([]);
-      setHasMore(false);
-      setMessagesForConversationId(null);
-      setMessagesLoading(true);
-    }
-
-    let cancelled = false;
-    apiFetch<MessageListResponse>(
-      conversationMessagesPath(conversationId),
-    )
-      .then((data) => {
-        if (cancelled) return;
-        setMessages(data.messages);
-        setHasMore(data.hasMore);
-        setFirstUnreadMessageId(data.firstUnreadMessageId);
-        setMessagesForConversationId(conversationId);
-        setCachedMessages(conversationId, {
-          messages: data.messages,
-          hasMore: data.hasMore,
-          firstUnreadMessageId: data.firstUnreadMessageId,
-        });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to load messages");
-      })
-      .finally(() => {
-        if (!cancelled) setMessagesLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [conversationId]);
 
   async function toggleMute(muted: boolean) {
     if (!detail?.conversation) return;
@@ -192,12 +138,12 @@ export default function TeamChatPage() {
       onCco: member.onCco,
     })) ?? [];
 
-  if (!detailLoading && error && !detail) {
+  if (!detailLoading && displayError && !detail) {
     return (
       <div className="chat-panel">
         <ChatPanelHeader title="Loading" loading />
         <div className="chat-panel-content">
-          <ErrorState message={error} backHref="/teams" backLabel="Back to teams" />
+          <ErrorState message={displayError} backHref="/teams" backLabel="Back to teams" />
         </div>
       </div>
     );
@@ -244,9 +190,9 @@ export default function TeamChatPage() {
         />
       </ChatPanelHeader>
 
-      {error && (
+      {displayError && (
         <div className="alert alert-error" role="alert" style={{ margin: "8px 20px 0" }}>
-          {error}
+          {displayError}
         </div>
       )}
 

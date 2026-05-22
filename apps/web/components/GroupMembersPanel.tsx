@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { usePresenceWatch } from "@/components/PresenceProvider";
 import { apiFetch, type GroupDetail } from "@/lib/api";
+import { resolveMemberAvatarUrl } from "@/lib/member-avatar";
 
 type SessionInfo = { userId: string; displayName?: string };
 
@@ -13,6 +15,7 @@ type Props = {
 
 
 export function GroupMembersPanel({ groupId }: Props) {
+  const { session } = useChatLayout();
   const [detail, setDetail] = useState<GroupDetail | null>(null);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +115,7 @@ export function GroupMembersPanel({ groupId }: Props) {
             <UserAvatarWithPresence
               userId={m.id}
               displayName={m.displayName}
-              avatarUrl={m.avatarUrl}
+              avatarUrl={resolveMemberAvatarUrl(m, session)}
               className="member-avatar"
             />
             <span className="member-row-name">{m.displayName}</span>

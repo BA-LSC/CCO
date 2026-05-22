@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   parseUserStatusPreset,
+  resolveEffectivePreset,
   resolvePresenceDotState,
   type UserStatus,
   type UserStatusPreset,
@@ -19,13 +20,17 @@ import {
 import { apiFetch } from "@/lib/api";
 
 const HEARTBEAT_MS = 15_000;
+const IDLE_MS = 5 * 60 * 1000;
 
 type PresenceContextValue = {
   pageActive: boolean;
+  idle: boolean;
   myStatus: UserStatus;
+  effectivePreset: UserStatusPreset;
   isUserOnline: (userId: string | null | undefined) => boolean;
   getUserStatus: (userId: string | null | undefined) => UserStatus;
   setMyStatus: (update: Partial<UserStatus>) => Promise<void>;
+  markUserActive: () => void;
   refreshPresence: (userIds: string[]) => Promise<void>;
 };
 
@@ -49,7 +54,14 @@ export function PresenceProvider({
   const [onlineByUserId, setOnlineByUserId] = useState<Record<string, boolean>>({});
   const [statusByUserId, setStatusByUserId] = useState<Record<string, UserStatus>>({});
   const [myStatus, setMyStatusState] = useState<UserStatus>(DEFAULT_STATUS);
+  const [idle, setIdle] = useState(false);
   const watchedUserIdsRef = useRef(new Set<string>());
+  const lastActivityRef = useRef(Date.now());
+
+  const markUserActive = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    setIdle(false);
+  }, []);
 
   useEffect(() => {
     const update = () => setPageActive(readPageActive());
@@ -62,6 +74,34 @@ export function PresenceProvider({
       window.removeEventListener("pageshow", update);
     };
   }, []);
+
+  useEffect(() => {
+    if (!userId || !pageActive) {
+      setIdle(false);
+      return;
+    }
+
+    const onActivity = () => {
+      lastActivityRef.current = Date.now();
+      setIdle(false);
+    };
+
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"] as const;
+    for (const event of events) {
+      window.addEventListener(event, onActivity, { passive: true });
+    }
+
+    const intervalId = window.setInterval(() => {
+      setIdle(Date.now() - lastActivityRef.current >= IDLE_MS);
+    }, 1000);
+
+    return () => {
+      for (const event of events) {
+        window.removeEventListener(event, onActivity);
+      }
+      window.clearInterval(intervalId);
+    };
+  }, [pageActive, userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -143,13 +183,20 @@ export function PresenceProvider({
     [onlineByUserId, pageActive, userId],
   );
 
+  const effectivePreset = useMemo(
+    () => resolveEffectivePreset(myStatus, { pageActive, idle }),
+    [idle, myStatus, pageActive],
+  );
+
   const getUserStatus = useCallback(
     (targetUserId: string | null | undefined): UserStatus => {
       if (!targetUserId) return DEFAULT_STATUS;
-      if (targetUserId === userId) return myStatus;
+      if (targetUserId === userId) {
+        return { ...myStatus, preset: effectivePreset };
+      }
       return statusByUserId[targetUserId] ?? DEFAULT_STATUS;
     },
-    [myStatus, statusByUserId, userId],
+    [effectivePreset, myStatus, statusByUserId, userId],
   );
 
   const setMyStatus = useCallback(
@@ -181,13 +228,26 @@ export function PresenceProvider({
   const value = useMemo(
     () => ({
       pageActive,
+      idle,
       myStatus,
+      effectivePreset,
       isUserOnline,
       getUserStatus,
       setMyStatus,
+      markUserActive,
       refreshPresence,
     }),
-    [getUserStatus, isUserOnline, myStatus, pageActive, refreshPresence, setMyStatus],
+    [
+      effectivePreset,
+      getUserStatus,
+      idle,
+      isUserOnline,
+      markUserActive,
+      myStatus,
+      pageActive,
+      refreshPresence,
+      setMyStatus,
+    ],
   );
 
   return (
@@ -253,4 +313,4 @@ export function usePresenceWatch(
   }, [enabled, refreshPresence, watchKey, watchedUserIdsRef]);
 }
 
-export { resolvePresenceDotState };
+export { resolveEffectivePreset, resolvePresenceDotState };

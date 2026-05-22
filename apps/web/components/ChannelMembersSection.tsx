@@ -1,7 +1,9 @@
 "use client";
 
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { usePresenceWatch } from "@/components/PresenceProvider";
+import { resolveMemberAvatarUrl } from "@/lib/member-avatar";
 
 export type ChannelMember = {
   id?: string;
@@ -131,7 +133,7 @@ export function ChannelMembersSection({
                   <UserAvatarWithPresence
                     userId={member.onCco ? member.id : null}
                     displayName={member.displayName}
-                    avatarUrl={member.avatarUrl}
+                    avatarUrl={resolveMemberAvatarUrl(member, session)}
                     className="channel-member-avatar"
                     showPresence={member.onCco}
                   />

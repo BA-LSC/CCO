@@ -28,6 +28,7 @@ import {
   mergeSignedUpMemberRecords,
   resolveRosterMemberLink,
 } from "./cco-member-status";
+import { refreshUserAvatarFromPco } from "./user-profile";
 import {
   reconcileOrgPlaceholderUsers,
   reconcileTeamPlaceholderUsers,
@@ -339,6 +340,46 @@ function sortTeamMembersByName(members: TeamMemberView[]): TeamMemberView[] {
   );
 }
 
+async function teamRosterAvatarsByPcoPersonId(
+  accessToken: string,
+  pcoTeamId: string,
+): Promise<Map<string, string | null>> {
+  try {
+    const client = new PlanningCenterClient({ accessToken });
+    const roster = await fetchServiceTeamRoster(client, pcoTeamId);
+    return new Map(roster.map((person) => [person.pcoPersonId, person.avatarUrl ?? null]));
+  } catch (err) {
+    console.warn(
+      "Team roster avatar lookup failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return new Map();
+  }
+}
+
+function mapCcoTeamMembers(
+  ccoMembers: Array<{
+    id: string;
+    pcoPersonId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    email: string;
+    role: string;
+  }>,
+  rosterAvatars: Map<string, string | null>,
+  onCco: boolean | ((member: (typeof ccoMembers)[number]) => boolean),
+): TeamMemberView[] {
+  return ccoMembers.map((member) => ({
+    id: member.id,
+    pcoPersonId: member.pcoPersonId,
+    displayName: member.displayName,
+    avatarUrl: member.avatarUrl ?? rosterAvatars.get(member.pcoPersonId) ?? null,
+    role: member.role,
+    onCco: typeof onCco === "boolean" ? onCco : onCco(member),
+    email: null,
+  }));
+}
+
 async function listTeamMembersForDetail(params: {
   teamId: string;
   organizationId: string;
@@ -371,17 +412,11 @@ async function listTeamMembersForDetail(params: {
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {
-    return sortTeamMembersByName(
-      ccoMembers.map((member) => ({
-        id: member.id,
-        pcoPersonId: member.pcoPersonId,
-        displayName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        role: member.role,
-        onCco: true,
-        email: null,
-      })),
-    );
+    const rosterAvatars = params.accessToken
+      ? await teamRosterAvatarsByPcoPersonId(params.accessToken, params.pcoTeamId)
+      : new Map<string, string | null>();
+
+    return sortTeamMembersByName(mapCcoTeamMembers(ccoMembers, rosterAvatars, true));
   }
 
   try {
@@ -424,13 +459,8 @@ async function listTeamMembersForDetail(params: {
       err instanceof Error ? err.message : err,
     );
     return sortTeamMembersByName(
-      ccoMembers.map((member) => ({
-        id: member.id,
-        pcoPersonId: member.pcoPersonId,
-        displayName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        role: member.role,
-        onCco: memberIsOnCco(
+      mapCcoTeamMembers(ccoMembers, new Map(), (member) =>
+        memberIsOnCco(
           {
             pcoPersonId: member.pcoPersonId,
             email: member.email,
@@ -440,8 +470,7 @@ async function listTeamMembersForDetail(params: {
           signedUp,
           signedUpRecords,
         ),
-        email: null,
-      })),
+      ),
     );
   }
 }
@@ -494,6 +523,8 @@ export async function getServiceTeamDetail(
     )
     .where(eq(conversations.serviceTeamId, teamId))
     .limit(1);
+
+  await refreshUserAvatarFromPco(userId).catch(() => null);
 
   const members = await listTeamMembersForDetail({
     teamId,

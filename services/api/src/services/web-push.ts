@@ -74,7 +74,13 @@ export async function collectWebPushSubscriptions(
 
 export async function sendWebPushNotifications(
   subscriptions: Array<{ endpoint: string; keys: { p256dh: string; auth: string } }>,
-  payload: { title: string; body: string; url: string; conversationId: string },
+  payload: {
+    title: string;
+    body: string;
+    url: string;
+    conversationId: string;
+    image?: string | null;
+  },
 ): Promise<void> {
   const vapid = await resolveVapidConfig();
   if (!vapid || subscriptions.length === 0) return;

@@ -8,6 +8,7 @@ import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { UserStatusMessage } from "@/components/UserStatusMessage";
 import { usePresenceWatch } from "@/components/PresenceProvider";
 import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { UserMenu } from "@/components/UserMenu";
@@ -284,8 +285,11 @@ export function ChatSidebar() {
                                 className="sidebar-dm-avatar"
                                 size="xs"
                               />
-                              <span className="sidebar-item-label">
-                                {creatingDm === p.id ? "Opening…" : p.displayName}
+                              <span className="sidebar-item-label sidebar-dm-label">
+                                <span className="sidebar-dm-name">
+                                  {creatingDm === p.id ? "Opening…" : p.displayName}
+                                </span>
+                                <UserStatusMessage userId={p.id} />
                               </span>
                             </div>
                           </button>
@@ -316,7 +320,10 @@ export function ChatSidebar() {
                             className="sidebar-dm-avatar"
                             size="xs"
                           />
-                          <span className="sidebar-item-label">{dm.participant.displayName}</span>
+                          <span className="sidebar-item-label sidebar-dm-label">
+                            <span className="sidebar-dm-name">{dm.participant.displayName}</span>
+                            <UserStatusMessage userId={dm.participant.id} />
+                          </span>
                           {dm.hasUnread && activeDmId !== dm.id && (
                             <span className="sidebar-unread-dot" aria-label="Unread messages" />
                           )}

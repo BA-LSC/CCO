@@ -365,6 +365,46 @@ function rosterDisplayName(member: GroupRosterMember): string {
   return [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || "Member";
 }
 
+async function groupRosterAvatarsByPcoPersonId(
+  accessToken: string,
+  pcoGroupId: string,
+): Promise<Map<string, string | null>> {
+  try {
+    const client = new PlanningCenterClient({ accessToken });
+    const roster = await fetchGroupRoster(client, pcoGroupId);
+    return new Map(roster.map((person) => [person.pcoPersonId, person.avatarUrl ?? null]));
+  } catch (err) {
+    console.warn(
+      "Group roster avatar lookup failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return new Map();
+  }
+}
+
+function mapCcoGroupMembers(
+  ccoMembers: Array<{
+    id: string;
+    pcoPersonId: string;
+    displayName: string;
+    avatarUrl: string | null;
+    email: string;
+    role: string;
+  }>,
+  rosterAvatars: Map<string, string | null>,
+  onCco: boolean | ((member: (typeof ccoMembers)[number]) => boolean),
+): GroupMemberView[] {
+  return ccoMembers.map((member) => ({
+    id: member.id,
+    pcoPersonId: member.pcoPersonId,
+    displayName: member.displayName,
+    avatarUrl: member.avatarUrl ?? rosterAvatars.get(member.pcoPersonId) ?? null,
+    role: member.role,
+    onCco: typeof onCco === "boolean" ? onCco : onCco(member),
+    email: null,
+  }));
+}
+
 export async function listGroupMembersForDetail(params: {
   groupId: string;
   organizationId: string;
@@ -397,17 +437,11 @@ export async function listGroupMembersForDetail(params: {
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {
-    return sortGroupMembersByName(
-      ccoMembers.map((member) => ({
-        id: member.id,
-        pcoPersonId: member.pcoPersonId,
-        displayName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        role: member.role,
-        onCco: true,
-        email: null,
-      })),
-    );
+    const rosterAvatars = params.accessToken
+      ? await groupRosterAvatarsByPcoPersonId(params.accessToken, params.pcoGroupId)
+      : new Map<string, string | null>();
+
+    return sortGroupMembersByName(mapCcoGroupMembers(ccoMembers, rosterAvatars, true));
   }
 
   try {
@@ -452,13 +486,8 @@ export async function listGroupMembersForDetail(params: {
       err instanceof Error ? err.message : err,
     );
     return sortGroupMembersByName(
-      ccoMembers.map((member) => ({
-        id: member.id,
-        pcoPersonId: member.pcoPersonId,
-        displayName: member.displayName,
-        avatarUrl: member.avatarUrl,
-        role: member.role,
-        onCco: memberIsOnCco(
+      mapCcoGroupMembers(ccoMembers, new Map(), (member) =>
+        memberIsOnCco(
           {
             pcoPersonId: member.pcoPersonId,
             email: member.email,
@@ -468,8 +497,7 @@ export async function listGroupMembersForDetail(params: {
           signedUp,
           signedUpRecords,
         ),
-        email: null,
-      })),
+      ),
     );
   }
 }

@@ -18,11 +18,29 @@ self.addEventListener("message", (event) => {
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
-  let payload = { title: "CCO", body: "New message", url: "/", conversationId: "" };
+  let payload = {
+    title: "CCO",
+    body: "New message",
+    url: "/",
+    conversationId: "",
+    image: "",
+  };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch {
     payload.body = event.data.text();
+  }
+
+  const notificationOptions = {
+    body: payload.body,
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: payload.conversationId ? "cco-" + payload.conversationId : "cco-message",
+    renotify: true,
+    data: { url: payload.url, conversationId: payload.conversationId },
+  };
+  if (payload.image) {
+    notificationOptions.image = payload.image;
   }
 
   const notifyClients = self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -53,14 +71,7 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     Promise.all([
-      self.registration.showNotification(payload.title, {
-        body: payload.body,
-        icon: "/icons/icon-192.png",
-        badge: "/icons/icon-192.png",
-        tag: payload.conversationId ? "cco-" + payload.conversationId : "cco-message",
-        renotify: true,
-        data: { url: payload.url, conversationId: payload.conversationId },
-      }),
+      self.registration.showNotification(payload.title, notificationOptions),
       notifyClients,
       bumpBadge,
     ]),

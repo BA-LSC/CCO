@@ -4,17 +4,20 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { apiFetch } from "@/lib/api";
+import { fetchSetupStatus } from "@/lib/setup";
 
 type PlanningCenterSyncContextValue = {
   groupsSyncing: boolean;
   teamsSyncing: boolean;
   syncError: string | null;
   needsReconnect: boolean;
+  webhooksEnabled: boolean | null;
   syncGroups: () => Promise<void>;
   syncTeams: () => Promise<void>;
   syncPco: () => Promise<void>;
@@ -28,7 +31,14 @@ export function PlanningCenterSyncProvider({ children }: { children: ReactNode }
   const [teamsSyncing, setTeamsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [needsReconnect, setNeedsReconnect] = useState(false);
+  const [webhooksEnabled, setWebhooksEnabled] = useState<boolean | null>(null);
   const reloadRef = useRef<(() => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    void fetchSetupStatus().then((status) => {
+      setWebhooksEnabled(status.webhooksEnabled ?? false);
+    });
+  }, []);
 
   const registerSidebarReload = useCallback((reload: () => Promise<void>) => {
     reloadRef.current = reload;
@@ -108,6 +118,7 @@ export function PlanningCenterSyncProvider({ children }: { children: ReactNode }
         teamsSyncing,
         syncError,
         needsReconnect,
+        webhooksEnabled,
         syncGroups,
         syncTeams,
         syncPco,

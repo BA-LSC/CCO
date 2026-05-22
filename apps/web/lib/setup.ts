@@ -5,6 +5,7 @@ export type SetupStatus = {
   churchName?: string | null;
   signInAvailable?: boolean;
   credentialsInDb?: boolean;
+  webhooksEnabled?: boolean;
 };
 
 export type SetupRedirectUris = {

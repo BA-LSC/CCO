@@ -426,11 +426,13 @@ export function ChatThread({
 
     if (firstPaint) {
       const unreadAnchorId = firstUnreadMessageId ?? initialFirstUnreadMessageId;
-      const unreadTarget =
+      const unreadDivider = unreadDividerRef.current;
+      const unreadMessage =
         unreadAnchorId &&
         messages.some((message) => message.id === unreadAnchorId)
           ? container.querySelector<HTMLElement>(`[data-message-id="${unreadAnchorId}"]`)
           : null;
+      const unreadTarget = unreadDivider ?? unreadMessage;
 
       if (unreadTarget) {
         scrollContainerToElement(container, unreadTarget);

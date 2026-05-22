@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import {
+  isManualUserStatus,
   USER_STATUS_LABELS,
   USER_STATUS_PRESETS,
   type UserStatusPreset,
@@ -35,7 +36,7 @@ type Props = {
 };
 
 export function UserMenu({ variant = "default" }: Props) {
-  const { pageActive, myStatus, setMyStatus } = usePresence();
+  const { pageActive, myStatus, effectivePreset, setMyStatus, markUserActive } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -132,7 +133,21 @@ export function UserMenu({ variant = "default" }: Props) {
   }
 
   async function handleStatusPreset(next: UserStatusPreset) {
-    if (next === myStatus.preset) return;
+    if (next === "active") {
+      if (isManualUserStatus(myStatus)) {
+        setStatusSaving(true);
+        try {
+          await setMyStatus({ preset: "active", message: null });
+        } finally {
+          setStatusSaving(false);
+        }
+      }
+      markUserActive();
+      return;
+    }
+
+    if (next === myStatus.preset && isManualUserStatus(myStatus)) return;
+
     setStatusSaving(true);
     try {
       await setMyStatus({ preset: next });
@@ -155,7 +170,8 @@ export function UserMenu({ variant = "default" }: Props) {
   }
 
   const menuClass = variant === "sidebar" ? "user-menu user-menu-sidebar" : "user-menu";
-  const presenceState = resolvePresenceDotState(myStatus.preset, pageActive);
+  const presenceState = resolvePresenceDotState(effectivePreset, pageActive);
+  const statusMessage = myStatus.message?.trim() ?? "";
 
   return (
     <div className={menuClass} ref={menuRef}>
@@ -180,7 +196,18 @@ export function UserMenu({ variant = "default" }: Props) {
             />
           )}
         </span>
-        <span className="user-menu-name">{displayName}</span>
+        <span className={variant === "sidebar" ? "user-menu-identity" : "user-menu-name"}>
+          {variant === "sidebar" ? (
+            <>
+              <span className="user-menu-name">{displayName}</span>
+              {statusMessage ? (
+                <span className="user-menu-status-preview">{statusMessage}</span>
+              ) : null}
+            </>
+          ) : (
+            displayName
+          )}
+        </span>
         <span className={`user-menu-chevron${open ? " user-menu-chevron-open" : ""}`} aria-hidden>
           <svg className="user-menu-chevron-icon" viewBox="0 0 24 24" aria-hidden>
             <path
@@ -245,9 +272,9 @@ export function UserMenu({ variant = "default" }: Props) {
                   key={preset}
                   type="button"
                   className={`user-menu-status-btn user-menu-status-btn-${preset}${
-                    myStatus.preset === preset ? " user-menu-status-btn-active" : ""
+                    effectivePreset === preset ? " user-menu-status-btn-active" : ""
                   }`}
-                  aria-pressed={myStatus.preset === preset}
+                  aria-pressed={effectivePreset === preset}
                   disabled={statusSaving}
                   onClick={() => void handleStatusPreset(preset)}
                 >
@@ -275,7 +302,7 @@ export function UserMenu({ variant = "default" }: Props) {
             </label>
           </div>
 
-          {pcoSync && (
+          {pcoSync && pcoSync.webhooksEnabled === false && (
             <div className="user-menu-sync" role="group" aria-label="Planning Center sync">
               <span className="user-menu-dropdown-label">Planning Center</span>
               <button

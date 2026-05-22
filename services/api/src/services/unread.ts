@@ -46,6 +46,7 @@ export async function unreadFlagsForConversations(
     .select({
       conversationId: conversationMembers.conversationId,
       lastReadAt: conversationMembers.lastReadAt,
+      muted: conversationMembers.muted,
     })
     .from(conversationMembers)
     .where(
@@ -58,6 +59,7 @@ export async function unreadFlagsForConversations(
   const lastReadByConv = new Map(
     memberRows.map((row) => [row.conversationId, row.lastReadAt]),
   );
+  const mutedByConv = new Map(memberRows.map((row) => [row.conversationId, row.muted]));
 
   const lastMessages = await db
     .select({
@@ -80,6 +82,11 @@ export async function unreadFlagsForConversations(
   }
 
   for (const conversationId of conversationIds) {
+    if (mutedByConv.get(conversationId)) {
+      result.set(conversationId, false);
+      continue;
+    }
+
     const last = lastByConv.get(conversationId);
     const lastReadAt = lastReadByConv.get(conversationId) ?? null;
     result.set(

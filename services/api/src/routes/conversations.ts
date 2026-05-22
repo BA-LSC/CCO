@@ -19,6 +19,7 @@ import {
 import { refreshGroupImageFromPco, refreshMissingGroupImages } from "../services/group-profile";
 import { listGroupMembersForDetail, trySyncGroupRosterForLeader } from "../services/group-sync";
 import { listMessages } from "../services/messages";
+import { refreshUserAvatarFromPco } from "../services/user-profile";
 
 type Env = { Variables: AuthVariables };
 
@@ -201,6 +202,8 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
         if (updated) result = updated;
       }
     }
+
+    await refreshUserAvatarFromPco(session.userId).catch(() => null);
 
     result = {
       ...result,
