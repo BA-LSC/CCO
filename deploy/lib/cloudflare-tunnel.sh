@@ -916,7 +916,7 @@ cco_print_manual_tunnel_guide() {
      Cloudflare usually creates proxied CNAME records for these hostnames.
      If not, add CNAME records in DNS → Records (orange cloud / Proxied).
 
-  4. Paste the run token below (from the Docker command or the eyJ… string alone).
+  4. Keep the eyJ… token copied — the wizard asks you to paste it on the next screen.
 
   Not required here: Cloudflare API tokens, Global API Key, or WARP client.
 
@@ -928,25 +928,45 @@ cco_provision_tunnel_manual() {
   local token="" pasted=""
 
   cco_print_manual_tunnel_guide "$cco_domain" "$api_domain"
-  cco_press_enter "Press Enter when the tunnel and both public hostnames are configured"
+  cco_press_enter "Press Enter when steps 1–3 are done in Cloudflare (tunnel created, Docker token copied, both hostnames added)"
+  echo ""
+  echo "── Paste tunnel run token ────────────────────────────────────────────────────"
+  echo ""
+  echo "From Zero Trust → your tunnel → Install connector → Docker, copy either:"
+  echo "  • the full  docker run … --token eyJ…  command, or"
+  echo "  • just the eyJ… token string"
+  echo ""
   while [[ -z "$token" ]]; do
-    echo "Paste the full Docker command from Cloudflare (or the eyJ… token alone):"
-    cco_read -r -p "> " pasted
+    cco_read -r -p "Paste here: " pasted
     token="$(cco_extract_tunnel_token "$pasted" 2>/dev/null || true)"
     if [[ -z "$token" ]]; then
-      echo "Could not extract token — paste the full docker run command."
+      echo ""
+      echo "Could not find a token — paste the full docker run command or the eyJ… token."
+      echo ""
     fi
   done
 
   cco_env_upsert "CLOUDFLARE_TUNNEL_TOKEN" "$token" "$env_file"
-  cco_start_setup_connector "$token" || return 1
+  echo ""
+  echo "  ✓ Tunnel token saved to ${env_file}"
+  echo ""
+
+  while ! cco_start_setup_connector "$token"; do
+    echo ""
+    if ! cco_prompt_yes_no "cloudflared failed to start. Retry?" "Y"; then
+      echo "Ensure Docker is running, then run ./deploy/setup.sh again." >&2
+      return 1
+    fi
+  done
   cco_wait_for_connector_healthy "$token"
 
-  until cco_prompt_yes_no "Both hostnames configured in Zero Trust?" "Y"; do
-    echo "  Tunnels → cco → Public Hostnames"
+  until cco_prompt_yes_no "Both hostnames show in Zero Trust → Tunnels → cco → Public Hostnames?" "Y"; do
+    echo "  Add:"
+    echo "    ${cco_domain}  →  http://web:3000"
+    echo "    ${api_domain}  →  http://api:3001"
   done
 
-  printf '%s' "$token"
+  return 0
 }
 
 cco_run_tunnel_setup() {
@@ -956,8 +976,7 @@ cco_run_tunnel_setup() {
   echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare."
   echo "This server does not need ports 80/443 open to the internet."
   echo ""
-  echo "Create the tunnel and public hostnames in Cloudflare Zero Trust,"
-  echo "then paste the tunnel run token (eyJ…) from the Docker install step."
+  echo "Follow the steps below in Cloudflare Zero Trust, then paste the run token."
   echo ""
 
   token="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$env_file")"
@@ -970,10 +989,16 @@ cco_run_tunnel_setup() {
   fi
 
   if [[ -z "$token" ]]; then
-    token="$(cco_provision_tunnel_manual "$env_file" "$cco_domain" "$api_domain")" || return 1
+    cco_provision_tunnel_manual "$env_file" "$cco_domain" "$api_domain" || return 1
+    token="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$env_file")"
   elif ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CCO_SETUP_CLOUDFLARED_CONTAINER"; then
     cco_start_setup_connector "$token" || true
   fi
 
-  printf '%s' "$token"
+  if [[ -z "$token" ]] || cco_env_is_placeholder "$token"; then
+    echo "CLOUDFLARE_TUNNEL_TOKEN is missing from ${env_file}." >&2
+    return 1
+  fi
+
+  return 0
 }

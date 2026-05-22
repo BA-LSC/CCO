@@ -98,7 +98,13 @@ done
 
 cco_step_banner "2/${TOTAL_STEPS}" "Cloudflare Tunnel"
 
-CLOUDFLARE_TUNNEL_TOKEN="$(cco_run_tunnel_setup "$ENV_FILE" "$CCO_DOMAIN" "$API_DOMAIN")" || exit 1
+if ! cco_run_tunnel_setup "$ENV_FILE" "$CCO_DOMAIN" "$API_DOMAIN"; then
+  echo ""
+  echo "Cloudflare Tunnel setup did not finish. Fix the issue above, then run:"
+  echo "  ./deploy/setup.sh"
+  exit 1
+fi
+CLOUDFLARE_TUNNEL_TOKEN="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$ENV_FILE")"
 
 # ── Step 3: Cloudflare hardening ─────────────────────────────────────────────
 
