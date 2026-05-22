@@ -148,6 +148,10 @@ function handleVersionPayload(d){
     return;
   }
   if(d.updating){
+    if(!needsReload){
+      clearDeployPending();
+      return;
+    }
     markDeployPending();
     return;
   }

@@ -65,4 +65,42 @@ describe("mergeConversationMessages", () => {
     const next = mergeConversationMessages([baseMessage], [baseMessage, other, other]);
     expect(next.map((m) => m.id)).toEqual(["m1", "m2"]);
   });
+
+  test("drops messages deleted on the server within the poll snapshot", () => {
+    const middle: Message = {
+      ...baseMessage,
+      id: "m2",
+      body: "gone",
+      createdAt: "2026-01-01T12:30:00.000Z",
+    };
+    const newest: Message = {
+      ...baseMessage,
+      id: "m3",
+      createdAt: "2026-01-01T13:00:00.000Z",
+    };
+    const prev = [baseMessage, middle, newest];
+    const polled = [baseMessage, { ...newest, body: "still here" }];
+    const next = mergeConversationMessages(prev, polled);
+    expect(next.map((m) => m.id)).toEqual(["m1", "m3"]);
+  });
+
+  test("keeps older history outside the poll snapshot", () => {
+    const older: Message = {
+      ...baseMessage,
+      id: "m0",
+      createdAt: "2026-01-01T11:00:00.000Z",
+    };
+    const prev = [older, baseMessage];
+    const polled = [baseMessage];
+    const next = mergeConversationMessages(prev, polled);
+    expect(next.map((m) => m.id)).toEqual(["m0", "m1"]);
+  });
+
+  test("respects locally deleted ids during merge", () => {
+    const other: Message = { ...baseMessage, id: "m2", body: "yo" };
+    const next = mergeConversationMessages([baseMessage, other], [baseMessage, other], {
+      excludeIds: new Set(["m2"]),
+    });
+    expect(next.map((m) => m.id)).toEqual(["m1"]);
+  });
 });

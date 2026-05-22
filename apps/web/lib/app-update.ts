@@ -245,8 +245,14 @@ export async function fetchServerAppVersion(): Promise<string | null> {
   return version;
 }
 
+export async function isAppVersionCurrent(): Promise<boolean> {
+  const clientVersion = getClientBuildVersion();
+  const { version: serverVersion } = await probeServerAppVersion();
+  return Boolean(serverVersion && serverVersion === clientVersion);
+}
+
 export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise<boolean> {
-  if (APP_BUILD_VERSION === "dev") return false;
+  if (APP_BUILD_VERSION === "dev" && getClientBuildVersion() === "dev") return false;
   if (isAppUpdateInProgress() && !isDeployPending() && !isPostDeployGracePeriod()) return false;
 
   const clientVersion = getClientBuildVersion();

@@ -5,13 +5,12 @@ import {
   DEPLOY_POLL_MS,
   getUpdateCheckIntervalMs,
   isAppUpdateInProgress,
+  isAppVersionCurrent,
   isDeployWaitActive,
   isPostDeployGracePeriod,
   prepareAppUpdate,
   shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
-
-import { getClientBuildVersion } from "@/lib/build-version";
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -19,8 +18,7 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
 
   try {
-    const swUrl = `/sw.js?build=${encodeURIComponent(getClientBuildVersion())}`;
-    return await navigator.serviceWorker.register(swUrl, { scope: "/" });
+    return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   } catch (err) {
     console.warn("Service worker registration failed:", err);
     return null;
@@ -72,6 +70,10 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
       reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
       return;
     }
+    if (await isAppVersionCurrent()) {
+      reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+      return;
+    }
     if (isAppUpdateInProgress()) return;
     applying = true;
 
@@ -100,7 +102,9 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   const runUpdateChecks = async () => {
     if (isAppUpdateInProgress() && !isDeployWaitActive() && !isPostDeployGracePeriod()) return;
     if (await checkAppVersion(onUpdating)) return;
-    void registration?.update();
+    if (!(await isAppVersionCurrent())) {
+      void registration?.update();
+    }
     syncDeployPoll();
   };
 

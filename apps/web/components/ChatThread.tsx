@@ -19,6 +19,7 @@ import { dispatchConversationUpdated, dispatchUnreadChanged } from "@/lib/sideba
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
 import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
+import { invalidateConversation } from "@/lib/message-cache";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
   maxScrollTop,
@@ -105,6 +106,8 @@ type Props = {
   composerDisabled?: boolean;
 };
 
+const RECENT_MESSAGE_MS = 15_000;
+
 export function ChatThread({
   conversationId,
   initialMessages,
@@ -164,6 +167,8 @@ export function ChatThread({
   const initialScrollDoneRef = useRef(false);
   const messageSnapshotRef = useRef("");
   const bottomSeenMessageIdRef = useRef<string | null>(null);
+  const deletedMessageIdsRef = useRef(new Set<string>());
+  const recentMessageIdsRef = useRef(new Map<string, number>());
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [scrollReady, setScrollReady] = useState(false);
@@ -211,6 +216,37 @@ export function ChatThread({
       },
     );
     dispatchUnreadChanged({ conversationId, hasUnread: false });
+  }, [conversationId]);
+
+  const markMessageDeleted = useCallback(
+    (messageId: string) => {
+      deletedMessageIdsRef.current.add(messageId);
+      recentMessageIdsRef.current.delete(messageId);
+      if (conversationId) invalidateConversation(conversationId);
+    },
+    [conversationId],
+  );
+
+  const markMessageLive = useCallback((messageId: string) => {
+    recentMessageIdsRef.current.set(messageId, Date.now());
+  }, []);
+
+  const getPollMergeOptions = useCallback(() => {
+    const now = Date.now();
+    for (const [id, timestamp] of recentMessageIdsRef.current) {
+      if (now - timestamp > RECENT_MESSAGE_MS) {
+        recentMessageIdsRef.current.delete(id);
+      }
+    }
+    return {
+      excludeIds: deletedMessageIdsRef.current,
+      recentIds: new Set(recentMessageIdsRef.current.keys()),
+    };
+  }, []);
+
+  useEffect(() => {
+    deletedMessageIdsRef.current.clear();
+    recentMessageIdsRef.current.clear();
   }, [conversationId]);
 
   function isAtScrollBottom(container: HTMLElement): boolean {
@@ -524,6 +560,7 @@ export function ChatThread({
       title?: string;
     }) => {
       if (event.type === "message.created" && event.message) {
+        markMessageLive(event.message.id);
         setMessages((prev) => {
           if (prev.some((m) => m.id === event.message!.id)) return prev;
           const shouldFollow =
@@ -543,6 +580,7 @@ export function ChatThread({
         );
       }
       if (event.type === "message.deleted" && event.messageId) {
+        markMessageDeleted(event.messageId);
         setMessages((prev) => prev.filter((m) => m.id !== event.messageId));
       }
       if (event.type === "reaction.changed" && event.messageId && event.reaction) {
@@ -568,7 +606,7 @@ export function ChatThread({
         });
       }
     },
-    [conversationId, markConversationRead, onConversationSettingsChange, resolvedUserId],
+    [conversationId, markConversationRead, markMessageDeleted, markMessageLive, onConversationSettingsChange, resolvedUserId],
   );
 
   useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
@@ -577,6 +615,7 @@ export function ChatThread({
     realtimeConnected && activeConversationId === conversationId,
     messagesLoading,
     setMessages,
+    { getMergeOptions: getPollMergeOptions },
   );
 
   async function postMessage(payload: {
@@ -598,6 +637,7 @@ export function ChatThread({
       autoScrollToBottomRef.current = true;
       return sortMessagesByCreatedAt([...prev, message]);
     });
+    markMessageLive(message.id);
   }
 
   const loadOlder = useCallback(async () => {
@@ -801,6 +841,7 @@ export function ChatThread({
     setDeleteTarget(null);
     try {
       await apiFetch(`/api/v1/messages/${messageId}`, { method: "DELETE" });
+      markMessageDeleted(messageId);
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Failed to delete message");

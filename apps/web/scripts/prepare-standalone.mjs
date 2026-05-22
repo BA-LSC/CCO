@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,5 +25,9 @@ cpSync(staticSrc, staticDest, { recursive: true });
 if (existsSync(publicSrc)) {
   cpSync(publicSrc, publicDest, { recursive: true });
 }
+
+const buildId = process.env.CCO_BUILD_ID?.trim() || "dev";
+writeFileSync(join(standaloneApp, "BUILD_ID"), `${buildId}\n`);
+writeFileSync(join(webRoot, ".next/BUILD_ID"), `${buildId}\n`);
 
 console.log("[prepare-standalone] Copied static assets into standalone output.");

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { apiFetch, type Message } from "@/lib/api";
-import { mergeConversationMessages } from "@/lib/message-reactions";
+import { mergeConversationMessages, type MergeConversationMessagesOptions } from "@/lib/message-reactions";
 import { conversationMessagesPath } from "@/lib/messages";
 
 const POLL_MS_DISCONNECTED = 4000;
 const POLL_MS_CONNECTED = 8000;
+
+export type ConversationPollMergeOptions = {
+  getMergeOptions?: () => MergeConversationMessagesOptions;
+};
 
 /** Keep messages and reactions in sync when the socket is down; light backup while connected. */
 export function useConversationPollFallback(
@@ -14,7 +18,11 @@ export function useConversationPollFallback(
   connected: boolean,
   messagesLoading: boolean,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+  pollMerge?: ConversationPollMergeOptions,
 ): void {
+  const pollMergeRef = useRef(pollMerge);
+  pollMergeRef.current = pollMerge;
+
   useEffect(() => {
     if (!conversationId || messagesLoading) return;
 
@@ -28,7 +36,8 @@ export function useConversationPollFallback(
         );
         if (cancelled) return;
 
-        setMessages((prev) => mergeConversationMessages(prev, data.messages));
+        const mergeOptions = pollMergeRef.current?.getMergeOptions?.();
+        setMessages((prev) => mergeConversationMessages(prev, data.messages, mergeOptions));
       } catch {
         // ignore transient poll errors
       }
