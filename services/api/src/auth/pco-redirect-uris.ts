@@ -1,12 +1,17 @@
 import { getOrganizationWithOAuthCredentials } from "../services/org-oauth";
 
 /** Env-derived default — used before org URLs are saved during setup. */
+export function getLegacyPcoWebRedirectUri(): string {
+  const base = process.env.WEB_URL ?? "http://localhost:3000";
+  return `${base.replace(/\/$/, "")}/api/auth/pco/callback`;
+}
+
 export function getDefaultPcoWebRedirectUri(): string {
   if (process.env.PCO_WEB_REDIRECT_URI?.trim()) {
     return process.env.PCO_WEB_REDIRECT_URI.trim();
   }
   const base = process.env.WEB_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/api/auth/pco/callback`;
+  return `${base.replace(/\/$/, "")}/auth/pco/callback`;
 }
 
 export function getDefaultPcoApiRedirectUri(): string {
@@ -75,6 +80,7 @@ export function getPcoMobileRedirectUri(): string {
 export async function getAllowedPcoRedirectUris(): Promise<string[]> {
   const uris = new Set<string>([
     getDefaultPcoWebRedirectUri(),
+    getLegacyPcoWebRedirectUri(),
     getDefaultPcoApiRedirectUri(),
     getDefaultPcoMobileRedirectUri(),
   ]);

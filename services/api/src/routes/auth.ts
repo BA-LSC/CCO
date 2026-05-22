@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { redeemMobileAuthCode } from "../auth/mobile-auth-codes";
 import { exchangeOAuthCode } from "../auth/pco-exchange";
@@ -21,11 +20,6 @@ authRouter.post("/pco/exchange", async (c) => {
   const parsed = ExchangeSchema.safeParse(await c.req.json());
   if (!parsed.success) {
     return c.json({ error: parsed.error.flatten() }, 400);
-  }
-
-  const savedState = getCookie(c, "pco_oauth_state");
-  if (!savedState || savedState !== parsed.data.state) {
-    return c.json({ error: "Invalid OAuth state" }, 400);
   }
 
   const result = await exchangeOAuthCode({

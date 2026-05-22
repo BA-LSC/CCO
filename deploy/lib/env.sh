@@ -83,7 +83,7 @@ cco_env_apply_domains() {
   cco_env_upsert "NEXT_PUBLIC_WS_URL" "wss://${api}" "$file"
   cco_env_upsert "NEXT_PUBLIC_WEB_URL" "https://${cco}" "$file"
   cco_env_upsert "PUBLIC_UPLOAD_URL" "https://${api}/uploads" "$file"
-  cco_env_upsert "PCO_WEB_REDIRECT_URI" "https://${cco}/api/auth/pco/callback" "$file"
+  cco_env_upsert "PCO_WEB_REDIRECT_URI" "https://${cco}/auth/pco/callback" "$file"
   cco_env_upsert "PCO_REDIRECT_URI" "https://${api}/auth/pco/callback" "$file"
   cco_env_upsert "PCO_MOBILE_REDIRECT_URI" "https://${api}/auth/pco/mobile/callback" "$file"
   cco_env_upsert "PCO_WEBHOOK_URL" "https://${api}/webhooks/pco" "$file"

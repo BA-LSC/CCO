@@ -33,6 +33,7 @@ async function requestToken(body: URLSearchParams): Promise<TokenResponse> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {

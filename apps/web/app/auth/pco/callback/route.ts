@@ -3,7 +3,6 @@ import { handlePcoOAuthCallback } from "@/lib/pco-callback";
 
 export const dynamic = "force-dynamic";
 
-/** Legacy PCO redirect URI path — kept for existing developer app registrations. */
 export async function GET(request: NextRequest) {
   return handlePcoOAuthCallback(request);
 }
