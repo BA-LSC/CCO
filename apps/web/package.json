@@ -9,7 +9,8 @@
     "start": "node .next/standalone/apps/web/server.js",
     "start:next": "next start",
     "lint": "eslint .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate:emoji-picker": "node scripts/generate-emoji-picker-data.mjs"
   },
   "dependencies": {
     "@cco/pco-client": "workspace:*",
@@ -24,6 +25,7 @@
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "dotenv": "^17.4.2",
+    "emojibase-data": "^17.0.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
     "typescript": "^6.0.3"

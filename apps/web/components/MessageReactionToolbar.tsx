@@ -3,6 +3,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -101,7 +102,7 @@ function MessageEmojiPickerPopover({
   const [style, setStyle] = useState<CSSProperties>({});
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const filteredGroups = filterEmojiPickerGroups(query);
+  const filteredGroups = useMemo(() => filterEmojiPickerGroups(query), [query]);
 
   useEffect(() => {
     if (!pickerOpen) {

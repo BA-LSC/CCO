@@ -4483,6 +4483,11 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 10px;
 }
 
+.message-emoji-picker-group {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 180px;
+}
+
 .message-emoji-picker-label {
   margin: 0 0 6px;
   font-size: 0.72rem;
