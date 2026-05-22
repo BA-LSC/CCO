@@ -1,13 +1,16 @@
-import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
-import { db } from "../db";
-import { users } from "../db/schema";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
-import { getUsersOnline, touchUserPresence } from "../services/presence";
+import {
+  getUsersOnline,
+  resolvePresenceVisibleUserIds,
+  touchUserPresence,
+} from "../services/presence";
 
 type Env = { Variables: AuthVariables };
 
 const MAX_QUERY_IDS = 200;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const presenceRouter = new Hono<Env>();
 
@@ -32,21 +35,30 @@ presenceRouter.post("/query", requireAuth, async (c) => {
       ? (body as { userIds: unknown[] }).userIds
       : [];
 
-  const userIds = [...new Set(rawIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
+  const userIds = [
+    ...new Set(
+      rawIds.filter((id): id is string => typeof id === "string" && UUID_RE.test(id)),
+    ),
+  ];
   if (userIds.length > MAX_QUERY_IDS) {
     return c.json({ error: `Too many userIds (max ${MAX_QUERY_IDS})` }, 400);
   }
 
-  if (userIds.length === 0) {
-    return c.json({ online: {} });
+  const online: Record<string, boolean> = {};
+  for (const userId of userIds) online[userId] = false;
+  if (userIds.length === 0) return c.json({ online });
+
+  const allowedIds = await resolvePresenceVisibleUserIds(
+    session.userId,
+    session.organizationId,
+    userIds,
+  );
+  const allowedSet = new Set(allowedIds);
+  const onlineStatus = await getUsersOnline(allowedIds);
+
+  for (const userId of userIds) {
+    online[userId] = allowedSet.has(userId) ? (onlineStatus[userId] ?? false) : false;
   }
 
-  const rows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(inArray(users.id, userIds), eq(users.organizationId, session.organizationId)));
-
-  const allowedIds = rows.map((row) => row.id);
-  const online = await getUsersOnline(allowedIds);
   return c.json({ online });
 });

@@ -6,12 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { apiFetch } from "@/lib/api";
 
-const HEARTBEAT_MS = 25_000;
+const HEARTBEAT_MS = 15_000;
 
 type PresenceContextValue = {
   pageActive: boolean;
@@ -35,6 +36,7 @@ export function PresenceProvider({
 }) {
   const [pageActive, setPageActive] = useState(readPageActive);
   const [onlineByUserId, setOnlineByUserId] = useState<Record<string, boolean>>({});
+  const watchedUserIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     const update = () => setPageActive(readPageActive());
@@ -47,20 +49,6 @@ export function PresenceProvider({
       window.removeEventListener("pageshow", update);
     };
   }, []);
-
-  useEffect(() => {
-    if (!userId || !pageActive) return;
-
-    const ping = () => {
-      void apiFetch("/api/v1/presence/heartbeat", { method: "POST" }).catch(() => {
-        // Ignore transient network errors.
-      });
-    };
-
-    ping();
-    const intervalId = window.setInterval(ping, HEARTBEAT_MS);
-    return () => window.clearInterval(intervalId);
-  }, [pageActive, userId]);
 
   const refreshPresence = useCallback(async (userIds: string[]) => {
     const unique = [...new Set(userIds.filter(Boolean))];
@@ -77,6 +65,33 @@ export function PresenceProvider({
     }
   }, []);
 
+  const refreshWatchedPresence = useCallback(async () => {
+    const ids = [...watchedUserIdsRef.current];
+    if (ids.length > 0) await refreshPresence(ids);
+  }, [refreshPresence]);
+
+  useEffect(() => {
+    if (!userId || !pageActive) return;
+
+    const ping = () => {
+      void apiFetch("/api/v1/presence/heartbeat", { method: "POST" }).catch(() => {
+        // Ignore transient network errors.
+      });
+    };
+
+    ping();
+    const intervalId = window.setInterval(ping, HEARTBEAT_MS);
+    return () => window.clearInterval(intervalId);
+  }, [pageActive, userId]);
+
+  useEffect(() => {
+    if (!pageActive) return;
+
+    void refreshWatchedPresence();
+    const intervalId = window.setInterval(() => void refreshWatchedPresence(), HEARTBEAT_MS);
+    return () => window.clearInterval(intervalId);
+  }, [pageActive, refreshWatchedPresence]);
+
   const isUserOnline = useCallback(
     (targetUserId: string | null | undefined) => {
       if (!targetUserId) return false;
@@ -91,7 +106,31 @@ export function PresenceProvider({
     [isUserOnline, pageActive, refreshPresence],
   );
 
-  return <PresenceContext.Provider value={value}>{children}</PresenceContext.Provider>;
+  return (
+    <PresenceContext.Provider value={value}>
+      <PresenceWatchRegistry watchedUserIdsRef={watchedUserIdsRef}>
+        {children}
+      </PresenceWatchRegistry>
+    </PresenceContext.Provider>
+  );
+}
+
+const PresenceWatchRegistryContext = createContext<React.MutableRefObject<Set<string>> | null>(
+  null,
+);
+
+function PresenceWatchRegistry({
+  watchedUserIdsRef,
+  children,
+}: {
+  watchedUserIdsRef: React.MutableRefObject<Set<string>>;
+  children: ReactNode;
+}) {
+  return (
+    <PresenceWatchRegistryContext.Provider value={watchedUserIdsRef}>
+      {children}
+    </PresenceWatchRegistryContext.Provider>
+  );
 }
 
 export function usePresence() {
@@ -100,11 +139,12 @@ export function usePresence() {
   return ctx;
 }
 
-/** Poll presence for the given user ids while enabled (e.g. settings panel open). */
+/** Register user ids to poll for presence while mounted. */
 export function usePresenceWatch(
   userIds: Array<string | null | undefined>,
   enabled = true,
 ): void {
+  const watchedUserIdsRef = useContext(PresenceWatchRegistryContext);
   const { refreshPresence } = usePresence();
 
   const watchKey = useMemo(
@@ -116,11 +156,15 @@ export function usePresenceWatch(
   );
 
   useEffect(() => {
-    if (!enabled || !watchKey) return;
+    if (!watchedUserIdsRef || !enabled || !watchKey) return;
 
     const ids = watchKey.split(",");
+    for (const id of ids) watchedUserIdsRef.current.add(id);
+
     void refreshPresence(ids);
-    const intervalId = window.setInterval(() => void refreshPresence(ids), HEARTBEAT_MS);
-    return () => window.clearInterval(intervalId);
-  }, [enabled, refreshPresence, watchKey]);
+
+    return () => {
+      for (const id of ids) watchedUserIdsRef.current.delete(id);
+    };
+  }, [enabled, refreshPresence, watchKey, watchedUserIdsRef]);
 }
