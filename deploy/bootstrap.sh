@@ -110,6 +110,8 @@ clear_deploy_draining() {
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
 }
 
+trap 'clear_deploy_draining || true' EXIT
+
 clear_deploy_draining
 
 echo "Building CCO production images..."

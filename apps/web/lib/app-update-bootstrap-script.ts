@@ -60,7 +60,6 @@ function hideOverlay(){
   if(el)el.remove();
 }
 function markDeployPending(){
-  if(deployPending)return;
   deployPending=true;
   window.__ccoDeployPending=true;
   overlay();
@@ -150,11 +149,14 @@ function handleVersionPayload(d){
     }
     return;
   }
-  if(needsReload&&deployPending){
+  if(deployPending){
+    if(!needsReload){
+      clearDeployPending();
+      return;
+    }
     applyUpdate(true);
     return;
   }
-  if(deployPending)return;
   if(needsReload){
     applyUpdate(false);
   }
