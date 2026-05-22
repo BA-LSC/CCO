@@ -4,14 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarCloseIcon, SidebarLockIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import {
   apiFetch,
   slugify,
   type GroupDetail,
   type GroupSidebarItem,
 } from "@/lib/api";
-import { subscribeUnreadChanged } from "@/lib/sidebar-events";
+import { subscribeConversationUpdated, subscribeUnreadChanged } from "@/lib/sidebar-events";
 
 type Props = {
   groups: GroupSidebarItem[];
@@ -49,6 +49,25 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
           ...group,
           conversations: group.conversations.map((conv) =>
             conv.id === conversationId ? { ...conv, hasUnread } : conv,
+          ),
+        })),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribeConversationUpdated(({ conversationId, leaderOnly, title }) => {
+      setGroups((prev) =>
+        prev.map((group) => ({
+          ...group,
+          conversations: group.conversations.map((conv) =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  ...(leaderOnly !== undefined ? { leaderOnly } : {}),
+                  ...(title !== undefined ? { title } : {}),
+                }
+              : conv,
           ),
         })),
       );
@@ -245,19 +264,21 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                         >
                           <span className="sidebar-hash">#</span>
                           <span className="sidebar-item-label">{conv.title}</span>
-                          {conv.leaderOnly && (
-                            <span className="sidebar-badge" title="Leaders only">
-                              🔒
-                            </span>
-                          )}
-                          {conv.muted && (
-                            <span className="sidebar-badge" title="Muted">
-                              🔕
-                            </span>
-                          )}
-                          {conv.hasUnread && activeConversationId !== conv.id && (
-                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
-                          )}
+                          <span className="sidebar-nested-trailing">
+                            {conv.leaderOnly && (
+                              <span className="sidebar-channel-lock" title="Leaders only">
+                                <SidebarLockIcon />
+                              </span>
+                            )}
+                            {conv.muted && (
+                              <span className="sidebar-badge" title="Muted">
+                                🔕
+                              </span>
+                            )}
+                            {conv.hasUnread && activeConversationId !== conv.id && (
+                              <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                            )}
+                          </span>
                         </Link>
                       </li>
                     ))

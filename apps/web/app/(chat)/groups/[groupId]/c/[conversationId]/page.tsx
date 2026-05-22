@@ -13,6 +13,7 @@ import { apiFetch, getErrorMessage, type GroupDetail, type Message, type Message
 import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
 import { canPostInGroupChannel } from "@/lib/group-permissions";
 import { conversationMessagesPath } from "@/lib/messages";
+import { dispatchConversationUpdated } from "@/lib/sidebar-events";
 
 type ConversationMember = { id: string; displayName: string; role: string };
 
@@ -186,6 +187,7 @@ export default function GroupConversationPage() {
     });
     if (updates.leaderOnly !== undefined) setEditLeaderOnly(updates.leaderOnly);
     if (updates.title !== undefined) setEditTitle(updates.title);
+    dispatchConversationUpdated({ conversationId, ...updates });
   }
 
   async function saveChannelMembersAccess(userIds: string[]) {

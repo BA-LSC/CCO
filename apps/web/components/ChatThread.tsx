@@ -22,7 +22,7 @@ import { useConversationPollFallback } from "@/hooks/useConversationPollFallback
 import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
-import { dispatchUnreadChanged } from "@/lib/sidebar-events";
+import { dispatchConversationUpdated, dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
@@ -633,7 +633,12 @@ export function ChatThread({
           ),
         );
       }
-      if (event.type === "conversation.updated") {
+      if (event.type === "conversation.updated" && conversationId) {
+        dispatchConversationUpdated({
+          conversationId,
+          leaderOnly: event.leaderOnly,
+          title: event.title,
+        });
         onConversationSettingsChange?.({
           leaderOnly: event.leaderOnly,
           title: event.title,
