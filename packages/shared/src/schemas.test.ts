@@ -26,4 +26,14 @@ describe("MessageCreateSchema", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  test("accepts video-only payload", () => {
+    const result = MessageCreateSchema.safeParse({
+      body: "",
+      attachmentUrl: "http://localhost:3001/uploads/test.mp4",
+      messageType: "video",
+      clientMessageId: "550e8400-e29b-41d4-a716-446655440000",
+    });
+    expect(result.success).toBe(true);
+  });
 });

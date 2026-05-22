@@ -3925,6 +3925,56 @@ html[data-theme="6"] .user-menu-dropdown {
   object-fit: contain;
 }
 
+.chat-thread .attachment-video-preview-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 432px);
+  min-width: 200px;
+  min-height: 140px;
+  aspect-ratio: 16 / 10;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.18)),
+    var(--color-surface-elevated, #1a2332);
+  object-fit: cover;
+}
+
+.attachment-video-preview-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.attachment-video-preview-play svg {
+  width: 28px;
+  height: 28px;
+  margin-left: 3px;
+}
+
+.attachment-open.attachment-video-preview {
+  cursor: pointer;
+}
+
+.attachment-lightbox-stage-video {
+  align-items: center;
+  justify-content: center;
+}
+
+.attachment-lightbox-video {
+  display: block;
+  width: auto;
+  max-width: min(100%, 960px);
+  max-height: min(100%, calc(100vh - 120px));
+  border-radius: 8px;
+  background: #000;
+}
+
 .chat-thread .message-bubble:has(.attachment) {
   padding: 6px;
   overflow: visible;

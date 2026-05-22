@@ -110,12 +110,22 @@ export async function buildSignedUpMemberRecords(
     .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
     .where(eq(users.organizationId, organizationId));
 
-  return rows.map((row) => ({
-    userId: row.userId,
-    pcoPersonId: row.pcoPersonId,
-    email: normalizeMemberEmail(row.email),
-    displayName: normalizeMemberDisplayName(row.displayName),
-  }));
+  return mapSignedUpMemberRows(rows);
+}
+
+/** Every user with PCO OAuth credentials (any org). Used to match roster placeholders to real accounts. */
+export async function buildAllSignedUpMemberRecords(): Promise<SignedUpMemberRecord[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id));
+
+  return mapSignedUpMemberRows(rows);
 }
 
 function mapSignedUpMemberRows(

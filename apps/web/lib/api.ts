@@ -1,4 +1,5 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
+import { prepareVideoForUpload } from "./prepare-video-upload";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -72,6 +73,20 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 export async function uploadImage(file: File): Promise<string> {
   const prepared = await prepareImageForUpload(file);
+  const form = new FormData();
+  form.append("file", prepared);
+  const res = await fetch(`${API_BASE}/api/v1/uploads`, {
+    method: "POST",
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+  const data = (await res.json()) as { url: string };
+  return data.url;
+}
+
+export async function uploadVideo(file: File): Promise<string> {
+  const prepared = await prepareVideoForUpload(file);
   const form = new FormData();
   form.append("file", prepared);
   const res = await fetch(`${API_BASE}/api/v1/uploads`, {

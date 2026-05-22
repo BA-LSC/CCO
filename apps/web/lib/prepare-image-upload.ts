@@ -1,7 +1,13 @@
 /**
  * Normalize phone camera picks (often HEIC or missing MIME) into JPEG for upload.
  */
+const MAX_MEDIA_BYTES = 95 * 1024 * 1024;
+
 export async function prepareImageForUpload(file: File): Promise<File> {
+  if (file.size > MAX_MEDIA_BYTES) {
+    throw new Error("File must be 95MB or smaller.");
+  }
+
   const allowed = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
   if (allowed.has(file.type)) return file;
 

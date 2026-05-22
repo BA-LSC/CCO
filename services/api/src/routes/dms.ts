@@ -49,7 +49,7 @@ dmsRouter.post("/", async (c) => {
 
   if (!result) {
     return c.json(
-      { error: "You can only message people who share a group with you and have joined CCO." },
+      { error: "You can only message people who share a group or team with you and have joined CCO." },
       403,
     );
   }

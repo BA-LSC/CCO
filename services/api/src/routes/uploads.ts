@@ -10,8 +10,19 @@ import {
 
 type Env = { Variables: AuthVariables };
 
-const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const MAX_MEDIA_BYTES = 95 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+
+const EXT_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpeg",
+  "image/png": "png",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+};
 
 export const uploadsRouter = new Hono<Env>();
 
@@ -25,17 +36,20 @@ uploadsRouter.post("/", requireAuth, async (c) => {
     return c.json({ error: "file field required" }, 400);
   }
 
-  if (!ALLOWED.has(file.type)) {
-    return c.json({ error: "Unsupported image type" }, 400);
+  const isImage = IMAGE_TYPES.has(file.type);
+  const isVideo = VIDEO_TYPES.has(file.type);
+
+  if (!isImage && !isVideo) {
+    return c.json({ error: "Unsupported file type" }, 400);
   }
 
-  if (file.size > MAX_BYTES) {
-    return c.json({ error: "File too large (max 5MB)" }, 400);
+  if (file.size > MAX_MEDIA_BYTES) {
+    return c.json({ error: "File too large (max 95MB)" }, 400);
   }
 
   await mkdir(getUploadDir(), { recursive: true });
 
-  const ext = file.type.split("/")[1] ?? "bin";
+  const ext = EXT_BY_MIME[file.type] ?? file.type.split("/")[1] ?? "bin";
   const filename = `${crypto.randomUUID()}.${ext}`;
   const dest = safeUploadPath(getUploadDir(), filename);
   if (!dest) {

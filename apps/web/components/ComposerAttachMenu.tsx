@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   disabled?: boolean;
-  onPickImage: () => void;
+  onPickMedia: () => void;
 };
 
-export function ComposerAttachMenu({ disabled, onPickImage }: Props) {
+export function ComposerAttachMenu({ disabled, onPickMedia }: Props) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,10 +62,10 @@ export function ComposerAttachMenu({ disabled, onPickImage }: Props) {
             className="composer-attach-menu-item"
             onClick={() => {
               setOpen(false);
-              onPickImage();
+              onPickMedia();
             }}
           >
-            Image
+            Media
           </button>
         </div>
       )}

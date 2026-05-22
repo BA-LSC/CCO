@@ -5,7 +5,7 @@ export const MessageCreateSchema = z
     body: z.string().max(10000).default(""),
     clientMessageId: z.string().uuid(),
     attachmentUrl: z.string().url().optional(),
-    messageType: z.enum(["text", "image"]).optional(),
+    messageType: z.enum(["text", "image", "video"]).optional(),
   })
   .refine((data) => data.body.trim().length > 0 || data.attachmentUrl, {
     message: "Message must have text or an attachment",

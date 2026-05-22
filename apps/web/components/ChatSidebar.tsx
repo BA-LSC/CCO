@@ -36,6 +36,7 @@ export function ChatSidebar() {
   const [dmSearch, setDmSearch] = useState("");
   const [dmPeople, setDmPeople] = useState<DmParticipant[]>([]);
   const [dmSearching, setDmSearching] = useState(false);
+  const [dmPeopleError, setDmPeopleError] = useState<string | null>(null);
   const [creatingDm, setCreatingDm] = useState<string | null>(null);
   const [churchName, setChurchName] = useState<string | null>(null);
 
@@ -122,6 +123,7 @@ export function ChatSidebar() {
 
     const timer = setTimeout(async () => {
       setDmSearching(true);
+      setDmPeopleError(null);
       try {
         const q = dmSearch.trim();
         const path = q ? `/api/v1/dms/people?q=${encodeURIComponent(q)}` : "/api/v1/dms/people";
@@ -129,6 +131,7 @@ export function ChatSidebar() {
         setDmPeople(data.people);
       } catch {
         setDmPeople([]);
+        setDmPeopleError("Could not load people. Try again.");
       } finally {
         setDmSearching(false);
       }
@@ -218,8 +221,14 @@ export function ChatSidebar() {
                   />
                   {dmSearching ? (
                     <p className="sidebar-empty">Searching…</p>
+                  ) : dmPeopleError ? (
+                    <p className="sidebar-empty">{dmPeopleError}</p>
                   ) : dmPeople.length === 0 ? (
-                    <p className="sidebar-empty">No matches found.</p>
+                    <p className="sidebar-empty">
+                      {dmSearch.trim()
+                        ? "No matches found."
+                        : "No one in your groups or teams has joined CCO yet."}
+                    </p>
                   ) : (
                     <ul className="sidebar-list sidebar-new-dm-list">
                       {dmPeople.map((p) => (

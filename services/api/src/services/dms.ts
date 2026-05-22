@@ -10,6 +10,7 @@ import {
   users,
 } from "../db/schema";
 import {
+  buildAllSignedUpMemberRecords,
   buildSignedUpMemberRecords,
   buildSignedUpMemberRecordsForGroup,
   buildSignedUpMemberRecordsForTeam,
@@ -17,6 +18,10 @@ import {
   mergeSignedUpMemberRecords,
   type SignedUpMemberRecord,
 } from "./cco-member-status";
+import {
+  reconcileGroupPlaceholderUsers,
+  reconcileTeamPlaceholderUsers,
+} from "./user-account-merge";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
   return [userIdA, userIdB].sort().join(":");
@@ -145,13 +150,50 @@ async function listSignedUpRecordsForSharedContext(
   groupIds: string[],
   teamIds: string[],
 ): Promise<SignedUpMemberRecord[]> {
-  const [orgRecords, groupRecords, teamRecords] = await Promise.all([
+  const [orgRecords, allRecords, groupRecords, teamRecords] = await Promise.all([
     buildSignedUpMemberRecords(organizationId),
+    buildAllSignedUpMemberRecords(),
     Promise.all(groupIds.map((groupId) => buildSignedUpMemberRecordsForGroup(groupId))),
     Promise.all(teamIds.map((teamId) => buildSignedUpMemberRecordsForTeam(teamId))),
   ]);
 
-  return mergeSignedUpMemberRecords(orgRecords, ...groupRecords.flat(), ...teamRecords.flat());
+  return mergeSignedUpMemberRecords(
+    orgRecords,
+    allRecords,
+    ...groupRecords.flat(),
+    ...teamRecords.flat(),
+  );
+}
+
+async function listSignedUpCoMemberIdsInGroups(
+  userId: string,
+  groupIds: string[],
+): Promise<string[]> {
+  if (groupIds.length === 0) return [];
+
+  const rows = await db
+    .selectDistinct({ id: users.id })
+    .from(groupMemberships)
+    .innerJoin(users, eq(users.id, groupMemberships.userId))
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(and(inArray(groupMemberships.groupId, groupIds), ne(groupMemberships.userId, userId)));
+
+  return rows.map((row) => row.id);
+}
+
+async function listSignedUpCoMemberIdsInTeams(userId: string, teamIds: string[]): Promise<string[]> {
+  if (teamIds.length === 0) return [];
+
+  const rows = await db
+    .selectDistinct({ id: users.id })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(
+      and(inArray(serviceTeamMemberships.teamId, teamIds), ne(serviceTeamMemberships.userId, userId)),
+    );
+
+  return rows.map((row) => row.id);
 }
 
 export async function listDmEligibleUserIds(userId: string, organizationId: string): Promise<Set<string>> {
@@ -170,13 +212,30 @@ export async function listDmEligibleUserIds(userId: string, organizationId: stri
   const teamIds = myTeams.map((row) => row.teamId);
   if (groupIds.length === 0 && teamIds.length === 0) return new Set();
 
-  const [groupMembers, teamMembers, signedUpRecords] = await Promise.all([
-    listCoMembersFromSharedGroups(userId, groupIds),
-    listCoMembersFromSharedTeams(userId, teamIds),
-    listSignedUpRecordsForSharedContext(organizationId, groupIds, teamIds),
+  await Promise.all([
+    ...groupIds.map((groupId) => reconcileGroupPlaceholderUsers(groupId)),
+    ...teamIds.map((teamId) => reconcileTeamPlaceholderUsers(teamId)),
   ]);
 
-  return resolveDmEligibleUserIds(userId, [...groupMembers, ...teamMembers], signedUpRecords);
+  const [groupMembers, teamMembers, signedUpRecords, directGroupIds, directTeamIds] =
+    await Promise.all([
+      listCoMembersFromSharedGroups(userId, groupIds),
+      listCoMembersFromSharedTeams(userId, teamIds),
+      listSignedUpRecordsForSharedContext(organizationId, groupIds, teamIds),
+      listSignedUpCoMemberIdsInGroups(userId, groupIds),
+      listSignedUpCoMemberIdsInTeams(userId, teamIds),
+    ]);
+
+  const eligible = resolveDmEligibleUserIds(
+    userId,
+    [...groupMembers, ...teamMembers],
+    signedUpRecords,
+  );
+
+  for (const id of directGroupIds) eligible.add(id);
+  for (const id of directTeamIds) eligible.add(id);
+
+  return eligible;
 }
 
 /** @deprecated Use listDmEligibleUserIds */

@@ -13,6 +13,7 @@ import {
   apiFetch,
   formatMention,
   uploadImage,
+  uploadVideo,
   type Message,
   type Reaction,
 } from "@/lib/api";
@@ -24,6 +25,8 @@ import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
+import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
+import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
 import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
@@ -171,6 +174,7 @@ export function ChatThread({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
+  const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLLIElement>(null);
@@ -714,22 +718,24 @@ export function ChatThread({
     }
   }
 
-  async function handleImage(file: File) {
+  async function handleMedia(file: File) {
     if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
     sendInFlightRef.current = true;
     setSendInFlight(true);
     setSendError(null);
     try {
-      const url = await uploadImage(file);
+      const isVideo =
+        file.type.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(file.name);
+      const url = isVideo ? await uploadVideo(file) : await uploadImage(file);
       await postMessage({
         body: body.trim(),
         clientMessageId: crypto.randomUUID(),
         attachmentUrl: url,
-        messageType: "image",
+        messageType: isVideo ? "video" : "image",
       });
       setBody("");
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Failed to upload image");
+      setSendError(err instanceof Error ? err.message : "Failed to upload media");
     } finally {
       sendInFlightRef.current = false;
       setSendInFlight(false);
@@ -1083,6 +1089,18 @@ export function ChatThread({
                           />
                         </button>
                       )}
+                      {m.attachmentUrl && m.messageType === "video" && (
+                        <VideoAttachmentPreview
+                          label={m.body || "Shared video"}
+                          onPlay={() => {
+                            if (messageActions.isRevealed(m.id)) return;
+                            setLightboxVideo({
+                              src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
+                              alt: m.body || "Shared video",
+                            });
+                          }}
+                        />
+                      )}
                       {m.body ? <MessageBody body={m.body} /> : null}
                     </div>
                     </MessageBubbleStack>
@@ -1191,17 +1209,17 @@ export function ChatThread({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void handleImage(file);
+              if (file) void handleMedia(file);
               e.target.value = "";
             }}
           />
           <ComposerAttachMenu
             disabled={composerLocked}
-            onPickImage={() => fileRef.current?.click()}
+            onPickMedia={() => fileRef.current?.click()}
           />
           <textarea
             ref={composerRef}
@@ -1243,6 +1261,14 @@ export function ChatThread({
         </div>
       )}
       </div>
+
+      {lightboxVideo && (
+        <AttachmentVideoLightbox
+          src={lightboxVideo.src}
+          alt={lightboxVideo.alt}
+          onClose={() => setLightboxVideo(null)}
+        />
+      )}
 
       {lightboxImage && (
         <AttachmentLightbox
