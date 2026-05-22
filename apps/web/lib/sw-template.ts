@@ -25,15 +25,45 @@ self.addEventListener("push", (event) => {
     payload.body = event.data.text();
   }
 
+  const notifyClients = self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    for (const client of clients) {
+      client.postMessage({
+        type: "cco:unread-push",
+        conversationId: payload.conversationId,
+        url: payload.url,
+      });
+    }
+  });
+
+  const bumpBadge = (async () => {
+    if (!("setAppBadge" in self.navigator)) return;
+    try {
+      const current = typeof self.navigator.getAppBadge === "function"
+        ? await self.navigator.getAppBadge()
+        : 0;
+      await self.navigator.setAppBadge((current || 0) + 1);
+    } catch {
+      try {
+        await self.navigator.setAppBadge(1);
+      } catch {
+        // Badging unavailable on this platform.
+      }
+    }
+  })();
+
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      tag: payload.conversationId || "cco-message",
-      renotify: true,
-      data: { url: payload.url, conversationId: payload.conversationId },
-    }),
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: payload.conversationId ? "cco-" + payload.conversationId : "cco-message",
+        renotify: true,
+        data: { url: payload.url, conversationId: payload.conversationId },
+      }),
+      notifyClients,
+      bumpBadge,
+    ]),
   );
 });
 

@@ -9,7 +9,7 @@ export function WebPushRegistrar() {
 
   useEffect(() => {
     if (sessionLoading || !session?.userId) return;
-    void ensureWebPushSubscription({ promptIfNeeded: true });
+    void ensureWebPushSubscription({ promptIfNeeded: false });
   }, [session?.userId, sessionLoading]);
 
   return null;

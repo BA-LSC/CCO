@@ -87,7 +87,7 @@ export async function ensureWebPushSubscription(options?: {
   }
 
   const shouldPrompt =
-    options?.promptIfNeeded !== false &&
+    options?.promptIfNeeded === true &&
     (isStandalonePwa() || Notification.permission === "granted");
 
   if (!shouldPrompt) return;

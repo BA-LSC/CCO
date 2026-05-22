@@ -90,3 +90,20 @@ export async function unreadFlagsForConversations(
 
   return result;
 }
+
+export async function countUnreadConversations(userId: string): Promise<number> {
+  const memberships = await db
+    .select({ conversationId: conversationMembers.conversationId })
+    .from(conversationMembers)
+    .where(eq(conversationMembers.userId, userId));
+
+  const conversationIds = memberships.map((row) => row.conversationId);
+  if (conversationIds.length === 0) return 0;
+
+  const flags = await unreadFlagsForConversations(conversationIds, userId);
+  let count = 0;
+  for (const hasUnread of flags.values()) {
+    if (hasUnread) count += 1;
+  }
+  return count;
+}

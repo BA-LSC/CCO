@@ -17,6 +17,7 @@ import { uploadsRouter } from "./routes/uploads";
 import { configurePubSub } from "./realtime/pubsub";
 import { setupRouter } from "./routes/setup";
 import { settingsRouter } from "./routes/settings";
+import { unreadRouter } from "./routes/unread";
 import { webhooksRouter } from "./webhooks/pco";
 
 void mkdir(getUploadDir(), { recursive: true });
@@ -52,6 +53,7 @@ app.route("/v1/conversations", conversationsRouter);
 app.route("/v1/messages", messagesRouter);
 app.route("/v1/session", sessionRouter);
 app.route("/v1/push", pushRouter);
+app.route("/v1/unread", unreadRouter);
 app.route("/v1/services", servicesRouter);
 app.route("/v1/setup", setupRouter);
 app.route("/v1/settings", settingsRouter);

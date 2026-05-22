@@ -12,7 +12,14 @@ import {
 import { isLeaderRole } from "../permissions";
 import { mergeGroups } from "../sync/groups";
 import { upsertUserFromPco } from "./bootstrap";
-import { buildSignedUpMemberIndex, buildLocalMemberLookups, findLocalMember, memberIsOnCco } from "./cco-member-status";
+import {
+  buildSignedUpMemberIndex,
+  buildSignedUpMemberRecords,
+  buildLocalMemberLookups,
+  findLocalMember,
+  findSignedUpMember,
+  memberIsOnCco,
+} from "./cco-member-status";
 import { ensureConversationMembers, ensureGeneralConversation, ensureGeneralConversationMembers } from "./conversations";
 
 export async function persistGroupSync(params: {
@@ -344,7 +351,10 @@ export async function listGroupMembersForDetail(params: {
     .innerJoin(users, eq(users.id, groupMemberships.userId))
     .where(eq(groupMemberships.groupId, params.groupId));
 
-  const signedUp = await buildSignedUpMemberIndex(params.organizationId);
+  const [signedUp, signedUpRecords] = await Promise.all([
+    buildSignedUpMemberIndex(params.organizationId),
+    buildSignedUpMemberRecords(params.organizationId),
+  ]);
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {
@@ -368,21 +378,27 @@ export async function listGroupMembersForDetail(params: {
 
     return sortGroupMembersByName(
       roster.map((person) => {
-        const local = findLocalMember(person, localLookups);
-        const displayName = local?.displayName ?? rosterDisplayName(person);
+        const rosterName = rosterDisplayName(person);
+        const local = findLocalMember(
+          { pcoPersonId: person.pcoPersonId, email: person.email, displayName: rosterName },
+          localLookups,
+        );
+        const matchPerson = {
+          pcoPersonId: person.pcoPersonId,
+          email: person.email ?? local?.email,
+          displayName: rosterName,
+        };
+        const signedUpMember = findSignedUpMember(matchPerson, signedUpRecords);
         const onCco = memberIsOnCco(
-          {
-            pcoPersonId: person.pcoPersonId,
-            email: person.email ?? local?.email,
-            displayName,
-          },
-          local?.id,
+          matchPerson,
+          local?.id ?? signedUpMember?.userId,
           signedUp,
+          signedUpRecords,
         );
         return {
-          id: local?.id,
+          id: local?.id ?? signedUpMember?.userId,
           pcoPersonId: person.pcoPersonId,
-          displayName,
+          displayName: rosterName,
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
           onCco,

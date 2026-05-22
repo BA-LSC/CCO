@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildLocalMemberLookups,
+  buildSignedUpMemberIndex,
+  buildSignedUpMemberRecords,
   findLocalMember,
+  findSignedUpMember,
   memberIsOnCco,
+  namesLikelyMatch,
   type SignedUpMemberIndex,
+  type SignedUpMemberRecord,
 } from "./cco-member-status";
 
 function index(overrides: Partial<SignedUpMemberIndex> = {}): SignedUpMemberIndex {
@@ -70,6 +75,30 @@ describe("memberIsOnCco", () => {
       ),
     ).toBe(false);
   });
+
+  test("matches via signed-up records when local placeholder name blocked index lookup", () => {
+    const records: SignedUpMemberRecord[] = [
+      {
+        userId: "user-noah",
+        pcoPersonId: "oauth-id",
+        email: "noah@example.com",
+        displayName: "noah passeau",
+      },
+    ];
+
+    expect(
+      memberIsOnCco(
+        {
+          pcoPersonId: "roster-id",
+          email: null,
+          displayName: "Noah Passeau",
+        },
+        "placeholder-user-id",
+        index(),
+        records,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("findLocalMember", () => {
@@ -89,5 +118,55 @@ describe("findLocalMember", () => {
       email: "noah@example.com",
       id: "user-1",
     });
+  });
+
+  test("falls back to display name when ids and email differ", () => {
+    const lookups = buildLocalMemberLookups([
+      {
+        pcoPersonId: "local-id",
+        email: "123@placeholder.local",
+        displayName: "Noah Passeau",
+        id: "user-1",
+      },
+    ]);
+
+    expect(
+      findLocalMember(
+        { pcoPersonId: "roster-id", email: null, displayName: "Noah Passeau" },
+        lookups,
+      ),
+    ).toEqual({
+      pcoPersonId: "local-id",
+      email: "123@placeholder.local",
+      displayName: "Noah Passeau",
+      id: "user-1",
+    });
+  });
+});
+
+describe("findSignedUpMember", () => {
+  test("matches by fuzzy display name", () => {
+    const records: SignedUpMemberRecord[] = [
+      {
+        userId: "user-noah",
+        pcoPersonId: "oauth-id",
+        email: null,
+        displayName: "noah j passeau",
+      },
+    ];
+
+    expect(
+      findSignedUpMember(
+        { pcoPersonId: "roster-id", email: null, displayName: "Noah Passeau" },
+        records,
+      ),
+    ).toEqual(records[0]);
+  });
+});
+
+describe("namesLikelyMatch", () => {
+  test("requires two shared tokens for full names", () => {
+    expect(namesLikelyMatch("Noah Passeau", "Noah Passeau")).toBe(true);
+    expect(namesLikelyMatch("John Smith", "John Doe")).toBe(false);
   });
 });

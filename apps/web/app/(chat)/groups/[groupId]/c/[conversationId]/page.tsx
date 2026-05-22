@@ -47,8 +47,9 @@ export default function GroupConversationPage() {
     messagesForConversationId === conversationId ? messages : [];
   const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
-  async function reloadDetail() {
-    const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`);
+  async function reloadDetail(options?: { sync?: boolean }) {
+    const query = options?.sync ? "?sync=1" : "";
+    const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}${query}`);
     setDetail(data);
     return data;
   }
@@ -119,6 +120,7 @@ export default function GroupConversationPage() {
 
   useEffect(() => {
     if (!showChannelSettings || !isLeader) return;
+    void reloadDetail({ sync: true }).catch((err) => setError(getErrorMessage(err)));
     apiFetch<{ members: ConversationMember[] }>(
       `/api/v1/conversations/${conversationId}/members?groupId=${encodeURIComponent(groupId)}`,
     )
