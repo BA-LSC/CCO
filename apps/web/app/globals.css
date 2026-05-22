@@ -3098,11 +3098,15 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .chat-thread .message-item--spacing-medium {
   margin-top: 4px;
+}
+
+.chat-thread .message-item--other.message-item--spacing-medium {
+  margin-top: 6px;
 }
 
 /* New segment after a 5+ minute gap — room before the timestamp label */
@@ -3124,6 +3128,10 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 10px;
 }
 
+.chat-thread .message-item--group-last + .message-item--other {
+  margin-top: 12px;
+}
+
 .chat-thread .message-item--group-last + .message-item--spacing-tight {
   margin-top: 10px;
 }
@@ -3132,8 +3140,11 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 14px;
 }
 
-/* Slight extra room when the conversation switches between you and someone else */
-.chat-thread .message-item:not(.message-item--group-last) + .message-item--other:not(.message-item--timestamp-start),
+/* Slight extra room when the conversation switches between speakers */
+.chat-thread .message-item:not(.message-item--group-last) + .message-item--other:not(.message-item--spacing-tight):not(.message-item--timestamp-start) {
+  margin-top: 10px;
+}
+
 .chat-thread .message-item:not(.message-item--group-last) + .message-item--own:not(.message-item--timestamp-start) {
   margin-top: 6px;
 }
@@ -3225,7 +3236,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-content:has(.attachment) {
-  max-width: min(94%, 432px);
+  max-width: min(94%, 444px);
 }
 
 .chat-thread .message-item--own .message-content {
@@ -3758,8 +3769,8 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread .attachment {
   display: block;
   width: auto;
-  max-width: min(100%, 420px);
-  max-height: 320px;
+  max-width: min(100%, 432px);
+  max-height: 328px;
   border-radius: 12px;
   margin: 0 0 6px;
   object-fit: contain;
@@ -3782,8 +3793,8 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread .message-bubble:has(.attachment) .attachment {
   margin: 0;
   border-radius: 12px;
-  max-width: min(408px, 100%);
-  max-height: 308px;
+  max-width: min(420px, 100%);
+  max-height: 316px;
   width: auto;
 }
 
@@ -4016,7 +4027,7 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread
   .message-item:has(.message-bubble-stack--has-reactions):has(+ .message-item--spacing-tight)
   .message-reaction-row {
-  margin-bottom: 3px;
+  margin-bottom: 1px;
 }
 
 .chat-thread .message-reaction-pills {
@@ -4297,7 +4308,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread-panel .message-content:has(.attachment) {
-  max-width: min(94%, 432px);
+  max-width: min(94%, 444px);
 }
 
 .chat-thread-panel .edit-form {

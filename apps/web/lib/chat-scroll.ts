@@ -38,3 +38,68 @@ export function scheduleScrollMessagesToBottom(container: HTMLElement): () => vo
     cancelAnimationFrame(raf2);
   };
 }
+
+function pinIfNeeded(container: HTMLElement, shouldPin: () => boolean): void {
+  if (shouldPin()) scrollMessagesToBottom(container);
+}
+
+function schedulePinIfNeeded(container: HTMLElement, shouldPin: () => boolean): void {
+  if (!shouldPin()) return;
+  scheduleScrollMessagesToBottom(container);
+}
+
+/**
+ * Re-pin to the bottom when images decode/resize — list ResizeObserver alone can lag
+ * a frame behind img load, which shows as a small upward jump on open/reload.
+ */
+export function observePinnedScrollContent(
+  container: HTMLElement,
+  shouldPin: () => boolean,
+): () => void {
+  const trackedImages = new WeakSet<HTMLImageElement>();
+  const imageResizeObserver = new ResizeObserver(() => {
+    schedulePinIfNeeded(container, shouldPin);
+  });
+
+  const trackImage = (img: HTMLImageElement) => {
+    if (trackedImages.has(img)) return;
+    trackedImages.add(img);
+    imageResizeObserver.observe(img);
+    const onReady = () => schedulePinIfNeeded(container, shouldPin);
+    if (img.complete) {
+      onReady();
+      return;
+    }
+    img.addEventListener("load", onReady, { once: true });
+    img.addEventListener("error", onReady, { once: true });
+  };
+
+  const onCaptureLoad = (event: Event) => {
+    if (!(event.target instanceof HTMLImageElement)) return;
+    if (!container.contains(event.target)) return;
+    schedulePinIfNeeded(container, shouldPin);
+  };
+
+  container.addEventListener("load", onCaptureLoad, true);
+  container.querySelectorAll("img").forEach((img) => trackImage(img));
+
+  const mutationObserver = new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof HTMLImageElement) trackImage(node);
+        else if (node instanceof HTMLElement) {
+          node.querySelectorAll("img").forEach((img) => trackImage(img));
+        }
+      }
+    }
+  });
+  mutationObserver.observe(container, { childList: true, subtree: true });
+
+  pinIfNeeded(container, shouldPin);
+
+  return () => {
+    container.removeEventListener("load", onCaptureLoad, true);
+    imageResizeObserver.disconnect();
+    mutationObserver.disconnect();
+  };
+}

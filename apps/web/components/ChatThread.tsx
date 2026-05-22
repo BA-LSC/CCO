@@ -28,6 +28,7 @@ import { applyReactionChange, mergeConversationMessages } from "@/lib/message-re
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
   maxScrollTop,
+  observePinnedScrollContent,
   scheduleScrollMessagesToBottom,
   scrollMessagesToBottom,
 } from "@/lib/chat-scroll";
@@ -439,8 +440,14 @@ export function ChatThread({
     const container = getScrollContainer();
     if (!container) return;
 
+    const shouldPin = () => {
+      if (pendingScrollRestoreRef.current) return false;
+      if (loadingMoreRef.current) return false;
+      return pinnedToBottomRef.current || autoScrollToBottomRef.current;
+    };
+
     const onResize = () => {
-      if (pinnedToBottomRef.current || autoScrollToBottomRef.current) {
+      if (shouldPin()) {
         scrollMessagesToBottom(container);
         return;
       }
@@ -448,13 +455,17 @@ export function ChatThread({
     };
 
     updateScrollPinned();
+    const stopWatchingContent = observePinnedScrollContent(container, shouldPin);
     const observer = new ResizeObserver(onResize);
     observer.observe(container);
     const inner = container.querySelector<HTMLElement>(".chat-panel-messages-inner");
     if (inner) observer.observe(inner);
     const list = messagesListRef.current;
     if (list) observer.observe(list);
-    return () => observer.disconnect();
+    return () => {
+      stopWatchingContent();
+      observer.disconnect();
+    };
   }, [layout, messages.length, updateScrollPinned]);
 
   const onEvent = useCallback(
