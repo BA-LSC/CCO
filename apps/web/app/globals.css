@@ -3365,15 +3365,16 @@ html[data-theme="6"] .user-menu-dropdown {
   z-index: 4;
   max-width: min(320px, calc(100vw - 32px));
   flex-wrap: nowrap;
+  --message-actions-edge-inset: 8px;
 }
 
 .chat-thread .message-item--other .message-actions {
-  left: 0;
+  left: var(--message-actions-edge-inset);
   right: auto;
 }
 
 .chat-thread .message-item--own .message-actions {
-  right: 0;
+  right: var(--message-actions-edge-inset);
   left: auto;
 }
 
