@@ -576,12 +576,17 @@ export function ChatThread({
   useEffect(() => {
     const root = getScrollContainer();
     const sentinel = topSentinelRef.current;
-    if (!root || !sentinel || !hasMore || messages.length === 0 || loadingMore) return;
+    if (!scrollReady || !root || !sentinel || !hasMore || messages.length === 0 || loadingMore) {
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
+        if (!initialScrollDoneRef.current) return;
         if (loadingMoreRef.current || !hasMoreRef.current) return;
+        // Still pinning to latest on open/reload — don't prefetch history until the user scrolls up.
+        if (autoScrollToBottomRef.current) return;
         if (isAtScrollBottom(root)) return;
         void loadOlder();
       },
@@ -590,7 +595,7 @@ export function ChatThread({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadOlder, layout, messages.length, loadingMore]);
+  }, [hasMore, loadOlder, layout, messages.length, loadingMore, scrollReady]);
 
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
