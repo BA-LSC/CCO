@@ -427,22 +427,17 @@ export async function listGroupMembersForDetail(params: {
 
   if (useCachedRoster || !isLeader || !params.accessToken) {
     return sortGroupMembersByName(
-      mapCcoGroupMembers(
-        ccoMembers,
-        new Map(),
-        useCachedRoster
-          ? true
-          : (member) =>
-              memberIsOnCco(
-                {
-                  pcoPersonId: member.pcoPersonId,
-                  email: member.email,
-                  displayName: member.displayName,
-                },
-                member.id,
-                signedUp,
-                signedUpRecords,
-              ),
+      mapCcoGroupMembers(ccoMembers, new Map(), (member) =>
+        memberIsOnCco(
+          {
+            pcoPersonId: member.pcoPersonId,
+            email: member.email,
+            displayName: member.displayName,
+          },
+          member.id,
+          signedUp,
+          signedUpRecords,
+        ),
       ),
     );
   }

@@ -55,7 +55,13 @@ export default function DmChatPage() {
     ? [
         { id: detail.participant.id, displayName: detail.participant.displayName, avatarUrl: detail.participant.avatarUrl },
         ...(session?.userId && session.displayName
-          ? [{ id: session.userId, displayName: session.displayName }]
+          ? [
+              {
+                id: session.userId,
+                displayName: session.displayName,
+                avatarUrl: session.avatarUrl ?? null,
+              },
+            ]
           : []),
       ]
     : [];
@@ -68,7 +74,13 @@ export default function DmChatPage() {
           avatarUrl: detail.participant.avatarUrl,
         },
         ...(session?.userId
-          ? [{ id: session.userId, displayName: session.displayName ?? "You" }]
+          ? [
+              {
+                id: session.userId,
+                displayName: session.displayName ?? "You",
+                avatarUrl: session.avatarUrl ?? null,
+              },
+            ]
           : []),
       ]
     : [];

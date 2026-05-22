@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { getPcoAccessToken } from "../auth/pco-tokens";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { areOrgWebhooksEnabled } from "./pco-cache";
 
 type PcoMeResponse = {
   data?: {
@@ -21,13 +20,8 @@ export async function refreshUserAvatarFromPco(
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (!options?.force) {
-    if (await areOrgWebhooksEnabled()) {
-      return existing[0]?.avatarUrl ?? null;
-    }
-    if (existing[0]?.avatarUrl) {
-      return existing[0].avatarUrl;
-    }
+  if (!options?.force && existing[0]?.avatarUrl) {
+    return existing[0].avatarUrl;
   }
 
   const token = await getPcoAccessToken(userId);

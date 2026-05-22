@@ -1,7 +1,9 @@
 "use client";
 
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { usePresenceWatch } from "@/components/PresenceProvider";
+import { resolveMemberAvatarUrl } from "@/lib/member-avatar";
 
 export type PresenceMember = {
   id?: string;
@@ -20,6 +22,7 @@ export function PresenceMembersSection({
   members,
   enabled = true,
 }: Props) {
+  const { session } = useChatLayout();
   usePresenceWatch(
     members.map((member) => member.id),
     enabled && members.length > 0,
@@ -40,7 +43,7 @@ export function PresenceMembersSection({
                 <UserAvatarWithPresence
                   userId={member.id}
                   displayName={member.displayName}
-                  avatarUrl={member.avatarUrl}
+                  avatarUrl={resolveMemberAvatarUrl(member, session)}
                   className="channel-member-avatar"
                 />
                 <span className="channel-member-name">{member.displayName}</span>

@@ -1,5 +1,6 @@
 import {
   parseMembershipWebhookPayload,
+  parsePersonAvatarUrl,
   type MembershipWebhookPayload,
 } from "@cco/pco-client";
 import { eq } from "drizzle-orm";
@@ -127,7 +128,16 @@ export async function handleMembershipUpsert(
 }
 
 export async function handlePersonUpdated(payload: {
-  data: { id: string; attributes: { first_name?: string; last_name?: string; email?: string } };
+  data: {
+    id: string;
+    attributes: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      avatar_url?: string;
+      demographic_avatar_url?: string;
+    };
+  };
 }): Promise<boolean> {
   const personId = payload.data.id;
   const displayName =
@@ -136,9 +146,13 @@ export async function handlePersonUpdated(payload: {
       .join(" ")
       .trim() || "User";
 
-  const patch: { displayName: string; email?: string } = { displayName };
+  const patch: { displayName: string; email?: string; avatarUrl?: string } = { displayName };
   if (payload.data.attributes.email) {
     patch.email = payload.data.attributes.email;
+  }
+  const avatarUrl = parsePersonAvatarUrl(payload.data.attributes);
+  if (avatarUrl) {
+    patch.avatarUrl = avatarUrl;
   }
 
   const updated = await db

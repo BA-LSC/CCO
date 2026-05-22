@@ -449,22 +449,17 @@ async function listTeamMembersForDetail(params: {
 
   if (useCachedRoster || !isLeader || !params.accessToken) {
     return sortTeamMembersByName(
-      mapCcoTeamMembers(
-        ccoMembers,
-        new Map(),
-        useCachedRoster
-          ? true
-          : (member) =>
-              memberIsOnCco(
-                {
-                  pcoPersonId: member.pcoPersonId,
-                  email: member.email,
-                  displayName: member.displayName,
-                },
-                member.id,
-                signedUp,
-                signedUpRecords,
-              ),
+      mapCcoTeamMembers(ccoMembers, new Map(), (member) =>
+        memberIsOnCco(
+          {
+            pcoPersonId: member.pcoPersonId,
+            email: member.email,
+            displayName: member.displayName,
+          },
+          member.id,
+          signedUp,
+          signedUpRecords,
+        ),
       ),
     );
   }
