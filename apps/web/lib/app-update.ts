@@ -262,6 +262,16 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
+  // Deploy draining — show the overlay even while the old version is still live.
+  if (updating) {
+    if (!unavailable && serverVersion && serverVersion !== clientVersion) {
+      await applyAppUpdate(onUpdating);
+      return true;
+    }
+    markDeployWait(onUpdating);
+    return false;
+  }
+
   if (serverVersion && serverVersion === clientVersion) {
     clearReloadLoopGuard();
     if (isDeployPending()) clearDeployWait();
@@ -272,15 +282,10 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     !unavailable &&
     serverVersion &&
     serverVersion !== clientVersion &&
-    (updating || isDeployPending())
+    isDeployPending()
   ) {
     await applyAppUpdate(onUpdating);
     return true;
-  }
-
-  if (updating) {
-    markDeployWait(onUpdating);
-    return false;
   }
 
   if (isDeployPending()) {

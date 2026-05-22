@@ -143,16 +143,15 @@ function handleVersionPayload(d){
   if(!d.version)return;
   if(maybeCompletePostDeploy(d))return;
   var needsReload=d.version!==CLIENT;
-  if(needsReload&&(deployPending||d.updating)){
-    applyUpdate(true);
+  if(d.updating){
+    markDeployPending();
+    if(needsReload){
+      applyUpdate(true);
+    }
     return;
   }
-  if(d.updating){
-    if(!needsReload){
-      clearDeployPending();
-      return;
-    }
-    markDeployPending();
+  if(needsReload&&deployPending){
+    applyUpdate(true);
     return;
   }
   if(deployPending)return;

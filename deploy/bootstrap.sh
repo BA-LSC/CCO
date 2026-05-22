@@ -83,12 +83,27 @@ fi
 
 cco_stop_setup_connector
 
-DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-4}"
+DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-8}"
 DEPLOY_DRAINING_TTL_SEC="${DEPLOY_DRAINING_TTL_SEC:-600}"
+
+ensure_deploy_signal_services() {
+  # Keep the previous stack reachable so /health can report draining during build/migrate.
+  "${COMPOSE[@]}" up -d redis api >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do
+    if "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" ping 2>/dev/null | grep -q PONG; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "  Warning: redis is not reachable — clients may not see the update screen." >&2
+}
 
 mark_deploy_draining() {
   echo "  Signaling connected clients to show the update screen..."
-  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX "${DEPLOY_DRAINING_TTL_SEC}" >/dev/null 2>&1 || true
+  if ! "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX "${DEPLOY_DRAINING_TTL_SEC}" >/dev/null 2>&1; then
+    echo "  Warning: could not set deploy draining flag in redis." >&2
+    return 1
+  fi
 }
 
 clear_deploy_draining() {
@@ -104,13 +119,16 @@ cco_env_upsert "CCO_BUILD_ID" "$CCO_BUILD_ID" .env
 echo "  Web build id: ${CCO_BUILD_ID}"
 "${COMPOSE[@]}" build
 
-mark_deploy_draining
+echo ""
+echo "Build complete. Showing the update screen before migrations..."
+ensure_deploy_signal_services
+mark_deploy_draining || true
 echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
 sleep "$DEPLOY_DRAIN_WAIT_SEC"
 
 cco_run_migrations files
 
-mark_deploy_draining
+mark_deploy_draining || true
 
 echo "Recreating containers with new images..."
 "${COMPOSE[@]}" up -d --no-build
