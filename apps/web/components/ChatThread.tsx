@@ -186,6 +186,7 @@ export function ChatThread({
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
   const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
   const [composerDragOver, setComposerDragOver] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -227,14 +228,28 @@ export function ChatThread({
     return () => revokePendingComposerMedia(pendingMedia);
   }, [pendingMedia]);
 
+  const resetComposerDragState = useCallback(() => {
+    composerDragDepthRef.current = 0;
+    setComposerDragOver(false);
+  }, []);
+
   useEffect(() => {
     setPendingMedia((current) => {
       revokePendingComposerMedia(current);
       return null;
     });
-    setComposerDragOver(false);
-    composerDragDepthRef.current = 0;
-  }, [conversationId]);
+    resetComposerDragState();
+  }, [conversationId, resetComposerDragState]);
+
+  useEffect(() => {
+    if (!canPost) return;
+
+    const resetDrag = () => resetComposerDragState();
+    window.addEventListener("dragend", resetDrag);
+    return () => window.removeEventListener("dragend", resetDrag);
+  }, [canPost, resetComposerDragState]);
+
+  const canSendMessage = Boolean(body.trim() || pendingMedia) && !composerLocked && !isSending;
 
   const scrollBottomThresholdPx = 72;
 
@@ -632,7 +647,10 @@ export function ChatThread({
     attachmentUrl?: string;
     messageType?: string;
   }) {
-    if (!conversationId || isAppUpdateInProgress()) return;
+    if (!conversationId) return;
+    if (isAppUpdateInProgress()) {
+      throw new Error("App is updating. Try again in a moment.");
+    }
     const { message } = await apiFetch<{ message: Message }>(
       `/api/v1/messages?conversationId=${conversationId}`,
       { method: "POST", body: JSON.stringify(payload) },
@@ -728,6 +746,7 @@ export function ChatThread({
     setSendError(null);
     sendInFlightRef.current = true;
     setSendInFlight(true);
+    setIsSending(true);
 
     try {
       let attachmentUrl: string | undefined;
@@ -737,8 +756,6 @@ export function ChatThread({
         attachmentUrl =
           media.kind === "video" ? await uploadVideo(media.file) : await uploadImage(media.file);
         messageType = media.kind;
-        revokePendingComposerMedia(media);
-        setPendingMedia(null);
       }
 
       await postMessage({
@@ -746,11 +763,19 @@ export function ChatThread({
         clientMessageId: crypto.randomUUID(),
         ...(attachmentUrl ? { attachmentUrl, messageType } : {}),
       });
+
+      if (media) {
+        revokePendingComposerMedia(media);
+        setPendingMedia(null);
+      }
       setBody("");
       clearComposerDraft(conversationId);
+      resetComposerDragState();
     } catch (err) {
       if (media) {
-        setPendingMedia(media);
+        revokePendingComposerMedia(media);
+        const restored = createPendingComposerMedia(media.file);
+        setPendingMedia(restored);
       }
       if (text) {
         setBody(text);
@@ -760,6 +785,7 @@ export function ChatThread({
     } finally {
       sendInFlightRef.current = false;
       setSendInFlight(false);
+      setIsSending(false);
       focusComposer();
     }
   }
@@ -791,6 +817,7 @@ export function ChatThread({
       revokePendingComposerMedia(current);
       return next;
     });
+    resetComposerDragState();
     focusComposer();
   }
 
@@ -813,8 +840,6 @@ export function ChatThread({
   }
 
   function handleComposerDragLeave(e: React.DragEvent<HTMLDivElement>) {
-    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
-
     e.preventDefault();
     composerDragDepthRef.current = Math.max(0, composerDragDepthRef.current - 1);
     if (composerDragDepthRef.current === 0) {
@@ -824,8 +849,7 @@ export function ChatThread({
 
   function handleComposerDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
-    composerDragDepthRef.current = 0;
-    setComposerDragOver(false);
+    resetComposerDragState();
 
     if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
 
@@ -1323,6 +1347,12 @@ export function ChatThread({
         />
       ) : null}
 
+      {sendError ? (
+        <p className="composer-send-error" role="alert">
+          {sendError}
+        </p>
+      ) : null}
+
       {canPost ? (
         <form
           onSubmit={handleSend}
@@ -1337,7 +1367,7 @@ export function ChatThread({
           <input
             ref={fileRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.mov"
+            accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp4,.webm,.mov"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -1363,9 +1393,9 @@ export function ChatThread({
           <button
             type="submit"
             className="composer-send"
-            disabled={composerLocked || (!body.trim() && !pendingMedia)}
-            aria-label="Send message"
-            onMouseDown={(e) => e.preventDefault()}
+            disabled={!canSendMessage}
+            aria-label={isSending ? "Sending message" : "Send message"}
+            aria-busy={isSending}
           >
             <svg
               className="composer-send-icon"

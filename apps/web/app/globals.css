@@ -4572,9 +4572,11 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-shrink: 0;
 }
 
-.chat-composer-stack--drag-over .composer,
-.chat-composer-stack--drag-over .composer-pending-media {
-  pointer-events: none;
+.composer-send-error {
+  margin: 0;
+  padding: 6px var(--chat-inset-x, 12px) 0;
+  color: var(--color-danger, #f87171);
+  font-size: 0.82rem;
 }
 
 .composer-drop-overlay {

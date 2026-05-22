@@ -12,7 +12,10 @@ export function inferComposerMediaKind(file: File): ComposerMediaKind | null {
   if (file.type.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(file.name)) {
     return "video";
   }
-  if (file.type.startsWith("image/") || /\.(jpe?g|png|gif|webp)$/i.test(file.name)) {
+  if (
+    file.type.startsWith("image/") ||
+    /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(file.name)
+  ) {
     return "image";
   }
   return null;
