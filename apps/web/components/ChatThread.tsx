@@ -763,34 +763,37 @@ export function ChatThread({
     setSendInFlight(true);
     setIsSending(true);
 
+    let attachmentSent = false;
+
     try {
-      let attachmentUrl: string | undefined;
-      let messageType: "image" | "video" | undefined;
-
       if (media) {
-        attachmentUrl =
+        const attachmentUrl =
           media.kind === "video" ? await uploadVideo(media.file) : await uploadImage(media.file);
-        messageType = media.kind;
-      }
-
-      await postMessage({
-        body: text,
-        clientMessageId: crypto.randomUUID(),
-        ...(attachmentUrl ? { attachmentUrl, messageType } : {}),
-      });
-
-      if (media) {
+        await postMessage({
+          body: "",
+          clientMessageId: crypto.randomUUID(),
+          attachmentUrl,
+          messageType: media.kind,
+        });
+        attachmentSent = true;
         revokePendingComposerMedia(media);
         setPendingMedia(null);
       }
+
+      if (text) {
+        await postMessage({
+          body: text,
+          clientMessageId: crypto.randomUUID(),
+        });
+      }
+
       setBody("");
       clearComposerDraft(conversationId);
       resetComposerDragState();
     } catch (err) {
-      if (media) {
+      if (media && !attachmentSent) {
         revokePendingComposerMedia(media);
-        const restored = createPendingComposerMedia(media.file);
-        setPendingMedia(restored);
+        setPendingMedia(createPendingComposerMedia(media.file));
       }
       if (text) {
         setBody(text);
