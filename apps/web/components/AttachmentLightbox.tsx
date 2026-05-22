@@ -29,6 +29,34 @@ function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 }
 
+function stageFocalPoint(stage: HTMLElement, clientX: number, clientY: number) {
+  const rect = stage.getBoundingClientRect();
+  return {
+    x: clientX - rect.left - rect.width / 2,
+    y: clientY - rect.top - rect.height / 2,
+  };
+}
+
+/** Keep the image point under (focalX, focalY) fixed while changing scale. */
+function zoomAtFocal(
+  current: Transform,
+  focalX: number,
+  focalY: number,
+  nextScale: number,
+): Transform {
+  const scale = clampScale(nextScale);
+  if (scale <= 1) return { scale: 1, x: 0, y: 0 };
+
+  const px = (focalX - current.x) / current.scale;
+  const py = (focalY - current.y) / current.scale;
+
+  return {
+    scale,
+    x: focalX - px * scale,
+    y: focalY - py * scale,
+  };
+}
+
 export function AttachmentLightbox({ src, alt, onClose }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, x: 0, y: 0 });
@@ -38,7 +66,13 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
   transformRef.current = transform;
 
   const gestureRef = useRef<
-    | { type: "pinch"; startDist: number; startScale: number }
+    | {
+        type: "pinch";
+        startDist: number;
+        startScale: number;
+        startX: number;
+        startY: number;
+      }
     | { type: "pan"; startX: number; startY: number; startTx: number; startTy: number }
     | null
   >(null);
@@ -101,6 +135,8 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
           type: "pinch",
           startDist: touchDistance(event.touches[0]!, event.touches[1]!),
           startScale: transformRef.current.scale,
+          startX: transformRef.current.x,
+          startY: transformRef.current.y,
         };
         return;
       }
@@ -124,11 +160,19 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
       event.preventDefault();
 
       if (gesture.type === "pinch" && event.touches.length >= 2) {
-        const dist = touchDistance(event.touches[0]!, event.touches[1]!);
-        applyTransform({
-          ...transformRef.current,
-          scale: gesture.startScale * (dist / gesture.startDist),
-        });
+        const first = event.touches[0]!;
+        const second = event.touches[1]!;
+        const dist = touchDistance(first, second);
+        const focal = stageFocalPoint(stage, (first.clientX + second.clientX) / 2, (first.clientY + second.clientY) / 2);
+        const nextScale = gesture.startScale * (dist / gesture.startDist);
+        applyTransform(
+          zoomAtFocal(
+            { scale: gesture.startScale, x: gesture.startX, y: gesture.startY },
+            focal.x,
+            focal.y,
+            nextScale,
+          ),
+        );
         return;
       }
 
@@ -166,10 +210,10 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const delta = event.deltaY > 0 ? 0.92 : 1.08;
-      applyTransform({
-        ...transformRef.current,
-        scale: transformRef.current.scale * delta,
-      });
+      const focal = stageFocalPoint(stage, event.clientX, event.clientY);
+      applyTransform(
+        zoomAtFocal(transformRef.current, focal.x, focal.y, transformRef.current.scale * delta),
+      );
     };
 
     stage.addEventListener("touchstart", onTouchStart, { passive: true });

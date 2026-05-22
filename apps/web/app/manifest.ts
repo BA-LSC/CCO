@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "CCO",
     description:
       "Chat Center Online — Planning Center groups messaging for your church community",
-    start_url: "/",
+    start_url: "/groups",
     display: "standalone",
     background_color: "#090b10",
     theme_color: "#111620",

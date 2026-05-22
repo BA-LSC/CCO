@@ -2537,6 +2537,14 @@ html[data-theme="6"] .user-menu-dropdown {
   letter-spacing: 0.03em;
 }
 
+.app-update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  background: var(--color-bg);
+}
+
 .error-screen {
   padding: 24px 20px;
 }
@@ -3186,6 +3194,10 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow: visible;
 }
 
+.chat-thread .message-content:has(.attachment) {
+  max-width: min(94%, 432px);
+}
+
 .chat-thread .message-item--own .message-content {
   align-items: flex-end;
 }
@@ -3713,15 +3725,15 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread .attachment {
   display: block;
   width: auto;
-  max-width: min(100%, 320px);
-  max-height: 240px;
+  max-width: min(100%, 420px);
+  max-height: 320px;
   border-radius: 12px;
   margin: 0 0 6px;
   object-fit: contain;
 }
 
 .chat-thread .message-bubble:has(.attachment) {
-  padding: 2px;
+  padding: 6px;
   overflow: visible;
 }
 
@@ -3731,17 +3743,20 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow: hidden;
   line-height: 0;
   max-width: 100%;
+  border-radius: 12px;
 }
 
 .chat-thread .message-bubble:has(.attachment) .attachment {
   margin: 0;
-  border-radius: 14px;
-  max-width: min(316px, 100%);
+  border-radius: 12px;
+  max-width: min(408px, 100%);
+  max-height: 308px;
+  width: auto;
 }
 
 .chat-thread .message-bubble:has(.attachment) .message-body {
-  padding: 8px 10px 10px;
-  margin-top: 2px;
+  padding: 4px 8px 8px;
+  margin-top: 0;
 }
 
 .chat-thread .message-bubble .attachment:last-child {
@@ -4236,6 +4251,10 @@ html[data-theme="6"] .user-menu-dropdown {
   min-width: 0;
 }
 
+.chat-thread-panel .message-content:has(.attachment) {
+  max-width: min(94%, 432px);
+}
+
 .chat-thread-panel .edit-form {
   max-width: 70%;
 }
@@ -4275,8 +4294,6 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread-panel .chat-composer-stack {
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
 }

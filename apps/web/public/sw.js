@@ -1,4 +1,18 @@
-/* CCO service worker — web push for home-screen / PWA users */
+/* CCO service worker — web push + deploy updates for home-screen / PWA users */
+
+self.addEventListener("install", () => {
+  // Wait for the client to call skipWaiting so we can show an update overlay first.
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener("push", (event) => {
   if (!event.data) return;

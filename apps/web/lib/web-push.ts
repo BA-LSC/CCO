@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { registerAppServiceWorker } from "@/lib/service-worker-client";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -29,20 +30,10 @@ export function pushSupported(): boolean {
   );
 }
 
-async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
-  if (!pushSupported()) return null;
-  try {
-    return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-  } catch (err) {
-    console.warn("Service worker registration failed:", err);
-    return null;
-  }
-}
-
 export async function subscribeToWebPush(): Promise<boolean> {
   if (!pushSupported()) return false;
 
-  const registration = await getServiceWorkerRegistration();
+  const registration = await registerAppServiceWorker();
   if (!registration) return false;
 
   let permission = Notification.permission;
@@ -59,7 +50,7 @@ export async function subscribeToWebPush(): Promise<boolean> {
   });
 
   const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) return false;
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
 
   await apiFetch("/api/v1/push/web/subscribe", {
     method: "POST",
@@ -77,7 +68,9 @@ export async function ensureWebPushSubscription(options?: {
 }): Promise<void> {
   if (!pushSupported()) return;
 
-  const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  const registration = await registerAppServiceWorker();
+  if (!registration) return;
+
   const existing = await registration.pushManager.getSubscription();
   if (existing) {
     const json = existing.toJSON();

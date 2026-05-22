@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { ChatHomeBanner } from "@/components/ChatHomeBanner";
 import { EmptyChatPane } from "@/components/EmptyChatPane";
 import { apiFetch, type DmSummary, type GroupDetail, type GroupSummary, type ServiceTeamSummary } from "@/lib/api";
+import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
+import { readLastChatPath } from "@/lib/last-chat-path";
 import { useRouter } from "next/navigation";
 
 export default function GroupsHomePage() {
@@ -15,6 +17,14 @@ export default function GroupsHomePage() {
 
   useEffect(() => {
     if (justSynced || syncErrorFromLogin) return;
+
+    if (isStandaloneDisplay()) {
+      const lastPath = readLastChatPath();
+      if (lastPath) {
+        router.replace(lastPath);
+        return;
+      }
+    }
 
     async function redirectToFirst() {
       try {

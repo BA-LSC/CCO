@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { PlanningCenterSyncProvider } from "@/components/PlanningCenterSyncContext";
+import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
 
 type Props = {
@@ -20,6 +21,7 @@ export function AppShell({ children }: Props) {
 
   return (
     <PlanningCenterSyncProvider>
+      <ServiceWorkerUpdater />
       <div className="app">
         <AddToHomeScreenBanner />
         <div className="app-body">{children}</div>
