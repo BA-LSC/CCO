@@ -17,12 +17,13 @@ export function useConversationPollFallback(
   useEffect(() => {
     if (!conversationId) return;
 
+    const activeConversationId = conversationId;
     let cancelled = false;
 
     async function poll() {
       try {
         const data = await apiFetch<{ messages: Message[] }>(
-          conversationMessagesPath(conversationId, { limit: 50 }),
+          conversationMessagesPath(activeConversationId, { limit: 50 }),
         );
         if (cancelled) return;
 
