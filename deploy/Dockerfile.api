@@ -10,7 +10,7 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
 COPY apps/mobile/package.json apps/mobile/
 COPY services/api/package.json services/api/
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --linker hoisted
 
 FROM base AS runner
 ENV NODE_ENV=production

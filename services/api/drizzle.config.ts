@@ -1,5 +1,3 @@
-import { defineConfig } from "drizzle-kit";
-
 function databaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
   if (process.env.NODE_ENV === "production") {
@@ -8,11 +6,11 @@ function databaseUrl(): string {
   return "postgresql://connect:connect@localhost:5432/connect";
 }
 
-export default defineConfig({
+export default {
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
     url: databaseUrl(),
   },
-});
+};

@@ -5,8 +5,8 @@
     "": {
       "name": "connect",
       "devDependencies": {
-        "turbo": "latest",
-        "typescript": "latest",
+        "turbo": "^2.9.14",
+        "typescript": "^6.0.3",
       },
     },
     "apps/mobile": {
@@ -72,6 +72,7 @@
       "dependencies": {
         "@cco/pco-client": "workspace:*",
         "@cco/shared": "workspace:*",
+        "drizzle-kit": "^0.31.10",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.12.21",
         "ioredis": "^5.10.1",
@@ -81,7 +82,6 @@
       },
       "devDependencies": {
         "bun-types": "latest",
-        "drizzle-kit": "^0.31.10",
       },
     },
   },
