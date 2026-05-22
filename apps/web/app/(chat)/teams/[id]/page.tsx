@@ -164,10 +164,12 @@ export default function TeamChatPage() {
     });
   }
 
-  const activeTeamMembers =
-    detail?.members?.filter((member): member is ChannelMember & { id: string; onCco: true } =>
-      Boolean(member.onCco && member.id),
-    ) ?? [];
+  const mentionMembers =
+    detail?.members?.map((member) => ({
+      id: member.id,
+      displayName: member.displayName,
+      onCco: member.onCco,
+    })) ?? [];
 
   if (!detailLoading && error && !detail) {
     return (
@@ -254,7 +256,7 @@ export default function TeamChatPage() {
           initialMessages={threadMessages}
           hasMore={threadHasMore}
           firstUnreadMessageId={firstUnreadMessageId}
-          members={activeTeamMembers}
+          members={mentionMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}
           layout="panel"

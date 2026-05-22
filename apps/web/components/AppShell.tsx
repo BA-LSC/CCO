@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { PlanningCenterSyncProvider } from "@/components/PlanningCenterSyncContext";
 import { ServiceWorkerUpdater } from "@/components/ServiceWorkerUpdater";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
@@ -23,7 +22,6 @@ export function AppShell({ children }: Props) {
     <PlanningCenterSyncProvider>
       <ServiceWorkerUpdater />
       <div className="app">
-        <AddToHomeScreenBanner />
         <div className="app-body">{children}</div>
       </div>
     </PlanningCenterSyncProvider>

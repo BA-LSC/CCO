@@ -17,6 +17,7 @@ import {
   type ServiceTeamSummary,
 } from "@/lib/api";
 import { subscribeUnreadChanged } from "@/lib/sidebar-events";
+import { fetchSetupStatus } from "@/lib/setup";
 
 export function ChatSidebar() {
   const pathname = usePathname();
@@ -35,6 +36,7 @@ export function ChatSidebar() {
   const [dmPeople, setDmPeople] = useState<DmParticipant[]>([]);
   const [dmSearching, setDmSearching] = useState(false);
   const [creatingDm, setCreatingDm] = useState<string | null>(null);
+  const [churchName, setChurchName] = useState<string | null>(null);
 
   const loadSidebar = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -62,6 +64,12 @@ export function ChatSidebar() {
   useEffect(() => {
     void loadSidebar();
   }, [loadSidebar]);
+
+  useEffect(() => {
+    void fetchSetupStatus().then((status) => {
+      if (status.churchName) setChurchName(status.churchName);
+    });
+  }, []);
 
   useEffect(() => {
     if (!pcoSync) return;
@@ -159,6 +167,11 @@ export function ChatSidebar() {
       )}
 
       <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar-open" : ""}`} aria-label="Chat navigation">
+        {churchName ? (
+          <div className="sidebar-brand">
+            <span className="sidebar-brand-name">{churchName}</span>
+          </div>
+        ) : null}
         <div className="sidebar-scroll">
         {(error || pcoSync?.syncError) && (
           <div className="sidebar-alert" role="alert">

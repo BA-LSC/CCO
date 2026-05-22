@@ -17,8 +17,8 @@ import {
   buildSignedUpMemberRecords,
   buildLocalMemberLookups,
   findLocalMember,
-  findSignedUpMember,
   memberIsOnCco,
+  resolveRosterMemberLink,
 } from "./cco-member-status";
 import { ensureConversationMembers, ensureGeneralConversation, ensureGeneralConversationMembers } from "./conversations";
 
@@ -387,21 +387,22 @@ export async function listGroupMembersForDetail(params: {
           pcoPersonId: person.pcoPersonId,
           email: person.email ?? local?.email,
           displayName: rosterName,
+          firstName: person.firstName,
+          lastName: person.lastName,
         };
-        const signedUpMember = findSignedUpMember(matchPerson, signedUpRecords);
-        const onCco = memberIsOnCco(
+        const link = resolveRosterMemberLink(
           matchPerson,
-          local?.id ?? signedUpMember?.userId,
+          local?.id,
           signedUp,
           signedUpRecords,
         );
         return {
-          id: local?.id ?? signedUpMember?.userId,
+          id: link.userId,
           pcoPersonId: person.pcoPersonId,
           displayName: rosterName,
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
-          onCco,
+          onCco: link.onCco,
           email: person.email,
         };
       }),

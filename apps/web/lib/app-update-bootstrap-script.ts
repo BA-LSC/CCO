@@ -21,11 +21,13 @@ var deployPollId=null;
 var wired=false;
 var OVERLAY_ID="cco-app-update-overlay";
 var STYLE_ID="cco-app-update-overlay-style";
+var DEPLOY_RELOAD_KEY="cco-deploy-reload";
+var DEPLOY_RELOAD_GRACE_MS=15000;
 var CHECK_MS=5000;
 var DEPLOY_CHECK_MS=750;
 var OVERLAY_MS=2500;
 var SEND_WAIT_MS=8000;
-var DEPLOY_SEND_WAIT_MS=1500;
+var DEPLOY_SEND_WAIT_MS=500;
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
   var s=document.createElement("style");
@@ -58,6 +60,7 @@ function hideOverlay(){
   if(el)el.remove();
 }
 function markDeployPending(){
+  if(deployPending)return;
   deployPending=true;
   window.__ccoDeployPending=true;
   overlay();
@@ -72,6 +75,27 @@ function clearDeployPending(){
   if(deployPollId){
     clearInterval(deployPollId);
     deployPollId=null;
+  }
+}
+function markDeployReload(){
+  try{
+    sessionStorage.setItem(DEPLOY_RELOAD_KEY,String(Date.now()+DEPLOY_RELOAD_GRACE_MS));
+  }catch(e){}
+}
+function maybeCompletePostDeploy(d){
+  try{
+    var raw=sessionStorage.getItem(DEPLOY_RELOAD_KEY);
+    if(!raw)return false;
+    if(Number(raw)<Date.now()){
+      sessionStorage.removeItem(DEPLOY_RELOAD_KEY);
+      return false;
+    }
+    if(!d.version||d.version!==CLIENT)return false;
+    sessionStorage.removeItem(DEPLOY_RELOAD_KEY);
+    clearDeployPending();
+    return true;
+  }catch(e){
+    return false;
   }
 }
 function isDeployStatus(status){
@@ -107,31 +131,28 @@ function applyUpdate(fromDeploy){
     clearInterval(deployPollId);
     deployPollId=null;
   }
+  if(fromDeploy){
+    markDeployReload();
+    waitForSendIdle(function(){location.reload();},DEPLOY_SEND_WAIT_MS);
+    return;
+  }
   overlay();
-  waitForSendIdle(function(){
-    if(fromDeploy){
-      location.reload();
-      return;
-    }
-    reloadAfterOverlay();
-  },fromDeploy?DEPLOY_SEND_WAIT_MS:SEND_WAIT_MS);
+  waitForSendIdle(reloadAfterOverlay,SEND_WAIT_MS);
 }
 function handleVersionPayload(d){
+  if(!d.version)return;
+  if(maybeCompletePostDeploy(d))return;
+  var needsReload=d.version!==CLIENT;
+  if(needsReload&&(deployPending||d.updating)){
+    applyUpdate(true);
+    return;
+  }
   if(d.updating){
     markDeployPending();
     return;
   }
-  if(deployPending){
-    if(d.version&&d.version!==CLIENT){
-      applyUpdate(true);
-      return;
-    }
-    if(d.version===CLIENT){
-      clearDeployPending();
-    }
-    return;
-  }
-  if(d.version&&d.version!==CLIENT){
+  if(deployPending)return;
+  if(needsReload){
     applyUpdate(false);
   }
 }
@@ -148,7 +169,6 @@ function check(){
     })
     .then(function(d){
       if(!d)return;
-      if(!d.version)return;
       handleVersionPayload(d);
     })
     .catch(function(){

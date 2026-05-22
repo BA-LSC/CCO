@@ -258,10 +258,12 @@ export default function GroupConversationPage() {
     });
   }
 
-  const activeGroupMembers =
-    detail?.members?.filter((member): member is ChannelMember & { id: string; onCco: true } =>
-      Boolean(member.onCco && member.id),
-    ) ?? [];
+  const mentionMembers =
+    detail?.members?.map((member) => ({
+      id: member.id,
+      displayName: member.displayName,
+      onCco: member.onCco,
+    })) ?? [];
 
   async function archiveConversation() {
     if (!confirm("Archive this channel? It will be hidden from the list.")) return;
@@ -438,7 +440,7 @@ export default function GroupConversationPage() {
           initialMessages={threadMessages}
           hasMore={threadHasMore}
           firstUnreadMessageId={firstUnreadMessageId}
-          members={activeGroupMembers}
+          members={mentionMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}
           canPost={Boolean(canPostInActive) || detailLoading}

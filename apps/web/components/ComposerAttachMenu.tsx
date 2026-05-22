@@ -43,7 +43,7 @@ export function ComposerAttachMenu({ disabled, onPickImage }: Props) {
         aria-label="Add attachment"
         onClick={() => setOpen((value) => !value)}
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+        <svg viewBox="0 0 24 24" aria-hidden>
           <path
             d="M12 5v14M5 12h14"
             fill="none"

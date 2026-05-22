@@ -97,7 +97,23 @@ function composerPlaceholderForDevice(placeholder: string, coarsePointer: boolea
   return `${base} (Enter to send)`;
 }
 
-type Member = { id: string; displayName: string };
+function getActiveMentionQuery(value: string): string | null {
+  for (let i = value.length - 1; i >= 0; i -= 1) {
+    if (value[i] !== "@") continue;
+    const segment = value.slice(i);
+    if (segment.includes(" ")) return null;
+    const query = segment.slice(1);
+    if (query.startsWith("[")) return null;
+    return query.toLowerCase();
+  }
+  return null;
+}
+
+function memberCanMention(member: Member): boolean {
+  return Boolean(member.id && member.onCco !== false);
+}
+
+type Member = { id?: string; displayName: string; onCco?: boolean };
 
 type Props = {
   conversationId: string | null;
@@ -763,6 +779,7 @@ export function ChatThread({
   }
 
   function insertMention(member: Member) {
+    if (!memberCanMention(member) || !member.id) return;
     const token = formatMention(member.displayName, member.id);
     setBody((prev) => {
       const at = prev.lastIndexOf("@");
@@ -770,20 +787,30 @@ export function ChatThread({
       return `${prev}${token} `;
     });
     setMentionQuery(null);
+    composerRef.current?.focus();
   }
 
   function handleBodyChange(value: string) {
     setBody(value);
-    const at = value.lastIndexOf("@");
-    if (at >= 0 && !value.slice(at).includes(" ")) {
-      setMentionQuery(value.slice(at + 1).toLowerCase());
-    } else {
-      setMentionQuery(null);
-    }
+    setMentionQuery(getActiveMentionQuery(value));
   }
 
   function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Escape" && mentionQuery !== null) {
+      e.preventDefault();
+      setMentionQuery(null);
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
+      if (mentionQuery !== null) {
+        const firstMentionable = mentionCandidates.find(memberCanMention);
+        if (firstMentionable) {
+          e.preventDefault();
+          insertMention(firstMentionable);
+          return;
+        }
+      }
       e.preventDefault();
       void handleSend();
     }
@@ -1035,17 +1062,6 @@ export function ChatThread({
         </ul>
       )}
 
-        {mentionCandidates.length > 0 && (
-          <ul className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
-            {mentionCandidates.slice(0, 5).map((m) => (
-              <li key={m.id}>
-                <button type="button" role="option" onClick={() => insertMention(m)}>
-                  @{m.displayName}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
     </>
   );
 
@@ -1106,6 +1122,31 @@ export function ChatThread({
             ) : null}
           </button>
         )}
+
+      {mentionQuery !== null && mentionCandidates.length > 0 && (
+        <ul className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
+          {mentionCandidates.slice(0, 8).map((m) => {
+            const canMention = memberCanMention(m);
+            return (
+              <li key={m.id ?? m.displayName}>
+                <button
+                  type="button"
+                  role="option"
+                  className={canMention ? undefined : "mention-suggestion--pending"}
+                  disabled={!canMention}
+                  aria-disabled={!canMention}
+                  onClick={() => insertMention(m)}
+                >
+                  <span className="mention-suggestion-name">@{m.displayName}</span>
+                  {!canMention ? (
+                    <span className="mention-suggestion-hint">Not on CCO yet</span>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {canPost ? (
         <form

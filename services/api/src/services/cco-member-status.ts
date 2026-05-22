@@ -23,8 +23,40 @@ export function normalizeMemberEmail(email: string | null | undefined): string |
 }
 
 export function normalizeMemberDisplayName(displayName: string | null | undefined): string | null {
-  const normalized = displayName?.trim().toLowerCase().replace(/\s+/g, " ");
+  const normalized = displayName
+    ?.trim()
+    .toLowerCase()
+    .replace(/[''.`-]/g, "")
+    .replace(/\s+/g, " ");
   return normalized || null;
+}
+
+export type MemberMatchPerson = {
+  pcoPersonId: string;
+  email?: string | null;
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+};
+
+export type RosterMemberLink = {
+  onCco: boolean;
+  userId?: string;
+};
+
+function personDisplayNameCandidates(person: MemberMatchPerson): string[] {
+  const names = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    const normalized = normalizeMemberDisplayName(value);
+    if (normalized) names.add(normalized);
+  };
+
+  add(person.displayName);
+  if (person.firstName && person.lastName) {
+    add(`${person.firstName} ${person.lastName}`);
+  }
+
+  return [...names];
 }
 
 function nameTokens(name: string | null | undefined): string[] {
@@ -50,6 +82,17 @@ export function namesLikelyMatch(
 
   if (overlap >= 2) return true;
   if (overlap >= 1 && (tokensA.length === 1 || tokensB.length === 1)) return true;
+
+  if (tokensA.length >= 2 && tokensB.length >= 2) {
+    const lastA = tokensA[tokensA.length - 1]!;
+    const lastB = tokensB[tokensB.length - 1]!;
+    if (lastA === lastB && lastA.length > 1) {
+      const firstA = tokensA[0]!;
+      const firstB = tokensB[0]!;
+      if (firstA === firstB || firstA[0] === firstB[0]) return true;
+    }
+  }
+
   return false;
 }
 
@@ -95,11 +138,7 @@ export async function buildSignedUpMemberIndex(
 }
 
 export function findSignedUpMember(
-  person: {
-    pcoPersonId: string;
-    email?: string | null;
-    displayName?: string | null;
-  },
+  person: MemberMatchPerson,
   records: SignedUpMemberRecord[],
 ): SignedUpMemberRecord | undefined {
   const byPcoId = records.find((record) => record.pcoPersonId === person.pcoPersonId);
@@ -111,16 +150,37 @@ export function findSignedUpMember(
     if (byEmail) return byEmail;
   }
 
-  const displayName = normalizeMemberDisplayName(person.displayName);
-  if (displayName) {
-    const exact = records.find((record) => record.displayName === displayName);
+  for (const candidateName of personDisplayNameCandidates(person)) {
+    const exact = records.find((record) => record.displayName === candidateName);
     if (exact) return exact;
 
-    const fuzzy = records.find((record) => namesLikelyMatch(displayName, record.displayName));
+    const fuzzy = records.find((record) =>
+      namesLikelyMatch(candidateName, record.displayName),
+    );
     if (fuzzy) return fuzzy;
   }
 
   return undefined;
+}
+
+/** Links a PCO roster person to a signed-up CCO user when ids differ (placeholder roster rows). */
+export function resolveRosterMemberLink(
+  person: MemberMatchPerson,
+  localUserId: string | undefined,
+  signedUp: SignedUpMemberIndex,
+  signedUpRecords: SignedUpMemberRecord[],
+): RosterMemberLink {
+  const signedUpMember = findSignedUpMember(person, signedUpRecords);
+  if (signedUpMember) {
+    return { onCco: true, userId: signedUpMember.userId };
+  }
+
+  if (localUserId && signedUp.userIds.has(localUserId)) {
+    return { onCco: true, userId: localUserId };
+  }
+
+  const onCco = memberIsOnCco(person, undefined, signedUp, signedUpRecords);
+  return { onCco, userId: onCco ? localUserId : undefined };
 }
 
 export type LocalMemberLookups<T> = {
@@ -164,11 +224,7 @@ export function findLocalMember<
 
 /** True when this PCO roster person has signed into CCO (OAuth credentials on file). */
 export function memberIsOnCco(
-  person: {
-    pcoPersonId: string;
-    email?: string | null;
-    displayName?: string | null;
-  },
+  person: MemberMatchPerson,
   localUserId: string | undefined,
   signedUp: SignedUpMemberIndex,
   signedUpRecords?: SignedUpMemberRecord[],
@@ -179,8 +235,9 @@ export function memberIsOnCco(
   const email = normalizeMemberEmail(person.email);
   if (email && signedUp.emails.has(email)) return true;
 
-  const displayName = normalizeMemberDisplayName(person.displayName);
-  if (displayName && signedUp.displayNames.has(displayName)) return true;
+  for (const candidateName of personDisplayNameCandidates(person)) {
+    if (signedUp.displayNames.has(candidateName)) return true;
+  }
 
   if (signedUpRecords && findSignedUpMember(person, signedUpRecords)) return true;
 

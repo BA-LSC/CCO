@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
+import { PanelHeaderMenuIcon } from "@/components/PanelHeaderIcons";
 import { fetchSetupStatus } from "@/lib/setup";
 
 type Props = {
@@ -32,7 +33,7 @@ export function EmptyChatPane({ banner }: Props) {
               openSidebar();
             }}
           >
-            ☰
+            <PanelHeaderMenuIcon />
           </button>
           {churchName ? (
             <span className="empty-chat-pane-brand">{churchName}</span>

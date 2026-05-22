@@ -6,7 +6,9 @@ import {
   getUpdateCheckIntervalMs,
   isAppUpdateInProgress,
   isDeployWaitActive,
+  isPostDeployGracePeriod,
   prepareAppUpdate,
+  shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
 
 const SW_URL = "/sw.js";
@@ -52,7 +54,12 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   };
 
   const applyServiceWorkerUpdate = async (reg: ServiceWorkerRegistration) => {
-    if (applying || !reg.waiting || isAppUpdateInProgress()) return;
+    if (applying || !reg.waiting) return;
+    if (shouldSuppressServiceWorkerUpdateAfterDeploy()) {
+      reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+      return;
+    }
+    if (isAppUpdateInProgress()) return;
     applying = true;
 
     await prepareAppUpdate(onUpdating);
@@ -61,6 +68,10 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
 
   const onControllerChange = () => {
     if (reloaded) return;
+    if (shouldSuppressServiceWorkerUpdateAfterDeploy()) {
+      reloaded = true;
+      return;
+    }
     reloaded = true;
 
     if (isAppUpdateInProgress()) {
@@ -74,7 +85,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
 
   const runUpdateChecks = async () => {
-    if (isAppUpdateInProgress() && !isDeployWaitActive()) return;
+    if (isAppUpdateInProgress() && !isDeployWaitActive() && !isPostDeployGracePeriod()) return;
     if (await checkAppVersion(onUpdating)) return;
     void registration?.update();
     syncDeployPoll();

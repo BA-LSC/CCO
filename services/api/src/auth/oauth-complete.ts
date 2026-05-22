@@ -8,6 +8,7 @@ import {
   fetchMyGroups,
 } from "@cco/pco-client";
 import { persistGroupSync } from "../services/group-sync";
+import { reconcilePlaceholderUsersOnLogin } from "../services/user-account-merge";
 import { isSetupComplete } from "../services/org-oauth";
 import {
   ensureOrganizationForProfile,
@@ -60,6 +61,7 @@ export async function completeOAuthLogin(
   const userId = await upsertUserFromPcoProfile(organizationId, profile);
 
   await savePcoTokens(userId, token);
+  await reconcilePlaceholderUsersOnLogin({ organizationId, userId });
 
   let groupsSyncError: string | undefined;
   const shouldSync = setupComplete && options?.syncGroups !== false;

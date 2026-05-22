@@ -5,6 +5,7 @@ import { type ReactNode, useEffect } from "react";
 import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
+import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { EnableNotificationsBanner } from "@/components/EnableNotificationsBanner";
 import { WebPushRegistrar } from "@/components/WebPushRegistrar";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
@@ -48,6 +49,7 @@ export function ChatShell({ children }: Props) {
       <div className={`chat-shell${hideSidebar ? " chat-shell--no-sidebar" : ""}`}>
         {!hideSidebar ? <ChatSidebar /> : null}
         <main className="chat-main">
+          <AddToHomeScreenBanner />
           <EnableNotificationsBanner />
           {children}
         </main>

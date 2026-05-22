@@ -7,6 +7,7 @@ import {
   findSignedUpMember,
   memberIsOnCco,
   namesLikelyMatch,
+  resolveRosterMemberLink,
   type SignedUpMemberIndex,
   type SignedUpMemberRecord,
 } from "./cco-member-status";
@@ -101,6 +102,44 @@ describe("memberIsOnCco", () => {
   });
 });
 
+describe("resolveRosterMemberLink", () => {
+  test("prefers signed-up user over local placeholder id", () => {
+    const records: SignedUpMemberRecord[] = [
+      {
+        userId: "user-noah",
+        pcoPersonId: "oauth-id",
+        email: null,
+        displayName: "noah passeau",
+      },
+    ];
+
+    expect(
+      resolveRosterMemberLink(
+        {
+          pcoPersonId: "roster-id",
+          displayName: "Noah Passeau",
+          firstName: "Noah",
+          lastName: "Passeau",
+        },
+        "placeholder-user-id",
+        index(),
+        records,
+      ),
+    ).toEqual({ onCco: true, userId: "user-noah" });
+  });
+
+  test("uses local user when they have oauth credentials", () => {
+    expect(
+      resolveRosterMemberLink(
+        { pcoPersonId: "123", displayName: "Noah Passeau" },
+        "user-uuid",
+        index({ userIds: new Set(["user-uuid"]) }),
+        [],
+      ),
+    ).toEqual({ onCco: true, userId: "user-uuid" });
+  });
+});
+
 describe("findLocalMember", () => {
   test("falls back to email when PCO person ids differ", () => {
     const lookups = buildLocalMemberLookups([
@@ -168,5 +207,9 @@ describe("namesLikelyMatch", () => {
   test("requires two shared tokens for full names", () => {
     expect(namesLikelyMatch("Noah Passeau", "Noah Passeau")).toBe(true);
     expect(namesLikelyMatch("John Smith", "John Doe")).toBe(false);
+  });
+
+  test("matches same last name with compatible first names", () => {
+    expect(namesLikelyMatch("Noah Passeau", "N Passeau")).toBe(true);
   });
 });

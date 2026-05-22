@@ -3,7 +3,9 @@ import { waitForSendIdle } from "@/lib/app-update-composer";
 import { hideAppUpdateOverlay, showAppUpdateOverlay } from "@/lib/app-update-overlay";
 
 const OVERLAY_MIN_MS = 2500;
-const DEPLOY_RELOAD_SEND_WAIT_MS = 1500;
+const DEPLOY_RELOAD_SESSION_KEY = "cco-deploy-reload";
+const DEPLOY_RELOAD_GRACE_MS = 15_000;
+const DEPLOY_RELOAD_SEND_WAIT_MS = 500;
 export const STANDALONE_UPDATE_CHECK_MS = 5_000;
 export const UPDATE_CHECK_MS = 15_000;
 export const DEPLOY_POLL_MS = 750;
@@ -30,6 +32,56 @@ export function isDeployPending(): boolean {
 
 export function isAppUpdateInProgress(): boolean {
   return typeof window !== "undefined" && Boolean(window.__ccoApplyingUpdate);
+}
+
+export function markDeployReload(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      DEPLOY_RELOAD_SESSION_KEY,
+      String(Date.now() + DEPLOY_RELOAD_GRACE_MS),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+export function isPostDeployGracePeriod(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(DEPLOY_RELOAD_SESSION_KEY);
+    if (!raw) return false;
+    const until = Number(raw);
+    if (!Number.isFinite(until) || Date.now() >= until) {
+      sessionStorage.removeItem(DEPLOY_RELOAD_SESSION_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearPostDeployGracePeriod(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(DEPLOY_RELOAD_SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** After a deploy reload, skip overlay until the new bundle is confirmed live. */
+export function maybeCompletePostDeployReload(serverVersion: string | null): boolean {
+  if (!isPostDeployGracePeriod()) return false;
+  if (!serverVersion || serverVersion !== APP_BUILD_VERSION) return false;
+  clearPostDeployGracePeriod();
+  clearDeployWait();
+  return true;
+}
+
+export function shouldSuppressServiceWorkerUpdateAfterDeploy(): boolean {
+  return isPostDeployGracePeriod();
 }
 
 export function isDeployWaitActive(): boolean {
@@ -93,6 +145,7 @@ export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<
   if (afterDeploy) {
     deployWaitActive = false;
     if (typeof window !== "undefined") window.__ccoDeployPending = false;
+    markDeployReload();
     await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
     completeAppUpdateReload();
     return;
@@ -152,9 +205,23 @@ export async function fetchServerAppVersion(): Promise<string | null> {
 
 export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise<boolean> {
   if (APP_BUILD_VERSION === "dev") return false;
-  if (isAppUpdateInProgress() && !isDeployPending()) return false;
+  if (isAppUpdateInProgress() && !isDeployPending() && !isPostDeployGracePeriod()) return false;
 
   const { version: serverVersion, unavailable, updating } = await probeServerAppVersion();
+
+  if (maybeCompletePostDeployReload(serverVersion)) {
+    return false;
+  }
+
+  if (
+    !unavailable &&
+    serverVersion &&
+    serverVersion !== APP_BUILD_VERSION &&
+    (updating || isDeployPending())
+  ) {
+    await applyAppUpdate(onUpdating);
+    return true;
+  }
 
   if (updating) {
     markDeployWait(onUpdating);
@@ -162,13 +229,6 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
   }
 
   if (isDeployPending()) {
-    if (!unavailable && serverVersion && serverVersion !== APP_BUILD_VERSION) {
-      await applyAppUpdate(onUpdating);
-      return true;
-    }
-    if (!unavailable && serverVersion === APP_BUILD_VERSION) {
-      clearDeployWait();
-    }
     return false;
   }
 

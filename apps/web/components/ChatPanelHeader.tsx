@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
+import { PanelHeaderMenuIcon } from "@/components/PanelHeaderIcons";
 import { UserAvatar } from "@/components/UserAvatar";
 
 type Props = {
@@ -24,7 +25,7 @@ export function ChatPanelHeader({ title, subtitle, avatarUrl, loading = false, c
           aria-label="Open sidebar"
           onClick={openSidebar}
         >
-          ☰
+          <PanelHeaderMenuIcon />
         </button>
         {avatarUrl !== undefined && !loading && (
           <UserAvatar
