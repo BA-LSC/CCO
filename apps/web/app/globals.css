@@ -67,8 +67,11 @@ a:hover {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-top: env(safe-area-inset-top, 0px);
   box-sizing: border-box;
+}
+
+.app:not(:has(.chat-shell)) {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .app:has(.chat-shell) {
@@ -76,6 +79,7 @@ a:hover {
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
+  padding-top: 0;
 }
 
 .a2hs-banner {
@@ -83,7 +87,7 @@ a:hover {
   top: 0;
   z-index: 20;
   flex-shrink: 0;
-  padding: 8px 12px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
@@ -1370,6 +1374,11 @@ html[data-theme="6"] .user-menu-dropdown {
   color: color-mix(in srgb, var(--color-muted) 88%, var(--color-text));
 }
 
+.app:has(.a2hs-banner) .chat-panel-header,
+.app:has(.a2hs-banner) .empty-chat-pane-header {
+  padding-top: 12px;
+}
+
 .chat-panel-header {
   position: sticky;
   top: 0;
@@ -1378,7 +1387,7 @@ html[data-theme="6"] .user-menu-dropdown {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 20px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -4003,7 +4012,7 @@ html[data-theme="6"] .user-menu-dropdown {
   --chat-inset-x: 144px;
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
-  --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
+  --chat-composer-bottom-padding: env(safe-area-inset-bottom, 0px);
   --chat-scroll-fade-height: 48px;
   flex: 1;
   min-height: 0;
@@ -4117,6 +4126,11 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-shrink: 0;
 }
 
+.chat-thread-panel .chat-composer-stack {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
 .chat-scroll-to-bottom {
   position: absolute;
   left: 50%;
@@ -4196,9 +4210,12 @@ html[data-theme="6"] .user-menu-dropdown {
 @media (max-width: 768px) {
   .chat-sidebar {
     position: fixed;
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
     left: 0;
-    bottom: env(safe-area-inset-bottom, 0px);
+    bottom: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
     z-index: 20;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
@@ -4225,6 +4242,11 @@ html[data-theme="6"] .user-menu-dropdown {
 
   .empty-chat-pane-header {
     display: flex;
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+
+  .app:has(.a2hs-banner) .empty-chat-pane-header {
+    padding-top: 10px;
   }
 
   .empty-chat-pane-top {
@@ -4254,8 +4276,12 @@ html[data-theme="6"] .user-menu-dropdown {
 
   .chat-panel-header {
     flex-wrap: nowrap;
-    padding: 10px 12px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
     gap: 10px;
+  }
+
+  .app:has(.a2hs-banner) .chat-panel-header {
+    padding-top: 10px;
   }
 
   .chat-panel-header-actions {
@@ -4267,7 +4293,7 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 16px;
     --chat-messages-bottom-gap: 36px;
     --chat-composer-top-padding: 6px;
-    --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
+    --chat-composer-bottom-padding: env(safe-area-inset-bottom, 0px);
     --chat-scroll-fade-height: 40px;
   }
 
@@ -4376,7 +4402,7 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 12px;
     --chat-messages-bottom-gap: 28px;
     --chat-composer-top-padding: 4px;
-    --chat-composer-bottom-padding: calc(10px + env(safe-area-inset-bottom, 0px));
+    --chat-composer-bottom-padding: env(safe-area-inset-bottom, 0px);
     --chat-scroll-fade-height: 32px;
   }
 }
