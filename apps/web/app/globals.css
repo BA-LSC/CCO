@@ -5622,6 +5622,86 @@ html.standalone-display .chat-thread-panel {
   }
 }
 
+/* Landscape phone PWA: inset sidebar drawer and widen chat/composer area. */
+@media (orientation: landscape) and (max-height: 500px) {
+  html.standalone-display:has(.chat-shell) {
+    --pwa-landscape-edge-gap: 8px;
+    --pwa-landscape-sidebar-peek: 32px;
+  }
+
+  html.standalone-display .chat-shell {
+    padding-left: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-right, 0px));
+    box-sizing: border-box;
+  }
+
+  html.standalone-display .chat-thread-panel {
+    --chat-inset-x: 8px;
+    --chat-messages-bottom-gap: 18px;
+    --chat-composer-top-padding: 4px;
+    --chat-composer-bottom-padding: 4px;
+    --chat-scroll-fade-height: 24px;
+  }
+
+  html.standalone-display .chat-panel-header {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  html.standalone-display .empty-chat-pane-mobile {
+    padding: 16px 12px 20px;
+  }
+
+  html.standalone-display .chat-main {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  html.standalone-display .chat-sidebar {
+    position: fixed;
+    top: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-top, 0px));
+    bottom: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-bottom, 0px));
+    left: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-left, 0px));
+    width: min(
+      var(--sidebar-width),
+      calc(
+        100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) -
+          (var(--pwa-landscape-edge-gap, 8px) * 2) - var(--pwa-landscape-sidebar-peek, 32px)
+      )
+    );
+    padding-top: 12px;
+    z-index: 40;
+    transform: translateX(calc(-100% - 16px));
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-md);
+  }
+
+  html.standalone-display .chat-sidebar-open {
+    transform: translateX(0);
+  }
+
+  html.standalone-display .chat-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(15, 23, 42, 0.35);
+    border: none;
+    cursor: pointer;
+  }
+
+  html.standalone-display .chat-sidebar-toggle {
+    display: inline-flex;
+  }
+
+  html.standalone-display .chat-thread .message-content {
+    max-width: 82%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: none;
