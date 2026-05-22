@@ -1,5 +1,7 @@
+import { APP_BUILD_VERSION } from "@/lib/build-version";
+
 const SW_URL = "/sw.js";
-const UPDATE_CHECK_MS = 60 * 60 * 1000;
+const UPDATE_CHECK_MS = 5 * 60 * 1000;
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -14,24 +16,52 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   }
 }
 
-function activateWaitingWorker(
-  registration: ServiceWorkerRegistration,
-  onUpdating: () => void,
-): void {
-  const waiting = registration.waiting;
-  if (!waiting) return;
-  onUpdating();
-  waiting.postMessage(SKIP_WAITING_MESSAGE);
+/** Give React time to paint the update overlay before reloading. */
+export function waitForOverlayPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(resolve, 250);
+      });
+    });
+  });
+}
+
+export async function checkAppVersion(onUpdating: () => Promise<void>): Promise<boolean> {
+  if (APP_BUILD_VERSION === "dev") return false;
+
+  try {
+    const res = await fetch("/api/app-version", { cache: "no-store" });
+    if (!res.ok) return false;
+
+    const { version } = (await res.json()) as { version?: string };
+    if (!version || version === APP_BUILD_VERSION) return false;
+
+    await onUpdating();
+    window.location.reload();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Register the app service worker and auto-apply updates with a reload. */
-export function listenForServiceWorkerUpdates(onUpdating: () => void): () => void {
+export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return () => {};
   }
 
   let registration: ServiceWorkerRegistration | null = null;
+  let applying = false;
   let reloaded = false;
+
+  const applyServiceWorkerUpdate = async (reg: ServiceWorkerRegistration) => {
+    if (applying || !reg.waiting) return;
+    applying = true;
+
+    await onUpdating();
+    reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+  };
 
   const onControllerChange = () => {
     if (reloaded) return;
@@ -41,23 +71,24 @@ export function listenForServiceWorkerUpdates(onUpdating: () => void): () => voi
 
   navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
-  const checkForUpdates = () => {
+  const runUpdateChecks = async () => {
+    if (await checkAppVersion(onUpdating)) return;
     void registration?.update();
   };
 
   const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") checkForUpdates();
+    if (document.visibilityState === "visible") void runUpdateChecks();
   };
 
   document.addEventListener("visibilitychange", onVisibilityChange);
-  const intervalId = window.setInterval(checkForUpdates, UPDATE_CHECK_MS);
+  const intervalId = window.setInterval(() => void runUpdateChecks(), UPDATE_CHECK_MS);
 
   void registerAppServiceWorker().then((reg) => {
     if (!reg) return;
     registration = reg;
 
     if (reg.waiting && navigator.serviceWorker.controller) {
-      activateWaitingWorker(reg, onUpdating);
+      void applyServiceWorkerUpdate(reg);
     }
 
     reg.addEventListener("updatefound", () => {
@@ -67,16 +98,26 @@ export function listenForServiceWorkerUpdates(onUpdating: () => void): () => voi
       installing.addEventListener("statechange", () => {
         if (installing.state !== "installed") return;
         if (!navigator.serviceWorker.controller) return;
-        activateWaitingWorker(reg, onUpdating);
+        void applyServiceWorkerUpdate(reg);
       });
     });
 
-    checkForUpdates();
+    void runUpdateChecks();
   });
+
+  void runUpdateChecks();
 
   return () => {
     document.removeEventListener("visibilitychange", onVisibilityChange);
     window.clearInterval(intervalId);
     navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
   };
+}
+
+/** @deprecated Use listenForAppUpdates */
+export function listenForServiceWorkerUpdates(onUpdating: () => void): () => void {
+  return listenForAppUpdates(async () => {
+    onUpdating();
+    await waitForOverlayPaint();
+  });
 }

@@ -1,4 +1,5 @@
-/* CCO service worker — web push + deploy updates for home-screen / PWA users */
+/** Service worker source served from /sw.js with a per-deploy build id prefix. */
+export const SW_TEMPLATE = `/* CCO service worker — web push + deploy updates for home-screen / PWA users */
 
 self.addEventListener("install", () => {
   // Wait for the client to call skipWaiting so we can show an update overlay first.
@@ -54,3 +55,4 @@ self.addEventListener("notificationclick", (event) => {
     }),
   );
 });
+`;

@@ -246,10 +246,9 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
             focusable="false"
           >
             <path
-              d="M12 3v10.2l3.2-3.2 1.4 1.4L12 17.4 7.4 12.8l1.4-1.4 3.2 3.2V3h1z"
+              d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
               fill="currentColor"
             />
-            <path d="M5 19h14v2H5z" fill="currentColor" />
           </svg>
           <span className="attachment-lightbox-action-label">
             {downloading ? "Saving…" : "Download"}

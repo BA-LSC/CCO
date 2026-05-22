@@ -91,6 +91,7 @@ services:
       args:
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
         NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
+        CCO_BUILD_ID: ${CCO_BUILD_ID:-dev}
     restart: unless-stopped
     env_file:
       - ../.env

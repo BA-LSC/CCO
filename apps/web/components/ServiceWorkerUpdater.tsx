@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { LoadingState } from "@/components/PageStates";
-import { listenForServiceWorkerUpdates } from "@/lib/service-worker-client";
+import { listenForAppUpdates, waitForOverlayPaint } from "@/lib/service-worker-client";
 
 export function ServiceWorkerUpdater() {
   const [updating, setUpdating] = useState(false);
 
-  useEffect(() => listenForServiceWorkerUpdates(() => setUpdating(true)), []);
+  useEffect(
+    () =>
+      listenForAppUpdates(async () => {
+        flushSync(() => setUpdating(true));
+        await waitForOverlayPaint();
+      }),
+    [],
+  );
 
   if (!updating) return null;
 

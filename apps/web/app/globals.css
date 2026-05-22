@@ -3094,16 +3094,16 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 3px;
+  margin-top: 5px;
 }
 
 .chat-thread .message-item--spacing-medium {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 /* New segment after a 5+ minute gap — room before the timestamp label */
 .chat-thread .message-item--timestamp-start {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 /* Message ends a segment before a long gap — room after bubble/reactions */
@@ -3117,15 +3117,15 @@ html[data-theme="6"] .user-menu-dropdown {
 
 /* Room before the next cluster after a grouped stack ends */
 .chat-thread .message-item--group-last + .message-item {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .chat-thread .message-item--group-last + .message-item--spacing-tight {
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .chat-thread .message-item--group-single + .message-item--timestamp-start {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .chat-thread .message-item:first-child {
@@ -3169,6 +3169,7 @@ html[data-theme="6"] .user-menu-dropdown {
   display: grid;
   grid-template-columns: 32px minmax(0, 70%);
   column-gap: 10px;
+  row-gap: 2px;
   align-items: start;
 }
 
@@ -3262,7 +3263,8 @@ html[data-theme="6"] .user-menu-dropdown {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 0 6px;
+  padding: 0 6px 4px;
+  line-height: 1.2;
 }
 
 .chat-thread .message-meta strong {

@@ -24,10 +24,12 @@ COPY packages ./packages
 
 ARG NEXT_PUBLIC_WS_URL
 ARG NEXT_PUBLIC_WEB_URL
+ARG CCO_BUILD_ID=dev
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
 ENV NEXT_PUBLIC_WEB_URL=${NEXT_PUBLIC_WEB_URL}
+ENV CCO_BUILD_ID=${CCO_BUILD_ID}
 
 WORKDIR /app/apps/web
 # Next.js static generation is more reliable under Node than Bun in Linux containers.
