@@ -60,7 +60,7 @@ export default function DmChatPage() {
 
     let cancelled = false;
     apiFetch<MessageListResponse>(
-      conversationMessagesPath(conversationId, { anchorUnread: true }),
+      conversationMessagesPath(conversationId),
     )
       .then((data) => {
         if (cancelled) return;
