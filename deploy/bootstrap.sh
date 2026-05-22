@@ -8,6 +8,8 @@ cd "$ROOT"
 source deploy/lib/database.sh
 # shellcheck disable=SC1091
 source deploy/lib/cloudflare-tunnel.sh
+# shellcheck disable=SC1091
+source deploy/lib/env.sh
 
 if [[ ! -f .env ]]; then
   cp deploy/.env.production.example .env
@@ -26,6 +28,15 @@ if [[ -n "$normalized_url" && "$normalized_url" != "${DATABASE_URL:-}" ]]; then
   echo "Updated DATABASE_URL in .env (added sslmode=require for managed PostgreSQL)."
 fi
 export DATABASE_URL="$normalized_url"
+
+if [[ -n "${CCO_DOMAIN:-}" && -n "${API_DOMAIN:-}" ]]; then
+  cco_env_apply_domains "$CCO_DOMAIN" "$API_DOMAIN" .env
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+  echo "Updated derived URLs in .env (PUBLIC_UPLOAD_URL, WEB_URL, NEXT_PUBLIC_*)."
+fi
 
 files=()
 cco_compose_files files

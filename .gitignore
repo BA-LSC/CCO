@@ -49,6 +49,7 @@ yarn-error.log*
 
 # Local file uploads (dev storage)
 uploads/
+!apps/web/app/api/uploads/
 services/api/uploads/
 
 # TypeScript

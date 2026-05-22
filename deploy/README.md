@@ -314,7 +314,7 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 | `WEB_URL` | `https://` + `CCO_DOMAIN` |
 | `NEXT_PUBLIC_WS_URL` | `wss://` + `API_DOMAIN` |
 | `NEXT_PUBLIC_WEB_URL` | Same as `WEB_URL` |
-| `PUBLIC_UPLOAD_URL` | `https://` + `API_DOMAIN` + `/uploads` |
+| `PUBLIC_UPLOAD_URL` | `https://` + `CCO_DOMAIN` + `/api/uploads` (same-origin image proxy) |
 | `PCO_CLIENT_ID` / `PCO_CLIENT_SECRET` | Optional in `.env` — enter at `/setup` after deploy (stored encrypted in DB) |
 | `TOKEN_ENCRYPTION_KEY` | 64 hex characters — loss makes DB secrets unrecoverable |
 | `PCO_WEB_REDIRECT_URI` | `https://<CCO_DOMAIN>/api/auth/pco/callback` |

@@ -22,6 +22,7 @@ import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
+import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { applyReactionChange } from "@/lib/message-reactions";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
 
@@ -782,7 +783,7 @@ export function ChatThread({
                       </span>
                       {m.attachmentUrl && m.messageType === "image" && (
                         <img
-                          src={m.attachmentUrl}
+                          src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
                           alt={m.body || "Shared image"}
                           className="attachment"
                         />
