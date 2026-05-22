@@ -127,6 +127,13 @@
       "when": 1747708817000,
       "tag": "0017_user_status",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1747708818000,
+      "tag": "0018_service_team_service_types",
+      "breakpoints": true
     }
   ]
 }

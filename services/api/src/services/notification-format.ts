@@ -5,6 +5,7 @@ import { users } from "../db/schema";
 import type { MessageDto } from "./messages";
 import { getOrgPcoAccessToken } from "./org-config";
 import { getConfiguredOrganization } from "./org-oauth";
+import { areOrgWebhooksEnabled } from "./pco-cache";
 import { refreshUserAvatarFromPco } from "./user-profile";
 
 export type ConversationNotificationKind = "dm" | "group" | "team";
@@ -78,6 +79,8 @@ export async function resolveAuthorAvatarForNotification(authorId: string): Prom
       await refreshUserAvatarFromPco(authorId).catch(() => null),
     );
     if (refreshed) return refreshed;
+
+    if (await areOrgWebhooksEnabled()) return null;
 
     const pcoPersonId = row[0]?.pcoPersonId;
     if (!pcoPersonId) return null;

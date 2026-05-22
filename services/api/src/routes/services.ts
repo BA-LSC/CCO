@@ -1,15 +1,17 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { and, eq } from "drizzle-orm";
-import { PcoApiError, PlanningCenterClient, fetchServiceTypesForTeam } from "@cco/pco-client";
+import { PcoApiError } from "@cco/pco-client";
 import { resolvePcoAccessToken } from "../auth/resolve-pco-token";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { db } from "../db";
 import { serviceTeamMemberships, serviceTeams, users } from "../db/schema";
 import { isLeaderRole } from "../permissions";
+import { areOrgWebhooksEnabled } from "../services/pco-cache";
 import {
   getServiceTeamDetail,
   listServiceTeamsForUser,
+  maybeRefreshServiceTeamsFromPco,
   removeMemberFromServiceTeamWithPco,
   syncServiceTeamRoster,
   syncServiceTeamsFromPco,
@@ -45,58 +47,48 @@ async function refreshTeamsFromPco(
   });
 }
 
-async function enrichTeamsWithServiceTypes<
-  T extends { pcoTeamId: string },
->(teams: T[], session: { userId: string; pcoAccessToken?: string }, c: Context): Promise<
-  (T & { serviceTypeNames: string[] })[]
-> {
-  try {
-    const accessToken = await resolvePcoAccessToken(session, c);
-    if (!accessToken) {
-      return teams.map((team) => ({ ...team, serviceTypeNames: [] }));
-    }
-
-    const client = new PlanningCenterClient({ accessToken });
-    return Promise.all(
-      teams.map(async (team) => ({
-        ...team,
-        serviceTypeNames: await fetchServiceTypesForTeam(client, team.pcoTeamId).catch(() => []),
-      })),
-    );
-  } catch (err) {
-    console.warn(
-      "Service type lookup failed:",
-      err instanceof Error ? err.message : err,
-    );
-    return teams.map((team) => ({ ...team, serviceTypeNames: [] }));
-  }
-}
-
 servicesRouter.get("/teams", async (c) => {
   const session = c.get("session");
 
   try {
-    await refreshTeamsFromPco(session, c);
+    const accessToken = await resolvePcoAccessToken(session, c);
+    const userRow = await db
+      .select({ pcoPersonId: users.pcoPersonId })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+
+    if (accessToken && userRow[0]) {
+      await maybeRefreshServiceTeamsFromPco({
+        organizationId: session.organizationId,
+        userId: session.userId,
+        accessToken,
+        pcoPersonId: userRow[0].pcoPersonId,
+      });
+    }
   } catch (err) {
     console.warn("Team refresh on list failed:", err instanceof Error ? err.message : err);
   }
 
   const teams = await listServiceTeamsForUser(session.userId);
-  const teamsWithServiceTypes = await enrichTeamsWithServiceTypes(teams, session, c);
-  return c.json({ teams: teamsWithServiceTypes });
+  return c.json({ teams });
 });
 
 servicesRouter.get("/teams/:id", async (c) => {
   const session = c.get("session");
   const teamId = c.req.param("id");
   const accessToken = await resolvePcoAccessToken(session, c);
+  const webhooksEnabled = await areOrgWebhooksEnabled();
+  const requestLiveSync = c.req.query("sync") === "1" && !webhooksEnabled;
+
   let detail = await getServiceTeamDetail(teamId, session.userId, {
     accessToken: accessToken ?? undefined,
     organizationId: session.organizationId,
+    liveRoster: requestLiveSync,
   });
   if (!detail) return c.json({ error: "Not found" }, 404);
 
-  if (accessToken && c.req.query("sync") === "1") {
+  if (accessToken && requestLiveSync) {
     const synced = await trySyncServiceTeamRosterForLeader({
       organizationId: session.organizationId,
       teamId,
@@ -109,25 +101,13 @@ servicesRouter.get("/teams/:id", async (c) => {
       const updated = await getServiceTeamDetail(teamId, session.userId, {
         accessToken,
         organizationId: session.organizationId,
+        liveRoster: false,
       });
       if (updated) detail = updated;
     }
   }
 
-  let serviceTypeNames: string[] = [];
-  try {
-    if (accessToken) {
-      const client = new PlanningCenterClient({ accessToken });
-      serviceTypeNames = await fetchServiceTypesForTeam(client, detail.team.pcoTeamId);
-    }
-  } catch (err) {
-    console.warn(
-      "Service type lookup failed:",
-      err instanceof Error ? err.message : err,
-    );
-  }
-
-  return c.json({ ...detail, serviceTypeNames });
+  return c.json(detail);
 });
 
 servicesRouter.post("/teams/sync", async (c) => {

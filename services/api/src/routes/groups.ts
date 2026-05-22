@@ -13,6 +13,7 @@ import { resolvePcoAccessToken } from "../auth/resolve-pco-token";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { listGroupsForSidebar } from "../services/conversations";
 import { refreshMissingGroupImages } from "../services/group-profile";
+import { areOrgWebhooksEnabled } from "../services/pco-cache";
 import { mountGroupConversationRoutes } from "./conversations";
 import { users } from "../db/schema";
 import { isLeaderRole } from "../permissions";
@@ -51,7 +52,8 @@ groupsRouter.get("/sidebar", async (c) => {
     let groupsForSidebar = await listGroupsForSidebar(session.userId);
 
     const accessToken = await resolvePcoAccessToken(session, c);
-    if (accessToken) {
+    const webhooksEnabled = await areOrgWebhooksEnabled();
+    if (accessToken && !webhooksEnabled) {
       groupsForSidebar = await refreshMissingGroupImages(groupsForSidebar, accessToken);
     }
 

@@ -31,6 +31,7 @@ import {
   reconcileGroupPlaceholderUsers,
   reconcileOrgPlaceholderUsers,
 } from "./user-account-merge";
+import { areOrgWebhooksEnabled } from "./pco-cache";
 
 export async function persistGroupSync(params: {
   organizationId: string;
@@ -365,22 +366,6 @@ function rosterDisplayName(member: GroupRosterMember): string {
   return [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || "Member";
 }
 
-async function groupRosterAvatarsByPcoPersonId(
-  accessToken: string,
-  pcoGroupId: string,
-): Promise<Map<string, string | null>> {
-  try {
-    const client = new PlanningCenterClient({ accessToken });
-    const roster = await fetchGroupRoster(client, pcoGroupId);
-    return new Map(roster.map((person) => [person.pcoPersonId, person.avatarUrl ?? null]));
-  } catch (err) {
-    console.warn(
-      "Group roster avatar lookup failed:",
-      err instanceof Error ? err.message : err,
-    );
-    return new Map();
-  }
-}
 
 function mapCcoGroupMembers(
   ccoMembers: Array<{
@@ -411,6 +396,7 @@ export async function listGroupMembersForDetail(params: {
   membershipRole: string;
   pcoGroupId: string;
   accessToken?: string;
+  liveRoster?: boolean;
 }): Promise<GroupMemberView[]> {
   await reconcileGroupPlaceholderUsers(params.groupId);
   await reconcileOrgPlaceholderUsers(params.organizationId);
@@ -435,13 +421,28 @@ export async function listGroupMembersForDetail(params: {
   const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, groupRecords);
   const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
+  const useCachedRoster = !params.liveRoster || (await areOrgWebhooksEnabled());
 
-  if (!isLeader || !params.accessToken) {
-    const rosterAvatars = params.accessToken
-      ? await groupRosterAvatarsByPcoPersonId(params.accessToken, params.pcoGroupId)
-      : new Map<string, string | null>();
-
-    return sortGroupMembersByName(mapCcoGroupMembers(ccoMembers, rosterAvatars, true));
+  if (useCachedRoster || !isLeader || !params.accessToken) {
+    return sortGroupMembersByName(
+      mapCcoGroupMembers(
+        ccoMembers,
+        new Map(),
+        useCachedRoster
+          ? true
+          : (member) =>
+              memberIsOnCco(
+                {
+                  pcoPersonId: member.pcoPersonId,
+                  email: member.email,
+                  displayName: member.displayName,
+                },
+                member.id,
+                signedUp,
+                signedUpRecords,
+              ),
+      ),
+    );
   }
 
   try {

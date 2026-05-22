@@ -136,6 +136,7 @@ export const serviceTeams = pgTable(
       .notNull(),
     pcoTeamId: text("pco_team_id").notNull(),
     name: text("name").notNull(),
+    serviceTypeNames: text("service_type_names"),
     syncedAt: timestamp("synced_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("service_teams_org_pco").on(t.organizationId, t.pcoTeamId)],

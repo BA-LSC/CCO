@@ -3,6 +3,7 @@ import {
   fetchMyServiceTeams,
   fetchPersonAvatarUrl,
   fetchServiceTeamRoster,
+  fetchServiceTypesForTeam,
   PlanningCenterClient,
   removePersonFromServiceTeam,
   resolveServicesPersonId,
@@ -34,6 +35,12 @@ import {
   reconcileTeamPlaceholderUsers,
 } from "./user-account-merge";
 import { unreadFlagsForConversations } from "./unread";
+import {
+  areOrgWebhooksEnabled,
+  parseServiceTypeNames,
+  serializeServiceTypeNames,
+  shouldRefreshMembershipFromPco,
+} from "./pco-cache";
 
 async function upsertServiceTeamMembership(params: {
   teamId: string;
@@ -101,7 +108,7 @@ async function removeUserFromServiceTeam(teamId: string, userId: string): Promis
 export async function persistServiceTeamSync(params: {
   organizationId: string;
   userId: string;
-  incoming: ServiceTeamWithRole[];
+  incoming: Array<ServiceTeamWithRole & { serviceTypeNames?: string[] }>;
 }): Promise<{ created: number; removed: number }> {
   let created = 0;
   const incomingPcoIds = params.incoming.map((t) => t.pcoTeamId);
@@ -127,6 +134,13 @@ export async function persistServiceTeamSync(params: {
       created += 1;
     } else {
       await db.update(serviceTeams).set({ name: team.name }).where(eq(serviceTeams.id, teamId));
+    }
+
+    if (team.serviceTypeNames !== undefined) {
+      await db
+        .update(serviceTeams)
+        .set({ serviceTypeNames: serializeServiceTypeNames(team.serviceTypeNames) })
+        .where(eq(serviceTeams.id, teamId));
     }
 
     await upsertServiceTeamMembership({ teamId, userId: params.userId, role: team.role });
@@ -278,12 +292,43 @@ export async function syncServiceTeamsFromPco(params: {
 }): Promise<{ created: number; removed: number; total: number }> {
   const client = new PlanningCenterClient({ accessToken: params.accessToken });
   const incoming = await fetchMyServiceTeams(client, params.pcoPersonId);
+  const incomingWithServiceTypes = await Promise.all(
+    incoming.map(async (team) => ({
+      ...team,
+      serviceTypeNames: await fetchServiceTypesForTeam(client, team.pcoTeamId).catch(() => []),
+    })),
+  );
   const result = await persistServiceTeamSync({
     organizationId: params.organizationId,
     userId: params.userId,
-    incoming,
+    incoming: incomingWithServiceTypes,
   });
   return { ...result, total: incoming.length };
+}
+
+export async function maybeRefreshServiceTeamsFromPco(params: {
+  organizationId: string;
+  userId: string;
+  accessToken: string;
+  pcoPersonId: string;
+}): Promise<void> {
+  if (await areOrgWebhooksEnabled()) return;
+
+  const memberships = await db
+    .select({ syncedAt: serviceTeamMemberships.syncedAt })
+    .from(serviceTeamMemberships)
+    .where(eq(serviceTeamMemberships.userId, params.userId));
+
+  if (memberships.length === 0) return;
+
+  const oldestSyncedAt = memberships.reduce(
+    (oldest, row) => (row.syncedAt < oldest ? row.syncedAt : oldest),
+    memberships[0].syncedAt,
+  );
+
+  if (!(await shouldRefreshMembershipFromPco(oldestSyncedAt))) return;
+
+  await syncServiceTeamsFromPco(params);
 }
 
 export async function listServiceTeamsForUser(userId: string) {
@@ -292,6 +337,7 @@ export async function listServiceTeamsForUser(userId: string) {
       id: serviceTeams.id,
       name: serviceTeams.name,
       pcoTeamId: serviceTeams.pcoTeamId,
+      serviceTypeNames: serviceTeams.serviceTypeNames,
       role: serviceTeamMemberships.role,
     })
     .from(serviceTeams)
@@ -317,7 +363,11 @@ export async function listServiceTeamsForUser(userId: string) {
   return teams.map((team) => {
     const conversationId = convByTeam.get(team.id) ?? null;
     return {
-      ...team,
+      id: team.id,
+      name: team.name,
+      pcoTeamId: team.pcoTeamId,
+      role: team.role,
+      serviceTypeNames: parseServiceTypeNames(team.serviceTypeNames),
       conversationId,
       hasUnread: conversationId ? (unreadByConv.get(conversationId) ?? false) : false,
     };
@@ -340,22 +390,6 @@ function sortTeamMembersByName(members: TeamMemberView[]): TeamMemberView[] {
   );
 }
 
-async function teamRosterAvatarsByPcoPersonId(
-  accessToken: string,
-  pcoTeamId: string,
-): Promise<Map<string, string | null>> {
-  try {
-    const client = new PlanningCenterClient({ accessToken });
-    const roster = await fetchServiceTeamRoster(client, pcoTeamId);
-    return new Map(roster.map((person) => [person.pcoPersonId, person.avatarUrl ?? null]));
-  } catch (err) {
-    console.warn(
-      "Team roster avatar lookup failed:",
-      err instanceof Error ? err.message : err,
-    );
-    return new Map();
-  }
-}
 
 function mapCcoTeamMembers(
   ccoMembers: Array<{
@@ -386,6 +420,7 @@ async function listTeamMembersForDetail(params: {
   membershipRole: string;
   pcoTeamId: string;
   accessToken?: string;
+  liveRoster?: boolean;
 }): Promise<TeamMemberView[]> {
   await reconcileTeamPlaceholderUsers(params.teamId);
   await reconcileOrgPlaceholderUsers(params.organizationId);
@@ -410,13 +445,28 @@ async function listTeamMembersForDetail(params: {
   const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, teamRecords);
   const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
+  const useCachedRoster = !params.liveRoster || (await areOrgWebhooksEnabled());
 
-  if (!isLeader || !params.accessToken) {
-    const rosterAvatars = params.accessToken
-      ? await teamRosterAvatarsByPcoPersonId(params.accessToken, params.pcoTeamId)
-      : new Map<string, string | null>();
-
-    return sortTeamMembersByName(mapCcoTeamMembers(ccoMembers, rosterAvatars, true));
+  if (useCachedRoster || !isLeader || !params.accessToken) {
+    return sortTeamMembersByName(
+      mapCcoTeamMembers(
+        ccoMembers,
+        new Map(),
+        useCachedRoster
+          ? true
+          : (member) =>
+              memberIsOnCco(
+                {
+                  pcoPersonId: member.pcoPersonId,
+                  email: member.email,
+                  displayName: member.displayName,
+                },
+                member.id,
+                signedUp,
+                signedUpRecords,
+              ),
+      ),
+    );
   }
 
   try {
@@ -478,7 +528,7 @@ async function listTeamMembersForDetail(params: {
 export async function getServiceTeamDetail(
   teamId: string,
   userId: string,
-  options?: { accessToken?: string; organizationId?: string },
+  options?: { accessToken?: string; organizationId?: string; liveRoster?: boolean },
 ) {
   const membership = await db
     .select({ id: serviceTeamMemberships.id, role: serviceTeamMemberships.role })
@@ -489,7 +539,12 @@ export async function getServiceTeamDetail(
   if (!membership[0]) return null;
 
   const team = await db
-    .select({ id: serviceTeams.id, name: serviceTeams.name, pcoTeamId: serviceTeams.pcoTeamId })
+    .select({
+      id: serviceTeams.id,
+      name: serviceTeams.name,
+      pcoTeamId: serviceTeams.pcoTeamId,
+      serviceTypeNames: serviceTeams.serviceTypeNames,
+    })
     .from(serviceTeams)
     .where(eq(serviceTeams.id, teamId))
     .limit(1);
@@ -532,10 +587,16 @@ export async function getServiceTeamDetail(
     membershipRole: membership[0].role,
     pcoTeamId: team[0].pcoTeamId,
     accessToken: options?.accessToken,
+    liveRoster: options?.liveRoster,
   });
 
   return {
-    team: team[0],
+    team: {
+      id: team[0].id,
+      name: team[0].name,
+      pcoTeamId: team[0].pcoTeamId,
+    },
+    serviceTypeNames: parseServiceTypeNames(team[0].serviceTypeNames),
     conversation: conv[0]
       ? {
           id: conv[0].id,

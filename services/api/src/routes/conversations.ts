@@ -19,6 +19,7 @@ import {
 import { refreshGroupImageFromPco, refreshMissingGroupImages } from "../services/group-profile";
 import { listGroupMembersForDetail, trySyncGroupRosterForLeader } from "../services/group-sync";
 import { listMessages } from "../services/messages";
+import { areOrgWebhooksEnabled } from "../services/pco-cache";
 import { refreshUserAvatarFromPco } from "../services/user-profile";
 
 type Env = { Variables: AuthVariables };
@@ -166,6 +167,8 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
     if (!result) return c.json({ error: "Not found" }, 404);
 
     const accessToken = await resolvePcoAccessToken(session, c);
+    const webhooksEnabled = await areOrgWebhooksEnabled();
+    const requestLiveSync = c.req.query("sync") === "1" && !webhooksEnabled;
     const userRow = await db
       .select({ pcoPersonId: users.pcoPersonId })
       .from(users)
@@ -173,9 +176,7 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
       .limit(1);
 
     if (accessToken && userRow[0]) {
-      const syncRoster = c.req.query("sync") === "1";
-
-      if (!result.group.imageUrl) {
+      if (!webhooksEnabled && !result.group.imageUrl) {
         try {
           const imageUrl = await refreshGroupImageFromPco({
             groupId,
@@ -188,7 +189,7 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
         }
       }
 
-      if (syncRoster) {
+      if (requestLiveSync) {
         await trySyncGroupRosterForLeader({
           organizationId: session.organizationId,
           groupId,
@@ -203,7 +204,9 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
       }
     }
 
-    await refreshUserAvatarFromPco(session.userId).catch(() => null);
+    if (!webhooksEnabled) {
+      await refreshUserAvatarFromPco(session.userId).catch(() => null);
+    }
 
     result = {
       ...result,
@@ -213,6 +216,7 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
         membershipRole: result.membershipRole,
         pcoGroupId: result.group.pcoGroupId,
         accessToken: accessToken ?? undefined,
+        liveRoster: requestLiveSync,
       }),
     };
 
