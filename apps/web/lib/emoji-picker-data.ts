@@ -2,6 +2,8 @@ import { GENERATED_EMOJI_PICKER_GROUPS } from "./emoji-picker-data.generated";
 
 export const QUICK_REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
 
+export const RECENT_EMOJI_GROUP_LABEL = "Recents";
+
 export type EmojiPickerGroup = {
   label: string;
   keywords: readonly string[];
@@ -51,4 +53,28 @@ export function filterEmojiPickerGroups(query: string): EmojiPickerGroup[] {
       emojis,
     }];
   });
+}
+
+function filterRecentEmojis(query: string, recents: readonly string[]): string[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [...recents];
+
+  const visible = new Set(filterEmojiPickerGroups(query).flatMap((group) => group.emojis));
+  return recents.filter((emoji) => visible.has(emoji) || emoji.includes(normalized));
+}
+
+export function buildEmojiPickerGroups(query: string, recents: readonly string[]): EmojiPickerGroup[] {
+  const recentEmojis = filterRecentEmojis(query, recents);
+  const groups = filterEmojiPickerGroups(query);
+
+  if (recentEmojis.length === 0) return groups;
+
+  return [
+    {
+      label: RECENT_EMOJI_GROUP_LABEL,
+      keywords: ["recent", "recents"],
+      emojis: recentEmojis,
+    },
+    ...groups,
+  ];
 }

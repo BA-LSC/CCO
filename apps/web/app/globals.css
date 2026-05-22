@@ -4424,6 +4424,8 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .message-emoji-picker {
+  --emoji-picker-cell: 36px;
+  --emoji-picker-glyph: 22px;
   width: min(360px, calc(100vw - 16px));
   max-height: min(320px, 50vh);
   display: flex;
@@ -4488,6 +4490,12 @@ html[data-theme="6"] .user-menu-dropdown {
   contain-intrinsic-size: 0 180px;
 }
 
+.message-emoji-picker-group--recents {
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
 .message-emoji-picker-label {
   margin: 0 0 6px;
   font-size: 0.72rem;
@@ -4499,21 +4507,50 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .message-emoji-picker-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(8, var(--emoji-picker-cell));
   gap: 3px;
 }
 
 .message-emoji-picker-item {
-  width: 100%;
-  aspect-ratio: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--emoji-picker-cell);
+  height: var(--emoji-picker-cell);
   border: none;
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  font-size: 1.35rem;
-  line-height: 1;
   padding: 0;
-  font-family: inherit;
+  overflow: hidden;
+  contain: layout paint;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", emoji, sans-serif;
+  line-height: 1;
+}
+
+.message-emoji-picker-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--emoji-picker-glyph);
+  height: var(--emoji-picker-glyph);
+  font-size: var(--emoji-picker-glyph);
+  line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.message-emoji-picker-emoji--compound {
+  width: calc(var(--emoji-picker-cell) - 4px);
+  font-size: calc(var(--emoji-picker-glyph) * 0.72);
+  letter-spacing: -0.08em;
+}
+
+.message-emoji-picker-emoji--long {
+  width: calc(var(--emoji-picker-cell) - 2px);
+  font-size: calc(var(--emoji-picker-glyph) * 0.58);
+  letter-spacing: -0.12em;
 }
 
 .message-emoji-picker-item:hover,
@@ -4532,12 +4569,43 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-primary-soft);
 }
 
+@media (min-width: 769px) {
+  .message-emoji-picker {
+    --emoji-picker-cell: 44px;
+    --emoji-picker-glyph: 26px;
+    width: 420px;
+    max-height: min(420px, 60vh);
+  }
+
+  .message-emoji-picker-grid {
+    gap: 4px;
+  }
+}
+
 .chat-thread .message-bubble-stack--has-reactions {
   width: 100%;
 }
 
 .chat-thread .message-content:has(.message-bubble-stack--has-reactions) {
   width: 100%;
+}
+
+@media (min-width: 769px) {
+  .chat-thread .message-content:has(.message-bubble-stack--has-reactions) {
+    max-width: 82%;
+  }
+
+  .chat-thread .message-content:has(.attachment):has(.message-bubble-stack--has-reactions) {
+    max-width: min(96%, 520px);
+  }
+
+  .chat-thread-panel .message-content:has(.message-bubble-stack--has-reactions) {
+    max-width: 82%;
+  }
+
+  .chat-thread-panel .message-content:has(.attachment):has(.message-bubble-stack--has-reactions) {
+    max-width: min(96%, 520px);
+  }
 }
 
 .chat-thread .message-reaction-row {
@@ -4618,6 +4686,8 @@ html[data-theme="6"] .user-menu-dropdown {
   cursor: pointer;
   line-height: 1;
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .chat-thread .message-reaction-pill:hover,
@@ -4629,8 +4699,27 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread .message-reaction-emoji {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
   font-size: 1rem;
   line-height: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", emoji, sans-serif;
+}
+
+.chat-thread .message-reaction-emoji--compound {
+  width: 1.35rem;
+  font-size: 0.82rem;
+  letter-spacing: -0.08em;
+}
+
+.chat-thread .message-reaction-emoji--long {
+  width: 1.55rem;
+  font-size: 0.68rem;
+  letter-spacing: -0.12em;
 }
 
 .chat-thread .message-reaction-count {
@@ -5355,7 +5444,6 @@ html.standalone-display .chat-thread-panel {
   }
 
   .message-emoji-picker-item {
-    font-size: 1.45rem;
     border-radius: 8px;
   }
 

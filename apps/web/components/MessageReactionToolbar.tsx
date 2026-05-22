@@ -11,7 +11,9 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { filterEmojiPickerGroups, QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-data";
+import { buildEmojiPickerGroups, QUICK_REACTION_EMOJIS, RECENT_EMOJI_GROUP_LABEL } from "@/lib/emoji-picker-data";
+import { getEmojiDisplayClass } from "@/lib/emoji-display";
+import { pushRecentEmoji, readRecentEmojis } from "@/lib/emoji-recents";
 import type { Reaction } from "@/lib/api";
 
 type EmojiToggleProps = {
@@ -28,9 +30,14 @@ function getMyReactionEmojis(reactions: Reaction[], currentUserId?: string): Set
   );
 }
 
+function getPickerWidth(viewportWidth: number): number {
+  const maxWidth = viewportWidth >= 769 ? 420 : 360;
+  return Math.min(maxWidth, viewportWidth - 16);
+}
+
 function computePickerStyle(anchor: HTMLElement): CSSProperties {
   const rect = anchor.getBoundingClientRect();
-  const width = Math.min(360, window.innerWidth - 16);
+  const width = getPickerWidth(window.innerWidth);
   const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
   const top = Math.max(8, rect.top - 8);
 
@@ -45,8 +52,14 @@ function computePickerStyle(anchor: HTMLElement): CSSProperties {
 
 function useEmojiPicker(messageId: string, onToggleReaction: (messageId: string, emoji: string) => void) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const anchorRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    setRecentEmojis(readRecentEmojis());
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -80,29 +93,35 @@ function useEmojiPicker(messageId: string, onToggleReaction: (messageId: string,
   }, [pickerOpen]);
 
   function pickEmoji(emoji: string) {
+    setRecentEmojis((current) => pushRecentEmoji(emoji, current));
     onToggleReaction(messageId, emoji);
   }
 
-  return { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji };
+  return { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji, recentEmojis };
 }
 
 function MessageEmojiPickerPopover({
   pickerOpen,
   pickEmoji,
   activeEmojis,
+  recentEmojis,
   anchorRef,
   popoverRef,
 }: {
   pickerOpen: boolean;
   pickEmoji: (emoji: string) => void;
   activeEmojis: Set<string>;
+  recentEmojis: string[];
   anchorRef: RefObject<HTMLElement | null>;
   popoverRef: RefObject<HTMLDivElement | null>;
 }) {
   const [style, setStyle] = useState<CSSProperties>({});
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const filteredGroups = useMemo(() => filterEmojiPickerGroups(query), [query]);
+  const filteredGroups = useMemo(
+    () => buildEmojiPickerGroups(query, recentEmojis),
+    [query, recentEmojis],
+  );
 
   useEffect(() => {
     if (!pickerOpen) {
@@ -165,7 +184,10 @@ function MessageEmojiPickerPopover({
           <p className="message-emoji-picker-empty">No emojis found</p>
         ) : (
           filteredGroups.map((group) => (
-            <div key={group.label} className="message-emoji-picker-group">
+            <div
+              key={group.label}
+              className={`message-emoji-picker-group${group.label === RECENT_EMOJI_GROUP_LABEL ? " message-emoji-picker-group--recents" : ""}`}
+            >
               <p className="message-emoji-picker-label">{group.label}</p>
               <div className="message-emoji-picker-grid">
                 {group.emojis.map((emoji) => {
@@ -179,7 +201,12 @@ function MessageEmojiPickerPopover({
                       aria-pressed={active}
                       onClick={() => pickEmoji(emoji)}
                     >
-                      {emoji}
+                      <span
+                        className={getEmojiDisplayClass(emoji, "message-emoji-picker-emoji")}
+                        aria-hidden
+                      >
+                        {emoji}
+                      </span>
                     </button>
                   );
                 })}
@@ -199,7 +226,7 @@ export function MessageEmojiActions({
   currentUserId,
   onToggleReaction,
 }: EmojiToggleProps) {
-  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
+  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji, recentEmojis } = useEmojiPicker(
     messageId,
     onToggleReaction,
   );
@@ -237,6 +264,7 @@ export function MessageEmojiActions({
           pickerOpen={pickerOpen}
           pickEmoji={pickEmoji}
           activeEmojis={activeEmojis}
+          recentEmojis={recentEmojis}
           anchorRef={anchorRef}
           popoverRef={popoverRef}
         />
@@ -251,7 +279,7 @@ export function MessageAddReactionButton({
   currentUserId,
   onToggleReaction,
 }: EmojiToggleProps) {
-  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
+  const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji, recentEmojis } = useEmojiPicker(
     messageId,
     onToggleReaction,
   );
@@ -273,6 +301,7 @@ export function MessageAddReactionButton({
         pickerOpen={pickerOpen}
         pickEmoji={pickEmoji}
         activeEmojis={activeEmojis}
+        recentEmojis={recentEmojis}
         anchorRef={anchorRef}
         popoverRef={popoverRef}
       />
@@ -321,7 +350,7 @@ export function MessageReactionPills({
             }
             onClick={() => onToggleReaction(messageId, emoji)}
           >
-            <span className="message-reaction-emoji" aria-hidden>
+            <span className={getEmojiDisplayClass(emoji, "message-reaction-emoji")} aria-hidden>
               {emoji}
             </span>
             {count >= 2 && <span className="message-reaction-count">{count}</span>}
