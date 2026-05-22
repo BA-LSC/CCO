@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { EMOJI_PICKER_GROUPS, QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-data";
+import { filterEmojiPickerGroups, QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-data";
 import type { Reaction } from "@/lib/api";
 
 type EmojiToggleProps = {
@@ -29,7 +29,7 @@ function getMyReactionEmojis(reactions: Reaction[], currentUserId?: string): Set
 
 function computePickerStyle(anchor: HTMLElement): CSSProperties {
   const rect = anchor.getBoundingClientRect();
-  const width = Math.min(320, window.innerWidth * 0.7);
+  const width = Math.min(360, window.innerWidth - 16);
   const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
   const top = Math.max(8, rect.top - 8);
 
@@ -99,6 +99,21 @@ function MessageEmojiPickerPopover({
   popoverRef: RefObject<HTMLDivElement | null>;
 }) {
   const [style, setStyle] = useState<CSSProperties>({});
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const filteredGroups = filterEmojiPickerGroups(query);
+
+  useEffect(() => {
+    if (!pickerOpen) {
+      setQuery("");
+      return;
+    }
+
+    const focusTimer = window.setTimeout(() => {
+      searchRef.current?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(focusTimer);
+  }, [pickerOpen]);
 
   useLayoutEffect(() => {
     if (!pickerOpen || !anchorRef.current) {
@@ -112,12 +127,13 @@ function MessageEmojiPickerPopover({
     };
 
     updatePosition();
+
     window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
 
     return () => {
       window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
     };
   }, [pickerOpen, anchorRef]);
 
@@ -132,28 +148,45 @@ function MessageEmojiPickerPopover({
       aria-label="Emoji picker"
       onMouseDown={(event) => event.stopPropagation()}
     >
-      {EMOJI_PICKER_GROUPS.map((group) => (
-        <div key={group.label} className="message-emoji-picker-group">
-          <p className="message-emoji-picker-label">{group.label}</p>
-          <div className="message-emoji-picker-grid">
-            {group.emojis.map((emoji) => {
-              const active = activeEmojis.has(emoji);
-              return (
-              <button
-                key={`${group.label}-${emoji}`}
-                type="button"
-                className={`message-emoji-picker-item${active ? " message-emoji-picker-item--active" : ""}`}
-                aria-label={active ? `Remove ${emoji} reaction` : `React with ${emoji}`}
-                aria-pressed={active}
-                onClick={() => pickEmoji(emoji)}
-              >
-                {emoji}
-              </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+      <div className="message-emoji-picker-header">
+        <input
+          ref={searchRef}
+          type="search"
+          className="message-emoji-picker-search"
+          placeholder="Search emoji…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search emoji"
+        />
+      </div>
+      <div className="message-emoji-picker-body">
+        {filteredGroups.length === 0 ? (
+          <p className="message-emoji-picker-empty">No emojis found</p>
+        ) : (
+          filteredGroups.map((group) => (
+            <div key={group.label} className="message-emoji-picker-group">
+              <p className="message-emoji-picker-label">{group.label}</p>
+              <div className="message-emoji-picker-grid">
+                {group.emojis.map((emoji) => {
+                  const active = activeEmojis.has(emoji);
+                  return (
+                    <button
+                      key={`${group.label}-${emoji}`}
+                      type="button"
+                      className={`message-emoji-picker-item${active ? " message-emoji-picker-item--active" : ""}`}
+                      aria-label={active ? `Remove ${emoji} reaction` : `React with ${emoji}`}
+                      aria-pressed={active}
+                      onClick={() => pickEmoji(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>,
     document.body,
   );
