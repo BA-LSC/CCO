@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { fetchPcoWebRedirectUri } from "@/lib/pco-oauth";
 import { htmlRedirect } from "@/lib/html-redirect";
-import { secureCookie } from "@/lib/safe-next-path";
+import { isSecureCookieContext } from "@/lib/session-cookies";
 
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 const EXCHANGE_TIMEOUT_MS = 45_000;
@@ -69,7 +69,7 @@ export async function handlePcoOAuthCallback(request: NextRequest) {
     sameSite: "lax" as const,
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
-    ...secureCookie,
+    secure: isSecureCookieContext(request),
   };
 
   const nextPath =

@@ -9,24 +9,16 @@ type CookieOpts = {
   secure?: boolean;
 };
 
-const SESSION_COOKIE_NAMES = ["connect_session", "pco_access_token", "pco_oauth_state", "pco_oauth_next"] as const;
-
 function clearCookie(response: NextResponse, name: string, options?: CookieOpts) {
   response.cookies.set(name, "", {
     path: "/",
     maxAge: 0,
+    expires: new Date(0),
     httpOnly: true,
     sameSite: "lax",
     secure: isProduction(),
     ...options,
   });
-}
-
-/** Clear auth cookies set during OAuth sign-in. */
-export function clearAuthCookies(response: NextResponse) {
-  for (const name of SESSION_COOKIE_NAMES) {
-    clearCookie(response, name);
-  }
 }
 
 /** Browser navigation when NextResponse.redirect + cookies returns a blank/hung page. */
