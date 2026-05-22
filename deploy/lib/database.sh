@@ -83,6 +83,12 @@ cco_wait_for_bundled_postgres() {
   echo "" >&2
   echo "Recent logs:" >&2
   docker compose "${_files[@]}" logs --tail 50 postgres >&2 || true
+  if docker compose "${_files[@]}" logs --tail 20 postgres 2>/dev/null | grep -q '/var/lib/postgresql/data (unused mount'; then
+    echo "" >&2
+    echo "Fix: Postgres 18 needs a fresh data volume. From the repo root run:" >&2
+    echo "  docker compose -f deploy/docker-compose.prod.yml down -v" >&2
+    echo "  ./deploy/setup.sh" >&2
+  fi
   return 1
 }
 

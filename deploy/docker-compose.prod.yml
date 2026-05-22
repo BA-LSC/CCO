@@ -18,7 +18,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-cco}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # Postgres 18+ expects the mount at /var/lib/postgresql (not .../data).
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cco} -d ${POSTGRES_DB:-cco}"]
       interval: 5s
