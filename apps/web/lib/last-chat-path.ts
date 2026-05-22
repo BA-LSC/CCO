@@ -29,3 +29,16 @@ export function readLastChatPath(): string | null {
     return null;
   }
 }
+
+export function conversationIdFromChatPath(pathname: string): string | null {
+  const dm = pathname.match(/^\/dms\/([^/?#]+)/)?.[1];
+  if (dm) return dm;
+
+  const group = pathname.match(/^\/groups\/[^/?#]+\/c\/([^/?#]+)/)?.[1];
+  if (group) return group;
+
+  const team = pathname.match(/^\/teams\/([^/?#]+)/)?.[1];
+  if (team) return team;
+
+  return null;
+}

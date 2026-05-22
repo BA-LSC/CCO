@@ -10,6 +10,8 @@ type RealtimeEvent =
   | { type: "message.deleted"; messageId: string }
   | { type: "reaction.changed"; messageId: string; reaction: Reaction; action?: string };
 
+export type { RealtimeEvent };
+
 const MAX_RETRY_MS = 30_000;
 
 async function fetchWebSocketBase(): Promise<string> {

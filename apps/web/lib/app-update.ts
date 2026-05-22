@@ -93,6 +93,12 @@ function notifyAppUpdating(): void {
   window.dispatchEvent(new Event(APP_UPDATE_EVENT));
 }
 
+export function resumeAppUpdateUi(): void {
+  if (typeof window === "undefined") return;
+  if (!isAppUpdateInProgress() && !isDeployPending()) return;
+  showAppUpdateOverlay();
+}
+
 export function markDeployWait(onUpdating?: () => void | Promise<void>): void {
   deployWaitActive = true;
   if (typeof window !== "undefined") {

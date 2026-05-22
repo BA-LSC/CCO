@@ -20,7 +20,12 @@ import {
   memberIsOnCco,
   resolveRosterMemberLink,
 } from "./cco-member-status";
-import { ensureConversationMembers, ensureGeneralConversation, ensureGeneralConversationMembers } from "./conversations";
+import {
+  ensureConversationMembers,
+  ensureGeneralConversation,
+  ensureGeneralConversationMembers,
+} from "./conversations";
+import { reconcileOrgPlaceholderUsers } from "./user-account-merge";
 
 export async function persistGroupSync(params: {
   organizationId: string;
@@ -338,6 +343,8 @@ export async function listGroupMembersForDetail(params: {
   pcoGroupId: string;
   accessToken?: string;
 }): Promise<GroupMemberView[]> {
+  await reconcileOrgPlaceholderUsers(params.organizationId);
+
   const ccoMembers = await db
     .select({
       id: users.id,
@@ -427,6 +434,7 @@ export async function listGroupMembersForDetail(params: {
           },
           member.id,
           signedUp,
+          signedUpRecords,
         ),
         email: null,
       })),

@@ -1,7 +1,19 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useConversationSocket, type RealtimeEvent } from "@/hooks/useConversationSocket";
 import { apiFetch } from "@/lib/api";
+import { resolveActiveConversationId } from "@/lib/active-conversation-id";
 
 export type ChatSessionInfo = { userId: string; displayName?: string };
 
@@ -34,8 +46,9 @@ type ChatLayoutContextValue = {
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
+  activeConversationId: string | null;
   realtimeConnected: boolean;
-  setRealtimeConnected: (connected: boolean) => void;
+  subscribeRealtime: (listener: (event: RealtimeEvent) => void) => () => void;
   wsToken: string | null;
   session: ChatSessionInfo | null;
   sessionLoading: boolean;
@@ -44,16 +57,39 @@ type ChatLayoutContextValue = {
 const ChatLayoutContext = createContext<ChatLayoutContextValue | null>(null);
 
 export function ChatLayoutProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [wsToken, setWsToken] = useState<string | null>(null);
   const [session, setSession] = useState<ChatSessionInfo | null>(() => readCachedSession());
   const [sessionLoading, setSessionLoading] = useState(() => readCachedSession() === null);
+  const listenersRef = useRef(new Set<(event: RealtimeEvent) => void>());
+
+  const activeConversationId = useMemo(
+    () => resolveActiveConversationId(pathname),
+    [pathname],
+  );
 
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
-  const setConnected = useCallback((connected: boolean) => setRealtimeConnected(connected), []);
+
+  const broadcastRealtimeEvent = useCallback((event: RealtimeEvent) => {
+    for (const listener of listenersRef.current) {
+      listener(event);
+    }
+  }, []);
+
+  const subscribeRealtime = useCallback((listener: (event: RealtimeEvent) => void) => {
+    listenersRef.current.add(listener);
+    return () => {
+      listenersRef.current.delete(listener);
+    };
+  }, []);
+
+  const { connected: realtimeConnected } = useConversationSocket(
+    session?.userId ? activeConversationId : null,
+    broadcastRealtimeEvent,
+  );
 
   useEffect(() => {
     Promise.all([
@@ -75,8 +111,9 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
         openSidebar,
         closeSidebar,
         toggleSidebar,
+        activeConversationId,
         realtimeConnected,
-        setRealtimeConnected: setConnected,
+        subscribeRealtime,
         wsToken,
         session,
         sessionLoading,

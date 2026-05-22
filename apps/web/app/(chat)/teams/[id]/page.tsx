@@ -85,7 +85,7 @@ export default function TeamChatPage() {
       setHasMore(cached.hasMore);
       setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
       setMessagesForConversationId(conversationId);
-      setMessagesLoading(false);
+      setMessagesLoading(true);
     } else {
       setMessages([]);
       setHasMore(false);

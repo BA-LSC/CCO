@@ -18,7 +18,6 @@ import {
 } from "@/lib/api";
 import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
 import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
-import { useConversationSocket } from "@/hooks/useConversationSocket";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchUnreadChanged } from "@/lib/sidebar-events";
@@ -31,6 +30,7 @@ import {
   maxScrollTop,
   observePinnedScrollContent,
   scheduleScrollMessagesToBottom,
+  scrollContainerToElement,
   scrollMessagesToBottom,
 } from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
@@ -151,7 +151,8 @@ export function ChatThread({
   const appUpdateBlocked = useAppUpdateGuard();
   const composerLocked = composerDisabled || appUpdateBlocked;
   const placeholder = composerPlaceholderForDevice(composerPlaceholder, coarsePointer);
-  const { setRealtimeConnected, session } = useChatLayout();
+  const { subscribeRealtime, session, realtimeConnected, activeConversationId } = useChatLayout();
+  const messageActions = useMessageActionsReveal();
   const resolvedUserId = currentUserId ?? session?.userId;
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -186,8 +187,8 @@ export function ChatThread({
   messagesRef.current = messages;
   hasMoreRef.current = hasMore;
   loadingMoreRef.current = loadingMore;
-  const autoScrollToBottomRef = useRef(true);
-  const pinnedToBottomRef = useRef(true);
+  const autoScrollToBottomRef = useRef(initialFirstUnreadMessageId == null);
+  const pinnedToBottomRef = useRef(initialFirstUnreadMessageId == null);
   const initialScrollDoneRef = useRef(false);
   const messageSnapshotRef = useRef("");
   const bottomSeenMessageIdRef = useRef<string | null>(null);
@@ -347,18 +348,56 @@ export function ChatThread({
     if (!container) return;
 
     messageSnapshotRef.current = snapshot;
-    scrollMessagesToBottom(container);
-    pinnedToBottomRef.current = true;
-    autoScrollToBottomRef.current = true;
-    setShowScrollToBottom(false);
-    markBottomSeen();
+
+    let pinToBottomAfterPaint = true;
+
+    if (firstPaint) {
+      const unreadAnchorId = firstUnreadMessageId ?? initialFirstUnreadMessageId;
+      const unreadTarget =
+        unreadAnchorId &&
+        messages.some((message) => message.id === unreadAnchorId)
+          ? container.querySelector<HTMLElement>(`[data-message-id="${unreadAnchorId}"]`)
+          : null;
+
+      if (unreadTarget) {
+        scrollContainerToElement(container, unreadTarget);
+        autoScrollToBottomRef.current = false;
+        pinnedToBottomRef.current = false;
+        bottomSeenMessageIdRef.current = messages.at(-1)?.id ?? null;
+        setHasNewMessagesBelow(false);
+        setShowScrollToBottom(true);
+        pinToBottomAfterPaint = false;
+      } else {
+        scrollMessagesToBottom(container);
+        pinnedToBottomRef.current = true;
+        autoScrollToBottomRef.current = true;
+        setShowScrollToBottom(false);
+        markBottomSeen();
+      }
+    } else {
+      scrollMessagesToBottom(container);
+      pinnedToBottomRef.current = true;
+      autoScrollToBottomRef.current = true;
+      setShowScrollToBottom(false);
+      markBottomSeen();
+    }
 
     initialScrollDoneRef.current = true;
     setScrollReady(true);
 
-    const cancelScheduled = scheduleScrollMessagesToBottom(container);
+    const cancelScheduled = pinToBottomAfterPaint
+      ? scheduleScrollMessagesToBottom(container)
+      : () => {};
     return () => cancelScheduled();
-  }, [layout, markBottomSeen, messages, messages.length, messagesLoading]);
+  }, [
+    firstUnreadMessageId,
+    initialFirstUnreadMessageId,
+    layout,
+    markBottomSeen,
+    messages,
+    messages.length,
+    messagesLoading,
+  ]);
 
   useLayoutEffect(() => {
     if (messagesLoading || messages.length === 0) return;
@@ -415,8 +454,8 @@ export function ChatThread({
     prevConversationIdRef.current = conversationId;
 
     if (switchedConversation) {
-      autoScrollToBottomRef.current = true;
-      pinnedToBottomRef.current = true;
+      autoScrollToBottomRef.current = !initialFirstUnreadMessageId;
+      pinnedToBottomRef.current = !initialFirstUnreadMessageId;
       initialScrollDoneRef.current = false;
       messageSnapshotRef.current = "";
       setScrollReady(false);
@@ -550,17 +589,13 @@ export function ChatThread({
     [conversationId, resolvedUserId, markConversationRead],
   );
 
-  const { connected } = useConversationSocket(conversationId, onEvent);
-  useConversationPollFallback(conversationId, connected, messagesLoading, setMessages);
-  const messageActions = useMessageActionsReveal();
-
-  useEffect(() => {
-    setRealtimeConnected(connected);
-  }, [connected, setRealtimeConnected]);
-
-  useEffect(() => {
-    return () => setRealtimeConnected(false);
-  }, [conversationId, setRealtimeConnected]);
+  useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
+  useConversationPollFallback(
+    conversationId,
+    realtimeConnected && activeConversationId === conversationId,
+    messagesLoading,
+    setMessages,
+  );
 
   async function postMessage(payload: {
     body: string;

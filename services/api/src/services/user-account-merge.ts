@@ -118,6 +118,67 @@ async function mergePlaceholderUserIntoAuthenticated(
   await db.delete(users).where(eq(users.id, placeholderUserId));
 }
 
+function usersLikelySamePerson(
+  authUser: { pcoPersonId: string; email: string; displayName: string },
+  candidate: { pcoPersonId: string; email: string; displayName: string },
+): boolean {
+  if (candidate.pcoPersonId === authUser.pcoPersonId) return true;
+
+  const authEmail = normalizeMemberEmail(authUser.email);
+  const candidateEmail = normalizeMemberEmail(candidate.email);
+  if (authEmail && candidateEmail && authEmail === candidateEmail) return true;
+
+  if (
+    isLikelyPlaceholderUser(candidate) &&
+    namesLikelyMatch(authUser.displayName, candidate.displayName)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/** Merge all roster/webhook placeholder users into authenticated accounts for an org. */
+export async function reconcileOrgPlaceholderUsers(organizationId: string): Promise<void> {
+  const authUsers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(users.organizationId, organizationId));
+
+  if (authUsers.length === 0) return;
+
+  const placeholders = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .leftJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(and(eq(users.organizationId, organizationId), isNull(userPcoCredentials.userId)));
+
+  for (const candidate of placeholders) {
+    const authUser = authUsers.find((user) => usersLikelySamePerson(user, candidate));
+    if (!authUser || authUser.id === candidate.id) continue;
+
+    try {
+      await mergePlaceholderUserIntoAuthenticated(candidate.id, authUser.id);
+    } catch (err) {
+      console.warn(
+        `Placeholder user merge failed (${candidate.id} -> ${authUser.id}):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+}
+
 /** Merge roster/webhook placeholder users into the authenticated account after PCO login. */
 export async function reconcilePlaceholderUsersOnLogin(params: {
   organizationId: string;
@@ -155,12 +216,7 @@ export async function reconcilePlaceholderUsersOnLogin(params: {
     );
 
   for (const candidate of placeholders) {
-    const samePerson =
-      candidate.pcoPersonId === authUser.pcoPersonId ||
-      (isLikelyPlaceholderUser(candidate) &&
-        namesLikelyMatch(authUser.displayName, candidate.displayName));
-
-    if (!samePerson) continue;
+    if (!usersLikelySamePerson(authUser, candidate)) continue;
 
     try {
       await mergePlaceholderUserIntoAuthenticated(candidate.id, params.userId);

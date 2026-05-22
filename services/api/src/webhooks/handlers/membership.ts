@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { groupMemberships, groups, users } from "../../db/schema";
-import { ensureOrganization, upsertUserFromPco } from "../../services/bootstrap";
+import { upsertUserFromPco } from "../../services/bootstrap";
 import { ensureConversationMembers, ensureGeneralConversation } from "../../services/conversations";
 import {
   refreshUserGroupRoleFromPco,
@@ -9,6 +9,7 @@ import {
   syncGroupRoster,
 } from "../../services/group-sync";
 import { findLeaderAccessTokenForGroup, getOrgPcoAccessToken } from "../../services/org-config";
+import { getConfiguredOrganization } from "../../services/org-oauth";
 
 export type MembershipWebhookPayload = {
   data: {
@@ -71,15 +72,19 @@ export async function handleMembershipUpsert(
   const pcoGroupId = payload.data.attributes.group_id;
   if (!pcoPersonId || !pcoGroupId) return false;
 
-  const organizationId = await ensureOrganization();
-
   const groupRow = await db
-    .select({ id: groups.id })
+    .select({ id: groups.id, organizationId: groups.organizationId })
     .from(groups)
     .where(eq(groups.pcoGroupId, pcoGroupId))
     .limit(1);
 
   if (!groupRow[0]) return false;
+
+  const organizationId =
+    groupRow[0].organizationId ??
+    (await getConfiguredOrganization())?.id ??
+    null;
+  if (!organizationId) return false;
 
   const userId = await upsertUserFromPco(organizationId, {
     personId: pcoPersonId,

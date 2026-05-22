@@ -3,6 +3,7 @@ import { parsePersonAvatarUrl } from "@cco/pco-client";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { organizations, users } from "../db/schema";
+import { normalizeMemberEmail } from "./cco-member-status";
 
 export type PcoMeProfile = {
   data: {
@@ -125,6 +126,48 @@ export async function upsertUserFromPcoProfile(
   const email = profile.data.attributes.email ?? `${personId}@placeholder.local`;
   const siteAdministrator = isPcoSiteAdministrator(profile);
   const avatarUrl = parsePersonAvatarUrl(profile.data.attributes as Record<string, unknown>);
+
+  const orgScoped = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.organizationId, organizationId), eq(users.pcoPersonId, personId)))
+    .limit(1);
+
+  if (orgScoped[0]) {
+    await db
+      .update(users)
+      .set({
+        email,
+        displayName,
+        siteAdministrator,
+        avatarUrl: avatarUrl ?? undefined,
+      })
+      .where(eq(users.id, orgScoped[0].id));
+    return orgScoped[0].id;
+  }
+
+  const realEmail = normalizeMemberEmail(email);
+  if (realEmail) {
+    const orgUsers = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.organizationId, organizationId));
+
+    const byEmail = orgUsers.find((row) => normalizeMemberEmail(row.email) === realEmail);
+    if (byEmail) {
+      await db
+        .update(users)
+        .set({
+          pcoPersonId: personId,
+          email,
+          displayName,
+          siteAdministrator,
+          avatarUrl: avatarUrl ?? undefined,
+        })
+        .where(eq(users.id, byEmail.id));
+      return byEmail.id;
+    }
+  }
 
   const existing = await db
     .select({ id: users.id })

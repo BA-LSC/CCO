@@ -157,7 +157,10 @@ function handleVersionPayload(d){
   }
 }
 function check(){
-  if(applying)return;
+  if(applying){
+    overlay();
+    return;
+  }
   fetch("/api/app-version",{cache:"no-store",headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}})
     .then(function(r){
       if(isDeployStatus(r.status)){
@@ -179,10 +182,24 @@ function wire(){
   if(wired)return;
   wired=true;
   document.addEventListener("visibilitychange",function(){
-    if(document.visibilityState==="visible")check();
+    if(document.visibilityState!=="visible")return;
+    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
+      overlay();
+    }
+    check();
   });
-  window.addEventListener("pageshow",check);
-  window.addEventListener("focus",check);
+  window.addEventListener("pageshow",function(){
+    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
+      overlay();
+    }
+    check();
+  });
+  window.addEventListener("focus",function(){
+    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
+      overlay();
+    }
+    check();
+  });
   setInterval(check,CHECK_MS);
 }
 wire();

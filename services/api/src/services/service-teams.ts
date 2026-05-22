@@ -24,6 +24,7 @@ import {
   memberIsOnCco,
   resolveRosterMemberLink,
 } from "./cco-member-status";
+import { reconcileOrgPlaceholderUsers } from "./user-account-merge";
 import { unreadFlagsForConversations } from "./unread";
 
 async function upsertServiceTeamMembership(params: {
@@ -214,6 +215,8 @@ async function listTeamMembersForDetail(params: {
   pcoTeamId: string;
   accessToken?: string;
 }): Promise<TeamMemberView[]> {
+  await reconcileOrgPlaceholderUsers(params.organizationId);
+
   const ccoMembers = await db
     .select({
       id: users.id,
@@ -301,6 +304,7 @@ async function listTeamMembersForDetail(params: {
           },
           member.id,
           signedUp,
+          signedUpRecords,
         ),
         email: null,
       })),

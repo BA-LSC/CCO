@@ -121,7 +121,7 @@ html.standalone-display .app:has(.chat-shell) {
 .a2hs-banner {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 10;
   flex-shrink: 0;
   padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
   background: var(--color-surface);
@@ -203,7 +203,7 @@ html.standalone-display .app:has(.chat-shell) {
 .notifications-banner {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 10;
   flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
@@ -667,9 +667,10 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-brand {
   flex-shrink: 0;
-  padding: 0 8px 10px;
+  padding: 0 8px 12px;
   margin-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
+  text-align: center;
 }
 
 .sidebar-brand-name {
@@ -678,8 +679,8 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.125rem;
+  font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--color-text);
 }
@@ -4594,15 +4595,19 @@ html.standalone-display .chat-thread-panel {
 }
 
 @media (max-width: 768px) {
+  .chat-main {
+    position: relative;
+    z-index: 1;
+  }
+
   .chat-sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 8px 0;
     box-sizing: border-box;
-    z-index: 20;
+    z-index: 40;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md);
@@ -4616,10 +4621,23 @@ html.standalone-display .chat-thread-panel {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 15;
+    z-index: 35;
     background: rgba(15, 23, 42, 0.35);
     border: none;
     cursor: pointer;
+  }
+
+  .chat-shell:has(.chat-sidebar-open) .a2hs-banner,
+  .chat-shell:has(.chat-sidebar-open) .notifications-banner {
+    visibility: hidden;
+  }
+
+  .sidebar-footer {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .sidebar-brand {
+    padding-top: 0;
   }
 
   .chat-sidebar-toggle {
