@@ -190,12 +190,15 @@ export function ChatThread({
     const container = getScrollContainer();
     if (!container || container.scrollHeight <= container.clientHeight) {
       pinnedToBottomRef.current = true;
+      autoScrollToBottomRef.current = true;
       setShowScrollToBottom(false);
       return;
     }
     const atBottom = isAtScrollBottom(container);
     pinnedToBottomRef.current = atBottom;
-    if (!atBottom) {
+    if (atBottom) {
+      autoScrollToBottomRef.current = true;
+    } else {
       autoScrollToBottomRef.current = false;
     }
     setShowScrollToBottom(!atBottom && messages.length > 0);
@@ -223,33 +226,42 @@ export function ChatThread({
     pendingScrollRestoreRef.current = null;
   }, [messages, layout]);
 
+  const lastMessageId = messages[messages.length - 1]?.id;
+
   useLayoutEffect(() => {
-    if (!autoScrollToBottomRef.current) return;
     if (messagesLoading || identityPending || messages.length === 0) return;
     if (pendingScrollRestoreRef.current) return;
+    if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
 
     const container = getScrollContainer();
     if (!container) return;
 
-    const pin = () => {
-      if (!autoScrollToBottomRef.current || pendingScrollRestoreRef.current) return;
+    const followLatest = () => {
+      if (pendingScrollRestoreRef.current) return;
+      if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
+
       container.scrollTop = container.scrollHeight;
+      messagesEndRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
+
       if (isAtScrollBottom(container)) {
-        autoScrollToBottomRef.current = false;
         pinnedToBottomRef.current = true;
         setShowScrollToBottom(false);
       }
     };
 
-    pin();
+    followLatest();
+    const raf = requestAnimationFrame(followLatest);
 
-    const resizeObserver = new ResizeObserver(pin);
+    const resizeObserver = new ResizeObserver(followLatest);
     resizeObserver.observe(container);
     const list = messagesListRef.current;
     if (list) resizeObserver.observe(list);
 
-    return () => resizeObserver.disconnect();
-  }, [messages.length, messagesLoading, identityPending, layout]);
+    return () => {
+      cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+    };
+  }, [lastMessageId, messages.length, messagesLoading, identityPending, layout]);
 
   useEffect(() => {
     autoScrollToBottomRef.current = true;
