@@ -14,10 +14,13 @@ export {
   parseGroupHeaderImageUrl,
   parseGroupsListResponse,
   parseMyGroupMemberships,
+  parseMembershipWebhookPayload,
   deleteGroupMembership,
   findGroupMembershipId,
   type GroupMembership,
   type GroupRosterMember,
+  type MembershipWebhookPayload,
+  type ParsedMembershipWebhook,
   type SimpleGroup,
 } from "./groups";
 export {

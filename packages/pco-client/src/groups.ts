@@ -67,12 +67,65 @@ export type GroupRosterMember = {
 type PcoMembershipResource = {
   type: string;
   id: string;
-  attributes: { role?: string };
+  attributes: { role?: string; person_id?: string; group_id?: string };
   relationships?: {
     group?: { data?: { id?: string } };
     person?: { data?: { id?: string } };
   };
 };
+
+export type MembershipWebhookPayload = {
+  data: PcoMembershipResource;
+  included?: Array<{
+    type: string;
+    id: string;
+    attributes?: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      name?: string;
+    };
+  }>;
+};
+
+export type ParsedMembershipWebhook = {
+  pcoPersonId: string;
+  pcoGroupId: string;
+  role: string;
+  displayName?: string;
+  email?: string;
+};
+
+/** PCO membership webhooks put person/group IDs in relationships, not attributes. */
+export function parseMembershipWebhookPayload(
+  payload: MembershipWebhookPayload,
+): ParsedMembershipWebhook | null {
+  const data = payload.data;
+  const attrs = data?.attributes ?? {};
+  const rels = data?.relationships ?? {};
+
+  const pcoPersonId = rels.person?.data?.id ?? attrs.person_id;
+  const pcoGroupId = rels.group?.data?.id ?? attrs.group_id;
+  if (!pcoPersonId || !pcoGroupId) return null;
+
+  const role = mapPcoMembershipRole(attrs.role);
+
+  let displayName: string | undefined;
+  let email: string | undefined;
+  for (const item of payload.included ?? []) {
+    if (item.type === "Person" && item.id === pcoPersonId) {
+      const personAttrs = item.attributes ?? {};
+      displayName =
+        [personAttrs.first_name, personAttrs.last_name].filter(Boolean).join(" ").trim() ||
+        personAttrs.name ||
+        undefined;
+      email = personAttrs.email;
+      break;
+    }
+  }
+
+  return { pcoPersonId, pcoGroupId, role, displayName, email };
+}
 
 type PcoPersonResource = {
   type: string;

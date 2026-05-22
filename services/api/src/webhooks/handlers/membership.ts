@@ -1,4 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import {
+  parseMembershipWebhookPayload,
+  type MembershipWebhookPayload,
+} from "@cco/pco-client";
+import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { groupMemberships, groups, users } from "../../db/schema";
 import { upsertUserFromPco } from "../../services/bootstrap";
@@ -11,24 +15,20 @@ import {
 import { findLeaderAccessTokenForGroup, getOrgPcoAccessToken } from "../../services/org-config";
 import { getConfiguredOrganization } from "../../services/org-oauth";
 
-export type MembershipWebhookPayload = {
-  data: {
-    type: string;
-    attributes: {
-      person_id?: string;
-      group_id?: string;
-      role?: string;
-    };
-  };
-};
+export type { MembershipWebhookPayload };
 
 export async function handleMembershipDestroyed(
   payload: MembershipWebhookPayload,
 ): Promise<boolean> {
-  const pcoPersonId = payload.data.attributes.person_id;
-  const pcoGroupId = payload.data.attributes.group_id;
-  if (!pcoPersonId || !pcoGroupId) return false;
-  return removeGroupMembership({ pcoPersonId, pcoGroupId });
+  const parsed = parseMembershipWebhookPayload(payload);
+  if (!parsed) {
+    console.warn("PCO membership webhook missing person/group ids");
+    return false;
+  }
+  return removeGroupMembership({
+    pcoPersonId: parsed.pcoPersonId,
+    pcoGroupId: parsed.pcoGroupId,
+  });
 }
 
 async function syncMembershipRoleFromPco(params: {
@@ -68,9 +68,13 @@ async function syncMembershipRoleFromPco(params: {
 export async function handleMembershipUpsert(
   payload: MembershipWebhookPayload,
 ): Promise<boolean> {
-  const pcoPersonId = payload.data.attributes.person_id;
-  const pcoGroupId = payload.data.attributes.group_id;
-  if (!pcoPersonId || !pcoGroupId) return false;
+  const parsed = parseMembershipWebhookPayload(payload);
+  if (!parsed) {
+    console.warn("PCO membership webhook missing person/group ids");
+    return false;
+  }
+
+  const { pcoPersonId, pcoGroupId, displayName, email } = parsed;
 
   const groupRow = await db
     .select({ id: groups.id, organizationId: groups.organizationId })
@@ -78,7 +82,10 @@ export async function handleMembershipUpsert(
     .where(eq(groups.pcoGroupId, pcoGroupId))
     .limit(1);
 
-  if (!groupRow[0]) return false;
+  if (!groupRow[0]) {
+    console.warn(`PCO membership webhook: group ${pcoGroupId} not found locally`);
+    return false;
+  }
 
   const organizationId =
     groupRow[0].organizationId ??
@@ -88,8 +95,8 @@ export async function handleMembershipUpsert(
 
   const userId = await upsertUserFromPco(organizationId, {
     personId: pcoPersonId,
-    email: `${pcoPersonId}@placeholder.local`,
-    displayName: "Member",
+    email: email ?? `${pcoPersonId}@placeholder.local`,
+    displayName: displayName ?? "Member",
   });
 
   await db

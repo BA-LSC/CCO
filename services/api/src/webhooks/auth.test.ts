@@ -130,7 +130,15 @@ describe("normalizeWebhookPayload", () => {
   test("unwraps EventDelivery wrapper and parses inner payload", () => {
     const inner = {
       meta: { delivery_id: "inner-del" },
-      data: { type: "Membership", attributes: { person_id: "p1", group_id: "g1" } },
+      data: {
+        type: "GroupMembership",
+        id: "m1",
+        attributes: { role: "member" },
+        relationships: {
+          person: { data: { id: "p1" } },
+          group: { data: { id: "g1" } },
+        },
+      },
     };
     const outer = {
       data: [
