@@ -95,9 +95,12 @@ clear_deploy_draining() {
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
 }
 
+clear_deploy_draining
+
 echo "Building CCO production images..."
 CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
 export CCO_BUILD_ID
+cco_env_upsert "CCO_BUILD_ID" "$CCO_BUILD_ID" .env
 echo "  Web build id: ${CCO_BUILD_ID}"
 "${COMPOSE[@]}" build
 

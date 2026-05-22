@@ -11,13 +11,13 @@ describe("resolveAppBuildVersion", () => {
     ).toBe("abc123");
   });
 
-  test("ignores dev placeholder in production", () => {
-    const version = resolveAppBuildVersion({
-      CCO_BUILD_ID: "dev",
-      NODE_ENV: "production",
-    });
-
-    expect(version).toMatch(/^build-\d+$/);
+  test("treats dev placeholder as dev in production", () => {
+    expect(
+      resolveAppBuildVersion({
+        CCO_BUILD_ID: "dev",
+        NODE_ENV: "production",
+      }),
+    ).toBe("dev");
   });
 
   test("returns dev in local development", () => {

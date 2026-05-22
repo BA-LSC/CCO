@@ -97,7 +97,6 @@ services:
       - ../.env
     environment:
       NODE_ENV: production
-      CCO_BUILD_ID: ${CCO_BUILD_ID:-dev}
       API_URL: http://api:3001
       API_DOMAIN: ${API_DOMAIN}
       WEB_URL: ${WEB_URL}
