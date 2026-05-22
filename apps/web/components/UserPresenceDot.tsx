@@ -1,6 +1,6 @@
 "use client";
 
-import type { PresenceDotState } from "@cco/shared";
+import type { PresenceDotState } from "@cco/shared/user-status";
 
 type Props = {
   state: PresenceDotState;

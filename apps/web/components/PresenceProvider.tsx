@@ -15,7 +15,7 @@ import {
   resolvePresenceDotState,
   type UserStatus,
   type UserStatusPreset,
-} from "@cco/shared";
+} from "@cco/shared/user-status";
 import { apiFetch } from "@/lib/api";
 
 const HEARTBEAT_MS = 15_000;

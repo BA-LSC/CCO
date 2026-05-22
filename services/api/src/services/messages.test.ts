@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MessageCreateSchema } from "@cco/shared";
+import { MessageCreateSchema } from "@cco/shared/schemas";
 import { isAllowedAttachmentUrl } from "../lib/uploads";
 
 process.env.SESSION_SECRET ??= "test-secret-must-be-at-least-32-characters-long!!";

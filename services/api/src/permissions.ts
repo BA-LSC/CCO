@@ -1,4 +1,4 @@
-import type { GroupRole } from "@cco/shared";
+import type { GroupRole } from "@cco/shared/schemas";
 
 const LEADER_ROLES: GroupRole[] = ["leader", "admin"];
 

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { MessageCreateSchema } from "@cco/shared";
+import { MessageCreateSchema } from "@cco/shared/schemas";
 import { z } from "zod";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { createMessage, deleteMessage, updateMessage } from "../services/messages";

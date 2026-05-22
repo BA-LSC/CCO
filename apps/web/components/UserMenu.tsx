@@ -6,7 +6,7 @@ import {
   USER_STATUS_LABELS,
   USER_STATUS_PRESETS,
   type UserStatusPreset,
-} from "@cco/shared";
+} from "@cco/shared/user-status";
 import { useTheme } from "@/components/ThemeProvider";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
