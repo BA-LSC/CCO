@@ -67,6 +67,7 @@ export function ChannelMembersSection({
   watchPresence = true,
   headerAction,
 }: Props) {
+  const { session } = useChatLayout();
   const presenceUserIds = members.filter((member) => member.onCco && member.id).map((member) => member.id);
   usePresenceWatch(presenceUserIds, watchPresence && members.length > 0);
 
