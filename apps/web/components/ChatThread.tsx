@@ -927,13 +927,12 @@ export function ChatThread({
                           aria-label="View full image"
                           onClick={(event) => {
                             event.stopPropagation();
+                            if (messageActions.isRevealed(m.id)) return;
                             setLightboxImage({
                               src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
                               alt: m.body || "Shared image",
                             });
                           }}
-                          onTouchStart={(event) => event.stopPropagation()}
-                          onTouchEnd={(event) => event.stopPropagation()}
                         >
                           <img
                             src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
