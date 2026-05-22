@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { getClientBuildVersion, resolveAppBuildVersionFromEnv } from "./build-version";
 import {
   clearBuildVersionCacheForTests,
-  getClientBuildVersion,
   resolveAppBuildVersion,
-} from "./build-version";
+} from "./build-version.server";
 
 function withCleanBuildIdCwd(run: () => void): void {
   const dir = mkdtempSync(join(tmpdir(), "cco-build-"));
@@ -21,8 +21,37 @@ function withCleanBuildIdCwd(run: () => void): void {
   }
 }
 
-describe("resolveAppBuildVersion", () => {
+describe("resolveAppBuildVersionFromEnv", () => {
   test("uses git sha when provided", () => {
+    expect(
+      resolveAppBuildVersionFromEnv({
+        CCO_BUILD_ID: "abc123",
+        NODE_ENV: "production",
+      }),
+    ).toBe("abc123");
+  });
+
+  test("treats dev placeholder as dev in production", () => {
+    expect(
+      resolveAppBuildVersionFromEnv({
+        CCO_BUILD_ID: "dev",
+        NODE_ENV: "production",
+      }),
+    ).toBe("dev");
+  });
+
+  test("returns dev in local development", () => {
+    expect(
+      resolveAppBuildVersionFromEnv({
+        CCO_BUILD_ID: "dev",
+        NODE_ENV: "development",
+      }),
+    ).toBe("dev");
+  });
+});
+
+describe("resolveAppBuildVersion", () => {
+  test("uses env when no BUILD_ID file exists", () => {
     withCleanBuildIdCwd(() => {
       expect(
         resolveAppBuildVersion({
@@ -30,28 +59,6 @@ describe("resolveAppBuildVersion", () => {
           NODE_ENV: "production",
         }),
       ).toBe("abc123");
-    });
-  });
-
-  test("treats dev placeholder as dev in production", () => {
-    withCleanBuildIdCwd(() => {
-      expect(
-        resolveAppBuildVersion({
-          CCO_BUILD_ID: "dev",
-          NODE_ENV: "production",
-        }),
-      ).toBe("dev");
-    });
-  });
-
-  test("returns dev in local development", () => {
-    withCleanBuildIdCwd(() => {
-      expect(
-        resolveAppBuildVersion({
-          CCO_BUILD_ID: "dev",
-          NODE_ENV: "development",
-        }),
-      ).toBe("dev");
     });
   });
 
@@ -73,8 +80,10 @@ describe("resolveAppBuildVersion", () => {
       clearBuildVersionCacheForTests();
     }
   });
+});
 
-  test("getClientBuildVersion prefers the SSR meta tag", () => {
+describe("getClientBuildVersion", () => {
+  test("prefers the SSR meta tag", () => {
     const meta = { getAttribute: () => "server-version" };
     const querySelector = () => meta;
     const originalDocument = globalThis.document;

@@ -1,4 +1,4 @@
-import { resolveAppBuildVersion } from "@/lib/build-version";
+import { resolveAppBuildVersion } from "@/lib/build-version.server";
 import { SW_TEMPLATE } from "@/lib/sw-template";
 
 export const dynamic = "force-dynamic";

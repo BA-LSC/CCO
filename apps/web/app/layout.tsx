@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/AppShellWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { appUpdateBootstrapScript } from "@/lib/app-update-bootstrap-script";
-import { resolveAppBuildVersion } from "@/lib/build-version";
+import { resolveAppBuildVersion } from "@/lib/build-version.server";
 import "./globals.css";
 import "./themes.css";
 

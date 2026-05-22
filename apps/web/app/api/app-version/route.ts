@@ -1,4 +1,4 @@
-import { resolveAppBuildVersion } from "@/lib/build-version";
+import { resolveAppBuildVersion } from "@/lib/build-version.server";
 
 export const dynamic = "force-dynamic";
 
