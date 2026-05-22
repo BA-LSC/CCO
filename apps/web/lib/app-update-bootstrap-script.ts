@@ -22,9 +22,10 @@ var wired=false;
 var OVERLAY_ID="cco-app-update-overlay";
 var STYLE_ID="cco-app-update-overlay-style";
 var CHECK_MS=5000;
-var DEPLOY_CHECK_MS=1500;
+var DEPLOY_CHECK_MS=750;
 var OVERLAY_MS=2500;
 var SEND_WAIT_MS=8000;
+var DEPLOY_SEND_WAIT_MS=1500;
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
   var s=document.createElement("style");
@@ -58,12 +59,14 @@ function hideOverlay(){
 }
 function markDeployPending(){
   deployPending=true;
+  window.__ccoDeployPending=true;
   overlay();
   if(deployPollId)return;
   deployPollId=setInterval(check,DEPLOY_CHECK_MS);
 }
 function clearDeployPending(){
   deployPending=false;
+  window.__ccoDeployPending=false;
   window.__ccoApplyingUpdate=false;
   hideOverlay();
   if(deployPollId){
@@ -77,10 +80,11 @@ function isDeployStatus(status){
 function sendIdle(){
   return !window.__ccoSendInFlight;
 }
-function waitForSendIdle(cb){
+function waitForSendIdle(cb,maxMs){
+  var limit=maxMs||SEND_WAIT_MS;
   var started=Date.now();
   (function poll(){
-    if(sendIdle()||Date.now()-started>=SEND_WAIT_MS){
+    if(sendIdle()||Date.now()-started>=limit){
       cb();
       return;
     }
@@ -94,16 +98,23 @@ function reloadAfterOverlay(){
     });
   });
 }
-function applyUpdate(){
+function applyUpdate(fromDeploy){
   if(applying)return;
   applying=true;
   deployPending=false;
+  window.__ccoDeployPending=false;
   if(deployPollId){
     clearInterval(deployPollId);
     deployPollId=null;
   }
   overlay();
-  waitForSendIdle(reloadAfterOverlay);
+  waitForSendIdle(function(){
+    if(fromDeploy){
+      location.reload();
+      return;
+    }
+    reloadAfterOverlay();
+  },fromDeploy?DEPLOY_SEND_WAIT_MS:SEND_WAIT_MS);
 }
 function handleVersionPayload(d){
   if(d.updating){
@@ -112,7 +123,7 @@ function handleVersionPayload(d){
   }
   if(deployPending){
     if(d.version&&d.version!==CLIENT){
-      applyUpdate();
+      applyUpdate(true);
       return;
     }
     if(d.version===CLIENT){
@@ -121,7 +132,7 @@ function handleVersionPayload(d){
     return;
   }
   if(d.version&&d.version!==CLIENT){
-    applyUpdate();
+    applyUpdate(false);
   }
 }
 function check(){

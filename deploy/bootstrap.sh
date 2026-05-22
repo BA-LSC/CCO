@@ -109,7 +109,12 @@ echo "Recreating containers with new images..."
 
 echo ""
 echo "Waiting for services..."
-sleep 5
+for _ in $(seq 1 30); do
+  if "${COMPOSE[@]}" exec -T web bun -e "fetch('http://127.0.0.1:3000/api/app-version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 clear_deploy_draining
 "${COMPOSE[@]}" ps
 

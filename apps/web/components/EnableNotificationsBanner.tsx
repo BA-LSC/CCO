@@ -86,7 +86,7 @@ export function EnableNotificationsBanner() {
         <p>
           {blocked
             ? "Notifications are blocked. Open Settings → CCO → Notifications to allow alerts."
-            : "Get notified when you receive new messages in CCO."}
+            : "Get notified when you receive new messages."}
         </p>
       </div>
       <div className="notifications-banner-actions">

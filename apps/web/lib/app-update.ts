@@ -3,9 +3,10 @@ import { waitForSendIdle } from "@/lib/app-update-composer";
 import { hideAppUpdateOverlay, showAppUpdateOverlay } from "@/lib/app-update-overlay";
 
 const OVERLAY_MIN_MS = 2500;
+const DEPLOY_RELOAD_SEND_WAIT_MS = 1500;
 export const STANDALONE_UPDATE_CHECK_MS = 5_000;
 export const UPDATE_CHECK_MS = 15_000;
-export const DEPLOY_POLL_MS = 1500;
+export const DEPLOY_POLL_MS = 750;
 
 const DEPLOY_HTTP_STATUSES = new Set([502, 503, 504]);
 
@@ -14,17 +15,25 @@ export const APP_UPDATE_EVENT = "cco:app-updating";
 declare global {
   interface Window {
     __ccoApplyingUpdate?: boolean;
+    __ccoDeployPending?: boolean;
   }
 }
 
 let deployWaitActive = false;
+
+export function isDeployPending(): boolean {
+  return (
+    deployWaitActive ||
+    (typeof window !== "undefined" && Boolean(window.__ccoDeployPending))
+  );
+}
 
 export function isAppUpdateInProgress(): boolean {
   return typeof window !== "undefined" && Boolean(window.__ccoApplyingUpdate);
 }
 
 export function isDeployWaitActive(): boolean {
-  return deployWaitActive;
+  return isDeployPending();
 }
 
 function notifyAppUpdating(): void {
@@ -34,7 +43,10 @@ function notifyAppUpdating(): void {
 
 export function markDeployWait(onUpdating?: () => void | Promise<void>): void {
   deployWaitActive = true;
-  if (typeof window !== "undefined") window.__ccoApplyingUpdate = true;
+  if (typeof window !== "undefined") {
+    window.__ccoApplyingUpdate = true;
+    window.__ccoDeployPending = true;
+  }
   showAppUpdateOverlay();
   notifyAppUpdating();
   void onUpdating?.();
@@ -42,7 +54,10 @@ export function markDeployWait(onUpdating?: () => void | Promise<void>): void {
 
 export function clearDeployWait(): void {
   deployWaitActive = false;
-  if (typeof window !== "undefined") window.__ccoApplyingUpdate = false;
+  if (typeof window !== "undefined") {
+    window.__ccoApplyingUpdate = false;
+    window.__ccoDeployPending = false;
+  }
   hideAppUpdateOverlay();
 }
 
@@ -58,8 +73,9 @@ export function waitForOverlayPaint(ms = OVERLAY_MIN_MS): Promise<void> {
 
 export async function prepareAppUpdate(onUpdating?: () => Promise<void>): Promise<void> {
   if (typeof window === "undefined") return;
-  if (window.__ccoApplyingUpdate && !deployWaitActive) return;
+  if (window.__ccoApplyingUpdate && !isDeployPending()) return;
   deployWaitActive = false;
+  if (typeof window !== "undefined") window.__ccoDeployPending = false;
   window.__ccoApplyingUpdate = true;
   showAppUpdateOverlay();
   notifyAppUpdating();
@@ -73,6 +89,15 @@ export function completeAppUpdateReload(): void {
 }
 
 export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<void> {
+  const afterDeploy = isDeployPending();
+  if (afterDeploy) {
+    deployWaitActive = false;
+    if (typeof window !== "undefined") window.__ccoDeployPending = false;
+    await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
+    completeAppUpdateReload();
+    return;
+  }
+
   await prepareAppUpdate(onUpdating);
   await waitForSendIdle();
   completeAppUpdateReload();
@@ -102,7 +127,7 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (DEPLOY_HTTP_STATUSES.has(res.status)) {
-      return { version: null, unavailable: true, updating: deployWaitActive };
+      return { version: null, unavailable: true, updating: isDeployPending() };
     }
     if (!res.ok) {
       return { version: null, unavailable: true, updating: false };
@@ -115,7 +140,7 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
 
     return { version: data.version ?? null, unavailable: false, updating: false };
   } catch {
-    return { version: null, unavailable: true, updating: deployWaitActive };
+    return { version: null, unavailable: true, updating: isDeployPending() };
   }
 }
 
@@ -127,7 +152,7 @@ export async function fetchServerAppVersion(): Promise<string | null> {
 
 export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise<boolean> {
   if (APP_BUILD_VERSION === "dev") return false;
-  if (isAppUpdateInProgress() && !deployWaitActive) return false;
+  if (isAppUpdateInProgress() && !isDeployPending()) return false;
 
   const { version: serverVersion, unavailable, updating } = await probeServerAppVersion();
 
@@ -136,7 +161,7 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  if (deployWaitActive) {
+  if (isDeployPending()) {
     if (!unavailable && serverVersion && serverVersion !== APP_BUILD_VERSION) {
       await applyAppUpdate(onUpdating);
       return true;
