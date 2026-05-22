@@ -14,6 +14,11 @@ import {
   isSetupComplete,
   updateOrganizationOAuthSettings,
 } from "../services/org-oauth";
+import {
+  ensureVapidKeys,
+  getOrganizationVapidStatus,
+  updateOrganizationVapidSubject,
+} from "../services/org-vapid";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 
@@ -26,6 +31,7 @@ const IntegrationsPatchSchema = z.object({
   webhookSecret: z.string().min(1).optional(),
   signInRedirectUri: z.string().url().optional(),
   webhookUrl: z.string().url().optional(),
+  vapidSubjectEmail: z.string().email().optional(),
 });
 
 export const settingsRouter = new Hono<Env>();
@@ -57,17 +63,21 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   const org = await getConfiguredOrganization();
   if (!org) return c.json({ error: "Organization not found" }, 404);
 
-  const webhookSecrets = decryptWebhookSecrets(org.pcoWebhookSecretEnc);
+  await ensureVapidKeys(org.id);
+  const refreshed = (await getConfiguredOrganization()) ?? org;
+  const vapidStatus = await getOrganizationVapidStatus(refreshed);
+  const webhookSecrets = decryptWebhookSecrets(refreshed.pcoWebhookSecretEnc);
 
   return c.json({
     configured: true,
-    name: org.name,
-    clientId: org.pcoClientId ?? "",
-    clientSecretConfigured: Boolean(org.pcoClientSecretEnc),
+    name: refreshed.name,
+    clientId: refreshed.pcoClientId ?? "",
+    clientSecretConfigured: Boolean(refreshed.pcoClientSecretEnc),
     webhookConfigured: webhookSecrets.length > 0,
     webhookSecretCount: webhookSecrets.length,
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
+    ...vapidStatus,
   });
 });
 
@@ -109,10 +119,23 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     webhookUrl: data.webhookUrl,
   });
 
+  if (data.vapidSubjectEmail !== undefined) {
+    try {
+      await updateOrganizationVapidSubject({
+        organizationId: org.id,
+        subjectEmail: data.vapidSubjectEmail,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid VAPID contact email";
+      return c.json({ error: message }, 400);
+    }
+  }
+
   const updated = await getConfiguredOrganization();
   const webhookSecrets = decryptWebhookSecrets(
     updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
   );
+  const vapidStatus = await getOrganizationVapidStatus(updated ?? org);
   return c.json({
     ok: true,
     name: updated?.name ?? org.name,
@@ -129,5 +152,6 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     webhookUrl: resolvePcoWebhookUrl(
       updated?.pcoWebhookUrl ?? org.pcoWebhookUrl,
     ),
+    ...vapidStatus,
   });
 });

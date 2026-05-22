@@ -13,7 +13,6 @@ import { MessageBody } from "@/components/MessageBody";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
   apiFetch,
-  fetchGiphyEnabled,
   formatMention,
   importGiphyGif,
   uploadImage,
@@ -192,7 +191,6 @@ export function ChatThread({
   const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
   const [composerDragOver, setComposerDragOver] = useState(false);
   const [giphyOpen, setGiphyOpen] = useState(false);
-  const [giphyEnabled, setGiphyEnabled] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -272,10 +270,6 @@ export function ChatThread({
     resetComposerDragState();
     setGiphyOpen(false);
   }, [canPost, resetComposerDragState]);
-
-  useEffect(() => {
-    void fetchGiphyEnabled().then(setGiphyEnabled);
-  }, []);
 
   const canSendMessage =
     Boolean(body.trim() || pendingMedia) && canPost && !composerLocked && !isSending;
@@ -1477,7 +1471,6 @@ export function ChatThread({
         />
         <ComposerAttachMenu
           disabled={composerInputLocked}
-          giphyEnabled={giphyEnabled}
           onPickMedia={() => fileRef.current?.click()}
           onPickGiphy={() => setGiphyOpen(true)}
         />

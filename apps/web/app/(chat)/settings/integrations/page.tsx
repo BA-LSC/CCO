@@ -19,6 +19,9 @@ type IntegrationsSettings = {
   webhookSecretCount: number;
   signInRedirectUri: string;
   webhookUrl: string;
+  vapidKeysConfigured: boolean;
+  vapidSubjectEmail: string;
+  webPushConfigured: boolean;
 };
 
 function MaskedSecretField({
@@ -76,6 +79,9 @@ export default function IntegrationsSettingsPage() {
   const [clientSecretConfigured, setClientSecretConfigured] = useState(false);
   const [webhookConfigured, setWebhookConfigured] = useState(false);
   const [webhookSecretCount, setWebhookSecretCount] = useState(0);
+  const [vapidSubjectEmail, setVapidSubjectEmail] = useState("");
+  const [vapidKeysConfigured, setVapidKeysConfigured] = useState(false);
+  const [webPushConfigured, setWebPushConfigured] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -92,6 +98,9 @@ export default function IntegrationsSettingsPage() {
         setClientSecretConfigured(settings.clientSecretConfigured);
         setWebhookConfigured(settings.webhookConfigured);
         setWebhookSecretCount(settings.webhookSecretCount ?? 0);
+        setVapidSubjectEmail(settings.vapidSubjectEmail ?? "");
+        setVapidKeysConfigured(settings.vapidKeysConfigured ?? false);
+        setWebPushConfigured(settings.webPushConfigured ?? false);
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -126,6 +135,7 @@ export default function IntegrationsSettingsPage() {
     };
     if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
+    if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
 
     try {
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
@@ -142,6 +152,9 @@ export default function IntegrationsSettingsPage() {
       setClientSecretConfigured(updated.clientSecretConfigured);
       setWebhookConfigured(updated.webhookConfigured);
       setWebhookSecretCount(updated.webhookSecretCount ?? 0);
+      setVapidSubjectEmail(updated.vapidSubjectEmail ?? "");
+      setVapidKeysConfigured(updated.vapidKeysConfigured ?? false);
+      setWebPushConfigured(updated.webPushConfigured ?? false);
       setClientSecret("");
       setWebhookSecret("");
       setSaved(true);
@@ -225,6 +238,29 @@ export default function IntegrationsSettingsPage() {
             placeholder="Leave blank to keep current secrets"
             helpText="Saving replaces all stored secrets."
           />
+
+          <div className="settings-section">
+            <h2>PWA push notifications</h2>
+            <p className="help-text">
+              VAPID keys are generated automatically. Set a contact email so installed PWA users
+              can enable message notifications.
+            </p>
+            {vapidKeysConfigured ? (
+              <p className="help-text" role="status">
+                Push keys are ready{webPushConfigured ? " and notifications are enabled for PWA users." : "."}
+              </p>
+            ) : null}
+            <label className="field">
+              <span>VAPID contact email</span>
+              <input
+                value={vapidSubjectEmail}
+                onChange={(e) => setVapidSubjectEmail(e.target.value)}
+                type="email"
+                autoComplete="email"
+                placeholder="notifications@yourchurch.org"
+              />
+            </label>
+          </div>
 
           {error && (
             <p className="help-text error-text" role="alert">

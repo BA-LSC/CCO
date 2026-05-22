@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { webPushSubscriptions } from "../db/schema";
+import { resolveVapidConfig } from "./org-vapid";
 
 export type WebPushSubscriptionInput = {
   endpoint: string;
@@ -9,17 +10,9 @@ export type WebPushSubscriptionInput = {
   userAgent?: string;
 };
 
-function getVapidConfig(): { publicKey: string; privateKey: string; subject: string } | null {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) return null;
-
-  const subject = process.env.VAPID_SUBJECT ?? process.env.WEB_URL ?? "mailto:support@example.com";
-  return { publicKey, privateKey, subject };
-}
-
-export function getVapidPublicKey(): string | null {
-  return getVapidConfig()?.publicKey ?? null;
+export async function getVapidPublicKey(): Promise<string | null> {
+  const config = await resolveVapidConfig();
+  return config?.publicKey ?? null;
 }
 
 export async function registerWebPushSubscription(
@@ -83,7 +76,7 @@ export async function sendWebPushNotifications(
   subscriptions: Array<{ endpoint: string; keys: { p256dh: string; auth: string } }>,
   payload: { title: string; body: string; url: string; conversationId: string },
 ): Promise<void> {
-  const vapid = getVapidConfig();
+  const vapid = await resolveVapidConfig();
   if (!vapid || subscriptions.length === 0) return;
 
   webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);

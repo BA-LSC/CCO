@@ -30,8 +30,8 @@ export const pushRouter = new Hono<Env>();
 
 pushRouter.use("*", requireAuth);
 
-pushRouter.get("/vapid-public-key", (c) => {
-  const publicKey = getVapidPublicKey();
+pushRouter.get("/vapid-public-key", async (c) => {
+  const publicKey = await getVapidPublicKey();
   if (!publicKey) return c.json({ error: "Web push is not configured" }, 503);
   return c.json({ publicKey });
 });

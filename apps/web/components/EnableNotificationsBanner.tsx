@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
+import { apiFetch } from "@/lib/api";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
 import { getReadyServiceWorkerRegistration } from "@/lib/service-worker-client";
 import {
@@ -34,9 +35,34 @@ export function EnableNotificationsBanner() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [webPushConfigured, setWebPushConfigured] = useState(false);
 
   useEffect(() => {
     if (sessionLoading || !session?.userId) {
+      setWebPushConfigured(false);
+      return;
+    }
+
+    let cancelled = false;
+    void apiFetch<{ publicKey: string }>("/api/v1/push/vapid-public-key")
+      .then(() => {
+        if (!cancelled) setWebPushConfigured(true);
+      })
+      .catch(() => {
+        if (!cancelled) setWebPushConfigured(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.userId, sessionLoading]);
+
+  useEffect(() => {
+    if (sessionLoading || !session?.userId) {
+      setVisible(false);
+      return;
+    }
+    if (!webPushConfigured) {
       setVisible(false);
       return;
     }
@@ -56,7 +82,7 @@ export function EnableNotificationsBanner() {
     const permission = Notification.permission;
     setBlocked(permission === "denied");
     setVisible(permission !== "granted");
-  }, [session?.userId, sessionLoading]);
+  }, [session?.userId, sessionLoading, webPushConfigured]);
 
   useEffect(() => {
     if (!visible) return;

@@ -146,6 +146,9 @@ export async function completeOrganizationSetup(params: {
       setupSessionTokenHash: null,
     })
     .where(eq(organizations.id, params.organizationId));
+
+  const { ensureVapidKeys } = await import("./org-vapid");
+  await ensureVapidKeys(params.organizationId);
 }
 
 /** @deprecated use saveSetupDraft */
@@ -201,6 +204,9 @@ export async function saveOrganizationOAuthSetup(params: {
       setupByUserId: params.userId,
     })
     .where(eq(organizations.id, params.organizationId));
+
+  const { ensureVapidKeys } = await import("./org-vapid");
+  await ensureVapidKeys(params.organizationId);
 }
 
 export async function updateOrganizationOAuthSettings(params: {

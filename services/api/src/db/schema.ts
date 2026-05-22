@@ -21,6 +21,9 @@ export const organizations = pgTable("organizations", {
   setupCompletedAt: timestamp("setup_completed_at"),
   setupByUserId: uuid("setup_by_user_id"),
   setupSessionTokenHash: text("setup_session_token_hash"),
+  vapidPublicKey: text("vapid_public_key"),
+  vapidPrivateKeyEnc: text("vapid_private_key_enc"),
+  vapidSubject: text("vapid_subject"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
