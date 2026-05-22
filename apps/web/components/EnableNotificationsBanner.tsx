@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
+import { getReadyServiceWorkerRegistration } from "@/lib/service-worker-client";
 import {
+  ensureWebPushSubscription,
   isStandalonePwa,
   pushSupported,
   subscribeToWebPush,
@@ -56,19 +58,33 @@ export function EnableNotificationsBanner() {
     setVisible(permission !== "granted");
   }, [session?.userId, sessionLoading]);
 
+  useEffect(() => {
+    if (!visible) return;
+    void getReadyServiceWorkerRegistration();
+  }, [visible]);
+
   const enable = useCallback(async () => {
     setBusy(true);
     try {
-      const subscribed = await subscribeToWebPush();
-      if (subscribed || Notification.permission === "granted") {
+      await subscribeToWebPush();
+    } catch (err) {
+      console.warn("Web push subscribe failed:", err);
+    } finally {
+      setBusy(false);
+
+      const permission = Notification.permission;
+      if (permission === "granted") {
+        await ensureWebPushSubscription().catch((err) => {
+          console.warn("Web push ensure failed:", err);
+        });
+        dismissBanner();
         setVisible(false);
         return;
       }
-      if (Notification.permission === "denied") {
+
+      if (permission === "denied") {
         setBlocked(true);
       }
-    } finally {
-      setBusy(false);
     }
   }, []);
 

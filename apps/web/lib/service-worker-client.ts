@@ -26,6 +26,18 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   }
 }
 
+export async function getReadyServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
+
+  try {
+    await registerAppServiceWorker();
+    return await navigator.serviceWorker.ready;
+  } catch (err) {
+    console.warn("Service worker ready failed:", err);
+    return null;
+  }
+}
+
 /** @deprecated Import from @/lib/app-update */
 export function waitForOverlayPaint(): Promise<void> {
   return import("@/lib/app-update").then((mod) => mod.waitForOverlayPaint());

@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import { registerAppServiceWorker } from "@/lib/service-worker-client";
+import { getReadyServiceWorkerRegistration } from "@/lib/service-worker-client";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -30,25 +30,7 @@ export function pushSupported(): boolean {
   );
 }
 
-export async function subscribeToWebPush(): Promise<boolean> {
-  if (!pushSupported()) return false;
-
-  const registration = await registerAppServiceWorker();
-  if (!registration) return false;
-
-  let permission = Notification.permission;
-  if (permission === "default") {
-    permission = await Notification.requestPermission();
-  }
-  if (permission !== "granted") return false;
-
-  const { publicKey } = await apiFetch<{ publicKey: string }>("/api/v1/push/vapid-public-key");
-
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  });
-
+async function syncSubscriptionToServer(subscription: PushSubscription): Promise<boolean> {
   const json = subscription.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return false;
 
@@ -63,34 +45,60 @@ export async function subscribeToWebPush(): Promise<boolean> {
   return true;
 }
 
+export async function subscribeToWebPush(): Promise<boolean> {
+  if (!pushSupported()) return false;
+
+  let permission = Notification.permission;
+  if (permission === "default") {
+    permission = await Notification.requestPermission();
+  }
+  if (permission !== "granted") return false;
+
+  const registration = await getReadyServiceWorkerRegistration();
+  if (!registration) return false;
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    const { publicKey } = await apiFetch<{ publicKey: string }>("/api/v1/push/vapid-public-key");
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  }
+
+  return syncSubscriptionToServer(subscription);
+}
+
 export async function ensureWebPushSubscription(options?: {
   promptIfNeeded?: boolean;
 }): Promise<void> {
   if (!pushSupported()) return;
 
-  const registration = await registerAppServiceWorker();
+  const registration = await getReadyServiceWorkerRegistration();
   if (!registration) return;
 
   const existing = await registration.pushManager.getSubscription();
   if (existing) {
-    const json = existing.toJSON();
-    if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
-      await apiFetch("/api/v1/push/web/subscribe", {
-        method: "POST",
-        body: JSON.stringify({
-          endpoint: json.endpoint,
-          keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
-        }),
-      }).catch(() => {});
-    }
+    await syncSubscriptionToServer(existing).catch((err) => {
+      console.warn("Web push subscription sync failed:", err);
+    });
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    await subscribeToWebPush().catch((err) => {
+      console.warn("Web push subscribe failed:", err);
+    });
     return;
   }
 
   const shouldPrompt =
     options?.promptIfNeeded === true &&
-    (isStandalonePwa() || Notification.permission === "granted");
+    isStandalonePwa();
 
   if (!shouldPrompt) return;
 
-  await subscribeToWebPush().catch(() => {});
+  await subscribeToWebPush().catch((err) => {
+    console.warn("Web push subscribe failed:", err);
+  });
 }
