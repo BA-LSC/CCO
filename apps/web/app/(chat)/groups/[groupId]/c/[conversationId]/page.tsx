@@ -13,7 +13,7 @@ import { apiFetch, getErrorMessage, type GroupDetail, type Message, type Message
 import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
 import { canPostInGroupChannel } from "@/lib/group-permissions";
 import { conversationMessagesPath } from "@/lib/messages";
-import { dispatchConversationUpdated } from "@/lib/sidebar-events";
+import { dispatchConversationUpdated, subscribeConversationUpdated } from "@/lib/sidebar-events";
 
 type ConversationMember = { id: string; displayName: string; role: string };
 
@@ -73,6 +73,30 @@ export default function GroupConversationPage() {
       router.replace(`/groups/${groupId}/c/${detail.conversations[0].id}`);
     }
   }, [detail, conversationId, groupId, router]);
+
+  useEffect(() => {
+    return subscribeConversationUpdated(({ conversationId: updatedId, leaderOnly, title }) => {
+      setDetail((prev) => {
+        if (!prev) return prev;
+        if (!prev.conversations.some((conversation) => conversation.id === updatedId)) return prev;
+        return {
+          ...prev,
+          conversations: prev.conversations.map((conversation) =>
+            conversation.id === updatedId
+              ? {
+                  ...conversation,
+                  ...(leaderOnly !== undefined ? { leaderOnly } : {}),
+                  ...(title !== undefined ? { title } : {}),
+                }
+              : conversation,
+          ),
+        };
+      });
+      if (updatedId !== conversationId) return;
+      if (leaderOnly !== undefined) setEditLeaderOnly(leaderOnly);
+      if (title !== undefined) setEditTitle(title);
+    });
+  }, [conversationId]);
 
   useEffect(() => {
     if (!conversationId) return;

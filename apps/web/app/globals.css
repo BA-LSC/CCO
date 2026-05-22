@@ -3928,20 +3928,29 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .composer.composer--readonly {
-  opacity: 0.72;
   pointer-events: none;
-  filter: grayscale(0.15);
+}
+
+.chat-thread .composer.composer--readonly .composer-attach-trigger {
+  opacity: 0.55;
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  border-color: color-mix(in srgb, var(--color-border) 85%, transparent);
+  cursor: not-allowed;
 }
 
 .chat-thread .composer.composer--readonly textarea {
   background: var(--color-surface-2);
   color: var(--color-muted);
   cursor: not-allowed;
+  border-color: color-mix(in srgb, var(--color-border) 85%, transparent);
 }
 
-.chat-thread .composer.composer--readonly .composer-send,
-.chat-thread .composer.composer--readonly .composer-attach-menu {
-  opacity: 0.55;
+.chat-thread .composer.composer--readonly .composer-send {
+  opacity: 0.5;
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  cursor: not-allowed;
 }
 
 .chat-thread input[type="text"],

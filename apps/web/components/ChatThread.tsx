@@ -251,7 +251,24 @@ export function ChatThread({
     return () => window.removeEventListener("dragend", resetDrag);
   }, [canPost, resetComposerDragState]);
 
-  const canSendMessage = Boolean(body.trim() || pendingMedia) && !composerLocked && !isSending;
+  const composerReadOnly = !canPost;
+  const composerInputLocked = composerLocked || composerReadOnly;
+  const effectiveComposerPlaceholder = composerReadOnly
+    ? (readOnlyReason ?? "You cannot post in this conversation.")
+    : placeholder;
+
+  useEffect(() => {
+    if (canPost) return;
+
+    setPendingMedia((current) => {
+      revokePendingComposerMedia(current);
+      return null;
+    });
+    resetComposerDragState();
+  }, [canPost, resetComposerDragState]);
+
+  const canSendMessage =
+    Boolean(body.trim() || pendingMedia) && canPost && !composerLocked && !isSending;
 
   const scrollBottomThresholdPx = 72;
 
@@ -1371,95 +1388,69 @@ export function ChatThread({
         </p>
       ) : null}
 
-      {canPost ? (
-        <form
-          onSubmit={handleSend}
-          className={[
-            "composer",
-            composerLocked ? "composer--locked" : "",
-            pendingMedia ? "composer--has-pending-media" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+      <form
+        onSubmit={handleSend}
+        className={[
+          "composer",
+          composerReadOnly ? "composer--readonly" : "",
+          composerLocked ? "composer--locked" : "",
+          pendingMedia ? "composer--has-pending-media" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-disabled={composerReadOnly || undefined}
+      >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp4,.webm,.mov"
+          hidden
+          disabled={composerInputLocked}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) stageComposerMedia(file);
+            e.target.value = "";
+          }}
+        />
+        <ComposerAttachMenu
+          disabled={composerInputLocked}
+          onPickMedia={() => fileRef.current?.click()}
+        />
+        <textarea
+          ref={composerRef}
+          value={body}
+          onChange={(e) => handleBodyChange(e.target.value)}
+          onKeyDown={handleComposerKeyDown}
+          placeholder={effectiveComposerPlaceholder}
+          enterKeyHint="send"
+          disabled={composerInputLocked}
+          readOnly={composerReadOnly}
+          rows={1}
+          aria-label="Message"
+        />
+        <button
+          type="submit"
+          className="composer-send"
+          disabled={!canSendMessage}
+          aria-label={isSending ? "Sending message" : "Send message"}
+          aria-busy={isSending}
         >
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp4,.webm,.mov"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) stageComposerMedia(file);
-              e.target.value = "";
-            }}
-          />
-          <ComposerAttachMenu
-            disabled={composerLocked}
-            onPickMedia={() => fileRef.current?.click()}
-          />
-          <textarea
-            ref={composerRef}
-            value={body}
-            onChange={(e) => handleBodyChange(e.target.value)}
-            onKeyDown={handleComposerKeyDown}
-            placeholder={placeholder}
-            enterKeyHint="send"
-            disabled={composerLocked}
-            rows={1}
-            aria-label="Message"
-          />
-          <button
-            type="submit"
-            className="composer-send"
-            disabled={!canSendMessage}
-            aria-label={isSending ? "Sending message" : "Send message"}
-            aria-busy={isSending}
+          <svg
+            className="composer-send-icon"
+            viewBox="0 0 24 24"
+            aria-hidden
           >
-            <svg
-              className="composer-send-icon"
-              viewBox="0 0 24 24"
-              aria-hidden
-            >
-              <path
-                d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </form>
-      ) : (
-        <div className="composer composer--readonly" aria-disabled="true" role="status">
-          <span className="composer-attach-menu composer-attach-menu--disabled" aria-hidden>
-            <span className="composer-attach-trigger" aria-hidden>
-              +
-            </span>
-          </span>
-          <textarea
-            disabled
-            readOnly
-            value=""
-            placeholder={readOnlyReason ?? "You cannot post in this conversation."}
-            rows={1}
-            aria-label="Message"
-          />
-          <button type="button" className="composer-send" disabled aria-hidden tabIndex={-1}>
-            <svg className="composer-send-icon" viewBox="0 0 24 24" aria-hidden>
-              <path
-                d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
+            <path
+              d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </form>
       </div>
 
       {lightboxVideo && (
