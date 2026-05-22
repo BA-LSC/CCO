@@ -49,3 +49,47 @@ cco_compose_files() {
     _out+=(-f deploy/docker-compose.external-db.yml)
   fi
 }
+
+cco_wait_for_bundled_postgres() {
+  local -n _files=$1
+  local timeout="${2:-120}"
+  local elapsed=0 health=""
+
+  echo "Starting postgres container for connection test..."
+  if docker compose "${_files[@]}" up -d --wait --wait-timeout "$timeout" postgres 2>/dev/null; then
+    return 0
+  fi
+
+  docker compose "${_files[@]}" up -d postgres
+
+  echo "Waiting for postgres (up to ${timeout}s)..."
+  while (( elapsed < timeout )); do
+    health="$(docker compose "${_files[@]}" ps --format '{{.Health}}' postgres 2>/dev/null | head -1 || true)"
+    if [[ "$health" == "healthy" ]]; then
+      return 0
+    fi
+    if docker compose "${_files[@]}" exec -T postgres \
+      pg_isready -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  echo "Postgres did not become ready in ${timeout}s." >&2
+  echo "" >&2
+  echo "Container status:" >&2
+  docker compose "${_files[@]}" ps postgres >&2 || true
+  echo "" >&2
+  echo "Recent logs:" >&2
+  docker compose "${_files[@]}" logs --tail 50 postgres >&2 || true
+  return 1
+}
+
+cco_test_bundled_postgres_connection() {
+  local -n _files=$1
+  docker compose "${_files[@]}" exec -T \
+    -e PGPASSWORD="${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}" \
+    postgres psql -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" \
+    -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'
+}

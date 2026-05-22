@@ -83,17 +83,3 @@ cco_detect_public_ip() {
     || curl -fsSL -4 --max-time 5 https://api.ipify.org 2>/dev/null \
     || true
 }
-
-cco_urlencode() {
-  local value="$1"
-  if command -v python3 >/dev/null 2>&1; then
-    VALUE="$value" python3 -c 'import os, urllib.parse; print(urllib.parse.quote_plus(os.environ["VALUE"], safe=""))'
-    return 0
-  fi
-  if command -v python >/dev/null 2>&1; then
-    VALUE="$value" python -c 'import os, urllib.parse; print(urllib.parse.quote_plus(os.environ["VALUE"], safe=""))'
-    return 0
-  fi
-  echo "python3 is required to encode database passwords." >&2
-  return 1
-}

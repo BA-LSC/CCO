@@ -43,25 +43,11 @@ else
   echo "Mode: bundled PostgreSQL container (host postgres in DATABASE_URL)."
   files=()
   cco_compose_files files
-  echo "Starting postgres container for connection test..."
-  docker compose "${files[@]}" up -d postgres
-  echo "Waiting for postgres..."
-  ready=0
-  for _ in $(seq 1 60); do
-    if docker compose "${files[@]}" exec -T postgres \
-      pg_isready -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" >/dev/null 2>&1; then
-      ready=1
-      break
-    fi
-    sleep 1
-  done
-  if [[ "$ready" != "1" ]]; then
-    echo "Postgres did not become ready in time."
+  if ! cco_wait_for_bundled_postgres files 120; then
     exit 1
   fi
   echo "Testing connection..."
-  if docker compose "${files[@]}" exec -T postgres \
-    psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
+  if cco_test_bundled_postgres_connection files; then
     echo "Database connection OK."
   else
     echo "Connection failed. Check POSTGRES_PASSWORD and DATABASE_URL in .env."

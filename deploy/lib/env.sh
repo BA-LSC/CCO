@@ -1,6 +1,29 @@
 # Dotenv helpers for deploy scripts. Source from repo root:
 #   source deploy/lib/env.sh
 
+cco_urlencode() {
+  local value="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    VALUE="$value" python3 -c 'import os, urllib.parse; print(urllib.parse.quote_plus(os.environ["VALUE"], safe=""))'
+    return 0
+  fi
+  echo "python3 is required to encode database passwords." >&2
+  return 1
+}
+
+cco_env_format_for_dotenv() {
+  local value="$1"
+  if [[ "$value" =~ ^[A-Za-z0-9/:@._+-]+$ ]]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//\$/\\$}"
+  value="${value//\`/\\\`}"
+  printf '"%s"' "$value"
+}
+
 cco_env_upsert() {
   local key="$1" value="$2" file="$3"
   local tmp="${file}.tmp.$$"
@@ -11,8 +34,7 @@ cco_env_upsert() {
   else
     : >"$tmp"
   fi
-  # %q so values with spaces (e.g. PCO_OAUTH_SCOPE) are safe to `source` as .env
-  printf '%s=%q\n' "$key" "$value" >>"$tmp"
+  printf '%s=%s\n' "$key" "$(cco_env_format_for_dotenv "$value")" >>"$tmp"
   mv "$tmp" "$file"
 }
 
@@ -67,11 +89,12 @@ cco_env_apply_domains() {
 }
 
 cco_env_apply_bundled_db() {
-  local password="$1" file="$2"
+  local password="$1" file="$2" encoded=""
+  encoded="$(cco_urlencode "$password")" || return 1
   cco_env_upsert "POSTGRES_USER" "cco" "$file"
   cco_env_upsert "POSTGRES_DB" "cco" "$file"
   cco_env_upsert "POSTGRES_PASSWORD" "$password" "$file"
-  cco_env_upsert "DATABASE_URL" "postgresql://cco:${password}@postgres:5432/cco" "$file"
+  cco_env_upsert "DATABASE_URL" "postgresql://cco:${encoded}@postgres:5432/cco" "$file"
 }
 
 cco_env_apply_secrets() {
@@ -81,9 +104,10 @@ cco_env_apply_secrets() {
 }
 
 cco_env_apply_redis() {
-  local password="$1" file="$2"
+  local password="$1" file="$2" encoded=""
+  encoded="$(cco_urlencode "$password")" || return 1
   cco_env_upsert "REDIS_PASSWORD" "$password" "$file"
-  cco_env_upsert "REDIS_URL" "redis://:${password}@redis:6379" "$file"
+  cco_env_upsert "REDIS_URL" "redis://:${encoded}@redis:6379" "$file"
 }
 
 cco_env_apply_defaults() {
