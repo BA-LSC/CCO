@@ -22,14 +22,19 @@ dmsRouter.get("/", async (c) => {
 });
 
 dmsRouter.get("/people", async (c) => {
-  const session = c.get("session");
-  const q = c.req.query("q") ?? undefined;
-  const people = await searchDmCandidates({
-    userId: session.userId,
-    organizationId: session.organizationId,
-    query: q,
-  });
-  return c.json({ people });
+  try {
+    const session = c.get("session");
+    const q = c.req.query("q") ?? undefined;
+    const people = await searchDmCandidates({
+      userId: session.userId,
+      organizationId: session.organizationId,
+      query: q,
+    });
+    return c.json({ people });
+  } catch (err) {
+    console.error("GET /dms/people failed:", err);
+    return c.json({ error: "Failed to load people" }, 500);
+  }
 });
 
 const CreateDmSchema = z.object({

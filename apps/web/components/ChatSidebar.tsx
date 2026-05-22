@@ -12,6 +12,7 @@ import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons
 import { UserMenu } from "@/components/UserMenu";
 import {
   apiFetch,
+  getErrorMessage,
   type DmParticipant,
   type DmSummary,
   type GroupSidebarItem,
@@ -121,6 +122,8 @@ export function ChatSidebar() {
   useEffect(() => {
     if (!showNewDm) return;
 
+    let cancelled = false;
+
     const timer = setTimeout(async () => {
       setDmSearching(true);
       setDmPeopleError(null);
@@ -128,16 +131,21 @@ export function ChatSidebar() {
         const q = dmSearch.trim();
         const path = q ? `/api/v1/dms/people?q=${encodeURIComponent(q)}` : "/api/v1/dms/people";
         const data = await apiFetch<{ people: DmParticipant[] }>(path);
+        if (cancelled) return;
         setDmPeople(data.people);
-      } catch {
+      } catch (err) {
+        if (cancelled) return;
         setDmPeople([]);
-        setDmPeopleError("Could not load people. Try again.");
+        setDmPeopleError(getErrorMessage(err));
       } finally {
-        setDmSearching(false);
+        if (!cancelled) setDmSearching(false);
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [showNewDm, dmSearch]);
 
   async function startDm(userId: string) {
