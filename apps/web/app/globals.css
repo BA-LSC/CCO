@@ -3100,6 +3100,7 @@ html[data-theme="6"] .user-menu-dropdown {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: fit-content;
   min-width: 0;
   max-width: 70%;
   overflow: visible;
@@ -3165,9 +3166,10 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .chat-thread .message-bubble {
   position: relative;
+  width: fit-content;
+  max-width: 100%;
   padding: 10px 14px;
   border-radius: 18px;
-  max-width: 100%;
 }
 
 .chat-thread .message-bubble--other {
@@ -3630,11 +3632,12 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .chat-thread .attachment {
   display: block;
-  max-width: 100%;
+  width: auto;
+  max-width: min(100%, 320px);
   max-height: 240px;
   border-radius: 12px;
   margin: 0 0 6px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .chat-thread .message-bubble .attachment:last-child {
@@ -3645,6 +3648,8 @@ html[data-theme="6"] .user-menu-dropdown {
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
   line-height: 1.45;
 }
 
@@ -3660,6 +3665,7 @@ html[data-theme="6"] .user-menu-dropdown {
   position: relative;
   display: flex;
   flex-direction: column;
+  width: fit-content;
   max-width: 100%;
   gap: 4px;
   overflow: visible;
@@ -4008,8 +4014,8 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread-panel .message-content {
+  width: fit-content;
   max-width: 70%;
-  width: auto;
   flex: 0 1 auto;
   min-width: 0;
 }

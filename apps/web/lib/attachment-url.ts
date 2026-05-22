@@ -4,12 +4,12 @@ export function resolveAttachmentDisplayUrl(attachmentUrl: string): string {
 
   try {
     const parsed = new URL(attachmentUrl);
-    const match = parsed.pathname.match(/\/uploads\/([^/]+)$/);
+    const match = parsed.pathname.match(/\/(?:api\/)?uploads\/([^/]+)$/);
     if (!match) return attachmentUrl;
     return `/api/uploads/${match[1]}${parsed.search}`;
   } catch {
     if (attachmentUrl.startsWith("/api/uploads/")) return attachmentUrl;
-    const relative = attachmentUrl.match(/^\/?uploads\/([^/?#]+)(\?.*)?$/);
+    const relative = attachmentUrl.match(/^\/?(?:api\/)?uploads\/([^/?#]+)(\?.*)?$/);
     if (relative) {
       return `/api/uploads/${relative[1]}${relative[2] ?? ""}`;
     }

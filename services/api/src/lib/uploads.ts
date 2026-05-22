@@ -66,6 +66,29 @@ export function buildSignedUploadUrl(
   return `${base}/${filename}?sig=${sig}&exp=${expiresAt}`;
 }
 
+const UPLOAD_PATH_RE = /\/(?:api\/)?uploads\/([^/]+)$/;
+
+/** Extract the stored filename from a public or relative upload URL. */
+export function extractUploadFilename(urlOrPath: string): string | null {
+  if (!urlOrPath) return null;
+
+  try {
+    const match = new URL(urlOrPath).pathname.match(UPLOAD_PATH_RE);
+    return match?.[1] ?? null;
+  } catch {
+    const match = urlOrPath.match(/^\/?(?:api\/)?uploads\/([^/?#]+)/);
+    return match?.[1] ?? null;
+  }
+}
+
+/** Re-sign upload URLs so clients always receive a valid, non-expired attachment link. */
+export function refreshAttachmentUrl(stored: string | null): string | null {
+  if (!stored) return null;
+  const filename = extractUploadFilename(stored);
+  if (!filename || safeUploadPath(getUploadDir(), filename) === null) return stored;
+  return buildSignedUploadUrl(filename);
+}
+
 export function isAllowedAttachmentUrl(
   attachmentUrl: string,
   publicUploadUrl = PUBLIC_UPLOAD_URL,

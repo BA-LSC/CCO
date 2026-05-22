@@ -73,6 +73,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
       UPLOAD_DIR: /data/uploads
+      PUBLIC_UPLOAD_URL: ${PUBLIC_UPLOAD_URL}
     volumes:
       - uploads_data:/data/uploads
     depends_on:

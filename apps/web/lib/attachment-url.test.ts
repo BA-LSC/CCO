@@ -10,6 +10,14 @@ describe("resolveAttachmentDisplayUrl", () => {
     ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
 
+  test("rewrites same-origin /api/uploads URLs from PUBLIC_UPLOAD_URL", () => {
+    expect(
+      resolveAttachmentDisplayUrl(
+        "https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999",
+      ),
+    ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
+  });
+
   test("leaves non-upload URLs unchanged", () => {
     const url = "https://example.com/photo.png";
     expect(resolveAttachmentDisplayUrl(url)).toBe(url);

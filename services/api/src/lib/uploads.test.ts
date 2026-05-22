@@ -11,7 +11,9 @@ import app from "../app";
 import { signSession } from "../auth/session";
 import {
   buildSignedUploadUrl,
+  extractUploadFilename,
   isAllowedAttachmentUrl,
+  refreshAttachmentUrl,
   safeUploadPath,
   signUploadAccess,
   verifyUploadSignature,
@@ -135,6 +137,31 @@ describe("upload signed URLs", () => {
         Number.parseInt(parsed.searchParams.get("exp")!, 10),
       ),
     ).toBe(true);
+  });
+});
+
+describe("extractUploadFilename", () => {
+  test("parses legacy API host paths", () => {
+    expect(
+      extractUploadFilename("https://api.example.com/uploads/photo.png?sig=x"),
+    ).toBe("photo.png");
+  });
+
+  test("parses same-origin /api/uploads paths", () => {
+    expect(
+      extractUploadFilename("https://cco.example.com/api/uploads/photo.png?sig=x"),
+    ).toBe("photo.png");
+  });
+});
+
+describe("refreshAttachmentUrl", () => {
+  test("re-signs stored upload URLs", () => {
+    const refreshed = refreshAttachmentUrl(
+      "https://api.example.com/uploads/valid.png?sig=old&exp=1",
+    );
+    expect(refreshed).toContain("/uploads/valid.png");
+    expect(refreshed).toContain("sig=");
+    expect(refreshed).toContain("exp=");
   });
 });
 

@@ -10,7 +10,7 @@ import {
   users,
 } from "../db/schema";
 import { extractMentionedUserIds } from "../lib/mentions";
-import { isAllowedAttachmentUrl } from "../lib/uploads";
+import { isAllowedAttachmentUrl, refreshAttachmentUrl } from "../lib/uploads";
 import { markConversationRead } from "./conversations";
 import { directMessageParticipantsAreSignedUp } from "./dms";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
@@ -57,7 +57,7 @@ function toDto(row: MessageRow): MessageDto {
     authorName: row.authorName,
     authorAvatarUrl: row.authorAvatarUrl ?? null,
     body: row.body,
-    attachmentUrl: row.attachmentUrl,
+    attachmentUrl: refreshAttachmentUrl(row.attachmentUrl),
     messageType: row.messageType,
     clientMessageId: row.clientMessageId,
     editedAt: row.editedAt?.toISOString() ?? null,
