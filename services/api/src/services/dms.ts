@@ -5,9 +5,18 @@ import {
   conversations,
   groupMemberships,
   messages,
+  serviceTeamMemberships,
   userPcoCredentials,
   users,
 } from "../db/schema";
+import {
+  buildSignedUpMemberRecords,
+  buildSignedUpMemberRecordsForGroup,
+  buildSignedUpMemberRecordsForTeam,
+  findSignedUpMember,
+  mergeSignedUpMemberRecords,
+  type SignedUpMemberRecord,
+} from "./cco-member-status";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
   return [userIdA, userIdB].sort().join(":");
@@ -61,29 +70,118 @@ export async function directMessageParticipantsAreSignedUp(
   return members.every((member) => signedUp.has(member.userId));
 }
 
-export async function listSharedGroupUserIds(userId: string, organizationId: string): Promise<Set<string>> {
-  const myGroups = await db
-    .select({ groupId: groupMemberships.groupId })
-    .from(groupMemberships)
-    .where(eq(groupMemberships.userId, userId));
+type CoMemberRow = {
+  id: string;
+  pcoPersonId: string;
+  email: string;
+  displayName: string;
+};
 
-  const groupIds = myGroups.map((g) => g.groupId);
-  if (groupIds.length === 0) return new Set();
+/** Map shared group/team roster rows to signed-up CCO accounts eligible for DMs. */
+export function resolveDmEligibleUserIds(
+  selfUserId: string,
+  coMembers: CoMemberRow[],
+  signedUpRecords: SignedUpMemberRecord[],
+): Set<string> {
+  const signedUpIds = new Set(signedUpRecords.map((record) => record.userId));
+  const eligible = new Set<string>();
+  const seenMemberIds = new Set<string>();
 
-  const rows = await db
-    .selectDistinct({ userId: groupMemberships.userId })
+  for (const member of coMembers) {
+    if (member.id === selfUserId || seenMemberIds.has(member.id)) continue;
+    seenMemberIds.add(member.id);
+
+    if (signedUpIds.has(member.id)) {
+      eligible.add(member.id);
+      continue;
+    }
+
+    const matched = findSignedUpMember(
+      {
+        pcoPersonId: member.pcoPersonId,
+        email: member.email,
+        displayName: member.displayName,
+      },
+      signedUpRecords,
+    );
+    if (matched) eligible.add(matched.userId);
+  }
+
+  return eligible;
+}
+
+async function listCoMembersFromSharedGroups(userId: string, groupIds: string[]): Promise<CoMemberRow[]> {
+  if (groupIds.length === 0) return [];
+
+  return db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
     .from(groupMemberships)
     .innerJoin(users, eq(users.id, groupMemberships.userId))
-    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
-    .where(
-      and(
-        inArray(groupMemberships.groupId, groupIds),
-        eq(users.organizationId, organizationId),
-        ne(groupMemberships.userId, userId),
-      ),
-    );
+    .where(and(inArray(groupMemberships.groupId, groupIds), ne(groupMemberships.userId, userId)));
+}
 
-  return new Set(rows.map((r) => r.userId));
+async function listCoMembersFromSharedTeams(userId: string, teamIds: string[]): Promise<CoMemberRow[]> {
+  if (teamIds.length === 0) return [];
+
+  return db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .where(and(inArray(serviceTeamMemberships.teamId, teamIds), ne(serviceTeamMemberships.userId, userId)));
+}
+
+async function listSignedUpRecordsForSharedContext(
+  organizationId: string,
+  groupIds: string[],
+  teamIds: string[],
+): Promise<SignedUpMemberRecord[]> {
+  const [orgRecords, groupRecords, teamRecords] = await Promise.all([
+    buildSignedUpMemberRecords(organizationId),
+    Promise.all(groupIds.map((groupId) => buildSignedUpMemberRecordsForGroup(groupId))),
+    Promise.all(teamIds.map((teamId) => buildSignedUpMemberRecordsForTeam(teamId))),
+  ]);
+
+  return mergeSignedUpMemberRecords(orgRecords, ...groupRecords.flat(), ...teamRecords.flat());
+}
+
+export async function listDmEligibleUserIds(userId: string, organizationId: string): Promise<Set<string>> {
+  const [myGroups, myTeams] = await Promise.all([
+    db
+      .select({ groupId: groupMemberships.groupId })
+      .from(groupMemberships)
+      .where(eq(groupMemberships.userId, userId)),
+    db
+      .select({ teamId: serviceTeamMemberships.teamId })
+      .from(serviceTeamMemberships)
+      .where(eq(serviceTeamMemberships.userId, userId)),
+  ]);
+
+  const groupIds = myGroups.map((row) => row.groupId);
+  const teamIds = myTeams.map((row) => row.teamId);
+  if (groupIds.length === 0 && teamIds.length === 0) return new Set();
+
+  const [groupMembers, teamMembers, signedUpRecords] = await Promise.all([
+    listCoMembersFromSharedGroups(userId, groupIds),
+    listCoMembersFromSharedTeams(userId, teamIds),
+    listSignedUpRecordsForSharedContext(organizationId, groupIds, teamIds),
+  ]);
+
+  return resolveDmEligibleUserIds(userId, [...groupMembers, ...teamMembers], signedUpRecords);
+}
+
+/** @deprecated Use listDmEligibleUserIds */
+export async function listSharedGroupUserIds(userId: string, organizationId: string): Promise<Set<string>> {
+  return listDmEligibleUserIds(userId, organizationId);
 }
 
 export async function searchDmCandidates(params: {
@@ -92,14 +190,14 @@ export async function searchDmCandidates(params: {
   query?: string;
   limit?: number;
 }): Promise<DmParticipant[]> {
-  const allowedIds = await listSharedGroupUserIds(params.userId, params.organizationId);
+  const allowedIds = await listDmEligibleUserIds(params.userId, params.organizationId);
   if (allowedIds.size === 0) return [];
 
   const idList = [...allowedIds];
   const limit = Math.min(params.limit ?? 20, 50);
   const q = params.query?.trim();
 
-  const conditions = [inArray(users.id, idList), eq(users.organizationId, params.organizationId)];
+  const conditions = [inArray(users.id, idList)];
 
   if (q) {
     const pattern = `%${q.replace(/[%_\\]/g, "")}%`;
@@ -109,6 +207,7 @@ export async function searchDmCandidates(params: {
   const rows = await db
     .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
     .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
     .where(and(...conditions))
     .orderBy(users.displayName)
     .limit(limit);
@@ -123,14 +222,14 @@ async function assertCanMessageUser(params: {
 }): Promise<DmParticipant | null> {
   if (params.userId === params.targetUserId) return null;
 
-  const allowed = await listSharedGroupUserIds(params.userId, params.organizationId);
+  const allowed = await listDmEligibleUserIds(params.userId, params.organizationId);
   if (!allowed.has(params.targetUserId)) return null;
 
   const row = await db
     .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
     .from(users)
     .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
-    .where(and(eq(users.id, params.targetUserId), eq(users.organizationId, params.organizationId)))
+    .where(eq(users.id, params.targetUserId))
     .limit(1);
 
   return row[0] ?? null;
