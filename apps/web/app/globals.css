@@ -3112,9 +3112,40 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-shrink: 0;
 }
 
+/* Avatar beside the bubble row, not vertically centered on name + bubble */
+.chat-thread .message-item--other.message-item--group-first,
+.chat-thread .message-item--other.message-item--group-single {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 70%);
+  column-gap: 10px;
+  align-items: start;
+}
+
 .chat-thread .message-item--other.message-item--group-first .message-avatar,
 .chat-thread .message-item--other.message-item--group-single .message-avatar {
-  margin-top: 18px;
+  grid-column: 1;
+  grid-row: 2;
+  margin-top: 0;
+  align-self: start;
+}
+
+.chat-thread .message-item--other.message-item--group-first .message-content,
+.chat-thread .message-item--other.message-item--group-single .message-content {
+  display: contents;
+}
+
+.chat-thread .message-item--other.message-item--group-first .message-meta,
+.chat-thread .message-item--other.message-item--group-single .message-meta {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.chat-thread .message-item--other.message-item--group-first .message-content > *:not(.message-meta),
+.chat-thread .message-item--other.message-item--group-single .message-content > *:not(.message-meta) {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chat-thread .message-item--other:not(.message-item--group-first):not(.message-item--group-single) .message-avatar {
@@ -4274,6 +4305,48 @@ html[data-theme="6"] .user-menu-dropdown {
   .chat-thread .message-bubble-stack:has(.message-reaction-add[aria-expanded="true"]) .message-actions {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .chat-thread .message-actions {
+    gap: 4px;
+    padding: 3px 6px;
+    font-size: 0.9375rem;
+    bottom: -20px;
+  }
+
+  .chat-thread .message-actions .link-btn {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+    min-height: 32px;
+    line-height: 1.3;
+  }
+
+  .chat-thread .message-action-emoji {
+    min-width: 30px;
+    min-height: 30px;
+    font-size: 1.2rem;
+  }
+
+  .chat-thread .message-action-emoji-more {
+    min-width: 30px;
+    font-size: 1.05rem;
+  }
+
+  .chat-thread .message-actions-divider {
+    height: 18px;
+  }
+
+  .message-emoji-picker {
+    padding: 12px;
+  }
+
+  .message-emoji-picker-grid {
+    gap: 4px;
+  }
+
+  .message-emoji-picker-item {
+    font-size: 1.35rem;
+    border-radius: 8px;
   }
 
   .chat-thread .message-content {
