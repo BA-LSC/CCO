@@ -2,8 +2,10 @@ import {
   applyAppUpdate,
   checkAppVersion,
   completeAppUpdateReload,
+  DEPLOY_POLL_MS,
   getUpdateCheckIntervalMs,
   isAppUpdateInProgress,
+  isDeployWaitActive,
   prepareAppUpdate,
 } from "@/lib/app-update";
 
@@ -36,6 +38,18 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   let registration: ServiceWorkerRegistration | null = null;
   let applying = false;
   let reloaded = false;
+  let deployPollId: number | null = null;
+
+  const syncDeployPoll = () => {
+    if (isDeployWaitActive()) {
+      if (deployPollId !== null) return;
+      deployPollId = window.setInterval(() => void runUpdateChecks(), DEPLOY_POLL_MS);
+      return;
+    }
+    if (deployPollId === null) return;
+    window.clearInterval(deployPollId);
+    deployPollId = null;
+  };
 
   const applyServiceWorkerUpdate = async (reg: ServiceWorkerRegistration) => {
     if (applying || !reg.waiting || isAppUpdateInProgress()) return;
@@ -60,9 +74,10 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
 
   const runUpdateChecks = async () => {
-    if (isAppUpdateInProgress()) return;
+    if (isAppUpdateInProgress() && !isDeployWaitActive()) return;
     if (await checkAppVersion(onUpdating)) return;
     void registration?.update();
+    syncDeployPoll();
   };
 
   const onVisibilityChange = () => {
@@ -109,6 +124,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     window.removeEventListener("pageshow", onPageShow);
     window.removeEventListener("focus", onPageShow);
     window.clearInterval(intervalId);
+    if (deployPollId !== null) window.clearInterval(deployPollId);
     navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
   };
 }

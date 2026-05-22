@@ -1,38 +1,117 @@
+import {
+  APP_UPDATE_OVERLAY_INNER_HTML,
+  APP_UPDATE_OVERLAY_STYLE_CSS,
+} from "@/lib/app-update-overlay";
+
 /** Inline head bootstrap so update checks run before React hydrates. */
 export function appUpdateBootstrapScript(clientVersion: string): string {
   if (!clientVersion || clientVersion === "dev") return "";
 
   const versionLiteral = JSON.stringify(clientVersion);
+  const styleLiteral = JSON.stringify(APP_UPDATE_OVERLAY_STYLE_CSS);
+  const innerHtmlLiteral = JSON.stringify(APP_UPDATE_OVERLAY_INNER_HTML);
 
   return `(function(){try{
 var CLIENT=${versionLiteral};
+var STYLE=${styleLiteral};
+var INNER=${innerHtmlLiteral};
 var applying=false;
-function overlay(){
-  if(document.getElementById("cco-app-update-overlay"))return;
-  var el=document.createElement("div");
-  el.id="cco-app-update-overlay";
-  el.className="app-update-overlay";
-  el.setAttribute("role","alert");
-  el.setAttribute("aria-live","assertive");
-  el.innerHTML='<div class="loading-screen loading-screen-page" aria-label="Updating CCO"><div class="loading-screen-content"><div class="spinner" aria-hidden="true"></div><p class="loading-screen-label">Updating CCO…</p></div></div>';
-  (document.body||document.documentElement).appendChild(el);
+var deployPending=false;
+var deployPollId=null;
+var OVERLAY_ID="cco-app-update-overlay";
+var STYLE_ID="cco-app-update-overlay-style";
+function ensureStyle(){
+  if(document.getElementById(STYLE_ID))return;
+  var s=document.createElement("style");
+  s.id=STYLE_ID;
+  s.textContent=STYLE;
+  (document.head||document.documentElement).appendChild(s);
 }
-function applyUpdate(){
-  if(applying||window.__ccoApplyingUpdate)return;
-  applying=true;
+function overlay(){
+  ensureStyle();
+  var el=document.getElementById(OVERLAY_ID);
+  if(!el){
+    el=document.createElement("div");
+    el.id=OVERLAY_ID;
+    el.className="app-update-overlay";
+    el.setAttribute("role","alert");
+    el.setAttribute("aria-live","assertive");
+    el.innerHTML=INNER;
+    (document.body||document.documentElement).appendChild(el);
+    return;
+  }
+  el.hidden=false;
+}
+function hideOverlay(){
+  var el=document.getElementById(OVERLAY_ID);
+  if(el)el.remove();
+}
+function markDeployPending(){
+  deployPending=true;
   window.__ccoApplyingUpdate=true;
   overlay();
-  setTimeout(function(){location.reload()},900);
+  if(deployPollId)return;
+  deployPollId=setInterval(check,2000);
+}
+function clearDeployPending(){
+  deployPending=false;
+  window.__ccoApplyingUpdate=false;
+  hideOverlay();
+  if(deployPollId){
+    clearInterval(deployPollId);
+    deployPollId=null;
+  }
+}
+function isDeployStatus(status){
+  return status===502||status===503||status===504;
+}
+function applyUpdate(){
+  if(applying)return;
+  applying=true;
+  deployPending=false;
+  if(deployPollId){
+    clearInterval(deployPollId);
+    deployPollId=null;
+  }
+  window.__ccoApplyingUpdate=true;
+  overlay();
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      setTimeout(function(){location.reload()},1200);
+    });
+  });
 }
 function check(){
-  if(applying||window.__ccoApplyingUpdate)return;
+  if(applying)return;
   fetch("/api/app-version",{cache:"no-store",headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}})
-    .then(function(r){return r.ok?r.json():null})
+    .then(function(r){
+      if(isDeployStatus(r.status)){
+        markDeployPending();
+        return null;
+      }
+      if(!r.ok){
+        markDeployPending();
+        return null;
+      }
+      return r.json();
+    })
     .then(function(d){
-      if(!d||!d.version||d.version===CLIENT)return;
+      if(!d){
+        return;
+      }
+      if(!d.version){
+        markDeployPending();
+        return;
+      }
+      if(d.version===CLIENT){
+        if(deployPending)clearDeployPending();
+        return;
+      }
       applyUpdate();
     })
-    .catch(function(){});
+    .catch(function(){
+      markDeployPending();
+    });
 }
 function start(){
   document.addEventListener("visibilitychange",function(){

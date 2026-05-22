@@ -2568,6 +2568,33 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-bg);
 }
 
+.app-update-overlay .loading-screen-page {
+  min-height: 100vh;
+}
+
+.app-update-overlay .loading-screen-content {
+  gap: 18px;
+}
+
+.app-update-overlay .loading-screen-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.app-update-overlay .spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  border-width: 4px;
+  animation-name: cco-app-update-spin;
+}
+
+@keyframes cco-app-update-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .error-screen {
   padding: 24px 20px;
 }

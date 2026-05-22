@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { isAppUpdateInProgress } from "@/lib/app-update";
-import { LoadingState } from "@/components/PageStates";
+import { showAppUpdateOverlay } from "@/lib/app-update-overlay";
 import { listenForAppUpdates } from "@/lib/service-worker-client";
 
 export function ServiceWorkerUpdater() {
@@ -17,11 +17,10 @@ export function ServiceWorkerUpdater() {
     [],
   );
 
-  if (!updating && !isAppUpdateInProgress()) return null;
+  useEffect(() => {
+    if (!updating && !isAppUpdateInProgress()) return;
+    showAppUpdateOverlay();
+  }, [updating]);
 
-  return (
-    <div className="app-update-overlay" role="alert" aria-live="assertive">
-      <LoadingState variant="page" label="Updating CCO…" />
-    </div>
-  );
+  return null;
 }
