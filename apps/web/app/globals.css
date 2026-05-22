@@ -3707,8 +3707,106 @@ html[data-theme="6"] .user-menu-dropdown {
   object-fit: contain;
 }
 
+.chat-thread .message-bubble:has(.attachment) {
+  padding: 0;
+  overflow: hidden;
+}
+
+.chat-thread .message-bubble:has(.attachment):not(:has(.message-body)) {
+  background: transparent;
+}
+
+.chat-thread .message-bubble:has(.attachment) .attachment {
+  margin: 0;
+  border-radius: 0;
+  max-width: min(320px, 100%);
+}
+
+.chat-thread .message-bubble:has(.attachment) .message-body {
+  padding: 8px 12px;
+}
+
+.chat-thread .message-bubble:has(.attachment) .attachment-open {
+  margin: 0;
+}
+
 .chat-thread .message-bubble .attachment:last-child {
   margin-bottom: 0;
+}
+
+.attachment-open {
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  line-height: 0;
+  max-width: 100%;
+}
+
+.attachment-open:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.attachment-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.94);
+  display: flex;
+  flex-direction: column;
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+}
+
+.attachment-lightbox-close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.attachment-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.attachment-lightbox-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.attachment-lightbox-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.attachment-lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .message-body {

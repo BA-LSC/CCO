@@ -23,6 +23,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
+import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
@@ -141,6 +142,7 @@ export function ChatThread({
   const [editBody, setEditBody] = useState("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLLIElement>(null);
@@ -919,11 +921,27 @@ export function ChatThread({
                         )}
                       </span>
                       {m.attachmentUrl && m.messageType === "image" && (
-                        <img
-                          src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
-                          alt={m.body || "Shared image"}
-                          className="attachment"
-                        />
+                        <button
+                          type="button"
+                          className="attachment-open"
+                          aria-label="View full image"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setLightboxImage({
+                              src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
+                              alt: m.body || "Shared image",
+                            });
+                          }}
+                          onTouchStart={(event) => event.stopPropagation()}
+                          onTouchEnd={(event) => event.stopPropagation()}
+                        >
+                          <img
+                            src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
+                            alt={m.body || "Shared image"}
+                            className="attachment"
+                            draggable={false}
+                          />
+                        </button>
                       )}
                       {m.body ? <MessageBody body={m.body} /> : null}
                     </div>
@@ -1060,6 +1078,14 @@ export function ChatThread({
         </div>
       )}
       </div>
+
+      {lightboxImage && (
+        <AttachmentLightbox
+          src={lightboxImage.src}
+          alt={lightboxImage.alt}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
 
       {deleteTarget && (
         <div className="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-title">
