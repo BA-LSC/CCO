@@ -5622,16 +5622,19 @@ html.standalone-display .chat-thread-panel {
   }
 }
 
-/* Landscape phone PWA: inset sidebar drawer and widen chat/composer area. */
+/* Landscape phone PWA: persistent split sidebar with edge gaps and wider chat area. */
 @media (orientation: landscape) and (max-height: 500px) {
   html.standalone-display:has(.chat-shell) {
     --pwa-landscape-edge-gap: 8px;
-    --pwa-landscape-sidebar-peek: 32px;
+    --sidebar-width: min(240px, 38vw);
   }
 
   html.standalone-display .chat-shell {
+    gap: var(--pwa-landscape-edge-gap, 8px);
     padding-left: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-left, 0px));
     padding-right: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-right, 0px));
+    padding-top: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-top, 0px));
+    padding-bottom: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
   }
 
@@ -5655,46 +5658,39 @@ html.standalone-display .chat-thread-panel {
   html.standalone-display .chat-main {
     position: relative;
     z-index: 1;
-    width: 100%;
     min-width: 0;
+    flex: 1 1 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
   }
 
   html.standalone-display .chat-sidebar {
-    position: fixed;
-    top: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-top, 0px));
-    bottom: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-bottom, 0px));
-    left: max(var(--pwa-landscape-edge-gap, 8px), env(safe-area-inset-left, 0px));
-    width: min(
-      var(--sidebar-width),
-      calc(
-        100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) -
-          (var(--pwa-landscape-edge-gap, 8px) * 2) - var(--pwa-landscape-sidebar-peek, 32px)
-      )
-    );
-    padding-top: 12px;
-    z-index: 40;
-    transform: translateX(calc(-100% - 16px));
-    transition: transform 0.2s ease;
-    box-shadow: var(--shadow-md);
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    transform: none;
+    transition: none;
+    z-index: auto;
+    box-shadow: var(--shadow-sm);
     border-radius: var(--radius-md);
+    padding-top: 12px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    align-self: stretch;
   }
 
   html.standalone-display .chat-sidebar-open {
-    transform: translateX(0);
+    transform: none;
   }
 
   html.standalone-display .chat-sidebar-overlay {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 35;
-    background: rgba(15, 23, 42, 0.35);
-    border: none;
-    cursor: pointer;
+    display: none;
   }
 
   html.standalone-display .chat-sidebar-toggle {
-    display: inline-flex;
+    display: none;
   }
 
   html.standalone-display .chat-thread .message-content {
