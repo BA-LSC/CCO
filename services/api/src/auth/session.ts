@@ -1,6 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const secret = () => new TextEncoder().encode(process.env.SESSION_SECRET!);
+let sessionSecretBytes: Uint8Array | null = null;
+
+function secret(): Uint8Array {
+  if (!sessionSecretBytes) {
+    sessionSecretBytes = new TextEncoder().encode(process.env.SESSION_SECRET!);
+  }
+  return sessionSecretBytes;
+}
 
 export type SessionPayload = {
   userId: string;

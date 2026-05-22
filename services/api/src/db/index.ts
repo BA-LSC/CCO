@@ -12,5 +12,9 @@ function databaseUrl(): string {
 
 const connectionString = databaseUrl();
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, {
+  max: Number(process.env.DB_POOL_MAX ?? 10),
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 export const db = drizzle(client, { schema });

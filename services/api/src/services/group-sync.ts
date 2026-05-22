@@ -398,8 +398,10 @@ export async function listGroupMembersForDetail(params: {
   accessToken?: string;
   liveRoster?: boolean;
 }): Promise<GroupMemberView[]> {
-  await reconcileGroupPlaceholderUsers(params.groupId);
-  await reconcileOrgPlaceholderUsers(params.organizationId);
+  if (params.liveRoster) {
+    await reconcileGroupPlaceholderUsers(params.groupId);
+    await reconcileOrgPlaceholderUsers(params.organizationId);
+  }
 
   const ccoMembers = await db
     .select({

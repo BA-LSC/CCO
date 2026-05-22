@@ -1,11 +1,10 @@
-import { getOrgWebhookSecrets } from "./org-config";
+import { areOrgWebhooksEnabledCached } from "./org-context-cache";
 
 /** How long cached PCO membership data stays fresh without webhooks. */
 export const PCO_MEMBERSHIP_STALE_MS = 24 * 60 * 60 * 1000;
 
 export async function areOrgWebhooksEnabled(): Promise<boolean> {
-  const secrets = await getOrgWebhookSecrets();
-  return secrets.length > 0;
+  return areOrgWebhooksEnabledCached();
 }
 
 export function isSyncedAtStale(

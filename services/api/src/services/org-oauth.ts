@@ -5,6 +5,10 @@ import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../auth/token-crypto";
 import { encryptWebhookSecretsInput } from "../webhooks/secrets";
+import {
+  getCachedConfiguredOrganization,
+  invalidateOrgContextCache,
+} from "./org-context-cache";
 
 export type OrgOAuthCredentials = {
   clientId: string;
@@ -33,12 +37,7 @@ function credentialsFromOrg(org: typeof organizations.$inferSelect): OrgOAuthCre
 }
 
 export async function getConfiguredOrganization() {
-  const rows = await db
-    .select()
-    .from(organizations)
-    .where(isNotNull(organizations.setupCompletedAt))
-    .limit(1);
-  return rows[0] ?? null;
+  return getCachedConfiguredOrganization();
 }
 
 export async function getOrganizationWithOAuthCredentials() {
@@ -119,6 +118,7 @@ export async function saveSetupDraft(params: {
         pcoWebhookUrl: webhookUrl,
       })
       .where(eq(organizations.id, pending[0].id));
+    invalidateOrgContextCache();
     return;
   }
 
@@ -132,6 +132,7 @@ export async function saveSetupDraft(params: {
     pcoWebRedirectUri: signInRedirectUri,
     pcoWebhookUrl: webhookUrl,
   });
+  invalidateOrgContextCache();
 }
 
 export async function completeOrganizationSetup(params: {
@@ -146,6 +147,7 @@ export async function completeOrganizationSetup(params: {
       setupSessionTokenHash: null,
     })
     .where(eq(organizations.id, params.organizationId));
+  invalidateOrgContextCache();
 
   const { ensureVapidKeys } = await import("./org-vapid");
   await ensureVapidKeys(params.organizationId);
@@ -204,6 +206,7 @@ export async function saveOrganizationOAuthSetup(params: {
       setupByUserId: params.userId,
     })
     .where(eq(organizations.id, params.organizationId));
+  invalidateOrgContextCache();
 
   const { ensureVapidKeys } = await import("./org-vapid");
   await ensureVapidKeys(params.organizationId);
@@ -252,4 +255,5 @@ export async function updateOrganizationOAuthSettings(params: {
     .update(organizations)
     .set(updates)
     .where(eq(organizations.id, params.organizationId));
+  invalidateOrgContextCache();
 }

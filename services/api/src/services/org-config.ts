@@ -1,13 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { organizations, userPcoCredentials, users } from "../db/schema";
-import { getConfiguredOrganization } from "./org-oauth";
 import { getPcoAccessToken } from "../auth/pco-tokens";
-import { decryptWebhookSecrets } from "../webhooks/secrets";
+import { getCachedOrgWebhookSecrets } from "./org-context-cache";
 
 export async function getOrgWebhookSecrets(): Promise<string[]> {
-  const org = await getConfiguredOrganization();
-  return decryptWebhookSecrets(org?.pcoWebhookSecretEnc);
+  return getCachedOrgWebhookSecrets();
 }
 
 export async function getOrgPcoAccessToken(organizationId: string): Promise<string | null> {

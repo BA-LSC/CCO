@@ -46,7 +46,10 @@ export const users = pgTable(
     statusMessage: text("status_message"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("users_org_person").on(t.organizationId, t.pcoPersonId)],
+  (t) => [
+    uniqueIndex("users_org_person").on(t.organizationId, t.pcoPersonId),
+    index("users_pco_person_id_idx").on(t.pcoPersonId),
+  ],
 );
 
 export const groups = pgTable(
@@ -77,7 +80,10 @@ export const groupMemberships = pgTable(
     role: text("role").notNull().default("member"),
     syncedAt: timestamp("synced_at").defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("membership_group_user").on(t.groupId, t.userId)],
+  (t) => [
+    uniqueIndex("membership_group_user").on(t.groupId, t.userId),
+    index("group_memberships_user_id_idx").on(t.userId),
+  ],
 );
 
 export const mobileAuthCodes = pgTable("mobile_auth_codes", {
@@ -174,6 +180,7 @@ export const conversations = pgTable(
   (t) => [
     uniqueIndex("conversations_group_slug").on(t.groupId, t.slug),
     uniqueIndex("conversations_dm_pair_key").on(t.dmPairKey),
+    index("conversations_group_id_active_idx").on(t.groupId),
   ],
 );
 
@@ -190,7 +197,10 @@ export const conversationMembers = pgTable(
     muted: boolean("muted").notNull().default(false),
     lastReadAt: timestamp("last_read_at"),
   },
-  (t) => [uniqueIndex("conversation_members_unique").on(t.conversationId, t.userId)],
+  (t) => [
+    uniqueIndex("conversation_members_unique").on(t.conversationId, t.userId),
+    index("conversation_members_user_id_idx").on(t.userId),
+  ],
 );
 
 export const messages = pgTable(

@@ -34,8 +34,20 @@ export async function serveUploadFile(c: Context): Promise<Response> {
   if (!(await file.exists())) return c.notFound();
 
   const contentType = file.type || uploadContentTypeForFilename(filename);
+  const headers: Record<string, string> = {};
   if (contentType) {
-    return c.body(file, 200, { "Content-Type": contentType });
+    headers["Content-Type"] = contentType;
+  }
+  if (sig && expRaw) {
+    const exp = Number.parseInt(expRaw, 10);
+    const maxAge = Math.max(0, exp - Math.floor(Date.now() / 1000));
+    if (maxAge > 0) {
+      headers["Cache-Control"] = `private, max-age=${maxAge}, immutable`;
+    }
+  }
+
+  if (Object.keys(headers).length > 0) {
+    return c.body(file, 200, headers);
   }
 
   return new Response(file);

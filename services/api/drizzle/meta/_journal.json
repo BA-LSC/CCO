@@ -134,6 +134,20 @@
       "when": 1747708818000,
       "tag": "0018_service_team_service_types",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1747708819000,
+      "tag": "0019_messages_conversation_created_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1747708820000,
+      "tag": "0020_hot_path_indexes",
+      "breakpoints": true
     }
   ]
 }

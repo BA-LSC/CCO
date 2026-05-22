@@ -88,6 +88,7 @@ async function getMembershipForConversation(conversationId: string, userId: stri
     .select({
       role: groupMemberships.role,
       leaderOnly: conversations.leaderOnly,
+      lastReadAt: conversationMembers.lastReadAt,
     })
     .from(conversationMembers)
     .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
@@ -104,7 +105,11 @@ async function getMembershipForConversation(conversationId: string, userId: stri
   if (groupRow[0]?.role) return groupRow[0];
 
   const memberOnly = await db
-    .select({ id: conversationMembers.id, leaderOnly: conversations.leaderOnly })
+    .select({
+      id: conversationMembers.id,
+      leaderOnly: conversations.leaderOnly,
+      lastReadAt: conversationMembers.lastReadAt,
+    })
     .from(conversationMembers)
     .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
     .where(
@@ -113,7 +118,7 @@ async function getMembershipForConversation(conversationId: string, userId: stri
     .limit(1);
 
   if (memberOnly[0]) {
-    return { role: "member", leaderOnly: memberOnly[0].leaderOnly };
+    return { role: "member", leaderOnly: memberOnly[0].leaderOnly, lastReadAt: memberOnly[0].lastReadAt };
   }
 
   return null;
@@ -160,20 +165,10 @@ export async function listMessages(
   lastReadAt: string | null;
   canPost: boolean;
 } | null> {
-  const member = await db
-    .select({ id: conversationMembers.id, lastReadAt: conversationMembers.lastReadAt })
-    .from(conversationMembers)
-    .where(
-      and(
-        eq(conversationMembers.conversationId, conversationId),
-        eq(conversationMembers.userId, userId),
-      ),
-    )
-    .limit(1);
+  const membership = await getMembershipForConversation(conversationId, userId);
+  if (!membership) return null;
 
-  if (!member[0]) return null;
-
-  const lastReadAt = member[0].lastReadAt;
+  const lastReadAt = membership.lastReadAt;
   const limit = Math.min(options?.limit ?? 50, 100);
   const baseConditions = [
     eq(messages.conversationId, conversationId),
@@ -281,13 +276,10 @@ export async function listMessages(
     reactions: reactionMap.get(row.id) ?? [],
   }));
 
-  const postingMembership = await getMembershipForConversation(conversationId, userId);
-  const canPost = postingMembership
-    ? canPostInConversation({
-        membershipRole: postingMembership.role,
-        leaderOnly: postingMembership.leaderOnly,
-      })
-    : false;
+  const canPost = canPostInConversation({
+    membershipRole: membership.role,
+    leaderOnly: membership.leaderOnly,
+  });
 
   return {
     messages: messagesDto,
@@ -367,7 +359,7 @@ export async function createMessage(params: {
       createdAt: messages.createdAt,
     });
 
-  await refreshUserAvatarFromPco(params.userId).catch((err) => {
+  void refreshUserAvatarFromPco(params.userId).catch((err) => {
     console.warn("Avatar refresh failed:", err instanceof Error ? err.message : err);
   });
 

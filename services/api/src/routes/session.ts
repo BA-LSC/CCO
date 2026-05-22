@@ -37,8 +37,10 @@ sessionRouter.get("/me", requireAuth, async (c) => {
 
   if (!row[0]) return c.json({ error: "User not found" }, 404);
 
-  const refreshedAvatar = await refreshUserAvatarFromPco(session.userId);
-  const avatarUrl = refreshedAvatar ?? row[0].avatarUrl;
+  let avatarUrl = row[0].avatarUrl;
+  if (!avatarUrl) {
+    avatarUrl = await refreshUserAvatarFromPco(session.userId);
+  }
 
   return c.json({
     userId: row[0].id,

@@ -20,7 +20,6 @@ import { refreshGroupImageFromPco, refreshMissingGroupImages } from "../services
 import { listGroupMembersForDetail, trySyncGroupRosterForLeader } from "../services/group-sync";
 import { listMessages } from "../services/messages";
 import { areOrgWebhooksEnabled } from "../services/pco-cache";
-import { refreshUserAvatarFromPco } from "../services/user-profile";
 
 type Env = { Variables: AuthVariables };
 
@@ -202,10 +201,6 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
         const updated = await getGroupWithConversations(groupId, session.userId);
         if (updated) result = updated;
       }
-    }
-
-    if (!webhooksEnabled) {
-      await refreshUserAvatarFromPco(session.userId).catch(() => null);
     }
 
     result = {

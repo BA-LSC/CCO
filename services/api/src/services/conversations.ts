@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   conversationMembers,
@@ -371,27 +371,39 @@ export async function getGroupWithConversations(groupId: string, userId: string)
     .innerJoin(users, eq(users.id, groupMemberships.userId))
     .where(eq(groupMemberships.groupId, groupId));
 
-  const mutedRows = await db
-    .select({ conversationId: conversationMembers.conversationId, muted: conversationMembers.muted })
-    .from(conversationMembers)
-    .where(eq(conversationMembers.userId, userId));
+  const convIds = convs.map((c) => c.id);
+
+  const mutedRows =
+    convIds.length > 0
+      ? await db
+          .select({
+            conversationId: conversationMembers.conversationId,
+            muted: conversationMembers.muted,
+          })
+          .from(conversationMembers)
+          .where(
+            and(
+              eq(conversationMembers.userId, userId),
+              inArray(conversationMembers.conversationId, convIds),
+            ),
+          )
+      : [];
 
   const mutedByConv = new Map(mutedRows.map((r) => [r.conversationId, r.muted]));
-
-  const convIds = convs.map((c) => c.id);
   const memberCountByConv = new Map<string, number>();
 
   if (convIds.length > 0 && isLeaderRole(membership[0].role)) {
     const counts = await db
       .select({
         conversationId: conversationMembers.conversationId,
-        userId: conversationMembers.userId,
+        count: sql<number>`count(*)::int`,
       })
       .from(conversationMembers)
-      .where(inArray(conversationMembers.conversationId, convIds));
+      .where(inArray(conversationMembers.conversationId, convIds))
+      .groupBy(conversationMembers.conversationId);
 
     for (const row of counts) {
-      memberCountByConv.set(row.conversationId, (memberCountByConv.get(row.conversationId) ?? 0) + 1);
+      memberCountByConv.set(row.conversationId, row.count);
     }
   }
 
