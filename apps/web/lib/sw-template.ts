@@ -15,32 +15,57 @@ self.addEventListener("message", (event) => {
   }
 });
 
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
+function resolveNotificationAssetUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) return trimmed;
+  try {
+    return new URL(trimmed, self.location.origin).href;
+  } catch {
+    return null;
+  }
+}
 
-  let payload = {
+function readPushPayload(event) {
+  const defaults = {
     title: "CCO",
     body: "New message",
     url: "/",
     conversationId: "",
     image: "",
   };
+  if (!event.data) return defaults;
+
   try {
-    payload = { ...payload, ...event.data.json() };
+    return { ...defaults, ...event.data.json() };
   } catch {
-    payload.body = event.data.text();
+    try {
+      const text = event.data.text();
+      if (text) return { ...defaults, ...JSON.parse(text) };
+    } catch {
+      // Fall back to defaults below.
+    }
   }
+
+  return defaults;
+}
+
+self.addEventListener("push", (event) => {
+  const payload = readPushPayload(event);
+  const appIcon = new URL("/icons/icon-192.png", self.location.origin).href;
+  const imageUrl = resolveNotificationAssetUrl(payload.image);
 
   const notificationOptions = {
     body: payload.body,
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: appIcon,
+    badge: appIcon,
     tag: payload.conversationId ? "cco-" + payload.conversationId : "cco-message",
     renotify: true,
     data: { url: payload.url, conversationId: payload.conversationId },
   };
-  if (payload.image) {
-    notificationOptions.image = payload.image;
+  if (imageUrl) {
+    notificationOptions.image = imageUrl;
   }
 
   const notifyClients = self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {

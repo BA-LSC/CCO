@@ -11,7 +11,9 @@ import {
   shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
 
-const SW_URL = "/sw.js";
+import { APP_BUILD_VERSION } from "@/lib/build-version";
+
+const SW_URL = `/sw.js?build=${encodeURIComponent(APP_BUILD_VERSION)}`;
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 

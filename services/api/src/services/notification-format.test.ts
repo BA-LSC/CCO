@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { buildMessageNotificationContent, formatNotificationBody } from "./notification-format";
+import {
+  buildMessageNotificationContent,
+  formatNotificationBody,
+  resolveNotificationImageUrl,
+} from "./notification-format";
 
 describe("notification format", () => {
   test("formatNotificationBody wraps long text to two lines", () => {
@@ -12,8 +16,16 @@ describe("notification format", () => {
     expect(body.endsWith("…")).toBe(true);
   });
 
-  test("buildMessageNotificationContent uses sender name for dm title", () => {
-    const content = buildMessageNotificationContent({
+  test("resolveNotificationImageUrl accepts https urls only when absolute", () => {
+    expect(resolveNotificationImageUrl("https://example.com/sam.jpg")).toBe(
+      "https://example.com/sam.jpg",
+    );
+    expect(resolveNotificationImageUrl("/avatars/sam.jpg")).toBeNull();
+    expect(resolveNotificationImageUrl("")).toBeNull();
+  });
+
+  test("buildMessageNotificationContent uses sender name for dm title", async () => {
+    const content = await buildMessageNotificationContent({
       message: {
         id: "msg-1",
         conversationId: "conv-1",
@@ -36,8 +48,8 @@ describe("notification format", () => {
     expect(content.image).toBe("https://example.com/sam.jpg");
   });
 
-  test("buildMessageNotificationContent uses group title and author in body", () => {
-    const content = buildMessageNotificationContent({
+  test("buildMessageNotificationContent uses group title and author in body", async () => {
+    const content = await buildMessageNotificationContent({
       message: {
         id: "msg-1",
         conversationId: "conv-1",
@@ -57,5 +69,6 @@ describe("notification format", () => {
 
     expect(content.title).toBe("Worship");
     expect(content.body).toBe("Sam McDonald: Team meeting tonight");
+    expect(content.image).toBeNull();
   });
 });

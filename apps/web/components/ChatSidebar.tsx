@@ -285,12 +285,13 @@ export function ChatSidebar() {
                                 className="sidebar-dm-avatar"
                                 size="xs"
                               />
-                              <span className="sidebar-item-label sidebar-dm-label">
-                                <span className="sidebar-dm-name">
+                              <span className="sidebar-item-label sidebar-dm-name">
                                   {creatingDm === p.id ? "Opening…" : p.displayName}
                                 </span>
-                                <UserStatusMessage userId={p.id} />
-                              </span>
+                                <UserStatusMessage
+                                  userId={p.id}
+                                  className="sidebar-dm-status"
+                                />
                             </div>
                           </button>
                         </li>
@@ -320,10 +321,13 @@ export function ChatSidebar() {
                             className="sidebar-dm-avatar"
                             size="xs"
                           />
-                          <span className="sidebar-item-label sidebar-dm-label">
-                            <span className="sidebar-dm-name">{dm.participant.displayName}</span>
-                            <UserStatusMessage userId={dm.participant.id} />
+                          <span className="sidebar-item-label sidebar-dm-name">
+                            {dm.participant.displayName}
                           </span>
+                          <UserStatusMessage
+                            userId={dm.participant.id}
+                            className="sidebar-dm-status"
+                          />
                           {dm.hasUnread && activeDmId !== dm.id && (
                             <span className="sidebar-unread-dot" aria-label="Unread messages" />
                           )}

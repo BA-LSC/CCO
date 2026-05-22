@@ -1,4 +1,11 @@
+import { fetchPersonAvatarUrl, PlanningCenterClient } from "@cco/pco-client";
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { users } from "../db/schema";
 import type { MessageDto } from "./messages";
+import { getOrgPcoAccessToken } from "./org-config";
+import { getConfiguredOrganization } from "./org-oauth";
+import { refreshUserAvatarFromPco } from "./user-profile";
 
 export type ConversationNotificationKind = "dm" | "group" | "team";
 
@@ -48,6 +55,50 @@ export function formatNotificationBody(
   return lines.join("\n");
 }
 
+export function resolveNotificationImageUrl(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("http://")) return trimmed;
+  return null;
+}
+
+export async function resolveAuthorAvatarForNotification(authorId: string): Promise<string | null> {
+  try {
+    const row = await db
+      .select({ avatarUrl: users.avatarUrl, pcoPersonId: users.pcoPersonId })
+      .from(users)
+      .where(eq(users.id, authorId))
+      .limit(1);
+
+    const existing = resolveNotificationImageUrl(row[0]?.avatarUrl);
+    if (existing) return existing;
+
+    const refreshed = resolveNotificationImageUrl(
+      await refreshUserAvatarFromPco(authorId).catch(() => null),
+    );
+    if (refreshed) return refreshed;
+
+    const pcoPersonId = row[0]?.pcoPersonId;
+    if (!pcoPersonId) return null;
+
+    const org = await getConfiguredOrganization();
+    if (!org) return null;
+
+    const accessToken = await getOrgPcoAccessToken(org.id);
+    if (!accessToken) return null;
+
+    const client = new PlanningCenterClient({ accessToken });
+    const avatarUrl = resolveNotificationImageUrl(await fetchPersonAvatarUrl(client, pcoPersonId));
+    if (avatarUrl) {
+      await db.update(users).set({ avatarUrl }).where(eq(users.id, authorId));
+    }
+    return avatarUrl;
+  } catch {
+    return null;
+  }
+}
+
 function messagePreview(message: MessageDto): string {
   if (message.attachmentUrl) {
     return message.body.trim() || "Sent an image";
@@ -55,11 +106,11 @@ function messagePreview(message: MessageDto): string {
   return message.body.trim();
 }
 
-export function buildMessageNotificationContent(params: {
+export async function buildMessageNotificationContent(params: {
   message: MessageDto;
   meta: ConversationNotificationMeta;
   mention?: boolean;
-}): { title: string; body: string; image: string | null } {
+}): Promise<{ title: string; body: string; image: string | null }> {
   const preview = messagePreview(params.message);
   const title =
     params.meta.kind === "dm" ? params.message.authorName.trim() || "Message" : params.meta.title;
@@ -75,9 +126,13 @@ export function buildMessageNotificationContent(params: {
       : `${params.message.authorName} sent a message`;
   }
 
+  const image =
+    resolveNotificationImageUrl(params.message.authorAvatarUrl) ??
+    (await resolveAuthorAvatarForNotification(params.message.authorId));
+
   return {
     title,
     body: formatNotificationBody(bodyText),
-    image: params.message.authorAvatarUrl ?? null,
+    image,
   };
 }

@@ -159,7 +159,7 @@ export async function notifyConversationOfMessage(
     resolveConversationNotificationMeta(conversationId),
   ]);
 
-  const content = buildMessageNotificationContent({ message, meta });
+  const content = await buildMessageNotificationContent({ message, meta });
 
   await notifyUsersOfMessage({
     userIds,
@@ -179,7 +179,7 @@ export async function notifyMentionedUsers(params: {
   const mentioned = params.mentionedUserIds.filter((id) => id !== params.authorUserId);
   const unmutedMentioned = await listUnmutedMemberIds(params.conversationId, mentioned);
   if (unmutedMentioned.length > 0) {
-    const content = buildMessageNotificationContent({
+    const content = await buildMessageNotificationContent({
       message: params.message,
       meta,
       mention: true,
@@ -198,7 +198,7 @@ export async function notifyMentionedUsers(params: {
     excludeUserIds: mentioned,
   });
 
-  const content = buildMessageNotificationContent({ message: params.message, meta });
+  const content = await buildMessageNotificationContent({ message: params.message, meta });
   await notifyUsersOfMessage({
     userIds: otherIds,
     conversationId: params.conversationId,

@@ -87,7 +87,13 @@ export async function sendWebPushNotifications(
 
   webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url,
+    conversationId: payload.conversationId,
+    ...(payload.image ? { image: payload.image } : {}),
+  });
 
   await Promise.allSettled(
     subscriptions.map(async (subscription) => {
