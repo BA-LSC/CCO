@@ -33,12 +33,12 @@ export function getMessageLayoutInfo(
   messages: MessageLike[],
   index: number,
   currentUserId?: string,
+  previousLayouts?: MessageLayoutInfo[],
 ): MessageLayoutInfo {
   const message = messages[index];
   const previous = index > 0 ? messages[index - 1] : null;
   const next = index < messages.length - 1 ? messages[index + 1] : null;
-  const previousLayout =
-    index > 0 ? getMessageLayoutInfo(messages, index - 1, currentUserId) : null;
+  const previousLayout = index > 0 ? previousLayouts?.[index - 1] ?? null : null;
 
   const gapFromPrevious = previous ? gapMs(previous.createdAt, message.createdAt) : Infinity;
   const gapToNext = next ? gapMs(message.createdAt, next.createdAt) : Infinity;
@@ -91,4 +91,15 @@ export function getMessageLayoutInfo(
     groupPosition,
     spacing,
   };
+}
+
+export function buildMessageLayoutInfos(
+  messages: MessageLike[],
+  currentUserId?: string,
+): MessageLayoutInfo[] {
+  const layouts: MessageLayoutInfo[] = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    layouts.push(getMessageLayoutInfo(messages, index, currentUserId, layouts));
+  }
+  return layouts;
 }

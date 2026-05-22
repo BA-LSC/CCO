@@ -1,6 +1,42 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { conversationMembers, messages } from "../db/schema";
+import { conversationMembers } from "../db/schema";
+
+export async function fetchLastMessagesForConversations(
+  conversationIds: string[],
+): Promise<Map<string, { authorId: string; createdAt: Date }>> {
+  const result = new Map<string, { authorId: string; createdAt: Date }>();
+  if (conversationIds.length === 0) return result;
+
+  const rows = await db.execute<{
+    conversation_id: string;
+    author_id: string;
+    created_at: Date | string;
+  }>(sql`
+    SELECT DISTINCT ON (conversation_id)
+      conversation_id,
+      author_id,
+      created_at
+    FROM messages
+    WHERE conversation_id IN (${sql.join(
+      conversationIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})
+      AND deleted_at IS NULL
+    ORDER BY conversation_id, created_at DESC
+  `);
+
+  for (const row of rows) {
+    const createdAt =
+      row.created_at instanceof Date ? row.created_at : new Date(row.created_at);
+    result.set(row.conversation_id, {
+      authorId: row.author_id,
+      createdAt,
+    });
+  }
+
+  return result;
+}
 
 export function isUnreadMessage(params: {
   authorId: string;
@@ -61,25 +97,7 @@ export async function unreadFlagsForConversations(
   );
   const mutedByConv = new Map(memberRows.map((row) => [row.conversationId, row.muted]));
 
-  const lastMessages = await db
-    .select({
-      conversationId: messages.conversationId,
-      authorId: messages.authorId,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .where(and(inArray(messages.conversationId, conversationIds), isNull(messages.deletedAt)))
-    .orderBy(desc(messages.createdAt));
-
-  const lastByConv = new Map<string, { authorId: string; createdAt: Date }>();
-  for (const msg of lastMessages) {
-    if (!lastByConv.has(msg.conversationId)) {
-      lastByConv.set(msg.conversationId, {
-        authorId: msg.authorId,
-        createdAt: msg.createdAt,
-      });
-    }
-  }
+  const lastByConv = await fetchLastMessagesForConversations(conversationIds);
 
   for (const conversationId of conversationIds) {
     if (mutedByConv.get(conversationId)) {

@@ -1,20 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, Fragment } from "react";
-import { syncComposerTextareaHeight } from "@/lib/composer-textarea";
-import {
-  MessageBubbleStack,
-  MessageEmojiActions,
-} from "@/components/MessageReactionToolbar";
-import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
-import { ComposerGiphyPicker } from "@/components/ComposerGiphyPicker";
-import { ComposerPendingMedia } from "@/components/ComposerPendingMedia";
-import { MessageBody } from "@/components/MessageBody";
-import { UserAvatar } from "@/components/UserAvatar";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChatComposer, useComposerDragHandlers, type PendingComposerMedia } from "@/components/ChatComposer";
+import { ChatMessageList } from "@/components/ChatMessageList";
 import {
   apiFetch,
-  fetchGiphyEnabled,
-  formatMention,
   importGiphyGif,
   uploadImage,
   uploadVideo,
@@ -26,11 +16,8 @@ import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchConversationUpdated, dispatchUnreadChanged } from "@/lib/sidebar-events";
-import { getMessageLayoutInfo } from "@/lib/message-grouping";
-import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
-import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
 import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
@@ -42,27 +29,13 @@ import {
 } from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
 import {
-  clearComposerDraft,
-  readComposerDraft,
   saveComposerDraft,
   setSendInFlight,
 } from "@/lib/app-update-composer";
 import { isAppUpdateInProgress } from "@/lib/app-update";
 import {
-  createPendingComposerMedia,
-  dragEventHasMediaFiles,
-  firstMediaFileFromDataTransfer,
   revokePendingComposerMedia,
-  validateComposerMediaFile,
-  type PendingComposerMedia,
 } from "@/lib/composer-media";
-
-function formatMessageTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 function detectMobileLikeViewport(): boolean {
   return (
@@ -110,22 +83,6 @@ function composerPlaceholderForDevice(placeholder: string, coarsePointer: boolea
   }
 
   return `${base} (Enter to send)`;
-}
-
-function getActiveMentionQuery(value: string): string | null {
-  for (let i = value.length - 1; i >= 0; i -= 1) {
-    if (value[i] !== "@") continue;
-    const segment = value.slice(i);
-    if (segment.includes(" ")) return null;
-    const query = segment.slice(1);
-    if (query.startsWith("[")) return null;
-    return query.toLowerCase();
-  }
-  return null;
-}
-
-function memberCanMention(member: Member): boolean {
-  return Boolean(member.id && member.onCco !== false);
 }
 
 type Member = { id?: string; displayName: string; onCco?: boolean };
@@ -179,24 +136,15 @@ export function ChatThread({
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const hasMarkedReadRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [body, setBody] = useState("");
   const sendInFlightRef = useRef(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
-  const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
-  const [composerDragOver, setComposerDragOver] = useState(false);
-  const [giphyOpen, setGiphyOpen] = useState(false);
-  const [giphyEnabled, setGiphyEnabled] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const composerDragDepthRef = useRef(0);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const stageComposerMediaRef = useRef<(file: File) => void>(() => {});
   const messagesEndRef = useRef<HTMLLIElement>(null);
   const messagesListRef = useRef<HTMLUListElement>(null);
   const panelBodyRef = useRef<HTMLDivElement>(null);
@@ -220,65 +168,31 @@ export function ChatThread({
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [scrollReady, setScrollReady] = useState(false);
 
-  useEffect(() => {
-    if (!conversationId) return;
-    const draft = readComposerDraft(conversationId);
-    if (draft) setBody(draft);
-  }, [conversationId]);
+  const {
+    composerDragOver,
+    resetComposerDragState,
+    handleComposerDragEnter,
+    handleComposerDragOver,
+    handleComposerDragLeave,
+    handleComposerDrop,
+  } = useComposerDragHandlers({
+    canPost,
+    composerLocked,
+    onDropFile: (file) => stageComposerMediaRef.current(file),
+  });
 
-  useEffect(() => {
-    if (!appUpdateBlocked || !conversationId) return;
-    saveComposerDraft(conversationId, body);
-  }, [appUpdateBlocked, body, conversationId]);
+  function getScrollContainer(): HTMLElement | null {
+    if (layout === "panel") return panelBodyRef.current;
+    return messagesListRef.current;
+  }
 
-  useEffect(() => {
-    return () => revokePendingComposerMedia(pendingMedia);
-  }, [pendingMedia]);
-
-  const resetComposerDragState = useCallback(() => {
-    composerDragDepthRef.current = 0;
-    setComposerDragOver(false);
-  }, []);
-
-  useEffect(() => {
-    setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return null;
-    });
-    resetComposerDragState();
-  }, [conversationId, resetComposerDragState]);
-
-  useEffect(() => {
-    if (!canPost) return;
-
-    const resetDrag = () => resetComposerDragState();
-    window.addEventListener("dragend", resetDrag);
-    return () => window.removeEventListener("dragend", resetDrag);
-  }, [canPost, resetComposerDragState]);
-
-  const composerReadOnly = !canPost;
-  const composerInputLocked = composerLocked || composerReadOnly;
-  const effectiveComposerPlaceholder = composerReadOnly
-    ? (readOnlyReason ?? "You cannot post in this conversation.")
-    : placeholder;
-
-  useEffect(() => {
-    if (canPost) return;
-
-    setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return null;
-    });
-    resetComposerDragState();
-    setGiphyOpen(false);
-  }, [canPost, resetComposerDragState]);
-
-  useEffect(() => {
-    void fetchGiphyEnabled().then(setGiphyEnabled);
-  }, []);
-
-  const canSendMessage =
-    Boolean(body.trim() || pendingMedia) && canPost && !composerLocked && !isSending;
+  const handleComposerLayout = useCallback(() => {
+    if (!initialScrollDoneRef.current) return;
+    if (firstUnreadMessageId) return;
+    if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
+    const container = getScrollContainer();
+    if (container) scrollMessagesToBottom(container);
+  }, [firstUnreadMessageId, layout, messages.length]);
 
   const scrollBottomThresholdPx = 72;
 
@@ -299,11 +213,6 @@ export function ChatThread({
     dispatchUnreadChanged({ conversationId, hasUnread: false });
   }, [conversationId]);
 
-  function getScrollContainer(): HTMLElement | null {
-    if (layout === "panel") return panelBodyRef.current;
-    return messagesListRef.current;
-  }
-
   function isAtScrollBottom(container: HTMLElement): boolean {
     return (
       container.scrollHeight - container.scrollTop - container.clientHeight <=
@@ -311,22 +220,9 @@ export function ChatThread({
     );
   }
 
-  function focusComposer() {
-    requestAnimationFrame(() => {
-      const el = composerRef.current;
-      el?.focus();
-      syncComposerTextareaHeight(el);
-    });
-  }
-
   useLayoutEffect(() => {
-    syncComposerTextareaHeight(composerRef.current);
-    if (!initialScrollDoneRef.current) return;
-    if (firstUnreadMessageId) return;
-    if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
-    const container = getScrollContainer();
-    if (container) scrollMessagesToBottom(container);
-  }, [body, composerLocked, conversationId, firstUnreadMessageId, layout, messages.length]);
+    handleComposerLayout();
+  }, [handleComposerLayout]);
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     const container = getScrollContainer();
@@ -537,8 +433,6 @@ export function ChatThread({
       setShowScrollToBottom(false);
       setHasNewMessagesBelow(false);
       bottomSeenMessageIdRef.current = null;
-      setBody("");
-      setMentionQuery(null);
       setSendError(null);
       setEditingId(null);
       setEditBody("");
@@ -771,67 +665,12 @@ export function ChatThread({
     return () => observer.disconnect();
   }, [hasMore, loadOlder, layout, messages.length, loadingMore, scrollReady]);
 
-  async function sendGiphy(importUrl: string) {
-    if (
-      !conversationId ||
-      sendInFlightRef.current ||
-      !canPost ||
-      composerLocked ||
-      isAppUpdateInProgress()
-    ) {
-      return;
-    }
+  const handleComposerSend = useCallback(
+    async ({ text, media }: { text: string; media: PendingComposerMedia | null }) => {
+      if (!conversationId) return;
 
-    setSendError(null);
-    sendInFlightRef.current = true;
-    setSendInFlight(true);
-    setIsSending(true);
+      let attachmentSent = false;
 
-    try {
-      const attachmentUrl = await importGiphyGif(importUrl);
-      await postMessage({
-        body: "",
-        clientMessageId: crypto.randomUUID(),
-        attachmentUrl,
-        messageType: "image",
-      });
-      resetComposerDragState();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to send GIF";
-      setSendError(message);
-      throw err instanceof Error ? err : new Error(message);
-    } finally {
-      sendInFlightRef.current = false;
-      setSendInFlight(false);
-      setIsSending(false);
-      focusComposer();
-    }
-  }
-
-  async function handleSend(e?: React.FormEvent) {
-    e?.preventDefault();
-    const text = body.trim();
-    const media = pendingMedia;
-    if (
-      !conversationId ||
-      (!text && !media) ||
-      sendInFlightRef.current ||
-      !canPost ||
-      composerLocked ||
-      isAppUpdateInProgress()
-    ) {
-      return;
-    }
-
-    setMentionQuery(null);
-    setSendError(null);
-    sendInFlightRef.current = true;
-    setSendInFlight(true);
-    setIsSending(true);
-
-    let attachmentSent = false;
-
-    try {
       if (media) {
         const attachmentUrl =
           media.kind === "video" ? await uploadVideo(media.file) : await uploadImage(media.file);
@@ -843,105 +682,56 @@ export function ChatThread({
         });
         attachmentSent = true;
         revokePendingComposerMedia(media);
-        setPendingMedia(null);
       }
 
       if (text) {
+        try {
+          await postMessage({
+            body: text,
+            clientMessageId: crypto.randomUUID(),
+          });
+        } catch (err) {
+          if (media && !attachmentSent) {
+            revokePendingComposerMedia(media);
+          }
+          saveComposerDraft(conversationId, text);
+          throw err;
+        }
+      }
+    },
+    [conversationId],
+  );
+
+  const handleComposerGiphy = useCallback(
+    async (importUrl: string) => {
+      if (!conversationId || !canPost || composerLocked || isAppUpdateInProgress()) return;
+
+      setSendError(null);
+      sendInFlightRef.current = true;
+      setSendInFlight(true);
+
+      try {
+        const attachmentUrl = await importGiphyGif(importUrl);
         await postMessage({
-          body: text,
+          body: "",
           clientMessageId: crypto.randomUUID(),
+          attachmentUrl,
+          messageType: "image",
         });
+        resetComposerDragState();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to send GIF";
+        setSendError(message);
+        throw err instanceof Error ? err : new Error(message);
+      } finally {
+        sendInFlightRef.current = false;
+        setSendInFlight(false);
       }
+    },
+    [canPost, composerLocked, conversationId, resetComposerDragState],
+  );
 
-      setBody("");
-      clearComposerDraft(conversationId);
-      resetComposerDragState();
-    } catch (err) {
-      if (media && !attachmentSent) {
-        revokePendingComposerMedia(media);
-        setPendingMedia(createPendingComposerMedia(media.file));
-      }
-      if (text) {
-        setBody(text);
-        saveComposerDraft(conversationId, text);
-      }
-      setSendError(err instanceof Error ? err.message : "Failed to send message");
-    } finally {
-      sendInFlightRef.current = false;
-      setSendInFlight(false);
-      setIsSending(false);
-      focusComposer();
-    }
-  }
-
-  function clearPendingMedia() {
-    setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return null;
-    });
-  }
-
-  function stageComposerMedia(file: File) {
-    if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
-
-    const validationError = validateComposerMediaFile(file);
-    if (validationError) {
-      setSendError(validationError);
-      return;
-    }
-
-    const next = createPendingComposerMedia(file);
-    if (!next) {
-      setSendError("Unsupported file type. Use an image or video.");
-      return;
-    }
-
-    setSendError(null);
-    setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return next;
-    });
-    resetComposerDragState();
-    focusComposer();
-  }
-
-  function handleComposerDragEnter(e: React.DragEvent<HTMLDivElement>) {
-    if (!canPost || composerLocked) return;
-    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
-
-    e.preventDefault();
-    composerDragDepthRef.current += 1;
-    setComposerDragOver(true);
-  }
-
-  function handleComposerDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!canPost || composerLocked) return;
-    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
-
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setComposerDragOver(true);
-  }
-
-  function handleComposerDragLeave(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    composerDragDepthRef.current = Math.max(0, composerDragDepthRef.current - 1);
-    if (composerDragDepthRef.current === 0) {
-      setComposerDragOver(false);
-    }
-  }
-
-  function handleComposerDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    resetComposerDragState();
-
-    if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
-
-    const file = firstMediaFileFromDataTransfer(e.dataTransfer);
-    if (file) stageComposerMedia(file);
-  }
-
-  async function toggleReaction(messageId: string, emoji: string) {
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!resolvedUserId) return;
 
     const message = messages.find((m) => m.id === messageId);
@@ -987,7 +777,7 @@ export function ChatThread({
         ),
       );
     }
-  }
+  }, [messages, resolvedUserId, session?.displayName]);
 
   async function saveEdit(messageId: string) {
     if (!editBody.trim()) return;
@@ -1017,318 +807,72 @@ export function ChatThread({
     }
   }
 
-  function insertMention(member: Member) {
-    if (!memberCanMention(member) || !member.id) return;
-    const token = formatMention(member.displayName, member.id);
-    setBody((prev) => {
-      const at = prev.lastIndexOf("@");
-      if (at >= 0) return `${prev.slice(0, at)}${token} `;
-      return `${prev}${token} `;
-    });
-    setMentionQuery(null);
-    composerRef.current?.focus();
-  }
-
-  useEffect(() => {
-    if (canPost) return;
-    composerRef.current?.blur();
-  }, [canPost]);
-
-  function handleBodyChange(value: string) {
-    if (!canPost) return;
-    setBody(value);
-    setMentionQuery(getActiveMentionQuery(value));
-  }
-
-  function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Escape") {
-      if (mentionQuery !== null) {
-        e.preventDefault();
-        setMentionQuery(null);
-        return;
-      }
-      if (pendingMedia) {
-        e.preventDefault();
-        clearPendingMedia();
-      }
-      return;
-    }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      if (mentionQuery !== null) {
-        const firstMentionable = mentionCandidates.find(memberCanMention);
-        if (firstMentionable) {
-          e.preventDefault();
-          insertMention(firstMentionable);
-          return;
-        }
-      }
-      e.preventDefault();
-      void handleSend();
-    }
-  }
-
-  const mentionCandidates =
-    mentionQuery === null
-      ? []
-      : members.filter(
-          (m) =>
-            m.id !== resolvedUserId &&
-            m.displayName.toLowerCase().includes(mentionQuery),
-        );
-
-  function isOwnMessage(message: Message): boolean {
-    return Boolean(resolvedUserId && message.authorId === resolvedUserId);
-  }
-
-  function canEditMessage(message: Message): boolean {
-    return Boolean(resolvedUserId && message.authorId === resolvedUserId);
-  }
-
-  function canDeleteMessage(message: Message): boolean {
-    if (isOwnMessage(message)) return true;
-    return isGroupLeader;
-  }
+  const handleToggleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      void toggleReaction(messageId, emoji);
+    },
+    [toggleReaction],
+  );
 
   const messageScrollContent = (
     <>
-        {sendError && (
-          <p className="send-error" role="alert">
-            {sendError}
-          </p>
-        )}
-
-        {(hasMore || loadingMore) && messages.length > 0 && (
-          <div className="messages-history-top" aria-hidden={!loadingMore}>
-            <div ref={topSentinelRef} className="messages-top-sentinel" />
-            {loadingMore && (
-              <div className="messages-loading-older" role="status" aria-live="polite">
-                <div className="spinner" aria-hidden />
-              </div>
-            )}
-          </div>
-        )}
-
-        {messagesLoading && messages.length === 0 ? (
-          <div className="messages-loading" role="status" aria-live="polite">
-            <div className="spinner" aria-hidden />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="empty-state">
-            <h3>No messages yet</h3>
-            <p>{canPost ? "Be the first to say hello." : "Messages from leaders will appear here."}</p>
-          </div>
-        ) : (
-          <ul
-            className="messages"
-            ref={messagesListRef}
-            aria-label="Messages"
-            onScroll={layout === "panel" ? undefined : handleScrollContainer}
-          >
-          {messages.map((m, index) => {
-            const isOwn = isOwnMessage(m);
-            const isEditing = editingId === m.id;
-            const layoutInfo = getMessageLayoutInfo(messages, index, resolvedUserId);
-            const showOwnMessageHeader =
-              isOwn &&
-              (layoutInfo.groupPosition === "first" ||
-                layoutInfo.groupPosition === "single" ||
-                layoutInfo.clusterTimestamp ||
-                Boolean(m.editedAt));
-            const hasVisibleTimestamp =
-              showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
-
-            return (
-            <Fragment key={m.id}>
-              {firstUnreadMessageId === m.id && (
-                <li className="messages-unread-divider-wrap" aria-hidden={false}>
-                  <div ref={unreadDividerRef} className="messages-unread-divider" role="separator">
-                    <span>New messages</span>
-                  </div>
-                </li>
-              )}
-            <li
-              data-message-id={m.id}
-              className={[
-                "message-item",
-                isOwn ? "message-item--own" : "message-item--other",
-                `message-item--spacing-${layoutInfo.spacing}`,
-                `message-item--group-${layoutInfo.groupPosition}`,
-                hasVisibleTimestamp ? "message-item--has-timestamp" : "",
-                showOwnMessageHeader ? "message-item--show-time" : "",
-                layoutInfo.showTimestamp ? "message-item--timestamp-start" : "",
-                layoutInfo.nextHasGapBreak ? "message-item--timestamp-gap" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {!isOwn &&
-                (layoutInfo.showAvatar ? (
-                  <UserAvatar
-                    displayName={m.authorName}
-                    avatarUrl={m.authorAvatarUrl}
-                    className="message-avatar"
-                  />
-                ) : (
-                  <span className="message-avatar-spacer" aria-hidden="true" />
-                ))}
-              <div
-                className={[
-                  "message-content",
-                  hasVisibleTimestamp ? "message-content--has-timestamp" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                    {!isOwn && layoutInfo.showAuthorName && (
-                      <div className="message-meta">
-                        <strong>{m.authorName}</strong>
-                        <time dateTime={m.createdAt}>{formatMessageTime(m.createdAt)}</time>
-                        {m.editedAt ? <span className="message-edited"> · edited</span> : null}
-                      </div>
-                    )}
-                    {!isOwn && m.editedAt && !layoutInfo.showAuthorName && (
-                      <div className="message-header">
-                        <span className="message-edited">edited</span>
-                      </div>
-                    )}
-
-                {isEditing ? (
-                  <form
-                    className="edit-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void saveEdit(m.id);
-                    }}
-                  >
-                    <input
-                      value={editBody}
-                      onChange={(e) => setEditBody(e.target.value)}
-                      disabled={sending}
-                      aria-label="Edit message"
-                    />
-                    <button type="submit" className="btn-send" disabled={sending}>
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn-sm"
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditBody("");
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    {showOwnMessageHeader && (
-                      <div className="message-header">
-                        <time dateTime={m.createdAt}>
-                          {m.editedAt ? "edited · " : ""}
-                          {formatMessageTime(m.createdAt)}
-                        </time>
-                      </div>
-                    )}
-                    <MessageBubbleStack
-                      messageId={m.id}
-                      reactions={m.reactions ?? []}
-                      currentUserId={resolvedUserId}
-                      onToggleReaction={(messageId, emoji) => void toggleReaction(messageId, emoji)}
-                    >
-                    <div
-                      className={[
-                        "message-bubble",
-                        isOwn ? "message-bubble--own" : "message-bubble--other",
-                        `message-bubble--group-${layoutInfo.groupPosition}`,
-                        messageActions.isRevealed(m.id) ? "message-bubble--actions-visible" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      {...messageActions.getBubbleHandlers(m.id)}
-                    >
-                      <span className="message-actions">
-                        <MessageEmojiActions
-                          messageId={m.id}
-                          reactions={m.reactions ?? []}
-                          currentUserId={resolvedUserId}
-                          onToggleReaction={(messageId, emoji) => void toggleReaction(messageId, emoji)}
-                        />
-                        {(canEditMessage(m) || canDeleteMessage(m)) && (
-                          <span className="message-actions-divider" aria-hidden />
-                        )}
-                        {canEditMessage(m) && (
-                          <button
-                            type="button"
-                            className="link-btn"
-                            onClick={() => {
-                              setEditingId(m.id);
-                              setEditBody(m.body);
-                            }}
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {canDeleteMessage(m) && (
-                          <button
-                            type="button"
-                            className="link-btn danger"
-                            onClick={() => setDeleteTarget(m.id)}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </span>
-                      {m.attachmentUrl && m.messageType === "image" && (
-                        <button
-                          type="button"
-                          className="attachment-open"
-                          aria-label="View full image"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (messageActions.isRevealed(m.id)) return;
-                            setLightboxImage({
-                              src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
-                              alt: m.body || "Shared image",
-                            });
-                          }}
-                        >
-                          <img
-                            src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
-                            alt={m.body || "Shared image"}
-                            className="attachment"
-                            draggable={false}
-                          />
-                        </button>
-                      )}
-                      {m.attachmentUrl && m.messageType === "video" && (
-                        <VideoAttachmentPreview
-                          label={m.body || "Shared video"}
-                          src={resolveAttachmentDisplayUrl(m.attachmentUrl!)}
-                          onPlay={() => {
-                            if (messageActions.isRevealed(m.id)) return;
-                            setLightboxVideo({
-                              src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
-                              alt: m.body || "Shared video",
-                            });
-                          }}
-                        />
-                      )}
-                      {m.body ? <MessageBody body={m.body} /> : null}
-                    </div>
-                    </MessageBubbleStack>
-                  </>
-                )}
-              </div>
-            </li>
-            </Fragment>
-            );
-          })}
-          <li className="messages-scroll-anchor" ref={messagesEndRef} aria-hidden />
-        </ul>
+      {sendError && (
+        <p className="send-error" role="alert">
+          {sendError}
+        </p>
       )}
 
+      {(hasMore || loadingMore) && messages.length > 0 && (
+        <div className="messages-history-top" aria-hidden={!loadingMore}>
+          <div ref={topSentinelRef} className="messages-top-sentinel" />
+          {loadingMore && (
+            <div className="messages-loading-older" role="status" aria-live="polite">
+              <div className="spinner" aria-hidden />
+            </div>
+          )}
+        </div>
+      )}
+
+      {messagesLoading && messages.length === 0 ? (
+        <div className="messages-loading" role="status" aria-live="polite">
+          <div className="spinner" aria-hidden />
+        </div>
+      ) : messages.length === 0 ? (
+        <div className="empty-state">
+          <h3>No messages yet</h3>
+          <p>{canPost ? "Be the first to say hello." : "Messages from leaders will appear here."}</p>
+        </div>
+      ) : (
+        <ChatMessageList
+          messages={messages}
+          firstUnreadMessageId={firstUnreadMessageId}
+          resolvedUserId={resolvedUserId}
+          isGroupLeader={isGroupLeader}
+          editingId={editingId}
+          editBody={editBody}
+          sending={sending}
+          layout={layout}
+          messageActions={messageActions}
+          unreadDividerRef={unreadDividerRef}
+          messagesListRef={messagesListRef}
+          messagesEndRef={messagesEndRef}
+          onScrollContainer={handleScrollContainer}
+          onToggleReaction={handleToggleReaction}
+          onStartEdit={(messageId, body) => {
+            setEditingId(messageId);
+            setEditBody(body);
+          }}
+          onEditBodyChange={setEditBody}
+          onSaveEdit={(messageId) => void saveEdit(messageId)}
+          onCancelEdit={() => {
+            setEditingId(null);
+            setEditBody("");
+          }}
+          onDeleteTarget={setDeleteTarget}
+          onOpenImage={setLightboxImage}
+          onOpenVideo={setLightboxVideo}
+        />
+      )}
     </>
   );
 
@@ -1406,118 +950,25 @@ export function ChatThread({
           </button>
         )}
 
-      {mentionQuery !== null && mentionCandidates.length > 0 && (
-        <ul className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
-          {mentionCandidates.slice(0, 8).map((m) => {
-            const canMention = memberCanMention(m);
-            return (
-              <li key={m.id ?? m.displayName}>
-                <button
-                  type="button"
-                  role="option"
-                  className={canMention ? undefined : "mention-suggestion--pending"}
-                  disabled={!canMention}
-                  aria-disabled={!canMention}
-                  onClick={() => insertMention(m)}
-                >
-                  <span className="mention-suggestion-name">@{m.displayName}</span>
-                  {!canMention ? (
-                    <span className="mention-suggestion-hint">Not on CCO yet</span>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {pendingMedia ? (
-        <ComposerPendingMedia
-          previewUrl={pendingMedia.previewUrl}
-          kind={pendingMedia.kind}
-          fileName={pendingMedia.file.name}
-          onRemove={clearPendingMedia}
-        />
-      ) : null}
-
-      {sendError ? (
-        <p className="composer-send-error" role="alert">
-          {sendError}
-        </p>
-      ) : null}
-
-      <ComposerGiphyPicker
-        open={giphyOpen}
-        disabled={composerInputLocked || isSending}
-        onClose={() => setGiphyOpen(false)}
-        onSelect={(gif) => sendGiphy(gif.importUrl)}
-      />
-
-      <form
-        onSubmit={handleSend}
-        className={[
-          "composer",
-          composerReadOnly ? "composer--readonly" : "",
-          composerLocked ? "composer--locked" : "",
-          pendingMedia ? "composer--has-pending-media" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        aria-disabled={composerReadOnly || undefined}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp4,.webm,.mov"
-          hidden
-          disabled={composerInputLocked}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) stageComposerMedia(file);
-            e.target.value = "";
+        <ChatComposer
+          conversationId={conversationId}
+          canPost={canPost}
+          composerLocked={composerLocked}
+          readOnlyReason={readOnlyReason}
+          coarsePointer={coarsePointer}
+          composerPlaceholder={placeholder}
+          members={members}
+          resolvedUserId={resolvedUserId}
+          sendError={sendError}
+          onSendError={setSendError}
+          onSend={handleComposerSend}
+          onSendGiphy={handleComposerGiphy}
+          onComposerLayout={handleComposerLayout}
+          onMountStageMedia={(stageMedia) => {
+            stageComposerMediaRef.current = stageMedia;
           }}
+          appUpdateBlocked={appUpdateBlocked}
         />
-        <ComposerAttachMenu
-          disabled={composerInputLocked}
-          giphyEnabled={giphyEnabled}
-          onPickMedia={() => fileRef.current?.click()}
-          onPickGiphy={() => setGiphyOpen(true)}
-        />
-        <textarea
-          ref={composerRef}
-          value={body}
-          onChange={(e) => handleBodyChange(e.target.value)}
-          onKeyDown={handleComposerKeyDown}
-          placeholder={effectiveComposerPlaceholder}
-          enterKeyHint="send"
-          disabled={composerInputLocked}
-          readOnly={composerReadOnly}
-          rows={1}
-          aria-label="Message"
-        />
-        <button
-          type="submit"
-          className="composer-send"
-          disabled={!canSendMessage}
-          aria-label={isSending ? "Sending message" : "Send message"}
-          aria-busy={isSending}
-        >
-          <svg
-            className="composer-send-icon"
-            viewBox="0 0 24 24"
-            aria-hidden
-          >
-            <path
-              d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </form>
       </div>
 
       {lightboxVideo && (

@@ -1,11 +1,8 @@
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
 import type { NextConfig } from "next";
-import { resolveAppBuildVersion } from "./lib/build-version";
 
 loadEnv({ path: path.resolve(__dirname, "../../.env") });
-
-const appVersion = resolveAppBuildVersion();
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@cco/pco-client", "@cco/shared"],
@@ -14,9 +11,6 @@ const nextConfig: NextConfig = {
   // proxy.ts runs for /api/v1/*; Next.js buffers those bodies (default 10MB).
   experimental: {
     proxyClientMaxBodySize: "100mb",
-  },
-  env: {
-    NEXT_PUBLIC_APP_VERSION: appVersion,
   },
   async headers() {
     return [

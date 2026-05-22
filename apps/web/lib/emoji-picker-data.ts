@@ -1,8 +1,7 @@
 import { GENERATED_EMOJI_PICKER_GROUPS } from "./emoji-picker-data.generated";
+import { RECENT_EMOJI_GROUP_LABEL } from "./emoji-picker-constants";
 
-export const QUICK_REACTION_EMOJIS = ["👍", "❤️", "😂"] as const;
-
-export const RECENT_EMOJI_GROUP_LABEL = "Recents";
+export { QUICK_REACTION_EMOJIS, RECENT_EMOJI_GROUP_LABEL } from "./emoji-picker-constants";
 
 export type EmojiPickerGroup = {
   label: string;

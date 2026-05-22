@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/AppShellWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { appUpdateBootstrapScript } from "@/lib/app-update-bootstrap-script";
-import { APP_BUILD_VERSION } from "@/lib/build-version";
+import { resolveAppBuildVersion } from "@/lib/build-version";
 import "./globals.css";
 import "./themes.css";
 
@@ -30,12 +30,13 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const updateBootstrapScript = appUpdateBootstrapScript(APP_BUILD_VERSION);
+  const appBuildVersion = resolveAppBuildVersion(process.env);
+  const updateBootstrapScript = appUpdateBootstrapScript(appBuildVersion);
 
   return (
     <html lang="en" data-theme="1" suppressHydrationWarning>
       <head>
-        <meta name="cco-app-version" content={APP_BUILD_VERSION} />
+        <meta name="cco-app-version" content={appBuildVersion} />
         {updateBootstrapScript ? (
           <script
             dangerouslySetInnerHTML={{

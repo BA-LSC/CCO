@@ -1,10 +1,9 @@
-import { and, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   conversationMembers,
   conversations,
   groupMemberships,
-  messages,
   serviceTeamMemberships,
   userPcoCredentials,
   users,
@@ -18,6 +17,7 @@ import {
   mergeSignedUpMemberRecords,
   type SignedUpMemberRecord,
 } from "./cco-member-status";
+import { fetchLastMessagesForConversations } from "./unread";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
   return [userIdA, userIdB].sort().join(":");
@@ -426,24 +426,13 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
 
   const signedUpParticipantIds = await listSignedUpUserIds(otherMembers.map((member) => member.id));
 
-  const lastMessages = await db
-    .select({
-      conversationId: messages.conversationId,
-      authorId: messages.authorId,
-      createdAt: messages.createdAt,
-    })
-    .from(messages)
-    .where(and(inArray(messages.conversationId, convIds), isNull(messages.deletedAt)))
-    .orderBy(desc(messages.createdAt));
-
+  const lastByConvRaw = await fetchLastMessagesForConversations(convIds);
   const lastByConv = new Map<string, { authorId: string; createdAt: string }>();
-  for (const msg of lastMessages) {
-    if (!lastByConv.has(msg.conversationId)) {
-      lastByConv.set(msg.conversationId, {
-        authorId: msg.authorId,
-        createdAt: msg.createdAt.toISOString(),
-      });
-    }
+  for (const [conversationId, last] of lastByConvRaw) {
+    lastByConv.set(conversationId, {
+      authorId: last.authorId,
+      createdAt: last.createdAt.toISOString(),
+    });
   }
 
   const summaries: DmSummary[] = convIds

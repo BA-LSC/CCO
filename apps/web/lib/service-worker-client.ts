@@ -11,9 +11,7 @@ import {
   shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
 
-import { APP_BUILD_VERSION } from "@/lib/build-version";
-
-const SW_URL = `/sw.js?build=${encodeURIComponent(APP_BUILD_VERSION)}`;
+import { getClientBuildVersion } from "@/lib/build-version";
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -21,7 +19,8 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
 
   try {
-    return await navigator.serviceWorker.register(SW_URL, { scope: "/" });
+    const swUrl = `/sw.js?build=${encodeURIComponent(getClientBuildVersion())}`;
+    return await navigator.serviceWorker.register(swUrl, { scope: "/" });
   } catch (err) {
     console.warn("Service worker registration failed:", err);
     return null;

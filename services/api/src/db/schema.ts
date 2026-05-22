@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   pgTable,
   text,
   timestamp,
@@ -210,7 +211,10 @@ export const messages = pgTable(
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("messages_idempotent").on(t.conversationId, t.clientMessageId)],
+  (t) => [
+    uniqueIndex("messages_idempotent").on(t.conversationId, t.clientMessageId),
+    index("messages_conversation_created_idx").on(t.conversationId, t.createdAt),
+  ],
 );
 
 export const webhookDeliveries = pgTable(

@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  lazy,
+  Suspense,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -11,10 +13,13 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import { buildEmojiPickerGroups, QUICK_REACTION_EMOJIS, RECENT_EMOJI_GROUP_LABEL } from "@/lib/emoji-picker-data";
+import { buildEmojiPickerGroups } from "@/lib/emoji-picker-data";
+import { QUICK_REACTION_EMOJIS, RECENT_EMOJI_GROUP_LABEL } from "@/lib/emoji-picker-constants";
 import { getEmojiDisplayClass } from "@/lib/emoji-display";
 import { pushRecentEmoji, readRecentEmojis } from "@/lib/emoji-recents";
 import type { Reaction } from "@/lib/api";
+
+export { QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-constants";
 
 type EmojiToggleProps = {
   messageId: string;
@@ -220,6 +225,19 @@ function MessageEmojiPickerPopover({
   );
 }
 
+const LazyMessageEmojiPickerPopover = lazy(async () => ({
+  default: MessageEmojiPickerPopover,
+}));
+
+function LazyEmojiPickerPopover(props: React.ComponentProps<typeof MessageEmojiPickerPopover>) {
+  if (!props.pickerOpen) return null;
+  return (
+    <Suspense fallback={null}>
+      <LazyMessageEmojiPickerPopover {...props} />
+    </Suspense>
+  );
+}
+
 export function MessageEmojiActions({
   messageId,
   reactions = [],
@@ -260,7 +278,7 @@ export function MessageEmojiActions({
         >
           +
         </button>
-        <MessageEmojiPickerPopover
+        <LazyEmojiPickerPopover
           pickerOpen={pickerOpen}
           pickEmoji={pickEmoji}
           activeEmojis={activeEmojis}
@@ -297,7 +315,7 @@ export function MessageAddReactionButton({
       >
         +
       </button>
-      <MessageEmojiPickerPopover
+      <LazyEmojiPickerPopover
         pickerOpen={pickerOpen}
         pickEmoji={pickEmoji}
         activeEmojis={activeEmojis}
@@ -372,7 +390,7 @@ type StackProps = {
   reactions: Reaction[];
   currentUserId?: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
-  children: ReactNode;
+  children: React.ReactNode;
 };
 
 export function MessageBubbleStack({
