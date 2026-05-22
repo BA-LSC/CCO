@@ -4117,6 +4117,15 @@ html[data-theme="6"] .user-menu-dropdown {
   letter-spacing: 0.04em;
 }
 
+@media (min-width: 769px) {
+  .composer-giphy-picker {
+    right: auto;
+    width: 420px;
+    max-width: calc(100% - 2 * var(--chat-inset-x, 12px));
+    max-height: min(520px, 62vh);
+  }
+}
+
 .chat-thread .composer-readonly {
   padding: 12px;
   background: var(--color-surface-2);
