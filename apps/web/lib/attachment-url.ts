@@ -1,4 +1,7 @@
-const UPLOAD_FILENAME_RE = /\/(?:api\/)?uploads\/([^/?#]+)/;
+const UPLOAD_FILENAME_RE = /\/(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/;
+
+/** Same-origin proxy base used for <img> attachment URLs. */
+export const UPLOAD_DISPLAY_PATH = "/api/v1/uploads";
 
 /** Extract the stored filename from a public or relative upload URL. */
 export function extractUploadFilename(urlOrPath: string): string | null {
@@ -8,7 +11,7 @@ export function extractUploadFilename(urlOrPath: string): string | null {
     const match = new URL(urlOrPath).pathname.match(UPLOAD_FILENAME_RE);
     return match?.[1] ?? null;
   } catch {
-    const match = urlOrPath.match(/^\/?(?:api\/)?uploads\/([^/?#]+)/);
+    const match = urlOrPath.match(/^\/?(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/);
     return match?.[1] ?? null;
   }
 }
@@ -46,7 +49,7 @@ export function resolveAttachmentDisplayUrl(attachmentUrl: string): string {
   const filename = extractUploadFilename(attachmentUrl);
   if (filename) {
     const { sig, exp } = readUploadSignatureParams(attachmentUrl);
-    const base = `/api/uploads/${filename}`;
+    const base = `${UPLOAD_DISPLAY_PATH}/${filename}`;
     if (sig && exp) {
       const params = new URLSearchParams({ sig, exp });
       return `${base}?${params.toString()}`;
@@ -54,11 +57,11 @@ export function resolveAttachmentDisplayUrl(attachmentUrl: string): string {
     return base;
   }
 
-  if (attachmentUrl.startsWith("/api/uploads/")) {
-    const bare = attachmentUrl.match(/^\/api\/uploads\/([^/?#]+)/);
+  if (attachmentUrl.startsWith(`${UPLOAD_DISPLAY_PATH}/`) || attachmentUrl.startsWith("/api/uploads/")) {
+    const bare = attachmentUrl.match(/^\/(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/);
     if (bare) {
       const { sig, exp } = readUploadSignatureParams(attachmentUrl);
-      const base = `/api/uploads/${bare[1]}`;
+      const base = `${UPLOAD_DISPLAY_PATH}/${bare[1]}`;
       if (sig && exp) {
         const params = new URLSearchParams({ sig, exp });
         return `${base}?${params.toString()}`;

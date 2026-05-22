@@ -8,7 +8,13 @@ describe("extractUploadFilename", () => {
     ).toBe("abc.jpeg");
   });
 
-  test("parses same-origin /api/uploads URLs", () => {
+  test("parses same-origin /api/v1/uploads URLs", () => {
+    expect(
+      extractUploadFilename("https://cco.lscavl.dev/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999"),
+    ).toBe("abc.jpeg");
+  });
+
+  test("parses legacy /api/uploads URLs", () => {
     expect(
       extractUploadFilename("https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
@@ -21,7 +27,7 @@ describe("resolveAttachmentDisplayUrl", () => {
       resolveAttachmentDisplayUrl(
         "https://api.cco.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
-    ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
+    ).toBe("/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
 
   test("rewrites same-origin /api/uploads URLs from PUBLIC_UPLOAD_URL", () => {
@@ -29,7 +35,7 @@ describe("resolveAttachmentDisplayUrl", () => {
       resolveAttachmentDisplayUrl(
         "https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
-    ).toBe("/api/uploads/abc.jpeg?sig=deadbeef&exp=999");
+    ).toBe("/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
 
   test("leaves non-upload URLs unchanged", () => {
@@ -38,12 +44,18 @@ describe("resolveAttachmentDisplayUrl", () => {
   });
 
   test("normalizes already-proxied paths and keeps signed params", () => {
+    expect(resolveAttachmentDisplayUrl("/api/v1/uploads/abc.jpeg?sig=x&exp=999")).toBe(
+      "/api/v1/uploads/abc.jpeg?sig=x&exp=999",
+    );
+  });
+
+  test("rewrites legacy proxy paths to v1 and keeps signed params", () => {
     expect(resolveAttachmentDisplayUrl("/api/uploads/abc.jpeg?sig=x&exp=999")).toBe(
-      "/api/uploads/abc.jpeg?sig=x&exp=999",
+      "/api/v1/uploads/abc.jpeg?sig=x&exp=999",
     );
   });
 
   test("returns proxy path without params when signature is absent", () => {
-    expect(resolveAttachmentDisplayUrl("/api/uploads/abc.jpeg")).toBe("/api/uploads/abc.jpeg");
+    expect(resolveAttachmentDisplayUrl("/api/v1/uploads/abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg");
   });
 });

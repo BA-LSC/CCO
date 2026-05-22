@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { Hono } from "hono";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
+import { serveUploadFile } from "../lib/serve-upload";
 import {
   getUploadDir,
   buildSignedUploadUrl,
@@ -14,9 +15,9 @@ const ALLOWED = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export const uploadsRouter = new Hono<Env>();
 
-uploadsRouter.use("*", requireAuth);
+uploadsRouter.get("/:filename", serveUploadFile);
 
-uploadsRouter.post("/", async (c) => {
+uploadsRouter.post("/", requireAuth, async (c) => {
   const body = await c.req.parseBody();
   const file = body.file;
 

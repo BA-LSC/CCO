@@ -1,3 +1,5 @@
+import { prepareImageForUpload } from "./prepare-image-upload";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function isHtmlResponse(text: string): boolean {
@@ -69,8 +71,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function uploadImage(file: File): Promise<string> {
+  const prepared = await prepareImageForUpload(file);
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", prepared);
   const res = await fetch(`${API_BASE}/api/v1/uploads`, {
     method: "POST",
     body: form,

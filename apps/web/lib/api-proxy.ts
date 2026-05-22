@@ -43,24 +43,31 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
-  let body: BodyInit | undefined;
+  let requestBody: BodyInit | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
-    body = await request.arrayBuffer();
+    requestBody = await request.arrayBuffer();
   }
 
   try {
     const upstream = await fetch(target, {
       method: request.method,
       headers,
-      body,
+      body: requestBody,
       signal: AbortSignal.timeout(30_000),
     });
 
     const responseHeaders = new Headers();
-    const upstreamType = upstream.headers.get("content-type");
+    const upstreamType = upstream.headers.get("content-type") ?? "";
     if (upstreamType) responseHeaders.set("content-type", upstreamType);
 
-    return new Response(await upstream.text(), {
+    const isTextBody =
+      upstreamType.startsWith("text/") ||
+      upstreamType.includes("application/json") ||
+      upstreamType.includes("javascript");
+
+    const responseBody = isTextBody ? await upstream.text() : await upstream.arrayBuffer();
+
+    return new Response(responseBody, {
       status: upstream.status,
       headers: responseHeaders,
     });

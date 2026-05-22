@@ -66,7 +66,7 @@ export function buildSignedUploadUrl(
   return `${base}/${filename}?sig=${sig}&exp=${expiresAt}`;
 }
 
-const UPLOAD_PATH_RE = /\/(?:api\/)?uploads\/([^/]+)$/;
+const UPLOAD_PATH_RE = /\/(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/;
 
 const UPLOAD_CONTENT_TYPES: Record<string, string> = {
   jpeg: "image/jpeg",
@@ -91,7 +91,7 @@ export function extractUploadFilename(urlOrPath: string): string | null {
     const match = new URL(urlOrPath).pathname.match(UPLOAD_PATH_RE);
     return match?.[1] ?? null;
   } catch {
-    const match = urlOrPath.match(/^\/?(?:api\/)?uploads\/([^/?#]+)/);
+    const match = urlOrPath.match(/^\/?(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/);
     return match?.[1] ?? null;
   }
 }
@@ -120,12 +120,8 @@ export function isAllowedAttachmentUrl(
   if (allowed.protocol !== candidate.protocol) return false;
   if (allowed.host !== candidate.host) return false;
 
-  const allowedPath = allowed.pathname.replace(/\/$/, "") || "";
-  const candidatePath = candidate.pathname.replace(/\/$/, "");
-  if (!candidatePath.startsWith(allowedPath)) return false;
-
-  const filename = path.basename(candidate.pathname);
-  if (!filename || filename === "." || filename === "..") return false;
+  const filename = extractUploadFilename(attachmentUrl);
+  if (!filename) return false;
 
   return safeUploadPath(getUploadDir(), filename) !== null;
 }
