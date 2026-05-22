@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   disabled?: boolean;
+  giphyEnabled?: boolean;
   onPickMedia: () => void;
+  onPickGiphy?: () => void;
 };
 
-export function ComposerAttachMenu({ disabled, onPickMedia }: Props) {
+export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPickGiphy }: Props) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -67,6 +69,19 @@ export function ComposerAttachMenu({ disabled, onPickMedia }: Props) {
           >
             Media
           </button>
+          {giphyEnabled && onPickGiphy && (
+            <button
+              type="button"
+              role="menuitem"
+              className="composer-attach-menu-item"
+              onClick={() => {
+                setOpen(false);
+                onPickGiphy();
+              }}
+            >
+              GIF
+            </button>
+          )}
         </div>
       )}
     </div>

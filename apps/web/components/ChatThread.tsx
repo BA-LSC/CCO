@@ -7,12 +7,15 @@ import {
   MessageEmojiActions,
 } from "@/components/MessageReactionToolbar";
 import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
+import { ComposerGiphyPicker } from "@/components/ComposerGiphyPicker";
 import { ComposerPendingMedia } from "@/components/ComposerPendingMedia";
 import { MessageBody } from "@/components/MessageBody";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
   apiFetch,
+  fetchGiphyEnabled,
   formatMention,
+  importGiphyGif,
   uploadImage,
   uploadVideo,
   type Message,
@@ -188,6 +191,8 @@ export function ChatThread({
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
   const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
   const [composerDragOver, setComposerDragOver] = useState(false);
+  const [giphyOpen, setGiphyOpen] = useState(false);
+  const [giphyEnabled, setGiphyEnabled] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -265,7 +270,12 @@ export function ChatThread({
       return null;
     });
     resetComposerDragState();
+    setGiphyOpen(false);
   }, [canPost, resetComposerDragState]);
+
+  useEffect(() => {
+    void fetchGiphyEnabled().then(setGiphyEnabled);
+  }, []);
 
   const canSendMessage =
     Boolean(body.trim() || pendingMedia) && canPost && !composerLocked && !isSending;
@@ -759,6 +769,43 @@ export function ChatThread({
     return () => observer.disconnect();
   }, [hasMore, loadOlder, layout, messages.length, loadingMore, scrollReady]);
 
+  async function sendGiphy(importUrl: string) {
+    if (
+      !conversationId ||
+      sendInFlightRef.current ||
+      !canPost ||
+      composerLocked ||
+      isAppUpdateInProgress()
+    ) {
+      return;
+    }
+
+    setSendError(null);
+    sendInFlightRef.current = true;
+    setSendInFlight(true);
+    setIsSending(true);
+
+    try {
+      const attachmentUrl = await importGiphyGif(importUrl);
+      await postMessage({
+        body: "",
+        clientMessageId: crypto.randomUUID(),
+        attachmentUrl,
+        messageType: "image",
+      });
+      resetComposerDragState();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send GIF";
+      setSendError(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      sendInFlightRef.current = false;
+      setSendInFlight(false);
+      setIsSending(false);
+      focusComposer();
+    }
+  }
+
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
     const text = body.trim();
@@ -1202,6 +1249,8 @@ export function ChatThread({
                       <span className="message-actions">
                         <MessageEmojiActions
                           messageId={m.id}
+                          reactions={m.reactions ?? []}
+                          currentUserId={resolvedUserId}
                           onToggleReaction={(messageId, emoji) => void toggleReaction(messageId, emoji)}
                         />
                         {(canEditMessage(m) || canDeleteMessage(m)) && (
@@ -1395,6 +1444,13 @@ export function ChatThread({
         </p>
       ) : null}
 
+      <ComposerGiphyPicker
+        open={giphyOpen}
+        disabled={composerInputLocked || isSending}
+        onClose={() => setGiphyOpen(false)}
+        onSelect={(gif) => sendGiphy(gif.importUrl)}
+      />
+
       <form
         onSubmit={handleSend}
         className={[
@@ -1421,7 +1477,9 @@ export function ChatThread({
         />
         <ComposerAttachMenu
           disabled={composerInputLocked}
+          giphyEnabled={giphyEnabled}
           onPickMedia={() => fileRef.current?.click()}
+          onPickGiphy={() => setGiphyOpen(true)}
         />
         <textarea
           ref={composerRef}

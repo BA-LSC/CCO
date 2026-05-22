@@ -14,6 +14,7 @@ import { messagesRouter } from "./routes/messages";
 import { pushRouter } from "./routes/push";
 import { sessionRouter } from "./routes/session";
 import { servicesRouter } from "./routes/services";
+import { giphyRouter } from "./routes/giphy";
 import { uploadsRouter } from "./routes/uploads";
 import { configurePubSub } from "./realtime/pubsub";
 import { setupRouter } from "./routes/setup";
@@ -63,6 +64,7 @@ app.route("/v1/services", servicesRouter);
 app.route("/v1/setup", setupRouter);
 app.route("/v1/settings", settingsRouter);
 app.route("/v1/presence", presenceRouter);
+app.route("/v1/giphy", giphyRouter);
 app.route("/webhooks", webhooksRouter);
 
 app.onError((err, c) => {

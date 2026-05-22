@@ -184,6 +184,32 @@ export type GroupDetail = {
   }>;
 };
 
+export type GiphyGifResult = {
+  id: string;
+  title: string;
+  previewUrl: string;
+  importUrl: string;
+  width: number;
+  height: number;
+};
+
+export async function importGiphyGif(importUrl: string): Promise<string> {
+  const data = await apiFetch<{ url: string }>("/api/v1/giphy/import", {
+    method: "POST",
+    body: JSON.stringify({ url: importUrl }),
+  });
+  return data.url;
+}
+
+export async function fetchGiphyEnabled(): Promise<boolean> {
+  try {
+    const data = await apiFetch<{ enabled: boolean }>("/api/v1/giphy/status");
+    return data.enabled;
+  } catch {
+    return false;
+  }
+}
+
 export type MessageListResponse = {
   messages: Message[];
   hasMore: boolean;

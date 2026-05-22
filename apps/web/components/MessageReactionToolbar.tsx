@@ -15,8 +15,17 @@ import type { Reaction } from "@/lib/api";
 
 type EmojiToggleProps = {
   messageId: string;
+  reactions?: Reaction[];
+  currentUserId?: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
 };
+
+function getMyReactionEmojis(reactions: Reaction[], currentUserId?: string): Set<string> {
+  if (!currentUserId) return new Set();
+  return new Set(
+    reactions.filter((reaction) => reaction.userId === currentUserId).map((reaction) => reaction.emoji),
+  );
+}
 
 function computePickerStyle(anchor: HTMLElement): CSSProperties {
   const rect = anchor.getBoundingClientRect();
@@ -70,7 +79,6 @@ function useEmojiPicker(messageId: string, onToggleReaction: (messageId: string,
   }, [pickerOpen]);
 
   function pickEmoji(emoji: string) {
-    setPickerOpen(false);
     onToggleReaction(messageId, emoji);
   }
 
@@ -80,11 +88,13 @@ function useEmojiPicker(messageId: string, onToggleReaction: (messageId: string,
 function MessageEmojiPickerPopover({
   pickerOpen,
   pickEmoji,
+  activeEmojis,
   anchorRef,
   popoverRef,
 }: {
   pickerOpen: boolean;
   pickEmoji: (emoji: string) => void;
+  activeEmojis: Set<string>;
   anchorRef: RefObject<HTMLElement | null>;
   popoverRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -126,17 +136,21 @@ function MessageEmojiPickerPopover({
         <div key={group.label} className="message-emoji-picker-group">
           <p className="message-emoji-picker-label">{group.label}</p>
           <div className="message-emoji-picker-grid">
-            {group.emojis.map((emoji) => (
+            {group.emojis.map((emoji) => {
+              const active = activeEmojis.has(emoji);
+              return (
               <button
                 key={`${group.label}-${emoji}`}
                 type="button"
-                className="message-emoji-picker-item"
-                aria-label={`React with ${emoji}`}
+                className={`message-emoji-picker-item${active ? " message-emoji-picker-item--active" : ""}`}
+                aria-label={active ? `Remove ${emoji} reaction` : `React with ${emoji}`}
+                aria-pressed={active}
                 onClick={() => pickEmoji(emoji)}
               >
                 {emoji}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
@@ -145,25 +159,35 @@ function MessageEmojiPickerPopover({
   );
 }
 
-export function MessageEmojiActions({ messageId, onToggleReaction }: EmojiToggleProps) {
+export function MessageEmojiActions({
+  messageId,
+  reactions = [],
+  currentUserId,
+  onToggleReaction,
+}: EmojiToggleProps) {
   const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
     messageId,
     onToggleReaction,
   );
+  const activeEmojis = getMyReactionEmojis(reactions, currentUserId);
 
   return (
     <>
-      {QUICK_REACTION_EMOJIS.map((emoji) => (
+      {QUICK_REACTION_EMOJIS.map((emoji) => {
+        const active = activeEmojis.has(emoji);
+        return (
         <button
           key={emoji}
           type="button"
-          className="message-action-emoji"
-          aria-label={`React with ${emoji}`}
+          className={`message-action-emoji${active ? " message-action-emoji--active" : ""}`}
+          aria-label={active ? `Remove ${emoji} reaction` : `React with ${emoji}`}
+          aria-pressed={active}
           onClick={() => pickEmoji(emoji)}
         >
           {emoji}
         </button>
-      ))}
+        );
+      })}
       <div className="message-action-picker" ref={anchorRef}>
         <button
           type="button"
@@ -178,6 +202,7 @@ export function MessageEmojiActions({ messageId, onToggleReaction }: EmojiToggle
         <MessageEmojiPickerPopover
           pickerOpen={pickerOpen}
           pickEmoji={pickEmoji}
+          activeEmojis={activeEmojis}
           anchorRef={anchorRef}
           popoverRef={popoverRef}
         />
@@ -186,11 +211,17 @@ export function MessageEmojiActions({ messageId, onToggleReaction }: EmojiToggle
   );
 }
 
-export function MessageAddReactionButton({ messageId, onToggleReaction }: EmojiToggleProps) {
+export function MessageAddReactionButton({
+  messageId,
+  reactions = [],
+  currentUserId,
+  onToggleReaction,
+}: EmojiToggleProps) {
   const { pickerOpen, setPickerOpen, anchorRef, popoverRef, pickEmoji } = useEmojiPicker(
     messageId,
     onToggleReaction,
   );
+  const activeEmojis = getMyReactionEmojis(reactions, currentUserId);
 
   return (
     <div className="message-action-picker message-reaction-add-picker" ref={anchorRef}>
@@ -207,6 +238,7 @@ export function MessageAddReactionButton({ messageId, onToggleReaction }: EmojiT
       <MessageEmojiPickerPopover
         pickerOpen={pickerOpen}
         pickEmoji={pickEmoji}
+        activeEmojis={activeEmojis}
         anchorRef={anchorRef}
         popoverRef={popoverRef}
       />
@@ -262,6 +294,12 @@ export function MessageReactionPills({
           </button>
         );
       })}
+      <MessageAddReactionButton
+        messageId={messageId}
+        reactions={reactions}
+        currentUserId={currentUserId}
+        onToggleReaction={onToggleReaction}
+      />
     </div>
   );
 }
@@ -295,7 +333,6 @@ export function MessageBubbleStack({
       {children}
       {hasReactions && (
         <div className="message-reaction-row">
-          <MessageAddReactionButton messageId={messageId} onToggleReaction={onToggleReaction} />
           <MessageReactionPills
             messageId={messageId}
             reactions={reactions}
