@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
+import { PresenceMembersSection } from "@/components/PresenceMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { PanelSettingsButton } from "@/components/PanelSettingsButton";
 import { ChatThread } from "@/components/ChatThread";
@@ -98,9 +99,22 @@ export default function DmChatPage() {
 
   const members = detail
     ? [
-        { id: detail.participant.id, displayName: detail.participant.displayName },
+        { id: detail.participant.id, displayName: detail.participant.displayName, avatarUrl: detail.participant.avatarUrl },
         ...(session?.userId && session.displayName
           ? [{ id: session.userId, displayName: session.displayName }]
+          : []),
+      ]
+    : [];
+
+  const settingsMembers = detail
+    ? [
+        {
+          id: detail.participant.id,
+          displayName: detail.participant.displayName,
+          avatarUrl: detail.participant.avatarUrl,
+        },
+        ...(session?.userId
+          ? [{ id: session.userId, displayName: session.displayName ?? "You" }]
           : []),
       ]
     : [];
@@ -149,6 +163,7 @@ export default function DmChatPage() {
             muted={detail.muted}
             onChange={toggleMute}
           />
+          <PresenceMembersSection members={settingsMembers} enabled={showOptions} />
         </ChannelSettingsPanel>
       )}
 

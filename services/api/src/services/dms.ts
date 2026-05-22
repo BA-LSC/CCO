@@ -242,10 +242,17 @@ export async function searchDmCandidates(params: {
   query?: string;
   limit?: number;
 }): Promise<DmParticipant[]> {
-  const allowedIds = await listDmEligibleUserIds(params.userId, params.organizationId);
+  const [allowedIds, existingDmUserIds] = await Promise.all([
+    listDmEligibleUserIds(params.userId, params.organizationId),
+    listExistingDmParticipantUserIds(params.userId),
+  ]);
   if (allowedIds.size === 0) return [];
 
-  const idList = [...allowedIds];
+  const idList = [...allowedIds].filter(
+    (id) => id !== params.userId && !existingDmUserIds.has(id),
+  );
+  if (idList.length === 0) return [];
+
   const limit = Math.min(params.limit ?? 20, 50);
   const q = params.query?.trim();
 
@@ -265,6 +272,38 @@ export async function searchDmCandidates(params: {
     .limit(limit);
 
   return rows;
+}
+
+async function listExistingDmParticipantUserIds(userId: string): Promise<Set<string>> {
+  const memberships = await db
+    .select({ conversationId: conversationMembers.conversationId })
+    .from(conversationMembers)
+    .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+    .where(
+      and(
+        eq(conversationMembers.userId, userId),
+        isNull(conversations.groupId),
+        isNull(conversations.serviceTeamId),
+        sql`${conversations.dmPairKey} IS NOT NULL`,
+        isNull(conversations.archivedAt),
+      ),
+    );
+
+  if (memberships.length === 0) return new Set();
+
+  const conversationIds = memberships.map((row) => row.conversationId);
+  const others = await db
+    .select({ id: users.id })
+    .from(conversationMembers)
+    .innerJoin(users, eq(users.id, conversationMembers.userId))
+    .where(
+      and(
+        inArray(conversationMembers.conversationId, conversationIds),
+        ne(conversationMembers.userId, userId),
+      ),
+    );
+
+  return new Set(others.map((row) => row.id));
 }
 
 async function assertCanMessageUser(params: {

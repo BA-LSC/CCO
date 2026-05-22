@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useConversationSocket, type RealtimeEvent } from "@/hooks/useConversationSocket";
 import { apiFetch } from "@/lib/api";
+import { PresenceProvider } from "@/components/PresenceProvider";
 import { resolveActiveConversationId } from "@/lib/active-conversation-id";
 
 export type ChatSessionInfo = { userId: string; displayName?: string };
@@ -119,7 +120,7 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
         sessionLoading,
       }}
     >
-      {children}
+      <PresenceProvider userId={session?.userId ?? null}>{children}</PresenceProvider>
     </ChatLayoutContext.Provider>
   );
 }

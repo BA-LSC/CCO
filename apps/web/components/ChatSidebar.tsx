@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { usePresenceWatch } from "@/components/PresenceProvider";
 import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { UserMenu } from "@/components/UserMenu";
 import {
@@ -24,7 +25,7 @@ import { fetchSetupStatus } from "@/lib/setup";
 export function ChatSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { sidebarOpen, closeSidebar, realtimeConnected } = useChatLayout();
+  const { sidebarOpen, closeSidebar } = useChatLayout();
 
   const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
   const [dms, setDms] = useState<DmSummary[]>([]);
@@ -104,6 +105,23 @@ export function ChatSidebar() {
 
   const activeDmId = pathname.match(/^\/dms\/([^/]+)/)?.[1] ?? null;
   const activeTeamId = pathname.match(/^\/teams\/([^/]+)/)?.[1] ?? null;
+
+  const existingDmUserIds = useMemo(
+    () => new Set(dms.map((dm) => dm.participant.id)),
+    [dms],
+  );
+
+  const newDmPeople = useMemo(
+    () => dmPeople.filter((person) => !existingDmUserIds.has(person.id)),
+    [dmPeople, existingDmUserIds],
+  );
+
+  usePresenceWatch(
+    dms.map((dm) => dm.participant.id),
+    dms.length > 0,
+  );
+
+  usePresenceWatch(newDmPeople.map((person) => person.id), showNewDm && newDmPeople.length > 0);
 
   useEffect(() => {
     if (!activeDmId) return;
@@ -231,23 +249,36 @@ export function ChatSidebar() {
                     <p className="sidebar-empty">Searching…</p>
                   ) : dmPeopleError ? (
                     <p className="sidebar-empty">{dmPeopleError}</p>
-                  ) : dmPeople.length === 0 ? (
+                  ) : newDmPeople.length === 0 ? (
                     <p className="sidebar-empty">
                       {dmSearch.trim()
                         ? "No matches found."
-                        : "No one in your groups or teams has joined CCO yet."}
+                        : existingDmUserIds.size > 0
+                          ? "You're already messaging everyone available."
+                          : "No one in your groups or teams has joined CCO yet."}
                     </p>
                   ) : (
                     <ul className="sidebar-list sidebar-new-dm-list">
-                      {dmPeople.map((p) => (
+                      {newDmPeople.map((p) => (
                         <li key={p.id}>
                           <button
                             type="button"
-                            className="sidebar-item"
+                            className="sidebar-item sidebar-dm-item"
                             disabled={creatingDm === p.id}
                             onClick={() => void startDm(p.id)}
                           >
-                            {creatingDm === p.id ? "Opening…" : p.displayName}
+                            <div className="sidebar-dm-row">
+                              <UserAvatarWithPresence
+                                userId={p.id}
+                                displayName={p.displayName}
+                                avatarUrl={p.avatarUrl}
+                                className="sidebar-dm-avatar"
+                                size="xs"
+                              />
+                              <span className="sidebar-item-label">
+                                {creatingDm === p.id ? "Opening…" : p.displayName}
+                              </span>
+                            </div>
                           </button>
                         </li>
                       ))}
@@ -269,10 +300,12 @@ export function ChatSidebar() {
                         }`}
                       >
                         <div className="sidebar-dm-row">
-                          <UserAvatar
+                          <UserAvatarWithPresence
+                            userId={dm.participant.id}
                             displayName={dm.participant.displayName}
                             avatarUrl={dm.participant.avatarUrl}
                             className="sidebar-dm-avatar"
+                            size="xs"
                           />
                           <span className="sidebar-item-label">{dm.participant.displayName}</span>
                           {dm.hasUnread && activeDmId !== dm.id && (
@@ -333,7 +366,7 @@ export function ChatSidebar() {
         </div>
 
         <div className="sidebar-footer">
-          <UserMenu variant="sidebar" online={realtimeConnected} />
+          <UserMenu variant="sidebar" />
         </div>
       </aside>
     </>

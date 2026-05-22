@@ -1,6 +1,7 @@
 "use client";
 
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { usePresenceWatch } from "@/components/PresenceProvider";
 
 export type ChannelMember = {
   id?: string;
@@ -47,6 +48,7 @@ type Props = {
   onInvite?: (member: ChannelMember) => void;
   onRemove?: (memberId: string, displayName: string) => void;
   channelAccess?: ChannelAccessProps;
+  watchPresence?: boolean;
 };
 
 export function ChannelMembersSection({
@@ -59,7 +61,11 @@ export function ChannelMembersSection({
   onInvite,
   onRemove,
   channelAccess,
+  watchPresence = true,
 }: Props) {
+  const presenceUserIds = members.filter((member) => member.onCco && member.id).map((member) => member.id);
+  usePresenceWatch(presenceUserIds, watchPresence && members.length > 0);
+
   if (members.length === 0) return null;
 
   const countLabel = channelMemberCountLabel(members, isLeader);
@@ -119,10 +125,12 @@ export function ChannelMembersSection({
                       </label>
                     )
                   )}
-                  <UserAvatar
+                  <UserAvatarWithPresence
+                    userId={member.onCco ? member.id : null}
                     displayName={member.displayName}
                     avatarUrl={member.avatarUrl}
                     className="channel-member-avatar"
+                    showPresence={member.onCco}
                   />
                   <span className="channel-member-name">{member.displayName}</span>
                   {member.role !== "member" && (

@@ -396,12 +396,11 @@ html.standalone-display .app:has(.chat-shell) {
   overflow: hidden;
 }
 
-.user-menu-status-dot {
+.user-menu-status-dot,
+.user-presence-dot {
   position: absolute;
   right: -1px;
   bottom: -1px;
-  width: 10px;
-  height: 10px;
   border-radius: 50%;
   background: var(--color-muted);
   border: 2px solid var(--color-surface);
@@ -409,8 +408,47 @@ html.standalone-display .app:has(.chat-shell) {
   pointer-events: none;
 }
 
-.user-menu-status-dot-online {
+.user-menu-status-dot,
+.user-presence-dot--sm {
+  width: 10px;
+  height: 10px;
+}
+
+.user-presence-dot--xs {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+}
+
+.user-presence-dot--md {
+  width: 11px;
+  height: 11px;
+}
+
+.user-menu-status-dot-online,
+.user-presence-dot--online {
   background: var(--color-success);
+}
+
+.avatar-with-presence {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.avatar-with-presence--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.avatar-with-presence--xs {
+  width: 24px;
+  height: 24px;
+}
+
+.avatar-with-presence--md {
+  width: 32px;
+  height: 32px;
 }
 
 .user-menu-avatar img,
@@ -1331,6 +1369,13 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-new-dm-list .sidebar-item {
   font-size: 0.85rem;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-new-dm-list .sidebar-dm-item {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .empty-chat-pane {

@@ -5,6 +5,8 @@ import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { useTheme } from "@/components/ThemeProvider";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
+import { UserPresenceDot } from "@/components/UserPresenceDot";
+import { usePresence } from "@/components/PresenceProvider";
 import { apiFetch } from "@/lib/api";
 import {
   CHAOS_UNLOCK_CLICKS,
@@ -25,10 +27,10 @@ const PICKER_THEMES: UserTheme[] = ["1", "2", "3", "4", "5"];
 
 type Props = {
   variant?: "default" | "sidebar";
-  online?: boolean;
 };
 
-export function UserMenu({ variant = "default", online = false }: Props) {
+export function UserMenu({ variant = "default" }: Props) {
+  const { pageActive } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -134,12 +136,7 @@ export function UserMenu({ variant = "default", online = false }: Props) {
             avatarUrl={user.avatarUrl}
             className="user-menu-avatar"
           />
-          {variant === "sidebar" && (
-            <span
-              className={`user-menu-status-dot${online ? " user-menu-status-dot-online" : ""}`}
-              aria-label={online ? "Online" : "Offline"}
-            />
-          )}
+          {variant === "sidebar" && <UserPresenceDot online={pageActive} size="sm" />}
         </span>
         <span className="user-menu-name">{displayName}</span>
         <span className={`user-menu-chevron${open ? " user-menu-chevron-open" : ""}`} aria-hidden>

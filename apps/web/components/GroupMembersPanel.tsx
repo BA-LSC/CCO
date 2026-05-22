@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
+import { usePresenceWatch } from "@/components/PresenceProvider";
 import { apiFetch, type GroupDetail } from "@/lib/api";
 
 type SessionInfo = { userId: string; displayName?: string };
@@ -21,6 +22,8 @@ export function GroupMembersPanel({ groupId }: Props) {
 
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
+
+  usePresenceWatch(detail?.members.map((member) => member.id) ?? [], Boolean(detail));
 
   async function reload() {
     const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`);
@@ -106,7 +109,8 @@ export function GroupMembersPanel({ groupId }: Props) {
       <ul className="group-members-list">
         {detail.members.map((m) => (
           <li key={m.id} className="member-row member-row-actions">
-            <UserAvatar
+            <UserAvatarWithPresence
+              userId={m.id}
               displayName={m.displayName}
               avatarUrl={m.avatarUrl}
               className="member-avatar"
