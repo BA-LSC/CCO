@@ -3163,7 +3163,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: -2px;
+  margin-top: 1px;
 }
 
 .chat-thread .message-item--spacing-medium {

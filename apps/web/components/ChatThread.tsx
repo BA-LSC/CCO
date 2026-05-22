@@ -17,6 +17,7 @@ import {
   type Reaction,
 } from "@/lib/api";
 import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
+import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 import { useConversationSocket } from "@/hooks/useConversationSocket";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -33,6 +34,13 @@ import {
   scrollMessagesToBottom,
 } from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
+import {
+  clearComposerDraft,
+  readComposerDraft,
+  saveComposerDraft,
+  setSendInFlight,
+} from "@/lib/app-update-composer";
+import { isAppUpdateInProgress } from "@/lib/app-update";
 
 function formatMessageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -124,6 +132,8 @@ export function ChatThread({
   composerDisabled = false,
 }: Props) {
   const coarsePointer = useCoarsePointer();
+  const appUpdateBlocked = useAppUpdateGuard();
+  const composerLocked = composerDisabled || appUpdateBlocked;
   const placeholder = composerPlaceholderForDevice(composerPlaceholder, coarsePointer);
   const { setRealtimeConnected, session } = useChatLayout();
   const resolvedUserId = currentUserId ?? session?.userId;
@@ -168,6 +178,17 @@ export function ChatThread({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [scrollReady, setScrollReady] = useState(false);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const draft = readComposerDraft(conversationId);
+    if (draft) setBody(draft);
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!appUpdateBlocked || !conversationId) return;
+    saveComposerDraft(conversationId, body);
+  }, [appUpdateBlocked, body, conversationId]);
 
   const scrollBottomThresholdPx = 72;
 
@@ -215,7 +236,7 @@ export function ChatThread({
     if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
     const container = getScrollContainer();
     if (container) scrollMessagesToBottom(container);
-  }, [body, composerDisabled, conversationId, firstUnreadMessageId, layout, messages.length]);
+  }, [body, composerLocked, conversationId, firstUnreadMessageId, layout, messages.length]);
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     const container = getScrollContainer();
@@ -531,7 +552,7 @@ export function ChatThread({
     attachmentUrl?: string;
     messageType?: string;
   }) {
-    if (!conversationId) return;
+    if (!conversationId || isAppUpdateInProgress()) return;
     const { message } = await apiFetch<{ message: Message }>(
       `/api/v1/messages?conversationId=${conversationId}`,
       { method: "POST", body: JSON.stringify(payload) },
@@ -610,28 +631,42 @@ export function ChatThread({
 
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!conversationId || !body.trim() || sendInFlightRef.current || !canPost || composerDisabled) return;
+    if (
+      !conversationId ||
+      !body.trim() ||
+      sendInFlightRef.current ||
+      !canPost ||
+      composerLocked ||
+      isAppUpdateInProgress()
+    ) {
+      return;
+    }
 
     const text = body.trim();
     setBody("");
     setMentionQuery(null);
     setSendError(null);
     sendInFlightRef.current = true;
+    setSendInFlight(true);
 
     try {
       await postMessage({ body: text, clientMessageId: crypto.randomUUID() });
+      clearComposerDraft(conversationId);
     } catch (err) {
       setBody(text);
+      saveComposerDraft(conversationId, text);
       setSendError(err instanceof Error ? err.message : "Failed to send message");
     } finally {
       sendInFlightRef.current = false;
+      setSendInFlight(false);
       focusComposer();
     }
   }
 
   async function handleImage(file: File) {
-    if (!canPost || composerDisabled || sendInFlightRef.current) return;
+    if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
     sendInFlightRef.current = true;
+    setSendInFlight(true);
     setSendError(null);
     try {
       const url = await uploadImage(file);
@@ -646,6 +681,7 @@ export function ChatThread({
       setSendError(err instanceof Error ? err.message : "Failed to upload image");
     } finally {
       sendInFlightRef.current = false;
+      setSendInFlight(false);
       focusComposer();
     }
   }
@@ -1074,7 +1110,7 @@ export function ChatThread({
       {canPost ? (
         <form
           onSubmit={handleSend}
-          className={`composer${composerDisabled ? " composer--locked" : ""}`}
+          className={`composer${composerLocked ? " composer--locked" : ""}`}
         >
           <input
             ref={fileRef}
@@ -1088,7 +1124,7 @@ export function ChatThread({
             }}
           />
           <ComposerAttachMenu
-            disabled={composerDisabled}
+            disabled={composerLocked}
             onPickImage={() => fileRef.current?.click()}
           />
           <textarea
@@ -1098,14 +1134,14 @@ export function ChatThread({
             onKeyDown={handleComposerKeyDown}
             placeholder={placeholder}
             enterKeyHint="send"
-            disabled={composerDisabled}
+            disabled={composerLocked}
             rows={1}
             aria-label="Message"
           />
           <button
             type="submit"
             className="composer-send"
-            disabled={composerDisabled || !body.trim()}
+            disabled={composerLocked || !body.trim()}
             aria-label="Send message"
             onMouseDown={(e) => e.preventDefault()}
           >

@@ -18,14 +18,22 @@ var INNER=${innerHtmlLiteral};
 var applying=false;
 var deployPending=false;
 var deployPollId=null;
+var wired=false;
 var OVERLAY_ID="cco-app-update-overlay";
 var STYLE_ID="cco-app-update-overlay-style";
+var CHECK_MS=5000;
+var DEPLOY_CHECK_MS=1500;
+var OVERLAY_MS=2500;
+var SEND_WAIT_MS=8000;
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
   var s=document.createElement("style");
   s.id=STYLE_ID;
   s.textContent=STYLE;
   (document.head||document.documentElement).appendChild(s);
+}
+function mountRoot(){
+  return document.body||document.documentElement;
 }
 function overlay(){
   ensureStyle();
@@ -37,10 +45,12 @@ function overlay(){
     el.setAttribute("role","alert");
     el.setAttribute("aria-live","assertive");
     el.innerHTML=INNER;
-    (document.body||document.documentElement).appendChild(el);
-    return;
+    mountRoot().appendChild(el);
+  }else{
+    el.hidden=false;
   }
-  el.hidden=false;
+  window.__ccoApplyingUpdate=true;
+  try{window.dispatchEvent(new Event("cco:app-updating"));}catch(e){}
 }
 function hideOverlay(){
   var el=document.getElementById(OVERLAY_ID);
@@ -48,10 +58,9 @@ function hideOverlay(){
 }
 function markDeployPending(){
   deployPending=true;
-  window.__ccoApplyingUpdate=true;
   overlay();
   if(deployPollId)return;
-  deployPollId=setInterval(check,2000);
+  deployPollId=setInterval(check,DEPLOY_CHECK_MS);
 }
 function clearDeployPending(){
   deployPending=false;
@@ -65,6 +74,26 @@ function clearDeployPending(){
 function isDeployStatus(status){
   return status===502||status===503||status===504;
 }
+function sendIdle(){
+  return !window.__ccoSendInFlight;
+}
+function waitForSendIdle(cb){
+  var started=Date.now();
+  (function poll(){
+    if(sendIdle()||Date.now()-started>=SEND_WAIT_MS){
+      cb();
+      return;
+    }
+    setTimeout(poll,100);
+  })();
+}
+function reloadAfterOverlay(){
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      setTimeout(function(){location.reload()},OVERLAY_MS);
+    });
+  });
+}
 function applyUpdate(){
   if(applying)return;
   applying=true;
@@ -73,13 +102,8 @@ function applyUpdate(){
     clearInterval(deployPollId);
     deployPollId=null;
   }
-  window.__ccoApplyingUpdate=true;
   overlay();
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      setTimeout(function(){location.reload()},1200);
-    });
-  });
+  waitForSendIdle(reloadAfterOverlay);
 }
 function check(){
   if(applying)return;
@@ -96,7 +120,9 @@ function check(){
       return r.json();
     })
     .then(function(d){
-      if(!d){
+      if(!d)return;
+      if(d.updating){
+        markDeployPending();
         return;
       }
       if(!d.version){
@@ -113,16 +139,17 @@ function check(){
       markDeployPending();
     });
 }
-function start(){
+function wire(){
+  if(wired)return;
+  wired=true;
   document.addEventListener("visibilitychange",function(){
     if(document.visibilityState==="visible")check();
   });
   window.addEventListener("pageshow",check);
   window.addEventListener("focus",check);
-  setInterval(check,15000);
-  setTimeout(check,500);
+  setInterval(check,CHECK_MS);
 }
-if(document.body){start();}
-else{document.addEventListener("DOMContentLoaded",start);}
+wire();
+check();
 }catch(e){}})();`;
 }

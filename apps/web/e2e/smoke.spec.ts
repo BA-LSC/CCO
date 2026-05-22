@@ -7,7 +7,7 @@ test.describe("CCO smoke", () => {
   test("API health returns ok", async ({ request }) => {
     const res = await request.get(`${API_URL}/health`);
     expect(res.ok()).toBeTruthy();
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toEqual({ ok: true, draining: false });
   });
 
   test("home page shows sign in", async ({ page }) => {

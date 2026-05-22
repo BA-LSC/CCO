@@ -7,7 +7,7 @@ test.describe("chat API contract", () => {
     const res = await request.get(`${API_URL}/health`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body).toEqual({ ok: true });
+    expect(body).toEqual({ ok: true, draining: false });
   });
 
   test("messages endpoint requires auth", async ({ request }) => {
