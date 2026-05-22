@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { SetupLoading } from "@/components/SetupLoading";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
+import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
 import type { SetupRedirectUris } from "@/lib/setup";
 
@@ -33,12 +34,22 @@ const SETUP_TOKEN_KEY = "cco_setup_token";
 
 function getStoredSetupToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(SETUP_TOKEN_KEY);
+  const stored = localStorage.getItem(SETUP_TOKEN_KEY);
+  if (stored) return stored;
+
+  const match = document.cookie.match(/(?:^|;\s*)cco_setup_token=([^;]*)/);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
 }
 
 function storeSetupToken(token: string) {
   localStorage.setItem(SETUP_TOKEN_KEY, token);
-  document.cookie = `cco_setup_token=${encodeURIComponent(token)}; path=/; max-age=604800; samesite=lax`;
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `cco_setup_token=${encodeURIComponent(token)}; path=/; max-age=604800; samesite=lax${secure}`;
 }
 
 function setupDraftHeaders(): HeadersInit {
@@ -63,6 +74,7 @@ export default function SetupPage() {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [webhookSecretCount, setWebhookSecretCount] = useState(0);
   const [webhooksEnabled, setWebhooksEnabled] = useState(false);
+  const [hasClientSecret, setHasClientSecret] = useState(false);
 
   const tryFinishSetup = useCallback(async () => {
     try {
@@ -80,13 +92,18 @@ export default function SetupPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [statusRes, draftRes, redirectUris] = await Promise.all([
-          fetch("/api/v1/setup/status").then((r) => r.json() as Promise<{ configured: boolean }>),
-          fetch("/api/v1/setup/draft", { headers: setupDraftHeaders() }).then(
-            (r) => r.json() as Promise<{ configured: boolean; draft: SetupDraft | null }>,
-          ),
+        const [statusRes, draftResRaw, redirectUris] = await Promise.all([
+          fetch("/api/v1/setup/status").then((r) => r.json() as Promise<{
+            configured: boolean;
+            signInAvailable?: boolean;
+          }>),
+          fetch("/api/v1/setup/draft", { headers: setupDraftHeaders() }),
           fetch("/api/v1/setup/redirect-uris").then((r) => r.json() as Promise<SetupRedirectUris>),
         ]);
+
+        const draftRes = draftResRaw.ok
+          ? ((await draftResRaw.json()) as { configured: boolean; draft: SetupDraft | null })
+          : { configured: false, draft: null };
 
         if (statusRes.configured || draftRes.configured) {
           router.replace("/groups");
@@ -100,6 +117,7 @@ export default function SetupPage() {
         if (draftRes.draft) {
           setName(draftRes.draft.name);
           setClientId(draftRes.draft.clientId);
+          setHasClientSecret(draftRes.draft.hasClientSecret);
           if (draftRes.draft.signInRedirectUri) {
             setSignInRedirectUri(draftRes.draft.signInRedirectUri);
           }
@@ -111,6 +129,8 @@ export default function SetupPage() {
           if (draftRes.draft.credentialsSaved) {
             setPhase("sign-in");
           }
+        } else if (statusRes.signInAvailable) {
+          setPhase("sign-in");
         }
 
         let me: SetupMe | null = null;
@@ -152,10 +172,10 @@ export default function SetupPage() {
       const body: Record<string, string | boolean> = {
         name,
         clientId,
-        clientSecret,
         signInRedirectUri,
         webhooksEnabled,
       };
+      if (clientSecret.trim()) body.clientSecret = clientSecret;
       if (webhooksEnabled) {
         body.webhookUrl = webhookUrl;
         if (webhookSecret.trim()) body.webhookSecret = webhookSecret;
@@ -178,6 +198,7 @@ export default function SetupPage() {
 
       setClientSecret("");
       setWebhookSecret("");
+      setHasClientSecret(true);
       if (webhooksEnabled && webhookSecret.trim()) {
         setWebhookSecretCount(webhookSecret.split(/\r?\n/).filter((line) => line.trim()).length);
       } else if (!webhooksEnabled) {
@@ -232,9 +253,10 @@ export default function SetupPage() {
                 <input
                   value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
-                  required
+                  required={!hasClientSecret}
                   type="password"
                   autoComplete="new-password"
+                  placeholder={hasClientSecret ? "Leave blank to keep saved secret" : undefined}
                 />
               </label>
               <label className="field">
@@ -281,31 +303,17 @@ export default function SetupPage() {
                       placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
                     />
                   </label>
-                  <label className="field">
-                    <span>Webhook secrets</span>
-                    <textarea
-                      className="setup-form-input"
-                      value={webhookSecret}
-                      onChange={(e) => setWebhookSecret(e.target.value)}
-                      autoComplete="off"
-                      rows={4}
-                      spellCheck={false}
-                      placeholder={
-                        webhookSecretCount > 0
-                          ? `${webhookSecretCount} secret(s) saved — paste new lines to replace all`
-                          : "One authenticity_secret per line (from each PCO webhook subscription)"
-                      }
-                    />
-                    <span className="help-text">
-                      <a
-                        href="https://api.planningcenteronline.com/webhooks"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        api.planningcenteronline.com/webhooks
-                      </a>
-                    </span>
-                  </label>
+                  <WebhookSecretsField
+                    value={webhookSecret}
+                    onChange={setWebhookSecret}
+                    configured={webhookSecretCount > 0}
+                    configuredCount={webhookSecretCount}
+                    placeholder={
+                      webhookSecretCount > 0
+                        ? `${webhookSecretCount} secret(s) saved — paste new lines to replace all`
+                        : undefined
+                    }
+                  />
                 </>
               ) : null}
 

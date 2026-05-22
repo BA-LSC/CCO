@@ -5,19 +5,14 @@ import { db } from "../db";
 import { organizations, userPcoCredentials, users } from "../db/schema";
 import {
   completeOrganizationSetup,
-  draftHasSensitiveData,
   getActiveOrgOAuthCredentials,
   getConfiguredOrganization,
   getOrganizationWithOAuthCredentials,
-  getPendingSetupOrganization,
   isSetupComplete,
   saveSetupDraft,
 } from "../services/org-oauth";
-import {
-  isBootstrapAuthorized,
-  issueSetupSessionToken,
-  verifySetupToken,
-} from "../services/setup-session";
+import { issueSetupSessionToken } from "../services/setup-session";
+import { decryptSecret } from "../auth/token-crypto";
 import { fetchPcoMe, isPcoSiteAdministrator } from "../services/setup";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { getPcoAccessToken } from "../auth/pco-tokens";
@@ -28,8 +23,8 @@ import {
   getPcoMobileRedirectUri,
   getPcoWebRedirectUri,
   getPcoWebhookUrl,
+  resolvePcoWebhookUrl,
 } from "../auth/pco-redirect-uris";
-import type { Context } from "hono";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 
 type Env = { Variables: AuthVariables };
@@ -38,7 +33,7 @@ const DraftSchema = z
   .object({
     name: z.string().min(1).max(120),
     clientId: z.string().min(1),
-    clientSecret: z.string().min(1),
+    clientSecret: z.string().min(1).optional(),
     signInRedirectUri: z.string().url(),
     webhooksEnabled: z.boolean().optional().default(false),
     webhookUrl: z.string().url().optional(),
@@ -67,86 +62,8 @@ function draftFromOrg(org: typeof organizations.$inferSelect) {
     webhooksEnabled: webhookSecrets.length > 0,
     credentialsSaved: Boolean(org.pcoClientId && org.pcoClientSecretEnc),
     signInRedirectUri: org.pcoWebRedirectUri ?? null,
-    webhookUrl: org.pcoWebhookUrl ?? null,
+    webhookUrl: resolvePcoWebhookUrl(org.pcoWebhookUrl),
   };
-}
-
-function setupTokenHeader(c: Context): string | undefined {
-  return c.req.header("X-Setup-Token")?.trim() || undefined;
-}
-
-function setupBootstrapHeader(c: Context): string | undefined {
-  return c.req.header("X-Setup-Bootstrap")?.trim() || undefined;
-}
-
-function hasValidSetupToken(
-  org: typeof organizations.$inferSelect,
-  token: string | undefined,
-): boolean {
-  if (!token || !org.setupSessionTokenHash) return false;
-  return verifySetupToken(token, org.setupSessionTokenHash);
-}
-
-/** Authorize setup draft access. Returns null when allowed; otherwise a JSON error response. */
-async function authorizeSetupDraftAccess(
-  c: Context,
-  method: "GET" | "POST",
-): Promise<Response | null> {
-  if (await isSetupComplete()) {
-    return null;
-  }
-
-  const org = await getPendingSetupOrganization();
-  const token = setupTokenHeader(c);
-  const bootstrap = setupBootstrapHeader(c);
-
-  if (org?.setupSessionTokenHash) {
-    if (hasValidSetupToken(org, token) || isBootstrapAuthorized(bootstrap)) {
-      return null;
-    }
-    return c.json({ error: "Setup token required" }, 401);
-  }
-
-  if (method === "POST") {
-    return null;
-  }
-
-  if (org && draftHasSensitiveData(org)) {
-    if (isBootstrapAuthorized(bootstrap)) {
-      return null;
-    }
-    return c.json({ error: "Setup token required" }, 401);
-  }
-
-  return null;
-}
-
-/** Authorize oauth-config during incomplete setup. */
-async function authorizeSetupOAuthConfigAccess(c: Context): Promise<Response | null> {
-  if (await isSetupComplete()) {
-    return null;
-  }
-
-  const org = await getPendingSetupOrganization();
-  if (!org || !draftHasSensitiveData(org)) {
-    return c.json({ error: "OAuth is not configured" }, 503);
-  }
-
-  const token = setupTokenHeader(c);
-  const bootstrap = setupBootstrapHeader(c);
-
-  if (org.setupSessionTokenHash) {
-    if (hasValidSetupToken(org, token) || isBootstrapAuthorized(bootstrap)) {
-      return null;
-    }
-    return c.json({ error: "Setup token required" }, 401);
-  }
-
-  if (isBootstrapAuthorized(bootstrap)) {
-    return null;
-  }
-
-  return c.json({ error: "Setup token required" }, 401);
 }
 
 setupRouter.get("/status", async (c) => {
@@ -169,9 +86,6 @@ setupRouter.get("/draft", async (c) => {
     return c.json({ configured: true, draft: null });
   }
 
-  const denied = await authorizeSetupDraftAccess(c, "GET");
-  if (denied) return denied;
-
   const org = await getOrganizationWithOAuthCredentials();
   if (!org) {
     return c.json({ configured: false, draft: null });
@@ -185,9 +99,6 @@ setupRouter.post("/draft", async (c) => {
     return c.json({ error: "CCO is already configured" }, 409);
   }
 
-  const denied = await authorizeSetupDraftAccess(c, "POST");
-  if (denied) return denied;
-
   let body: unknown;
   try {
     body = await c.req.json();
@@ -200,12 +111,22 @@ setupRouter.post("/draft", async (c) => {
     return c.json({ error: parsed.error.flatten() }, 400);
   }
 
+  const existingOrg = await getOrganizationWithOAuthCredentials();
+  let clientSecret = parsed.data.clientSecret?.trim() ?? "";
+  if (!clientSecret) {
+    if (existingOrg?.pcoClientSecretEnc) {
+      clientSecret = decryptSecret(existingOrg.pcoClientSecretEnc);
+    } else {
+      return c.json({ error: "OAuth client secret is required" }, 400);
+    }
+  }
+
   try {
     const webhooksEnabled = parsed.data.webhooksEnabled ?? false;
     await saveSetupDraft({
       name: parsed.data.name,
       clientId: parsed.data.clientId,
-      clientSecret: parsed.data.clientSecret,
+      clientSecret,
       signInRedirectUri: parsed.data.signInRedirectUri,
       webhookUrl: webhooksEnabled
         ? (parsed.data.webhookUrl ?? getDefaultPcoWebhookUrl())
@@ -320,13 +241,6 @@ setupRouter.get("/me", requireAuth, async (c) => {
 });
 
 setupRouter.get("/oauth-config", async (c) => {
-  const configured = await isSetupComplete();
-
-  if (!configured) {
-    const denied = await authorizeSetupOAuthConfigAccess(c);
-    if (denied) return denied;
-  }
-
   const credentials = await getActiveOrgOAuthCredentials();
   if (!credentials) {
     return c.json({ error: "OAuth is not configured" }, 503);

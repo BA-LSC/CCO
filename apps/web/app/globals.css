@@ -2615,6 +2615,22 @@ html[data-theme="6"] .user-menu-dropdown {
   word-break: break-all;
 }
 
+.webhook-subscription-list {
+  margin-bottom: 0;
+}
+
+.webhook-subscription-list ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.webhook-subscription-list li {
+  display: grid;
+  gap: 4px;
+}
+
 .setup-form {
   display: grid;
   gap: 14px;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LoadingState } from "@/components/PageStates";
+import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
 import type { SetupRedirectUris } from "@/lib/setup";
 
@@ -55,52 +56,6 @@ function MaskedSecretField({
           placeholder={showMask ? undefined : placeholder}
         />
       </div>
-    </label>
-  );
-}
-
-function MaskedSecretTextarea({
-  label,
-  configured,
-  configuredCount,
-  value,
-  onChange,
-  placeholder,
-  helpText,
-}: {
-  label: string;
-  configured: boolean;
-  configuredCount: number;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  helpText: string;
-}) {
-  const [focused, setFocused] = useState(false);
-  const showMask = configured && value === "" && !focused;
-
-  return (
-    <label className="field secret-field">
-      <span>{label}</span>
-      {showMask ? (
-        <p className="secret-field-mask" aria-hidden="true">
-          {configuredCount > 0
-            ? `${configuredCount} secret(s) configured`
-            : SECRET_MASK_DISPLAY}
-        </p>
-      ) : null}
-      <textarea
-        className="setup-form-input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        autoComplete="off"
-        rows={4}
-        spellCheck={false}
-        placeholder={showMask ? undefined : placeholder}
-      />
-      <span className="help-text">{helpText}</span>
     </label>
   );
 }
@@ -237,9 +192,6 @@ export default function IntegrationsSettingsPage() {
               placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
             />
           </label>
-          {webhookConfigured && (
-            <p className="help-text">Webhook secret is configured.</p>
-          )}
           <label className="field">
             <span>Church name</span>
             <input
@@ -265,14 +217,13 @@ export default function IntegrationsSettingsPage() {
             onChange={setClientSecret}
             placeholder="Leave blank to keep current"
           />
-          <MaskedSecretTextarea
-            label="Webhook secrets"
-            configured={webhookConfigured}
-            configuredCount={webhookSecretCount}
+          <WebhookSecretsField
             value={webhookSecret}
             onChange={setWebhookSecret}
-            placeholder="One authenticity_secret per line (from each PCO webhook subscription)"
-            helpText="All subscriptions should use the same webhook URL above. Saving replaces all stored secrets."
+            configured={webhookConfigured}
+            configuredCount={webhookSecretCount}
+            placeholder="Leave blank to keep current secrets"
+            helpText="Saving replaces all stored secrets."
           />
 
           {error && (

@@ -5,9 +5,9 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import {
   getDefaultPcoWebRedirectUri,
-  getDefaultPcoWebhookUrl,
   getPcoWebRedirectUri,
   getPcoWebhookUrl,
+  resolvePcoWebhookUrl,
 } from "../auth/pco-redirect-uris";
 import {
   getConfiguredOrganization,
@@ -126,7 +126,8 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
       updated?.pcoWebRedirectUri ??
       org.pcoWebRedirectUri ??
       getDefaultPcoWebRedirectUri(),
-    webhookUrl:
-      updated?.pcoWebhookUrl ?? org.pcoWebhookUrl ?? getDefaultPcoWebhookUrl(),
+    webhookUrl: resolvePcoWebhookUrl(
+      updated?.pcoWebhookUrl ?? org.pcoWebhookUrl,
+    ),
   });
 });

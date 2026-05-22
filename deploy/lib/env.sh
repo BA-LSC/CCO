@@ -86,6 +86,7 @@ cco_env_apply_domains() {
   cco_env_upsert "PCO_WEB_REDIRECT_URI" "https://${cco}/api/auth/pco/callback" "$file"
   cco_env_upsert "PCO_REDIRECT_URI" "https://${api}/auth/pco/callback" "$file"
   cco_env_upsert "PCO_MOBILE_REDIRECT_URI" "https://${api}/auth/pco/mobile/callback" "$file"
+  cco_env_upsert "PCO_WEBHOOK_URL" "https://${api}/webhooks/pco" "$file"
 }
 
 cco_env_apply_bundled_db() {

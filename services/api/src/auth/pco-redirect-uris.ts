@@ -26,8 +26,30 @@ export function getDefaultPcoMobileRedirectUri(): string {
 }
 
 export function getDefaultPcoWebhookUrl(): string {
+  if (process.env.PCO_WEBHOOK_URL?.trim()) {
+    return process.env.PCO_WEBHOOK_URL.trim();
+  }
+  if (process.env.PCO_REDIRECT_URI?.trim()) {
+    const base = process.env.PCO_REDIRECT_URI.trim().replace(/\/auth\/pco\/callback\/?$/, "");
+    return `${base}/webhooks/pco`;
+  }
   const apiUrl = process.env.API_URL ?? "http://127.0.0.1:3001";
   return `${apiUrl.replace(/\/$/, "")}/webhooks/pco`;
+}
+
+function looksLikeInternalServiceUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "api" || hostname === "web";
+  } catch {
+    return false;
+  }
+}
+
+export function resolvePcoWebhookUrl(saved: string | null | undefined): string {
+  const trimmed = saved?.trim();
+  if (trimmed && !looksLikeInternalServiceUrl(trimmed)) return trimmed;
+  return getDefaultPcoWebhookUrl();
 }
 
 export async function getPcoWebRedirectUri(): Promise<string> {
@@ -39,9 +61,7 @@ export async function getPcoWebRedirectUri(): Promise<string> {
 
 export async function getPcoWebhookUrl(): Promise<string> {
   const org = await getOrganizationWithOAuthCredentials();
-  const saved = org?.pcoWebhookUrl?.trim();
-  if (saved) return saved;
-  return getDefaultPcoWebhookUrl();
+  return resolvePcoWebhookUrl(org?.pcoWebhookUrl);
 }
 
 export function getPcoApiRedirectUri(): string {

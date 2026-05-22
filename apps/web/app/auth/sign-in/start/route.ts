@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
 
   const configRes = await fetch(`${API_URL}/v1/setup/oauth-config`, { cache: "no-store" });
   if (!configRes.ok) {
+    if (configRes.status === 503) {
+      const message = encodeURIComponent(
+        "Planning Center sign-in is not configured yet. Save your church OAuth credentials on the setup page first.",
+      );
+      return NextResponse.redirect(new URL(`/auth/error?message=${message}`, request.url));
+    }
     return NextResponse.json({ error: "OAuth client configuration unavailable" }, { status: 503 });
   }
 
