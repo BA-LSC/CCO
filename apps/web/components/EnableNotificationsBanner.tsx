@@ -85,17 +85,22 @@ export function EnableNotificationsBanner() {
         <strong>Turn on notifications</strong>
         <p>
           {blocked
-            ? "Notifications are blocked. Open your device Settings → CCO → Notifications to allow alerts."
+            ? "Notifications are blocked. Open Settings → CCO → Notifications to allow alerts."
             : "Get notified when you receive new messages in CCO."}
         </p>
       </div>
       <div className="notifications-banner-actions">
         {!blocked ? (
-          <button type="button" className="btn-primary" disabled={busy} onClick={() => void enable()}>
+          <button
+            type="button"
+            className="a2hs-banner-btn a2hs-banner-btn-primary"
+            disabled={busy}
+            onClick={() => void enable()}
+          >
             {busy ? "Enabling…" : "Enable"}
           </button>
         ) : null}
-        <button type="button" className="btn-secondary" onClick={dismiss}>
+        <button type="button" className="a2hs-banner-btn" onClick={dismiss}>
           Not now
         </button>
       </div>
