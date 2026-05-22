@@ -765,7 +765,7 @@ cco_print_cloudflare_hardening_guide() {
   Open https://dash.cloudflare.com/ → select your domain zone.
 
   Security → Settings
-    • Security Level: High
+    • Security level is automatic (Always Protected) — no change needed
     • Bot Fight Mode: On
     • Browser Integrity Check: On
 
@@ -787,7 +787,6 @@ cco_prompt_hardening_confirmations() {
   echo "Open the Cloudflare dashboard and confirm each item:"
   echo ""
   local items=(
-    "Security Level set to High"
     "Bot Fight Mode enabled"
     "Browser Integrity Check enabled"
     "Always Use HTTPS enabled"
@@ -909,16 +908,31 @@ cco_print_manual_tunnel_guide() {
      Copy the full docker run … --token eyJ… command (shown once).
      Do not paste it into a shell yet — the wizard will start cloudflared for you.
 
-  3. Public Hostnames (same tunnel):
+  3. Keep the eyJ… token copied — paste it on the next screen.
+     You will add Published application routes after cloudflared connects.
+
+  Not required here: Cloudflare API tokens, Global API Key, or WARP client.
+
+EOF
+}
+
+cco_print_published_application_guide() {
+  local cco_domain="$1" api_domain="$2"
+  cat <<EOF
+── Add Published application routes ──────────────────────────────────────────
+
+  After the connector shows Healthy in Zero Trust:
+
+  1. Networks → Tunnels → cco → Configure → Add a route
+  2. Choose Published application
+     (not Private hostname, Private CIDR, or Workers VPC)
+  3. Add two routes on this tunnel (use http — not https; TLS is at Cloudflare):
+
        ${cco_domain}  →  http://web:3000
        ${api_domain}  →  http://api:3001
 
-     Cloudflare usually creates proxied CNAME records for these hostnames.
-     If not, add CNAME records in DNS → Records (orange cloud / Proxied).
-
-  4. Keep the eyJ… token copied — the wizard asks you to paste it on the next screen.
-
-  Not required here: Cloudflare API tokens, Global API Key, or WARP client.
+  Cloudflare usually creates proxied CNAME records for these hostnames.
+  If not, add CNAME records in DNS → Records (orange cloud / Proxied).
 
 EOF
 }
@@ -928,7 +942,7 @@ cco_provision_tunnel_manual() {
   local token="" pasted=""
 
   cco_print_manual_tunnel_guide "$cco_domain" "$api_domain"
-  cco_press_enter "Press Enter when steps 1–3 are done in Cloudflare (tunnel created, Docker token copied, both hostnames added)"
+  cco_press_enter "Press Enter when the tunnel is created and the Docker token is copied (steps 1–2)"
   echo ""
   echo "── Paste tunnel run token ────────────────────────────────────────────────────"
   echo ""
@@ -960,10 +974,16 @@ cco_provision_tunnel_manual() {
   done
   cco_wait_for_connector_healthy "$token"
 
-  until cco_prompt_yes_no "Both hostnames show in Zero Trust → Tunnels → cco → Public Hostnames?" "Y"; do
-    echo "  Add:"
+  echo ""
+  cco_print_published_application_guide "$cco_domain" "$api_domain"
+  cco_press_enter "Press Enter after adding both Published application routes"
+
+  until cco_prompt_yes_no "Both Published application routes added (Zero Trust → Tunnels → cco)?" "Y"; do
+    echo ""
+    echo "  Add a route → Published application:"
     echo "    ${cco_domain}  →  http://web:3000"
     echo "    ${api_domain}  →  http://api:3001"
+    echo ""
   done
 
   return 0
@@ -976,7 +996,8 @@ cco_run_tunnel_setup() {
   echo "CCO runs cloudflared in Docker. It connects outbound to Cloudflare."
   echo "This server does not need ports 80/443 open to the internet."
   echo ""
-  echo "Follow the steps below in Cloudflare Zero Trust, then paste the run token."
+  echo "Follow the steps below in Cloudflare Zero Trust: paste the run token,"
+  echo "wait for cloudflared to connect, then add Published application routes."
   echo ""
 
   token="$(cco_env_get CLOUDFLARE_TUNNEL_TOKEN "$env_file")"

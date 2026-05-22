@@ -4,13 +4,16 @@
 cco_env_upsert() {
   local key="$1" value="$2" file="$3"
   local tmp="${file}.tmp.$$"
-  if grep -q "^${key}=" "$file" 2>/dev/null; then
+  if [[ -f "$file" ]] && grep -q "^${key}=" "$file" 2>/dev/null; then
     grep -v "^${key}=" "$file" >"$tmp"
-    printf '%s=%s\n' "$key" "$value" >>"$tmp"
-    mv "$tmp" "$file"
+  elif [[ -f "$file" ]]; then
+    cp "$file" "$tmp"
   else
-    printf '\n%s=%s\n' "$key" "$value" >>"$file"
+    : >"$tmp"
   fi
+  # %q so values with spaces (e.g. PCO_OAUTH_SCOPE) are safe to `source` as .env
+  printf '%s=%q\n' "$key" "$value" >>"$tmp"
+  mv "$tmp" "$file"
 }
 
 cco_env_get() {

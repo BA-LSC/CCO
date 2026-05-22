@@ -32,14 +32,39 @@ fi
 
 if cco_should_use_external_db; then
   echo "Mode: external PostgreSQL (bundled postgres container will not run)."
+  echo "Testing connection..."
+  if docker run --rm postgres:18-alpine psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
+    echo "Database connection OK."
+  else
+    echo "Connection failed. For Vultr: same region/VPC, VPC hostname (not public), trusted sources."
+    exit 1
+  fi
 else
   echo "Mode: bundled PostgreSQL container (host postgres in DATABASE_URL)."
-fi
-
-echo "Testing connection..."
-if docker run --rm postgres:18-alpine psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
-  echo "Database connection OK."
-else
-  echo "Connection failed. For Vultr: same region/VPC, VPC hostname (not public), trusted sources."
-  exit 1
+  files=()
+  cco_compose_files files
+  echo "Starting postgres container for connection test..."
+  docker compose "${files[@]}" up -d postgres
+  echo "Waiting for postgres..."
+  ready=0
+  for _ in $(seq 1 60); do
+    if docker compose "${files[@]}" exec -T postgres \
+      pg_isready -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$ready" != "1" ]]; then
+    echo "Postgres did not become ready in time."
+    exit 1
+  fi
+  echo "Testing connection..."
+  if docker compose "${files[@]}" exec -T postgres \
+    psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
+    echo "Database connection OK."
+  else
+    echo "Connection failed. Check POSTGRES_PASSWORD and DATABASE_URL in .env."
+    exit 1
+  fi
 fi
