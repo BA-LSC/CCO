@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { syncComposerTextareaHeight } from "@/lib/composer-textarea";
 import {
   MessageBubbleStack,
   MessageEmojiActions,
@@ -162,9 +163,15 @@ export function ChatThread({
 
   function focusComposer() {
     requestAnimationFrame(() => {
-      composerRef.current?.focus();
+      const el = composerRef.current;
+      el?.focus();
+      syncComposerTextareaHeight(el);
     });
   }
+
+  useLayoutEffect(() => {
+    syncComposerTextareaHeight(composerRef.current);
+  }, [body, composerDisabled, conversationId]);
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     const container = getScrollContainer();
