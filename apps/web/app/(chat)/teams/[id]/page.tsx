@@ -242,6 +242,7 @@ export default function TeamChatPage() {
           hasMore={hasMore}
           members={activeTeamMembers}
           currentUserId={session?.userId}
+          isGroupLeader={isLeader}
           layout="panel"
           composerPlaceholder="Message your team…"
           messagesLoading={messagesLoading || detailLoading}

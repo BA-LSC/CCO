@@ -38,9 +38,8 @@ export default function GroupConversationPage() {
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
-  const canModerate =
+  const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
-  const isLeader = canModerate;
 
   async function reloadDetail() {
     const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`);
@@ -425,7 +424,7 @@ export default function GroupConversationPage() {
           hasMore={hasMore}
           members={activeGroupMembers}
           currentUserId={session?.userId}
-          canModerate={canModerate}
+          isGroupLeader={isLeader}
           canPost={Boolean(canPostInActive) || detailLoading}
           readOnlyReason={
             !detailLoading && !canPostInActive

@@ -89,7 +89,8 @@ type Props = {
   hasMore?: boolean;
   members?: Member[];
   currentUserId?: string;
-  canModerate?: boolean;
+  /** Group/team leader — may delete other members' messages (not your own-only case). */
+  isGroupLeader?: boolean;
   canPost?: boolean;
   readOnlyReason?: string;
   layout?: "card" | "panel";
@@ -104,7 +105,7 @@ export function ChatThread({
   hasMore: initialHasMore = false,
   members = [],
   currentUserId,
-  canModerate = false,
+  isGroupLeader = false,
   canPost = true,
   readOnlyReason,
   layout = "card",
@@ -593,8 +594,8 @@ export function ChatThread({
   }
 
   function canDeleteMessage(message: Message): boolean {
-    if (canModerate) return true;
-    return canEditMessage(message);
+    if (isOwnMessage(message)) return true;
+    return isGroupLeader;
   }
 
   const messageScrollContent = (
