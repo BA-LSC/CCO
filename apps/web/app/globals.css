@@ -3232,21 +3232,22 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .chat-thread .message-actions {
   position: absolute;
-  top: -10px;
+  top: auto;
+  bottom: -18px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 2px 6px;
-  box-shadow: var(--shadow-sm);
-  font-size: 0.75rem;
-  z-index: 2;
-  max-width: min(240px, calc(100vw - 32px));
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+  font-size: 0.875rem;
+  z-index: 4;
+  max-width: min(320px, calc(100vw - 32px));
   flex-wrap: nowrap;
 }
 
@@ -3278,32 +3279,62 @@ html[data-theme="6"] .user-menu-dropdown {
   }
 }
 
+.chat-thread .message-actions .link-btn {
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+
+.chat-thread .message-actions .link-btn:hover {
+  text-decoration: none;
+  background: var(--color-primary-soft);
+}
+
+.chat-thread .message-actions .link-btn.danger:hover {
+  background: var(--color-danger-soft);
+}
+
+.chat-thread .message-bubble--own .message-actions .link-btn {
+  color: var(--color-primary);
+}
+
+.chat-thread .message-bubble--own .message-actions .link-btn.danger {
+  color: var(--color-danger);
+}
+
 .chat-thread .message-action-emoji {
-  padding: 0 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 4px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 1.2rem;
   line-height: 1;
   color: inherit;
+  border-radius: 8px;
 }
 
 .chat-thread .message-action-emoji:hover,
 .chat-thread .message-action-emoji[aria-expanded="true"] {
-  opacity: 0.85;
-  transform: scale(1.08);
+  background: var(--color-primary-soft);
+  transform: scale(1.05);
 }
 
 .chat-thread .message-action-emoji-more {
-  font-size: 0.9rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--color-muted);
-  min-width: 14px;
+  min-width: 36px;
 }
 
 .chat-thread .message-actions-divider {
   width: 1px;
-  height: 12px;
+  height: 24px;
   background: var(--color-border);
   flex-shrink: 0;
 }
@@ -3631,6 +3662,7 @@ html[data-theme="6"] .user-menu-dropdown {
   max-width: 100%;
   gap: 4px;
   overflow: visible;
+  padding-bottom: 10px;
 }
 
 .chat-thread .message-item--own .message-bubble-stack {
