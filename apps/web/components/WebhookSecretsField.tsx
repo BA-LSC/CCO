@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PCO_WEBHOOK_SUBSCRIPTIONS } from "@cco/shared";
+import { PCO_WEBHOOK_SUBSCRIPTIONS } from "@cco/shared/pco-webhooks";
 
 const SECRET_MASK_DISPLAY = "•".repeat(20);
 const PCO_WEBHOOKS_URL = "https://api.planningcenteronline.com/webhooks";
