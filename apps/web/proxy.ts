@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { publicUrl } from "@/lib/public-origin";
 
 const PROTECTED_PREFIXES = ["/groups", "/teams", "/dms", "/settings"];
 
@@ -13,7 +14,7 @@ export function proxy(request: NextRequest) {
   );
 
   if (isProtected && !session) {
-    const signIn = new URL("/auth/sign-in", request.url);
+    const signIn = publicUrl(request, "/auth/sign-in");
     signIn.searchParams.set("next", pathname);
     return NextResponse.redirect(signIn);
   }

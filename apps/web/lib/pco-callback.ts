@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getPublicOrigin, publicUrl } from "@/lib/public-origin";
 import { isSecureCookieContext } from "@/lib/session-cookies";
 
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
@@ -6,11 +7,11 @@ const EXCHANGE_TIMEOUT_MS = 30_000;
 
 function callbackRedirectUri(request: NextRequest): string {
   const url = new URL(request.url);
-  return `${url.origin}${url.pathname}`;
+  return `${getPublicOrigin(request)}${url.pathname}`;
 }
 
 function errorRedirect(request: NextRequest, message: string) {
-  const target = new URL("/auth/error", request.url);
+  const target = publicUrl(request, "/auth/error");
   target.searchParams.set("message", message);
   const response = NextResponse.redirect(target, 303);
   response.headers.set("Cache-Control", "no-store");
@@ -82,7 +83,7 @@ export async function handlePcoOAuthCallback(request: NextRequest) {
       return nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/groups";
     })();
 
-  const redirectUrl = new URL(nextPath, url.origin);
+  const redirectUrl = publicUrl(request, nextPath);
   if (nextPath.startsWith("/groups")) {
     redirectUrl.searchParams.set("synced", "1");
     if (data.groupsSyncError) {

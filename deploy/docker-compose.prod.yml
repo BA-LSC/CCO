@@ -96,6 +96,7 @@ services:
     environment:
       NODE_ENV: production
       API_URL: http://api:3001
+      WEB_URL: ${WEB_URL}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
     depends_on:
