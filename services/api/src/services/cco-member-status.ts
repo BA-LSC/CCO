@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { userPcoCredentials, users } from "../db/schema";
+import { groupMemberships, serviceTeamMemberships, userPcoCredentials, users } from "../db/schema";
 
 export type SignedUpMemberRecord = {
   userId: string;
@@ -118,10 +118,75 @@ export async function buildSignedUpMemberRecords(
   }));
 }
 
-export async function buildSignedUpMemberIndex(
-  organizationId: string,
-): Promise<SignedUpMemberIndex> {
-  const records = await buildSignedUpMemberRecords(organizationId);
+function mapSignedUpMemberRows(
+  rows: Array<{
+    userId: string;
+    pcoPersonId: string;
+    email: string;
+    displayName: string;
+  }>,
+): SignedUpMemberRecord[] {
+  return rows.map((row) => ({
+    userId: row.userId,
+    pcoPersonId: row.pcoPersonId,
+    email: normalizeMemberEmail(row.email),
+    displayName: normalizeMemberDisplayName(row.displayName),
+  }));
+}
+
+/** Signed-up users in a group, regardless of organization (handles legacy split accounts). */
+export async function buildSignedUpMemberRecordsForGroup(
+  groupId: string,
+): Promise<SignedUpMemberRecord[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(groupMemberships)
+    .innerJoin(users, eq(users.id, groupMemberships.userId))
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(groupMemberships.groupId, groupId));
+
+  return mapSignedUpMemberRows(rows);
+}
+
+/** Signed-up users on a service team, regardless of organization. */
+export async function buildSignedUpMemberRecordsForTeam(
+  teamId: string,
+): Promise<SignedUpMemberRecord[]> {
+  const rows = await db
+    .select({
+      userId: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(serviceTeamMemberships.teamId, teamId));
+
+  return mapSignedUpMemberRows(rows);
+}
+
+export function mergeSignedUpMemberRecords(
+  ...lists: SignedUpMemberRecord[][]
+): SignedUpMemberRecord[] {
+  const merged = new Map<string, SignedUpMemberRecord>();
+  for (const list of lists) {
+    for (const record of list) {
+      merged.set(record.userId, record);
+    }
+  }
+  return [...merged.values()];
+}
+
+export function buildSignedUpMemberIndexFromRecords(
+  records: SignedUpMemberRecord[],
+): SignedUpMemberIndex {
   const pcoPersonIds = new Set<string>();
   const userIds = new Set<string>();
   const emails = new Set<string>();
@@ -135,6 +200,12 @@ export async function buildSignedUpMemberIndex(
   }
 
   return { pcoPersonIds, userIds, emails, displayNames };
+}
+
+export async function buildSignedUpMemberIndex(
+  organizationId: string,
+): Promise<SignedUpMemberIndex> {
+  return buildSignedUpMemberIndexFromRecords(await buildSignedUpMemberRecords(organizationId));
 }
 
 export function findSignedUpMember(

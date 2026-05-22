@@ -13,11 +13,13 @@ import { isLeaderRole } from "../permissions";
 import { mergeGroups } from "../sync/groups";
 import { upsertUserFromPco } from "./bootstrap";
 import {
-  buildSignedUpMemberIndex,
-  buildSignedUpMemberRecords,
   buildLocalMemberLookups,
+  buildSignedUpMemberIndexFromRecords,
+  buildSignedUpMemberRecords,
+  buildSignedUpMemberRecordsForGroup,
   findLocalMember,
   memberIsOnCco,
+  mergeSignedUpMemberRecords,
   resolveRosterMemberLink,
 } from "./cco-member-status";
 import {
@@ -25,7 +27,10 @@ import {
   ensureGeneralConversation,
   ensureGeneralConversationMembers,
 } from "./conversations";
-import { reconcileOrgPlaceholderUsers } from "./user-account-merge";
+import {
+  reconcileGroupPlaceholderUsers,
+  reconcileOrgPlaceholderUsers,
+} from "./user-account-merge";
 
 export async function persistGroupSync(params: {
   organizationId: string;
@@ -343,6 +348,7 @@ export async function listGroupMembersForDetail(params: {
   pcoGroupId: string;
   accessToken?: string;
 }): Promise<GroupMemberView[]> {
+  await reconcileGroupPlaceholderUsers(params.groupId);
   await reconcileOrgPlaceholderUsers(params.organizationId);
 
   const ccoMembers = await db
@@ -358,10 +364,12 @@ export async function listGroupMembersForDetail(params: {
     .innerJoin(users, eq(users.id, groupMemberships.userId))
     .where(eq(groupMemberships.groupId, params.groupId));
 
-  const [signedUp, signedUpRecords] = await Promise.all([
-    buildSignedUpMemberIndex(params.organizationId),
+  const [orgRecords, groupRecords] = await Promise.all([
     buildSignedUpMemberRecords(params.organizationId),
+    buildSignedUpMemberRecordsForGroup(params.groupId),
   ]);
+  const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, groupRecords);
+  const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {

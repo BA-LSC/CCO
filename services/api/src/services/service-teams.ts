@@ -17,14 +17,19 @@ import {
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
 import {
-  buildSignedUpMemberIndex,
-  buildSignedUpMemberRecords,
   buildLocalMemberLookups,
+  buildSignedUpMemberIndexFromRecords,
+  buildSignedUpMemberRecords,
+  buildSignedUpMemberRecordsForTeam,
   findLocalMember,
   memberIsOnCco,
+  mergeSignedUpMemberRecords,
   resolveRosterMemberLink,
 } from "./cco-member-status";
-import { reconcileOrgPlaceholderUsers } from "./user-account-merge";
+import {
+  reconcileOrgPlaceholderUsers,
+  reconcileTeamPlaceholderUsers,
+} from "./user-account-merge";
 import { unreadFlagsForConversations } from "./unread";
 
 async function upsertServiceTeamMembership(params: {
@@ -215,6 +220,7 @@ async function listTeamMembersForDetail(params: {
   pcoTeamId: string;
   accessToken?: string;
 }): Promise<TeamMemberView[]> {
+  await reconcileTeamPlaceholderUsers(params.teamId);
   await reconcileOrgPlaceholderUsers(params.organizationId);
 
   const ccoMembers = await db
@@ -230,10 +236,12 @@ async function listTeamMembersForDetail(params: {
     .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
     .where(eq(serviceTeamMemberships.teamId, params.teamId));
 
-  const [signedUp, signedUpRecords] = await Promise.all([
-    buildSignedUpMemberIndex(params.organizationId),
+  const [orgRecords, teamRecords] = await Promise.all([
     buildSignedUpMemberRecords(params.organizationId),
+    buildSignedUpMemberRecordsForTeam(params.teamId),
   ]);
+  const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, teamRecords);
+  const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {

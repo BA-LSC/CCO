@@ -118,7 +118,7 @@ async function mergePlaceholderUserIntoAuthenticated(
   await db.delete(users).where(eq(users.id, placeholderUserId));
 }
 
-function usersLikelySamePerson(
+export function usersLikelySamePerson(
   authUser: { pcoPersonId: string; email: string; displayName: string },
   candidate: { pcoPersonId: string; email: string; displayName: string },
 ): boolean {
@@ -135,7 +135,95 @@ function usersLikelySamePerson(
     return true;
   }
 
+  if (namesLikelyMatch(authUser.displayName, candidate.displayName)) return true;
+
   return false;
+}
+
+/** Merge placeholder group members into authenticated accounts (any org). */
+export async function reconcileGroupPlaceholderUsers(groupId: string): Promise<void> {
+  const groupMembers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+      hasCredentials: userPcoCredentials.userId,
+    })
+    .from(groupMemberships)
+    .innerJoin(users, eq(users.id, groupMemberships.userId))
+    .leftJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(groupMemberships.groupId, groupId));
+
+  const placeholders = groupMembers.filter((member) => !member.hasCredentials);
+  if (placeholders.length === 0) return;
+
+  const authUsers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id));
+
+  for (const candidate of placeholders) {
+    const authUser = authUsers.find((user) => usersLikelySamePerson(user, candidate));
+    if (!authUser || authUser.id === candidate.id) continue;
+
+    try {
+      await mergePlaceholderUserIntoAuthenticated(candidate.id, authUser.id);
+    } catch (err) {
+      console.warn(
+        `Group placeholder merge failed (${candidate.id} -> ${authUser.id}):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+}
+
+/** Merge placeholder service team members into authenticated accounts (any org). */
+export async function reconcileTeamPlaceholderUsers(teamId: string): Promise<void> {
+  const teamMembers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+      hasCredentials: userPcoCredentials.userId,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .leftJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
+    .where(eq(serviceTeamMemberships.teamId, teamId));
+
+  const placeholders = teamMembers.filter((member) => !member.hasCredentials);
+  if (placeholders.length === 0) return;
+
+  const authUsers = await db
+    .select({
+      id: users.id,
+      pcoPersonId: users.pcoPersonId,
+      email: users.email,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id));
+
+  for (const candidate of placeholders) {
+    const authUser = authUsers.find((user) => usersLikelySamePerson(user, candidate));
+    if (!authUser || authUser.id === candidate.id) continue;
+
+    try {
+      await mergePlaceholderUserIntoAuthenticated(candidate.id, authUser.id);
+    } catch (err) {
+      console.warn(
+        `Team placeholder merge failed (${candidate.id} -> ${authUser.id}):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
 }
 
 /** Merge all roster/webhook placeholder users into authenticated accounts for an org. */

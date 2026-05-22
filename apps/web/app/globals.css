@@ -647,6 +647,25 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-bg);
 }
 
+/* Notch / status-bar inset above chat headers matches header surface (banners own safe area). */
+.chat-main:has(.chat-panel-header)::before,
+.chat-main:has(.empty-chat-pane-header)::before {
+  content: "";
+  display: block;
+  flex-shrink: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--color-surface);
+}
+
+.chat-main:has(.a2hs-banner)::before,
+.chat-main:has(.notifications-banner)::before {
+  display: none;
+}
+
+.a2hs-banner + .notifications-banner {
+  padding-top: 6px;
+}
+
 .chat-sidebar {
   width: var(--sidebar-width);
   flex-shrink: 0;
@@ -1504,7 +1523,7 @@ html[data-theme="6"] .user-menu-dropdown {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px;
+  padding: 12px 20px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -4627,11 +4646,6 @@ html.standalone-display .chat-thread-panel {
     cursor: pointer;
   }
 
-  .chat-shell:has(.chat-sidebar-open) .a2hs-banner,
-  .chat-shell:has(.chat-sidebar-open) .notifications-banner {
-    visibility: hidden;
-  }
-
   .sidebar-footer {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -4646,7 +4660,7 @@ html.standalone-display .chat-thread-panel {
 
   .empty-chat-pane-header {
     display: flex;
-    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    padding-top: 10px;
   }
 
   .chat-main:has(.a2hs-banner) .empty-chat-pane-header {
@@ -4680,7 +4694,7 @@ html.standalone-display .chat-thread-panel {
 
   .chat-panel-header {
     flex-wrap: nowrap;
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+    padding: 10px 12px;
     gap: 10px;
   }
 
