@@ -35,7 +35,10 @@ export type PcoMeProfile = {
 export async function fetchPcoMe(accessToken: string): Promise<PcoMeProfile | null> {
   const response = await fetch(
     "https://api.planningcenteronline.com/people/v2/me?include=organization",
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(30_000),
+    },
   );
   if (!response.ok) return null;
   return (await response.json()) as PcoMeProfile;
