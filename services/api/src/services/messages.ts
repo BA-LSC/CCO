@@ -157,6 +157,7 @@ export async function listMessages(
   hasMore: boolean;
   firstUnreadMessageId: string | null;
   lastReadAt: string | null;
+  canPost: boolean;
 } | null> {
   const member = await db
     .select({ id: conversationMembers.id, lastReadAt: conversationMembers.lastReadAt })
@@ -279,11 +280,20 @@ export async function listMessages(
     reactions: reactionMap.get(row.id) ?? [],
   }));
 
+  const postingMembership = await getMembershipForConversation(conversationId, userId);
+  const canPost = postingMembership
+    ? canPostInConversation({
+        membershipRole: postingMembership.role,
+        leaderOnly: postingMembership.leaderOnly,
+      })
+    : false;
+
   return {
     messages: messagesDto,
     hasMore,
     firstUnreadMessageId,
     lastReadAt: lastReadAtIso(lastReadAt),
+    canPost,
   };
 }
 

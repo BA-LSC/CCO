@@ -178,6 +178,7 @@ export type GroupDetail = {
     slug: string;
     title: string;
     leaderOnly: boolean;
+    canPost?: boolean;
     muted?: boolean;
     memberCount?: number;
   }>;
@@ -188,6 +189,7 @@ export type MessageListResponse = {
   hasMore: boolean;
   firstUnreadMessageId: string | null;
   lastReadAt: string | null;
+  canPost?: boolean;
 };
 
 export type Message = {

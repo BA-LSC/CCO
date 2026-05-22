@@ -7,7 +7,7 @@ import {
   groups,
   users,
 } from "../db/schema";
-import { isLeaderRole } from "../permissions";
+import { canPostInConversation, isLeaderRole } from "../permissions";
 import { publishMessageEvent } from "../realtime/pubsub";
 import { unreadFlagsForConversations } from "./unread";
 
@@ -402,6 +402,10 @@ export async function getGroupWithConversations(groupId: string, userId: string)
       ...conv,
       muted: mutedByConv.get(conv.id) ?? false,
       memberCount: memberCountByConv.get(conv.id),
+      canPost: canPostInConversation({
+        membershipRole: membership[0].role,
+        leaderOnly: conv.leaderOnly,
+      }),
     })),
     members,
   };

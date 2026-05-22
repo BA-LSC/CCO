@@ -41,6 +41,7 @@ export default function GroupConversationPage() {
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [conversationCanPost, setConversationCanPost] = useState<boolean | null>(null);
 
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
@@ -57,6 +58,7 @@ export default function GroupConversationPage() {
   }
 
   useEffect(() => {
+    setDetail(null);
     setDetailLoading(true);
     setError(null);
 
@@ -75,10 +77,27 @@ export default function GroupConversationPage() {
   }, [detail, conversationId, groupId, router]);
 
   useEffect(() => {
+    setConversationCanPost(null);
+  }, [conversationId]);
+
+  useEffect(() => {
     return subscribeConversationUpdated(({ conversationId: updatedId, leaderOnly, title }) => {
       setDetail((prev) => {
         if (!prev) return prev;
         if (!prev.conversations.some((conversation) => conversation.id === updatedId)) return prev;
+
+        const nextCanPost =
+          leaderOnly !== undefined
+            ? canPostInGroupChannel({
+                membershipRole: prev.membershipRole,
+                leaderOnly,
+              })
+            : undefined;
+
+        if (updatedId === conversationId && nextCanPost !== undefined) {
+          setConversationCanPost(nextCanPost);
+        }
+
         return {
           ...prev,
           conversations: prev.conversations.map((conversation) =>
@@ -87,6 +106,7 @@ export default function GroupConversationPage() {
                   ...conversation,
                   ...(leaderOnly !== undefined ? { leaderOnly } : {}),
                   ...(title !== undefined ? { title } : {}),
+                  ...(nextCanPost !== undefined ? { canPost: nextCanPost } : {}),
                 }
               : conversation,
           ),
@@ -125,6 +145,9 @@ export default function GroupConversationPage() {
         setHasMore(data.hasMore);
         setFirstUnreadMessageId(data.firstUnreadMessageId);
         setMessagesForConversationId(conversationId);
+        if (typeof data.canPost === "boolean") {
+          setConversationCanPost(data.canPost);
+        }
         setCachedMessages(conversationId, {
           messages: data.messages,
           hasMore: data.hasMore,
@@ -202,10 +225,29 @@ export default function GroupConversationPage() {
   function applyConversationUpdate(updates: { leaderOnly?: boolean; title?: string }) {
     setDetail((prev) => {
       if (!prev) return prev;
+
+      const nextCanPost =
+        updates.leaderOnly !== undefined
+          ? canPostInGroupChannel({
+              membershipRole: prev.membershipRole,
+              leaderOnly: updates.leaderOnly,
+            })
+          : undefined;
+
+      if (nextCanPost !== undefined) {
+        setConversationCanPost(nextCanPost);
+      }
+
       return {
         ...prev,
         conversations: prev.conversations.map((conversation) =>
-          conversation.id === conversationId ? { ...conversation, ...updates } : conversation,
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                ...updates,
+                ...(nextCanPost !== undefined ? { canPost: nextCanPost } : {}),
+              }
+            : conversation,
         ),
       };
     });
@@ -331,11 +373,14 @@ export default function GroupConversationPage() {
   const showChannelHiddenAccess =
     isLeader && activeConversation?.slug !== "general";
   const canPostInActive =
-    Boolean(activeConversation) &&
-    canPostInGroupChannel({
-      membershipRole: detail?.membershipRole,
-      leaderOnly: activeConversation?.leaderOnly ?? false,
-    });
+    conversationCanPost ??
+    activeConversation?.canPost ??
+    (activeConversation
+      ? canPostInGroupChannel({
+          membershipRole: detail?.membershipRole,
+          leaderOnly: activeConversation.leaderOnly,
+        })
+      : false);
   const composerDisabled = detailLoading || messagesLoading;
 
   function openChannelSettings() {

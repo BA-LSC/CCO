@@ -980,7 +980,13 @@ export function ChatThread({
     composerRef.current?.focus();
   }
 
+  useEffect(() => {
+    if (canPost) return;
+    composerRef.current?.blur();
+  }, [canPost]);
+
   function handleBodyChange(value: string) {
+    if (!canPost) return;
     setBody(value);
     setMentionQuery(getActiveMentionQuery(value));
   }
@@ -1248,6 +1254,7 @@ export function ChatThread({
                       {m.attachmentUrl && m.messageType === "video" && (
                         <VideoAttachmentPreview
                           label={m.body || "Shared video"}
+                          src={resolveAttachmentDisplayUrl(m.attachmentUrl!)}
                           onPlay={() => {
                             if (messageActions.isRevealed(m.id)) return;
                             setLightboxVideo({
