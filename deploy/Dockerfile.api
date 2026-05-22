@@ -17,11 +17,13 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/services/api/node_modules ./services/api/node_modules
 COPY package.json bun.lock ./
 COPY packages ./packages
 COPY services/api ./services/api
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps /app/packages/pco-client/node_modules ./packages/pco-client/node_modules
+COPY --from=deps /app/services/api/node_modules ./services/api/node_modules
 
 RUN mkdir -p /data/uploads
 VOLUME ["/data/uploads"]
