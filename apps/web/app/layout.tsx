@@ -30,6 +30,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" data-theme="1" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var n=navigator;if(n.standalone||matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches){document.documentElement.classList.add("standalone-display")}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body>
         <ThemeProvider>
           <AppShellWrapper>{children}</AppShellWrapper>

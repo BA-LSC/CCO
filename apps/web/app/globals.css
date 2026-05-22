@@ -42,8 +42,17 @@ html:has(.chat-shell) {
 html.standalone-display:has(.chat-shell),
 html.standalone-display:has(.chat-shell) body {
   height: 100%;
-  min-height: 100%;
+  height: -webkit-fill-available;
   overflow: hidden;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html:has(.chat-shell),
+  html:has(.chat-shell) body {
+    height: 100%;
+    height: -webkit-fill-available;
+    overflow: hidden;
+  }
 }
 
 body {
@@ -91,8 +100,18 @@ a:hover {
 
 html.standalone-display .app:has(.chat-shell) {
   height: 100%;
+  height: -webkit-fill-available;
   max-height: none;
   min-height: 0;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .app:has(.chat-shell) {
+    height: 100%;
+    height: -webkit-fill-available;
+    max-height: none;
+    min-height: 0;
+  }
 }
 
 .a2hs-banner {
@@ -4296,6 +4315,24 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread-panel .chat-composer-stack {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
+}
+
+html.standalone-display .chat-thread-panel .chat-composer-stack {
+  padding-bottom: 0;
+}
+
+html.standalone-display .chat-thread-panel {
+  --chat-composer-bottom-padding: 8px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .chat-thread-panel .chat-composer-stack {
+    padding-bottom: 0;
+  }
+
+  .chat-thread-panel {
+    --chat-composer-bottom-padding: 8px;
+  }
 }
 
 .chat-scroll-to-bottom {
