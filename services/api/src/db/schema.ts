@@ -41,6 +41,8 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     theme: text("theme").notNull().default("1"),
     siteAdministrator: boolean("site_administrator").notNull().default(false),
+    statusPreset: text("status_preset").notNull().default("active"),
+    statusMessage: text("status_message"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_org_person").on(t.organizationId, t.pcoPersonId)],

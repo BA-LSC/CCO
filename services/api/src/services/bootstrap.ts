@@ -46,7 +46,7 @@ export async function upsertUserFromPco(
       .set({
         email: profile.email,
         displayName: profile.displayName,
-        ...(profile.avatarUrl !== undefined ? { avatarUrl: profile.avatarUrl } : {}),
+        ...(profile.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}),
       })
       .where(eq(users.id, existing[0].id));
     return existing[0].id;

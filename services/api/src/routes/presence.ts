@@ -5,6 +5,7 @@ import {
   resolvePresenceVisibleUserIds,
   touchUserPresence,
 } from "../services/presence";
+import { getUsersStatus } from "../services/user-status";
 
 type Env = { Variables: AuthVariables };
 
@@ -54,11 +55,14 @@ presenceRouter.post("/query", requireAuth, async (c) => {
     userIds,
   );
   const allowedSet = new Set(allowedIds);
-  const onlineStatus = await getUsersOnline(allowedIds);
+  const [onlineStatus, statuses] = await Promise.all([
+    getUsersOnline(allowedIds),
+    getUsersStatus(allowedIds),
+  ]);
 
   for (const userId of userIds) {
     online[userId] = allowedSet.has(userId) ? (onlineStatus[userId] ?? false) : false;
   }
 
-  return c.json({ online });
+  return c.json({ online, statuses });
 });

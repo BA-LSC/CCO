@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import {
   fetchMyServiceTeams,
+  fetchPersonAvatarUrl,
   fetchServiceTeamRoster,
   PlanningCenterClient,
   removePersonFromServiceTeam,
@@ -186,14 +187,36 @@ export async function syncServiceTeamRoster(params: {
   const client = new PlanningCenterClient({ accessToken: params.accessToken });
   const roster = await fetchServiceTeamRoster(client, params.pcoTeamId);
   const rosterPcoPersonIds = new Set(roster.map((member) => member.pcoPersonId));
+  const existingUsers =
+    roster.length > 0
+      ? await db
+          .select({ pcoPersonId: users.pcoPersonId, avatarUrl: users.avatarUrl })
+          .from(users)
+          .where(inArray(users.pcoPersonId, [...rosterPcoPersonIds]))
+      : [];
+  const avatarByPcoPersonId = new Map(
+    existingUsers.map((user) => [user.pcoPersonId, user.avatarUrl]),
+  );
   let upserted = 0;
 
   for (const member of roster) {
+    let avatarUrl = member.avatarUrl ?? null;
+    if (!avatarUrl && !avatarByPcoPersonId.get(member.pcoPersonId)) {
+      try {
+        avatarUrl = await fetchPersonAvatarUrl(client, member.pcoPersonId);
+      } catch (err) {
+        console.warn(
+          `Avatar lookup failed for PCO person ${member.pcoPersonId}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
     const userId = await upsertUserFromPco(params.organizationId, {
       personId: member.pcoPersonId,
       email: member.email ?? `${member.pcoPersonId}@placeholder.local`,
       displayName: member.displayName,
-      avatarUrl: member.avatarUrl ?? null,
+      ...(avatarUrl ? { avatarUrl } : {}),
     });
 
     await upsertServiceTeamMembership({

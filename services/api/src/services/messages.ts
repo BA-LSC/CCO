@@ -16,6 +16,7 @@ import { markConversationRead } from "./conversations";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
 import { publishMessageEvent } from "../realtime/pubsub";
 import { notifyConversationOfMessage, notifyMentionedUsers } from "./push-notify";
+import { refreshUserAvatarFromPco } from "./user-profile";
 import { lastReadAtIso } from "./unread";
 import type { ReactionDto } from "./reactions";
 
@@ -365,6 +366,10 @@ export async function createMessage(params: {
       deletedAt: messages.deletedAt,
       createdAt: messages.createdAt,
     });
+
+  await refreshUserAvatarFromPco(params.userId).catch((err) => {
+    console.warn("Avatar refresh failed:", err instanceof Error ? err.message : err);
+  });
 
   const author = await db
     .select({ displayName: users.displayName, avatarUrl: users.avatarUrl })

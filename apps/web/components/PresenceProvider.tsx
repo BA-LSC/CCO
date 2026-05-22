@@ -10,17 +10,28 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  parseUserStatusPreset,
+  resolvePresenceDotState,
+  type UserStatus,
+  type UserStatusPreset,
+} from "@cco/shared";
 import { apiFetch } from "@/lib/api";
 
 const HEARTBEAT_MS = 15_000;
 
 type PresenceContextValue = {
   pageActive: boolean;
+  myStatus: UserStatus;
   isUserOnline: (userId: string | null | undefined) => boolean;
+  getUserStatus: (userId: string | null | undefined) => UserStatus;
+  setMyStatus: (update: Partial<UserStatus>) => Promise<void>;
   refreshPresence: (userIds: string[]) => Promise<void>;
 };
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
+
+const DEFAULT_STATUS: UserStatus = { preset: "active", message: null };
 
 function readPageActive(): boolean {
   if (typeof document === "undefined") return false;
@@ -36,6 +47,8 @@ export function PresenceProvider({
 }) {
   const [pageActive, setPageActive] = useState(readPageActive);
   const [onlineByUserId, setOnlineByUserId] = useState<Record<string, boolean>>({});
+  const [statusByUserId, setStatusByUserId] = useState<Record<string, UserStatus>>({});
+  const [myStatus, setMyStatusState] = useState<UserStatus>(DEFAULT_STATUS);
   const watchedUserIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
@@ -50,16 +63,45 @@ export function PresenceProvider({
     };
   }, []);
 
+  useEffect(() => {
+    if (!userId) {
+      setMyStatusState(DEFAULT_STATUS);
+      return;
+    }
+
+    void apiFetch<{
+      statusPreset: UserStatusPreset;
+      statusMessage: string | null;
+    }>("/api/v1/session/me")
+      .then((data) => {
+        const status: UserStatus = {
+          preset: parseUserStatusPreset(data.statusPreset),
+          message: data.statusMessage,
+        };
+        setMyStatusState(status);
+        setStatusByUserId((prev) => ({ ...prev, [userId]: status }));
+      })
+      .catch(() => {
+        // Ignore transient network errors.
+      });
+  }, [userId]);
+
   const refreshPresence = useCallback(async (userIds: string[]) => {
     const unique = [...new Set(userIds.filter(Boolean))];
     if (!unique.length) return;
 
     try {
-      const data = await apiFetch<{ online: Record<string, boolean> }>("/api/v1/presence/query", {
+      const data = await apiFetch<{
+        online: Record<string, boolean>;
+        statuses: Record<string, UserStatus>;
+      }>("/api/v1/presence/query", {
         method: "POST",
         body: JSON.stringify({ userIds: unique }),
       });
       setOnlineByUserId((prev) => ({ ...prev, ...data.online }));
+      if (data.statuses) {
+        setStatusByUserId((prev) => ({ ...prev, ...data.statuses }));
+      }
     } catch {
       // Ignore transient network errors.
     }
@@ -101,9 +143,51 @@ export function PresenceProvider({
     [onlineByUserId, pageActive, userId],
   );
 
+  const getUserStatus = useCallback(
+    (targetUserId: string | null | undefined): UserStatus => {
+      if (!targetUserId) return DEFAULT_STATUS;
+      if (targetUserId === userId) return myStatus;
+      return statusByUserId[targetUserId] ?? DEFAULT_STATUS;
+    },
+    [myStatus, statusByUserId, userId],
+  );
+
+  const setMyStatus = useCallback(
+    async (update: Partial<UserStatus>) => {
+      if (!userId) return;
+
+      const payload: Record<string, unknown> = {};
+      if (update.preset !== undefined) payload.preset = update.preset;
+      if (update.message !== undefined) payload.message = update.message;
+
+      const data = await apiFetch<{
+        statusPreset: UserStatusPreset;
+        statusMessage: string | null;
+      }>("/api/v1/session/me/status", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+
+      const next: UserStatus = {
+        preset: parseUserStatusPreset(data.statusPreset),
+        message: data.statusMessage,
+      };
+      setMyStatusState(next);
+      setStatusByUserId((prev) => ({ ...prev, [userId]: next }));
+    },
+    [userId],
+  );
+
   const value = useMemo(
-    () => ({ pageActive, isUserOnline, refreshPresence }),
-    [isUserOnline, pageActive, refreshPresence],
+    () => ({
+      pageActive,
+      myStatus,
+      isUserOnline,
+      getUserStatus,
+      setMyStatus,
+      refreshPresence,
+    }),
+    [getUserStatus, isUserOnline, myStatus, pageActive, refreshPresence, setMyStatus],
   );
 
   return (
@@ -168,3 +252,5 @@ export function usePresenceWatch(
     };
   }, [enabled, refreshPresence, watchKey, watchedUserIdsRef]);
 }
+
+export { resolvePresenceDotState };

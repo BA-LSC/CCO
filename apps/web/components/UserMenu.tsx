@@ -2,11 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
+import {
+  USER_STATUS_LABELS,
+  USER_STATUS_PRESETS,
+  type UserStatusPreset,
+} from "@cco/shared";
 import { useTheme } from "@/components/ThemeProvider";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserPresenceDot } from "@/components/UserPresenceDot";
-import { usePresence } from "@/components/PresenceProvider";
+import { resolvePresenceDotState, usePresence } from "@/components/PresenceProvider";
 import { apiFetch } from "@/lib/api";
 import {
   CHAOS_UNLOCK_CLICKS,
@@ -30,13 +35,15 @@ type Props = {
 };
 
 export function UserMenu({ variant = "default" }: Props) {
-  const { pageActive } = usePresence();
+  const { pageActive, myStatus, setMyStatus } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [chaosHint, setChaosHint] = useState(false);
+  const [statusMessageDraft, setStatusMessageDraft] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const themeOneClicks = useRef<number[]>([]);
 
@@ -67,6 +74,11 @@ export function UserMenu({ variant = "default" }: Props) {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setStatusMessageDraft(myStatus.message ?? "");
+  }, [myStatus.message, open]);
 
   if (loading) {
     return (
@@ -119,7 +131,31 @@ export function UserMenu({ variant = "default" }: Props) {
     await setTheme(next);
   }
 
+  async function handleStatusPreset(next: UserStatusPreset) {
+    if (next === myStatus.preset) return;
+    setStatusSaving(true);
+    try {
+      await setMyStatus({ preset: next });
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function saveStatusMessage() {
+    const trimmed = statusMessageDraft.trim();
+    const nextMessage = trimmed.length > 0 ? trimmed : null;
+    if (nextMessage === (myStatus.message ?? null)) return;
+
+    setStatusSaving(true);
+    try {
+      await setMyStatus({ message: nextMessage });
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
   const menuClass = variant === "sidebar" ? "user-menu user-menu-sidebar" : "user-menu";
+  const presenceState = resolvePresenceDotState(myStatus.preset, pageActive);
 
   return (
     <div className={menuClass} ref={menuRef}>
@@ -136,7 +172,13 @@ export function UserMenu({ variant = "default" }: Props) {
             avatarUrl={user.avatarUrl}
             className="user-menu-avatar"
           />
-          {variant === "sidebar" && <UserPresenceDot online={pageActive} size="sm" />}
+          {variant === "sidebar" && (
+            <UserPresenceDot
+              state={presenceState}
+              size="sm"
+              title={myStatus.message}
+            />
+          )}
         </span>
         <span className="user-menu-name">{displayName}</span>
         <span className={`user-menu-chevron${open ? " user-menu-chevron-open" : ""}`} aria-hidden>
@@ -194,6 +236,45 @@ export function UserMenu({ variant = "default" }: Props) {
               </p>
             )}
           </div>
+
+          <div className="user-menu-status" role="group" aria-label="Status">
+            <span className="user-menu-dropdown-label">Status</span>
+            <div className="user-menu-status-grid">
+              {USER_STATUS_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`user-menu-status-btn user-menu-status-btn-${preset}${
+                    myStatus.preset === preset ? " user-menu-status-btn-active" : ""
+                  }`}
+                  aria-pressed={myStatus.preset === preset}
+                  disabled={statusSaving}
+                  onClick={() => void handleStatusPreset(preset)}
+                >
+                  {USER_STATUS_LABELS[preset]}
+                </button>
+              ))}
+            </div>
+            <label className="user-menu-status-message-field">
+              <span className="visually-hidden">Status message</span>
+              <input
+                type="text"
+                className="user-menu-status-message"
+                value={statusMessageDraft}
+                maxLength={80}
+                placeholder="What's going on?"
+                disabled={statusSaving}
+                onChange={(event) => setStatusMessageDraft(event.target.value)}
+                onBlur={() => void saveStatusMessage()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+          </div>
+
           {pcoSync && (
             <div className="user-menu-sync" role="group" aria-label="Planning Center sync">
               <span className="user-menu-dropdown-label">Planning Center</span>

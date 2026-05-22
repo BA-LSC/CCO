@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   disabled?: boolean;
+  giphyEnabled?: boolean;
   onPickMedia: () => void;
-  onPickGiphy: () => void;
+  onPickGiphy?: () => void;
 };
 
-export function ComposerAttachMenu({ disabled, onPickMedia, onPickGiphy }: Props) {
+export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPickGiphy }: Props) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const showGiphy = Boolean(giphyEnabled && onPickGiphy);
 
   useEffect(() => {
     if (!open) return;
@@ -68,17 +70,19 @@ export function ComposerAttachMenu({ disabled, onPickMedia, onPickGiphy }: Props
           >
             Media
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="composer-attach-menu-item"
-            onClick={() => {
-              setOpen(false);
-              onPickGiphy();
-            }}
-          >
-            Giphy search
-          </button>
+          {showGiphy ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="composer-attach-menu-item"
+              onClick={() => {
+                setOpen(false);
+                onPickGiphy?.();
+              }}
+            >
+              Giphy search
+            </button>
+          ) : null}
         </div>
       )}
     </div>

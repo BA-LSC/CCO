@@ -1,17 +1,26 @@
 "use client";
 
+import type { PresenceDotState } from "@cco/shared";
+
 type Props = {
-  online: boolean;
+  state: PresenceDotState;
   size?: "xs" | "sm" | "md";
+  title?: string | null;
 };
 
-export function UserPresenceDot({ online, size = "md" }: Props) {
+const STATE_LABELS: Record<PresenceDotState, string> = {
+  online: "Active now",
+  offline: "Offline",
+  away: "Away",
+  busy: "Busy",
+};
+
+export function UserPresenceDot({ state, size = "md", title }: Props) {
   return (
     <span
-      className={`user-presence-dot user-presence-dot--${size}${
-        online ? " user-presence-dot--online" : ""
-      }`}
-      aria-label={online ? "Active now" : "Away"}
+      className={`user-presence-dot user-presence-dot--${size} user-presence-dot--${state}`}
+      aria-label={title?.trim() ? `${STATE_LABELS[state]} — ${title.trim()}` : STATE_LABELS[state]}
+      title={title?.trim() || STATE_LABELS[state]}
     />
   );
 }

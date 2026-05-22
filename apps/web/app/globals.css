@@ -430,6 +430,18 @@ html.standalone-display .app:has(.chat-shell) {
   background: var(--color-success);
 }
 
+.user-presence-dot--away {
+  background: #eab308;
+}
+
+.user-presence-dot--busy {
+  background: #ef4444;
+}
+
+.user-presence-dot--offline {
+  background: var(--color-muted);
+}
+
 .avatar-with-presence {
   position: relative;
   flex-shrink: 0;
@@ -562,6 +574,70 @@ html.standalone-display .app:has(.chat-shell) {
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 4px;
+}
+
+.user-menu-status {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
+}
+
+.user-menu-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.user-menu-status-btn {
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.user-menu-status-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.user-menu-status-btn-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.user-menu-status-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.user-menu-status-message-field {
+  display: block;
+  margin-top: 8px;
+}
+
+.user-menu-status-message {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.user-menu-status-message:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .user-menu-theme-grid {

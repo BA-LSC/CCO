@@ -1,4 +1,4 @@
-import { APP_BUILD_VERSION } from "@/lib/build-version";
+import { APP_BUILD_VERSION, getClientBuildVersion } from "@/lib/build-version";
 import { waitForSendIdle } from "@/lib/app-update-composer";
 import { hideAppUpdateOverlay, showAppUpdateOverlay } from "@/lib/app-update-overlay";
 
@@ -11,6 +11,9 @@ export const UPDATE_CHECK_MS = 15_000;
 export const DEPLOY_POLL_MS = 750;
 
 const DEPLOY_HTTP_STATUSES = new Set([502, 503, 504]);
+const RELOAD_LOOP_KEY = "cco-reload-loop";
+const RELOAD_LOOP_WINDOW_MS = 60_000;
+const RELOAD_LOOP_MAX = 3;
 
 export const APP_UPDATE_EVENT = "cco:app-updating";
 
@@ -74,10 +77,42 @@ export function clearPostDeployGracePeriod(): void {
 /** After a deploy reload, skip overlay until the new bundle is confirmed live. */
 export function maybeCompletePostDeployReload(serverVersion: string | null): boolean {
   if (!isPostDeployGracePeriod()) return false;
-  if (!serverVersion || serverVersion !== APP_BUILD_VERSION) return false;
+  const clientVersion = getClientBuildVersion();
+  if (!serverVersion || serverVersion !== clientVersion) return false;
   clearPostDeployGracePeriod();
   clearDeployWait();
+  clearReloadLoopGuard();
   return true;
+}
+
+function clearReloadLoopGuard(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(RELOAD_LOOP_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function shouldBlockReloadLoop(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(RELOAD_LOOP_KEY);
+    const now = Date.now();
+    const entries: number[] = raw ? (JSON.parse(raw) as number[]) : [];
+    const recent = entries.filter((timestamp) => now - timestamp < RELOAD_LOOP_WINDOW_MS);
+    if (recent.length >= RELOAD_LOOP_MAX) {
+      clearDeployWait();
+      clearPostDeployGracePeriod();
+      console.warn("CCO update reload loop detected — reload suppressed.");
+      return true;
+    }
+    recent.push(now);
+    sessionStorage.setItem(RELOAD_LOOP_KEY, JSON.stringify(recent));
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 export function shouldSuppressServiceWorkerUpdateAfterDeploy(): boolean {
@@ -143,6 +178,7 @@ export async function prepareAppUpdate(onUpdating?: () => Promise<void>): Promis
 
 export function completeAppUpdateReload(): void {
   if (typeof window === "undefined") return;
+  if (shouldBlockReloadLoop()) return;
   window.location.reload();
 }
 
@@ -213,16 +249,23 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
   if (APP_BUILD_VERSION === "dev") return false;
   if (isAppUpdateInProgress() && !isDeployPending() && !isPostDeployGracePeriod()) return false;
 
+  const clientVersion = getClientBuildVersion();
   const { version: serverVersion, unavailable, updating } = await probeServerAppVersion();
 
   if (maybeCompletePostDeployReload(serverVersion)) {
     return false;
   }
 
+  if (serverVersion && serverVersion === clientVersion) {
+    clearReloadLoopGuard();
+    if (isDeployPending()) clearDeployWait();
+    return false;
+  }
+
   if (
     !unavailable &&
     serverVersion &&
-    serverVersion !== APP_BUILD_VERSION &&
+    serverVersion !== clientVersion &&
     (updating || isDeployPending())
   ) {
     await applyAppUpdate(onUpdating);
@@ -238,7 +281,7 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  if (!serverVersion || serverVersion === APP_BUILD_VERSION) {
+  if (!serverVersion || serverVersion === clientVersion) {
     return false;
   }
 

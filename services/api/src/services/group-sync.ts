@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { GroupMembership, GroupRosterMember, SimpleGroup } from "@cco/pco-client";
-import { PlanningCenterClient, fetchGroupRoster, fetchMyRoleInGroup } from "@cco/pco-client";
+import { fetchPersonAvatarUrl, PlanningCenterClient, fetchGroupRoster, fetchMyRoleInGroup } from "@cco/pco-client";
 import { db } from "../db";
 import {
   conversationMembers,
@@ -137,16 +137,40 @@ export async function syncGroupRoster(params: {
   const roster: GroupRosterMember[] = await fetchGroupRoster(client, params.pcoGroupId);
 
   const rosterPcoPersonIds = new Set(roster.map((m) => m.pcoPersonId));
+  const existingUsers =
+    roster.length > 0
+      ? await db
+          .select({ pcoPersonId: users.pcoPersonId, avatarUrl: users.avatarUrl })
+          .from(users)
+          .where(inArray(users.pcoPersonId, [...rosterPcoPersonIds]))
+      : [];
+  const avatarByPcoPersonId = new Map(
+    existingUsers.map((user) => [user.pcoPersonId, user.avatarUrl]),
+  );
+
   let upserted = 0;
 
   for (const member of roster) {
     const displayName =
       [member.firstName, member.lastName].filter(Boolean).join(" ").trim() || "Member";
+
+    let avatarUrl = member.avatarUrl ?? null;
+    if (!avatarUrl && !avatarByPcoPersonId.get(member.pcoPersonId)) {
+      try {
+        avatarUrl = await fetchPersonAvatarUrl(client, member.pcoPersonId);
+      } catch (err) {
+        console.warn(
+          `Avatar lookup failed for PCO person ${member.pcoPersonId}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
     const userId = await upsertUserFromPco(params.organizationId, {
       personId: member.pcoPersonId,
       email: member.email ?? `${member.pcoPersonId}@placeholder.local`,
       displayName,
-      avatarUrl: member.avatarUrl ?? null,
+      ...(avatarUrl ? { avatarUrl } : {}),
     });
 
     await upsertGroupMembership({

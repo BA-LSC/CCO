@@ -1,13 +1,21 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { USER_STATUS_PRESETS, parseUserStatusPreset } from "@cco/shared";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { signWsToken } from "../auth/session";
 import { parseUserTheme } from "../lib/theme";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { refreshUserAvatarFromPco } from "../services/user-profile";
+import { updateUserStatus } from "../services/user-status";
 
 type Env = { Variables: AuthVariables };
+
+const StatusPatchSchema = z.object({
+  preset: z.enum(USER_STATUS_PRESETS).optional(),
+  message: z.string().max(80).nullable().optional(),
+});
 
 export const sessionRouter = new Hono<Env>();
 
@@ -20,6 +28,8 @@ sessionRouter.get("/me", requireAuth, async (c) => {
       theme: users.theme,
       avatarUrl: users.avatarUrl,
       siteAdministrator: users.siteAdministrator,
+      statusPreset: users.statusPreset,
+      statusMessage: users.statusMessage,
     })
     .from(users)
     .where(eq(users.id, session.userId))
@@ -27,10 +37,8 @@ sessionRouter.get("/me", requireAuth, async (c) => {
 
   if (!row[0]) return c.json({ error: "User not found" }, 404);
 
-  let avatarUrl = row[0].avatarUrl;
-  if (!avatarUrl) {
-    avatarUrl = await refreshUserAvatarFromPco(session.userId);
-  }
+  const refreshedAvatar = await refreshUserAvatarFromPco(session.userId);
+  const avatarUrl = refreshedAvatar ?? row[0].avatarUrl;
 
   return c.json({
     userId: row[0].id,
@@ -38,6 +46,39 @@ sessionRouter.get("/me", requireAuth, async (c) => {
     theme: row[0].theme,
     avatarUrl: avatarUrl ?? null,
     siteAdministrator: row[0].siteAdministrator,
+    statusPreset: parseUserStatusPreset(row[0].statusPreset),
+    statusMessage: row[0].statusMessage,
+  });
+});
+
+sessionRouter.patch("/me/status", requireAuth, async (c) => {
+  const session = c.get("session");
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = StatusPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  if (parsed.data.preset === undefined && parsed.data.message === undefined) {
+    return c.json({ error: "No fields to update" }, 400);
+  }
+
+  const status = await updateUserStatus({
+    userId: session.userId,
+    preset: parsed.data.preset,
+    message: parsed.data.message,
+  });
+
+  return c.json({
+    statusPreset: status.preset,
+    statusMessage: status.message,
   });
 });
 

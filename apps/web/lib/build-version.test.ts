@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveAppBuildVersion } from "./build-version";
+import { getClientBuildVersion, resolveAppBuildVersion } from "./build-version";
 
 describe("resolveAppBuildVersion", () => {
   test("uses git sha when provided", () => {
@@ -27,5 +27,23 @@ describe("resolveAppBuildVersion", () => {
         NODE_ENV: "development",
       }),
     ).toBe("dev");
+  });
+
+  test("getClientBuildVersion prefers the SSR meta tag", () => {
+    const meta = { getAttribute: () => "server-version" };
+    const querySelector = () => meta;
+    const originalDocument = globalThis.document;
+
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: { querySelector },
+    });
+
+    expect(getClientBuildVersion("bundle-version")).toBe("server-version");
+
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: originalDocument,
+    });
   });
 });
