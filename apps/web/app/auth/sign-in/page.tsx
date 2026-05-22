@@ -9,7 +9,7 @@ export default async function SignInPage() {
 
   return (
     <Suspense fallback={<SetupLoading label="Loading sign in" />}>
-      <SignInContent churchName={churchName} />
+      <SignInContent churchName={churchName} setupIncomplete={!status.configured} />
     </Suspense>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { SetupLoading } from "@/components/SetupLoading";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
@@ -91,6 +92,10 @@ export default function SetupPage() {
 
   useEffect(() => {
     async function load() {
+      const params = new URLSearchParams(window.location.search);
+      const forceCredentials =
+        params.get("step") === "credentials" || params.get("edit") === "1";
+
       try {
         const [statusRes, draftResRaw, redirectUris] = await Promise.all([
           fetch("/api/v1/setup/status").then((r) => r.json() as Promise<{
@@ -126,10 +131,10 @@ export default function SetupPage() {
           }
           setWebhookSecretCount(draftRes.draft.webhookSecretCount ?? 0);
           setWebhooksEnabled(draftRes.draft.webhooksEnabled ?? draftRes.draft.webhookSecretCount > 0);
-          if (draftRes.draft.credentialsSaved) {
+          if (!forceCredentials && draftRes.draft.credentialsSaved) {
             setPhase("sign-in");
           }
-        } else if (statusRes.signInAvailable) {
+        } else if (!forceCredentials && statusRes.signInAvailable) {
           setPhase("sign-in");
         }
 
@@ -347,6 +352,9 @@ export default function SetupPage() {
               <PcoSignInButton href="/auth/sign-in/start?next=/setup" className="setup-btn-primary">
                 Sign in with Planning Center
               </PcoSignInButton>
+              <Link href="/setup?step=credentials" className="setup-btn-secondary">
+                Edit credentials
+              </Link>
             </div>
           </>
         )}

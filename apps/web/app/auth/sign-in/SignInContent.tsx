@@ -1,14 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
 
 type Props = {
   churchName: string | null;
+  setupIncomplete?: boolean;
 };
 
-export function SignInContent({ churchName }: Props) {
+export function SignInContent({ churchName, setupIncomplete = false }: Props) {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/groups";
   const startHref = `/auth/sign-in/start?next=${encodeURIComponent(next)}`;
@@ -38,7 +40,18 @@ export function SignInContent({ churchName }: Props) {
           </p>
         )}
         <div className="setup-form-actions setup-form-actions-center">
-          <PcoSignInButton href={startHref} className="setup-btn-primary">
+          {setupIncomplete ? (
+            <>
+              <Link href="/setup?step=credentials" className="setup-btn-primary">
+                Continue setup
+              </Link>
+              <p className="help-text">
+                OAuth credentials are saved but setup is not finished. Edit credentials or sign in
+                below after fixing your Planning Center redirect URI.
+              </p>
+            </>
+          ) : null}
+          <PcoSignInButton href={startHref} className={setupIncomplete ? "setup-btn-secondary" : "setup-btn-primary"}>
             Sign in with Planning Center
           </PcoSignInButton>
         </div>
