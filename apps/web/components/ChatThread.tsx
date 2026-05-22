@@ -313,12 +313,13 @@ export function ChatThread({
         setMessages((prev) => prev.filter((m) => m.id !== event.messageId));
       }
       if (event.type === "reaction.changed" && event.messageId && event.reaction) {
+        const { messageId, reaction, action } = event;
         setMessages((prev) =>
           applyReactionChange(
             prev,
-            event.messageId,
-            event.reaction!,
-            event.action === "removed" ? "removed" : "added",
+            messageId,
+            reaction,
+            action === "removed" ? "removed" : "added",
           ),
         );
       }
