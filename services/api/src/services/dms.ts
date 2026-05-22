@@ -156,8 +156,8 @@ async function listSignedUpRecordsForSharedContext(
   return mergeSignedUpMemberRecords(
     orgRecords,
     allRecords,
-    ...groupRecords.flat(),
-    ...teamRecords.flat(),
+    ...groupRecords,
+    ...teamRecords,
   );
 }
 

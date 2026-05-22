@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildDmPairKey, resolveDmEligibleUserIds } from "./dms";
-import type { SignedUpMemberRecord } from "./cco-member-status";
+import { mergeSignedUpMemberRecords, type SignedUpMemberRecord } from "./cco-member-status";
 
 describe("buildDmPairKey", () => {
   test("is order-independent", () => {
@@ -87,5 +87,15 @@ describe("resolveDmEligibleUserIds", () => {
     );
 
     expect([...eligible]).toEqual(["user-brian"]);
+  });
+});
+
+describe("mergeSignedUpMemberRecords usage", () => {
+  test("merges record lists passed as arrays, not spread records", () => {
+    const merged = mergeSignedUpMemberRecords(
+      [{ userId: "a", pcoPersonId: "1", email: "a@x.com", displayName: "a" }],
+      [{ userId: "b", pcoPersonId: "2", email: "b@x.com", displayName: "b" }],
+    );
+    expect(merged.map((r) => r.userId).sort()).toEqual(["a", "b"]);
   });
 });

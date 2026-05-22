@@ -7,6 +7,7 @@ import {
   MessageEmojiActions,
 } from "@/components/MessageReactionToolbar";
 import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
+import { ComposerPendingMedia } from "@/components/ComposerPendingMedia";
 import { MessageBody } from "@/components/MessageBody";
 import { UserAvatar } from "@/components/UserAvatar";
 import {
@@ -44,6 +45,14 @@ import {
   setSendInFlight,
 } from "@/lib/app-update-composer";
 import { isAppUpdateInProgress } from "@/lib/app-update";
+import {
+  createPendingComposerMedia,
+  dragEventHasMediaFiles,
+  firstMediaFileFromDataTransfer,
+  revokePendingComposerMedia,
+  validateComposerMediaFile,
+  type PendingComposerMedia,
+} from "@/lib/composer-media";
 
 function formatMessageTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
@@ -175,6 +184,9 @@ export function ChatThread({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
+  const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
+  const [composerDragOver, setComposerDragOver] = useState(false);
+  const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLLIElement>(null);
@@ -210,6 +222,19 @@ export function ChatThread({
     if (!appUpdateBlocked || !conversationId) return;
     saveComposerDraft(conversationId, body);
   }, [appUpdateBlocked, body, conversationId]);
+
+  useEffect(() => {
+    return () => revokePendingComposerMedia(pendingMedia);
+  }, [pendingMedia]);
+
+  useEffect(() => {
+    setPendingMedia((current) => {
+      revokePendingComposerMedia(current);
+      return null;
+    });
+    setComposerDragOver(false);
+    composerDragDepthRef.current = 0;
+  }, [conversationId]);
 
   const scrollBottomThresholdPx = 72;
 
@@ -686,9 +711,11 @@ export function ChatThread({
 
   async function handleSend(e?: React.FormEvent) {
     e?.preventDefault();
+    const text = body.trim();
+    const media = pendingMedia;
     if (
       !conversationId ||
-      !body.trim() ||
+      (!text && !media) ||
       sendInFlightRef.current ||
       !canPost ||
       composerLocked ||
@@ -697,19 +724,38 @@ export function ChatThread({
       return;
     }
 
-    const text = body.trim();
-    setBody("");
     setMentionQuery(null);
     setSendError(null);
     sendInFlightRef.current = true;
     setSendInFlight(true);
 
     try {
-      await postMessage({ body: text, clientMessageId: crypto.randomUUID() });
+      let attachmentUrl: string | undefined;
+      let messageType: "image" | "video" | undefined;
+
+      if (media) {
+        attachmentUrl =
+          media.kind === "video" ? await uploadVideo(media.file) : await uploadImage(media.file);
+        messageType = media.kind;
+        revokePendingComposerMedia(media);
+        setPendingMedia(null);
+      }
+
+      await postMessage({
+        body: text,
+        clientMessageId: crypto.randomUUID(),
+        ...(attachmentUrl ? { attachmentUrl, messageType } : {}),
+      });
+      setBody("");
       clearComposerDraft(conversationId);
     } catch (err) {
-      setBody(text);
-      saveComposerDraft(conversationId, text);
+      if (media) {
+        setPendingMedia(media);
+      }
+      if (text) {
+        setBody(text);
+        saveComposerDraft(conversationId, text);
+      }
       setSendError(err instanceof Error ? err.message : "Failed to send message");
     } finally {
       sendInFlightRef.current = false;
@@ -718,29 +764,73 @@ export function ChatThread({
     }
   }
 
-  async function handleMedia(file: File) {
+  function clearPendingMedia() {
+    setPendingMedia((current) => {
+      revokePendingComposerMedia(current);
+      return null;
+    });
+  }
+
+  function stageComposerMedia(file: File) {
     if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
-    sendInFlightRef.current = true;
-    setSendInFlight(true);
-    setSendError(null);
-    try {
-      const isVideo =
-        file.type.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(file.name);
-      const url = isVideo ? await uploadVideo(file) : await uploadImage(file);
-      await postMessage({
-        body: body.trim(),
-        clientMessageId: crypto.randomUUID(),
-        attachmentUrl: url,
-        messageType: isVideo ? "video" : "image",
-      });
-      setBody("");
-    } catch (err) {
-      setSendError(err instanceof Error ? err.message : "Failed to upload media");
-    } finally {
-      sendInFlightRef.current = false;
-      setSendInFlight(false);
-      focusComposer();
+
+    const validationError = validateComposerMediaFile(file);
+    if (validationError) {
+      setSendError(validationError);
+      return;
     }
+
+    const next = createPendingComposerMedia(file);
+    if (!next) {
+      setSendError("Unsupported file type. Use an image or video.");
+      return;
+    }
+
+    setSendError(null);
+    setPendingMedia((current) => {
+      revokePendingComposerMedia(current);
+      return next;
+    });
+    focusComposer();
+  }
+
+  function handleComposerDragEnter(e: React.DragEvent<HTMLDivElement>) {
+    if (!canPost || composerLocked) return;
+    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
+
+    e.preventDefault();
+    composerDragDepthRef.current += 1;
+    setComposerDragOver(true);
+  }
+
+  function handleComposerDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!canPost || composerLocked) return;
+    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setComposerDragOver(true);
+  }
+
+  function handleComposerDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (!dragEventHasMediaFiles(e.dataTransfer)) return;
+
+    e.preventDefault();
+    composerDragDepthRef.current = Math.max(0, composerDragDepthRef.current - 1);
+    if (composerDragDepthRef.current === 0) {
+      setComposerDragOver(false);
+    }
+  }
+
+  function handleComposerDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    composerDragDepthRef.current = 0;
+    setComposerDragOver(false);
+
+    if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
+
+    const file = firstMediaFileFromDataTransfer(e.dataTransfer);
+    if (file) stageComposerMedia(file);
   }
 
   async function toggleReaction(messageId: string, emoji: string) {
@@ -837,9 +927,16 @@ export function ChatThread({
   }
 
   function handleComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Escape" && mentionQuery !== null) {
-      e.preventDefault();
-      setMentionQuery(null);
+    if (e.key === "Escape") {
+      if (mentionQuery !== null) {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+      if (pendingMedia) {
+        e.preventDefault();
+        clearPendingMedia();
+      }
       return;
     }
 
@@ -1143,7 +1240,23 @@ export function ChatThread({
         <div>{messageScrollContent}</div>
       )}
 
-      <div className="chat-composer-stack">
+      <div
+        className={[
+          "chat-composer-stack",
+          composerDragOver ? "chat-composer-stack--drag-over" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        onDragEnter={handleComposerDragEnter}
+        onDragOver={handleComposerDragOver}
+        onDragLeave={handleComposerDragLeave}
+        onDrop={handleComposerDrop}
+      >
+        {composerDragOver && canPost && !composerLocked ? (
+          <div className="composer-drop-overlay" aria-hidden="true">
+            <span className="composer-drop-overlay-label">Drop media to attach</span>
+          </div>
+        ) : null}
         {showScrollToBottom && (
           <button
             type="button"
@@ -1201,10 +1314,25 @@ export function ChatThread({
         </ul>
       )}
 
+      {pendingMedia ? (
+        <ComposerPendingMedia
+          previewUrl={pendingMedia.previewUrl}
+          kind={pendingMedia.kind}
+          fileName={pendingMedia.file.name}
+          onRemove={clearPendingMedia}
+        />
+      ) : null}
+
       {canPost ? (
         <form
           onSubmit={handleSend}
-          className={`composer${composerLocked ? " composer--locked" : ""}`}
+          className={[
+            "composer",
+            composerLocked ? "composer--locked" : "",
+            pendingMedia ? "composer--has-pending-media" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <input
             ref={fileRef}
@@ -1213,7 +1341,7 @@ export function ChatThread({
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void handleMedia(file);
+              if (file) stageComposerMedia(file);
               e.target.value = "";
             }}
           />
@@ -1235,7 +1363,7 @@ export function ChatThread({
           <button
             type="submit"
             className="composer-send"
-            disabled={composerLocked || !body.trim()}
+            disabled={composerLocked || (!body.trim() && !pendingMedia)}
             aria-label="Send message"
             onMouseDown={(e) => e.preventDefault()}
           >
