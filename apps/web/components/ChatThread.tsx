@@ -599,7 +599,11 @@ export function ChatThread({
             const isEditing = editingId === m.id;
             const layoutInfo = getMessageLayoutInfo(messages, index, resolvedUserId);
             const showOwnMessageHeader =
-              isOwn && (layoutInfo.clusterTimestamp || Boolean(m.editedAt));
+              isOwn &&
+              (layoutInfo.groupPosition === "first" ||
+                layoutInfo.groupPosition === "single" ||
+                layoutInfo.clusterTimestamp ||
+                Boolean(m.editedAt));
             const hasVisibleTimestamp =
               showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
 
@@ -612,9 +616,7 @@ export function ChatThread({
                 `message-item--spacing-${layoutInfo.spacing}`,
                 `message-item--group-${layoutInfo.groupPosition}`,
                 hasVisibleTimestamp ? "message-item--has-timestamp" : "",
-                showOwnMessageHeader && layoutInfo.clusterTimestamp
-                  ? "message-item--show-time"
-                  : "",
+                showOwnMessageHeader ? "message-item--show-time" : "",
                 layoutInfo.showTimestamp ? "message-item--timestamp-start" : "",
                 layoutInfo.nextHasGapBreak ? "message-item--timestamp-gap" : "",
               ]

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Message, Reaction } from "@/lib/api";
+import { resolveWebSocketBase } from "@/lib/websocket-url";
 
 type RealtimeEvent =
   | { type: "message.created"; message: Message }
@@ -24,7 +25,10 @@ export function useConversationSocket(
   useEffect(() => {
     if (!conversationId || !token) return;
 
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001";
+    const wsBase = resolveWebSocketBase({
+      windowProtocol: window.location.protocol,
+      windowHost: window.location.host,
+    });
     const url = `${wsBase}/v1/ws?conversationId=${conversationId}&token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
 
