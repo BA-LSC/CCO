@@ -4489,14 +4489,24 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-primary-soft);
 }
 
+.chat-thread .message-bubble-stack--has-reactions {
+  width: 100%;
+}
+
+.chat-thread .message-content:has(.message-bubble-stack--has-reactions) {
+  width: 100%;
+}
+
 .chat-thread .message-reaction-row {
   --message-reaction-control-height: 26px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  width: 100%;
   padding: 0 4px;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Extra room before the next bubble when reactions sit between grouped messages */
@@ -4511,6 +4521,11 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  width: 100%;
+}
+
+.chat-thread .message-item--own .message-reaction-pills {
+  justify-content: flex-end;
 }
 
 .chat-thread .message-reaction-add-picker {
