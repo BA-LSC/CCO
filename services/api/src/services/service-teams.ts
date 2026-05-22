@@ -13,10 +13,10 @@ import {
   conversations,
   serviceTeamMemberships,
   serviceTeams,
-  userPcoCredentials,
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
+import { buildSignedUpMemberIndex, memberIsOnCco } from "./cco-member-status";
 
 async function upsertServiceTeamMembership(params: {
   teamId: string;
@@ -168,16 +168,6 @@ export type TeamMemberView = {
   email?: string | null;
 };
 
-async function listSignedUpPcoPersonIds(organizationId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ pcoPersonId: users.pcoPersonId })
-    .from(users)
-    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
-    .where(eq(users.organizationId, organizationId));
-
-  return new Set(rows.map((row) => row.pcoPersonId));
-}
-
 function sortTeamMembersByName(members: TeamMemberView[]): TeamMemberView[] {
   return [...members].sort((a, b) =>
     a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }),
@@ -197,13 +187,14 @@ async function listTeamMembersForDetail(params: {
       pcoPersonId: users.pcoPersonId,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
+      email: users.email,
       role: serviceTeamMemberships.role,
     })
     .from(serviceTeamMemberships)
     .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
     .where(eq(serviceTeamMemberships.teamId, params.teamId));
 
-  const signedUpPcoIds = await listSignedUpPcoPersonIds(params.organizationId);
+  const signedUp = await buildSignedUpMemberIndex(params.organizationId);
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {
@@ -228,7 +219,7 @@ async function listTeamMembersForDetail(params: {
     return sortTeamMembersByName(
       roster.map((person) => {
         const local = memberByPcoId.get(person.pcoPersonId);
-        const onCco = signedUpPcoIds.has(person.pcoPersonId);
+        const onCco = memberIsOnCco(person, local?.id, signedUp);
         return {
           id: local?.id,
           pcoPersonId: person.pcoPersonId,
@@ -252,7 +243,11 @@ async function listTeamMembersForDetail(params: {
         displayName: member.displayName,
         avatarUrl: member.avatarUrl,
         role: member.role,
-        onCco: signedUpPcoIds.has(member.pcoPersonId),
+        onCco: memberIsOnCco(
+          { pcoPersonId: member.pcoPersonId, email: member.email },
+          member.id,
+          signedUp,
+        ),
         email: null,
       })),
     );

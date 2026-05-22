@@ -16,7 +16,7 @@ import { conversationMessagesPath } from "@/lib/messages";
 export default function DmChatPage() {
   const params = useParams();
   const conversationId = params.id as string;
-  const { wsToken, session } = useChatLayout();
+  const { session } = useChatLayout();
   useMarkConversationRead(conversationId);
 
   const [detail, setDetail] = useState<DmDetail | null>(null);
@@ -149,7 +149,6 @@ export default function DmChatPage() {
       <div className="chat-panel-content">
         <ChatThread
           conversationId={conversationId}
-          wsToken={wsToken}
           initialMessages={messages}
           hasMore={hasMore}
           members={members}

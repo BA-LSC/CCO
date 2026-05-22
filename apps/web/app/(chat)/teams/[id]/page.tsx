@@ -30,7 +30,7 @@ function formatServiceTypeSubtitle(serviceTypeNames?: string[]): string | undefi
 export default function TeamChatPage() {
   const params = useParams();
   const teamId = params.id as string;
-  const { wsToken, session } = useChatLayout();
+  const { session } = useChatLayout();
 
   const [detail, setDetail] = useState<TeamDetail | null>(null);
   const conversationId = detail?.conversation?.id ?? null;
@@ -238,7 +238,6 @@ export default function TeamChatPage() {
       <div className="chat-panel-content">
         <ChatThread
           conversationId={detail?.conversation?.id ?? null}
-          wsToken={wsToken}
           initialMessages={messages}
           hasMore={hasMore}
           members={activeTeamMembers}

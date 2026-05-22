@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { deriveApiHostname, resolveWebSocketBase } from "./websocket-url";
+import {
+  deriveApiHostname,
+  resolveRuntimeWebSocketUrl,
+  resolveWebSocketBase,
+} from "./websocket-url";
 
 describe("deriveApiHostname", () => {
   test("maps chat subdomain to api.chat", () => {
@@ -42,5 +46,26 @@ describe("resolveWebSocketBase", () => {
 
   test("falls back to localhost for dev", () => {
     expect(resolveWebSocketBase({})).toBe("ws://localhost:3001");
+  });
+});
+
+describe("resolveRuntimeWebSocketUrl", () => {
+  test("prefers API_DOMAIN over hostname guessing", () => {
+    expect(
+      resolveRuntimeWebSocketUrl({
+        nextPublicWsUrl: "",
+        apiDomain: "api.mychurch.org",
+        webUrl: "https://chat.mychurch.org",
+      }),
+    ).toBe("wss://api.mychurch.org");
+  });
+
+  test("uses NEXT_PUBLIC_WS_URL when set for production", () => {
+    expect(
+      resolveRuntimeWebSocketUrl({
+        nextPublicWsUrl: "wss://api.example.com",
+        apiDomain: "api.other.com",
+      }),
+    ).toBe("wss://api.example.com");
   });
 });

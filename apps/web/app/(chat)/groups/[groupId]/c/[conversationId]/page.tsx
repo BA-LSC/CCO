@@ -21,7 +21,7 @@ export default function GroupConversationPage() {
   const router = useRouter();
   const groupId = params.groupId as string;
   const conversationId = params.conversationId as string;
-  const { wsToken, session } = useChatLayout();
+  const { session } = useChatLayout();
   useMarkConversationRead(conversationId);
 
   const [detail, setDetail] = useState<GroupDetail | null>(null);
@@ -421,7 +421,6 @@ export default function GroupConversationPage() {
       <div className="chat-panel-content">
         <ChatThread
           conversationId={conversationId}
-          wsToken={wsToken}
           initialMessages={messages}
           hasMore={hasMore}
           members={activeGroupMembers}

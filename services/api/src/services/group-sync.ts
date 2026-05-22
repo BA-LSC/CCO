@@ -7,12 +7,12 @@ import {
   conversations,
   groupMemberships,
   groups,
-  userPcoCredentials,
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
 import { mergeGroups } from "../sync/groups";
 import { upsertUserFromPco } from "./bootstrap";
+import { buildSignedUpMemberIndex, memberIsOnCco } from "./cco-member-status";
 import { ensureConversationMembers, ensureGeneralConversation, ensureGeneralConversationMembers } from "./conversations";
 
 export async function persistGroupSync(params: {
@@ -314,16 +314,6 @@ export type GroupMemberView = {
   email?: string | null;
 };
 
-async function listSignedUpPcoPersonIds(organizationId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ pcoPersonId: users.pcoPersonId })
-    .from(users)
-    .innerJoin(userPcoCredentials, eq(userPcoCredentials.userId, users.id))
-    .where(eq(users.organizationId, organizationId));
-
-  return new Set(rows.map((row) => row.pcoPersonId));
-}
-
 function sortGroupMembersByName(members: GroupMemberView[]): GroupMemberView[] {
   return [...members].sort((a, b) =>
     a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" }),
@@ -347,13 +337,14 @@ export async function listGroupMembersForDetail(params: {
       pcoPersonId: users.pcoPersonId,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
+      email: users.email,
       role: groupMemberships.role,
     })
     .from(groupMemberships)
     .innerJoin(users, eq(users.id, groupMemberships.userId))
     .where(eq(groupMemberships.groupId, params.groupId));
 
-  const signedUpPcoIds = await listSignedUpPcoPersonIds(params.organizationId);
+  const signedUp = await buildSignedUpMemberIndex(params.organizationId);
   const isLeader = isLeaderRole(params.membershipRole);
 
   if (!isLeader || !params.accessToken) {
@@ -378,7 +369,7 @@ export async function listGroupMembersForDetail(params: {
     return sortGroupMembersByName(
       roster.map((person) => {
         const local = memberByPcoId.get(person.pcoPersonId);
-        const onCco = signedUpPcoIds.has(person.pcoPersonId);
+        const onCco = memberIsOnCco(person, local?.id, signedUp);
         return {
           id: local?.id,
           pcoPersonId: person.pcoPersonId,
@@ -402,7 +393,11 @@ export async function listGroupMembersForDetail(params: {
         displayName: member.displayName,
         avatarUrl: member.avatarUrl,
         role: member.role,
-        onCco: signedUpPcoIds.has(member.pcoPersonId),
+        onCco: memberIsOnCco(
+          { pcoPersonId: member.pcoPersonId, email: member.email },
+          member.id,
+          signedUp,
+        ),
         email: null,
       })),
     );

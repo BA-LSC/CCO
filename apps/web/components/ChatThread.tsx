@@ -16,11 +16,13 @@ import {
   type Message,
   type Reaction,
 } from "@/lib/api";
+import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
 import { useConversationSocket } from "@/hooks/useConversationSocket";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
+import { applyReactionChange } from "@/lib/message-reactions";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
 
 function formatMessageTime(iso: string): string {
@@ -82,7 +84,6 @@ type Member = { id: string; displayName: string };
 
 type Props = {
   conversationId: string | null;
-  wsToken: string | null;
   initialMessages: Message[];
   hasMore?: boolean;
   members?: Member[];
@@ -98,7 +99,6 @@ type Props = {
 
 export function ChatThread({
   conversationId,
-  wsToken,
   initialMessages,
   hasMore: initialHasMore = false,
   members = [],
@@ -314,30 +314,20 @@ export function ChatThread({
       }
       if (event.type === "reaction.changed" && event.messageId && event.reaction) {
         setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== event.messageId) return m;
-            const reactions = [...(m.reactions ?? [])];
-            if (event.action === "removed") {
-              return {
-                ...m,
-                reactions: reactions.filter(
-                  (r) => !(r.userId === event.reaction!.userId && r.emoji === event.reaction!.emoji),
-                ),
-              };
-            }
-            const exists = reactions.some(
-              (r) => r.userId === event.reaction!.userId && r.emoji === event.reaction!.emoji,
-            );
-            if (!exists && event.reaction) reactions.push(event.reaction);
-            return { ...m, reactions };
-          }),
+          applyReactionChange(
+            prev,
+            event.messageId,
+            event.reaction!,
+            event.action === "removed" ? "removed" : "added",
+          ),
         );
       }
     },
     [conversationId, resolvedUserId],
   );
 
-  const { connected } = useConversationSocket(conversationId, wsToken, onEvent);
+  const { connected } = useConversationSocket(conversationId, onEvent);
+  useConversationPollFallback(conversationId, connected, setMessages);
   const messageActions = useMessageActionsReveal();
 
   useEffect(() => {
@@ -469,19 +459,50 @@ export function ChatThread({
   }
 
   async function toggleReaction(messageId: string, emoji: string) {
+    if (!resolvedUserId) return;
+
     const message = messages.find((m) => m.id === messageId);
     const existing = message?.reactions?.find(
       (r) => r.userId === resolvedUserId && r.emoji === emoji,
     );
-    if (existing) {
-      await apiFetch(`/api/v1/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`, {
-        method: "DELETE",
-      });
-    } else {
-      await apiFetch(`/api/v1/messages/${messageId}/reactions`, {
-        method: "POST",
-        body: JSON.stringify({ emoji }),
-      });
+    const optimisticReaction: Reaction = {
+      messageId,
+      userId: resolvedUserId,
+      userName: session?.displayName ?? "You",
+      emoji,
+    };
+
+    setMessages((prev) =>
+      applyReactionChange(
+        prev,
+        messageId,
+        optimisticReaction,
+        existing ? "removed" : "added",
+      ),
+    );
+
+    try {
+      if (existing) {
+        await apiFetch(
+          `/api/v1/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`,
+          { method: "DELETE" },
+        );
+      } else {
+        const { reaction } = await apiFetch<{ reaction: Reaction }>(
+          `/api/v1/messages/${messageId}/reactions`,
+          { method: "POST", body: JSON.stringify({ emoji }) },
+        );
+        setMessages((prev) => applyReactionChange(prev, messageId, reaction, "added"));
+      }
+    } catch {
+      setMessages((prev) =>
+        applyReactionChange(
+          prev,
+          messageId,
+          optimisticReaction,
+          existing ? "added" : "removed",
+        ),
+      );
     }
   }
 
