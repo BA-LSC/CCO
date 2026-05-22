@@ -61,6 +61,19 @@ describe("GET /uploads/:filename", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("png-bytes");
   });
+
+  test("supports byte range requests for media playback", async () => {
+    const url = buildSignedUploadUrl("valid.png", 3600, publicBase);
+    const { pathname, search } = new URL(url);
+    const filename = path.basename(pathname);
+    const res = await app.request(`/uploads/${filename}${search}`, {
+      headers: { Range: "bytes=0-2" },
+    });
+    expect(res.status).toBe(206);
+    expect(res.headers.get("Accept-Ranges")).toBe("bytes");
+    expect(res.headers.get("Content-Range")).toBe("bytes 0-2/9");
+    expect(await res.text()).toBe("png");
+  });
 });
 
 describe("safeUploadPath", () => {

@@ -107,6 +107,7 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
           controls
           playsInline
           preload="auto"
+          crossOrigin="anonymous"
           className="attachment-lightbox-video"
           aria-label={alt}
         />

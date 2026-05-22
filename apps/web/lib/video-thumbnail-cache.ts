@@ -1,8 +1,9 @@
 import { extractUploadFilename } from "@/lib/attachment-url";
 
-const CACHE_NAME = "cco-video-thumbnails-v1";
+const CACHE_NAME = "cco-video-thumbnails-v2";
 const THUMB_JPEG_QUALITY = 0.82;
-const SEEK_SECONDS = 0.001;
+const SEEK_SECONDS = 0.1;
+const CAPTURE_TIMEOUT_MS = 20_000;
 
 const memoryUrls = new Map<string, string>();
 const inFlight = new Map<string, Promise<string | null>>();
@@ -13,7 +14,8 @@ export function videoThumbnailCacheKey(src: string): string {
 }
 
 function cacheRequestUrl(key: string): string {
-  return `video-thumb://${key}`;
+  if (typeof location === "undefined") return `https://cco.local/__cco/video-thumb/${encodeURIComponent(key)}`;
+  return new URL(`/__cco/video-thumb/${encodeURIComponent(key)}`, location.origin).toString();
 }
 
 function rememberBlobUrl(key: string, blob: Blob): string {
@@ -52,29 +54,56 @@ async function writePersistentCache(key: string, blob: Blob): Promise<void> {
   }
 }
 
+async function resolveVideoSource(src: string): Promise<{ url: string; revoke?: () => void }> {
+  const sameOrigin =
+    src.startsWith("/") ||
+    (typeof location !== "undefined" && src.startsWith(location.origin));
+
+  try {
+    const response = await fetch(src, {
+      credentials: sameOrigin ? "include" : "omit",
+    });
+    if (!response.ok) throw new Error(`Video fetch failed (${response.status})`);
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    return { url, revoke: () => URL.revokeObjectURL(url) };
+  } catch {
+    return { url: src };
+  }
+}
+
 function captureVideoFrame(src: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let revokeSource: (() => void) | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (blob: Blob | null, error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      cleanup();
+      revokeSource?.();
+      if (blob) resolve(blob);
+      else reject(error ?? new Error("Failed to capture video frame"));
+    };
+
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
-
-    let settled = false;
+    video.crossOrigin = "anonymous";
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
 
     const cleanup = () => {
+      video.onloadedmetadata = null;
       video.onloadeddata = null;
       video.onseeked = null;
       video.onerror = null;
       video.removeAttribute("src");
       video.load();
-    };
-
-    const finish = (blob: Blob | null, error?: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (blob) resolve(blob);
-      else reject(error ?? new Error("Failed to capture video frame"));
     };
 
     const drawFrame = () => {
@@ -103,7 +132,7 @@ function captureVideoFrame(src: string): Promise<Blob> {
       );
     };
 
-    video.onloadeddata = () => {
+    const seekToPreviewFrame = () => {
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         drawFrame();
         return;
@@ -111,15 +140,32 @@ function captureVideoFrame(src: string): Promise<Blob> {
 
       video.onseeked = drawFrame;
       try {
-        video.currentTime = SEEK_SECONDS;
+        const target =
+          Number.isFinite(video.duration) && video.duration > 0
+            ? Math.min(SEEK_SECONDS, Math.max(video.duration - 0.001, 0))
+            : SEEK_SECONDS;
+        video.currentTime = target;
       } catch {
         drawFrame();
       }
     };
 
+    timeoutId = setTimeout(() => {
+      finish(null, new Error("Video thumbnail capture timed out"));
+    }, CAPTURE_TIMEOUT_MS);
+
+    video.onloadedmetadata = seekToPreviewFrame;
+    video.onloadeddata = seekToPreviewFrame;
     video.onerror = () => finish(null, new Error("Video failed to load"));
 
-    video.src = src;
+    void resolveVideoSource(src)
+      .then(({ url, revoke }) => {
+        revokeSource = revoke;
+        video.src = url;
+      })
+      .catch((error: unknown) => {
+        finish(null, error instanceof Error ? error : new Error("Video failed to load"));
+      });
   });
 }
 

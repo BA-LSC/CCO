@@ -2,10 +2,24 @@ const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 const UPLOAD_PROXY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_PROXY_TIMEOUT_MS = 30_000;
 
+const UPSTREAM_MEDIA_HEADERS = [
+  "accept-ranges",
+  "cache-control",
+  "content-length",
+  "content-range",
+  "content-type",
+  "etag",
+  "last-modified",
+] as const;
+
 type FetchInitWithDuplex = RequestInit & { duplex?: "half" };
 
-function isUploadRequest(method: string, path: string): boolean {
+function isUploadPost(method: string, path: string): boolean {
   return method === "POST" && path === "uploads";
+}
+
+function isUploadMediaRequest(method: string, path: string): boolean {
+  return (method === "GET" || method === "HEAD") && path.startsWith("uploads/");
 }
 
 function readSetupToken(request: Request): string | undefined {
@@ -32,6 +46,15 @@ function readSetupToken(request: Request): string | undefined {
   return undefined;
 }
 
+function copyUpstreamMediaHeaders(upstream: Response): Headers {
+  const responseHeaders = new Headers();
+  for (const name of UPSTREAM_MEDIA_HEADERS) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
+  return responseHeaders;
+}
+
 export async function proxyToApi(request: Request, pathSegments: string[]): Promise<Response> {
   const incoming = new URL(request.url);
   const path = pathSegments.join("/");
@@ -51,11 +74,14 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
-  const uploadRequest = isUploadRequest(request.method, path);
+  const uploadPost = isUploadPost(request.method, path);
+  const uploadMedia = isUploadMediaRequest(request.method, path);
+  const range = request.headers.get("range");
+  if (range && uploadMedia) headers.set("range", range);
 
   let requestBody: BodyInit | undefined;
   if (request.method !== "GET" && request.method !== "HEAD") {
-    if (uploadRequest && request.body) {
+    if (uploadPost && request.body) {
       requestBody = request.body;
     } else {
       requestBody = await request.arrayBuffer();
@@ -68,14 +94,21 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
       headers,
       body: requestBody,
       signal: AbortSignal.timeout(
-        uploadRequest ? UPLOAD_PROXY_TIMEOUT_MS : DEFAULT_PROXY_TIMEOUT_MS,
+        uploadPost ? UPLOAD_PROXY_TIMEOUT_MS : DEFAULT_PROXY_TIMEOUT_MS,
       ),
     };
-    if (uploadRequest && requestBody) {
+    if (uploadPost && requestBody) {
       fetchInit.duplex = "half";
     }
 
     const upstream = await fetch(target, fetchInit);
+
+    if (uploadMedia) {
+      return new Response(request.method === "HEAD" ? null : upstream.body, {
+        status: upstream.status,
+        headers: copyUpstreamMediaHeaders(upstream),
+      });
+    }
 
     const responseHeaders = new Headers();
     const upstreamType = upstream.headers.get("content-type") ?? "";
