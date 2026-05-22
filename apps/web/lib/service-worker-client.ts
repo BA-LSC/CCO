@@ -1,8 +1,13 @@
-import { APP_BUILD_VERSION } from "@/lib/build-version";
-import { showAppUpdateOverlay } from "@/lib/app-update-overlay";
+import {
+  applyAppUpdate,
+  checkAppVersion,
+  completeAppUpdateReload,
+  getUpdateCheckIntervalMs,
+  isAppUpdateInProgress,
+  prepareAppUpdate,
+} from "@/lib/app-update";
 
 const SW_URL = "/sw.js";
-const UPDATE_CHECK_MS = 60 * 1000;
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -17,38 +22,9 @@ export async function registerAppServiceWorker(): Promise<ServiceWorkerRegistrat
   }
 }
 
-/** Give React time to paint the update overlay before reloading. */
+/** @deprecated Import from @/lib/app-update */
 export function waitForOverlayPaint(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setTimeout(resolve, 400);
-      });
-    });
-  });
-}
-
-async function notifyUpdating(onUpdating: () => Promise<void>): Promise<void> {
-  showAppUpdateOverlay();
-  await onUpdating();
-}
-
-export async function checkAppVersion(onUpdating: () => Promise<void>): Promise<boolean> {
-  if (APP_BUILD_VERSION === "dev") return false;
-
-  try {
-    const res = await fetch("/api/app-version", { cache: "no-store" });
-    if (!res.ok) return false;
-
-    const { version } = (await res.json()) as { version?: string };
-    if (!version || version === APP_BUILD_VERSION) return false;
-
-    await notifyUpdating(onUpdating);
-    window.location.reload();
-    return true;
-  } catch {
-    return false;
-  }
+  return import("@/lib/app-update").then((mod) => mod.waitForOverlayPaint());
 }
 
 /** Register the app service worker and auto-apply updates with a reload. */
@@ -62,22 +38,29 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   let reloaded = false;
 
   const applyServiceWorkerUpdate = async (reg: ServiceWorkerRegistration) => {
-    if (applying || !reg.waiting) return;
+    if (applying || !reg.waiting || isAppUpdateInProgress()) return;
     applying = true;
 
-    await notifyUpdating(onUpdating);
+    await prepareAppUpdate(onUpdating);
     reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
   };
 
   const onControllerChange = () => {
     if (reloaded) return;
     reloaded = true;
-    window.location.reload();
+
+    if (isAppUpdateInProgress()) {
+      completeAppUpdateReload();
+      return;
+    }
+
+    void applyAppUpdate(onUpdating);
   };
 
   navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
 
   const runUpdateChecks = async () => {
+    if (isAppUpdateInProgress()) return;
     if (await checkAppVersion(onUpdating)) return;
     void registration?.update();
   };
@@ -86,13 +69,14 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     if (document.visibilityState === "visible") void runUpdateChecks();
   };
 
-  const onPageShow = (event: PageTransitionEvent) => {
-    if (event.persisted) void runUpdateChecks();
+  const onPageShow = () => {
+    void runUpdateChecks();
   };
 
   document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("pageshow", onPageShow);
-  const intervalId = window.setInterval(() => void runUpdateChecks(), UPDATE_CHECK_MS);
+  window.addEventListener("focus", onPageShow);
+  const intervalId = window.setInterval(() => void runUpdateChecks(), getUpdateCheckIntervalMs());
 
   void runUpdateChecks();
 
@@ -123,6 +107,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   return () => {
     document.removeEventListener("visibilitychange", onVisibilityChange);
     window.removeEventListener("pageshow", onPageShow);
+    window.removeEventListener("focus", onPageShow);
     window.clearInterval(intervalId);
     navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
   };
@@ -132,6 +117,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
 export function listenForServiceWorkerUpdates(onUpdating: () => void): () => void {
   return listenForAppUpdates(async () => {
     onUpdating();
+    const { waitForOverlayPaint } = await import("@/lib/app-update");
     await waitForOverlayPaint();
   });
 }

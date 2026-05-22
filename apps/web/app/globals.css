@@ -2563,7 +2563,7 @@ html[data-theme="6"] .user-menu-dropdown {
 .app-update-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   background: var(--color-bg);
 }

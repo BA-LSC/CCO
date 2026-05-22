@@ -37,8 +37,10 @@ RUN node node_modules/next/dist/bin/next build \
  && node scripts/prepare-standalone.mjs
 
 FROM base AS runner
+ARG CCO_BUILD_ID=dev
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CCO_BUILD_ID=${CCO_BUILD_ID}
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
