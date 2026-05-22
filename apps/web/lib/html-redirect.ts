@@ -9,6 +9,26 @@ type CookieOpts = {
   secure?: boolean;
 };
 
+const SESSION_COOKIE_NAMES = ["connect_session", "pco_access_token", "pco_oauth_state", "pco_oauth_next"] as const;
+
+function clearCookie(response: NextResponse, name: string, options?: CookieOpts) {
+  response.cookies.set(name, "", {
+    path: "/",
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProduction(),
+    ...options,
+  });
+}
+
+/** Clear auth cookies set during OAuth sign-in. */
+export function clearAuthCookies(response: NextResponse) {
+  for (const name of SESSION_COOKIE_NAMES) {
+    clearCookie(response, name);
+  }
+}
+
 /** Browser navigation when NextResponse.redirect + cookies returns a blank/hung page. */
 export function htmlRedirect(
   targetUrl: string,
@@ -37,7 +57,7 @@ export function htmlRedirect(
 
   for (const cookie of cookies ?? []) {
     if ("delete" in cookie && cookie.delete) {
-      response.cookies.delete(cookie.name);
+      clearCookie(response, cookie.name);
     } else if ("value" in cookie) {
       response.cookies.set(cookie.name, cookie.value, {
         secure: isProduction(),
