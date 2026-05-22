@@ -19,6 +19,10 @@ import {
   getOrganizationVapidStatus,
   updateOrganizationVapidSubject,
 } from "../services/org-vapid";
+import {
+  getOrganizationGiphyStatus,
+  updateOrganizationGiphyApiKey,
+} from "../services/org-giphy";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 
@@ -32,6 +36,7 @@ const IntegrationsPatchSchema = z.object({
   signInRedirectUri: z.string().url().optional(),
   webhookUrl: z.string().url().optional(),
   vapidSubjectEmail: z.string().email().optional(),
+  giphyApiKey: z.string().min(1).optional(),
 });
 
 export const settingsRouter = new Hono<Env>();
@@ -66,6 +71,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   await ensureVapidKeys(org.id);
   const refreshed = (await getConfiguredOrganization()) ?? org;
   const vapidStatus = await getOrganizationVapidStatus(refreshed);
+  const giphyStatus = getOrganizationGiphyStatus(refreshed);
   const webhookSecrets = decryptWebhookSecrets(refreshed.pcoWebhookSecretEnc);
 
   return c.json({
@@ -78,6 +84,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
     ...vapidStatus,
+    ...giphyStatus,
   });
 });
 
@@ -131,11 +138,24 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     }
   }
 
+  if (data.giphyApiKey !== undefined) {
+    try {
+      await updateOrganizationGiphyApiKey({
+        organizationId: org.id,
+        apiKey: data.giphyApiKey,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid Giphy API key";
+      return c.json({ error: message }, 400);
+    }
+  }
+
   const updated = await getConfiguredOrganization();
   const webhookSecrets = decryptWebhookSecrets(
     updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
   );
   const vapidStatus = await getOrganizationVapidStatus(updated ?? org);
+  const giphyStatus = getOrganizationGiphyStatus(updated ?? org);
   return c.json({
     ok: true,
     name: updated?.name ?? org.name,
@@ -153,5 +173,6 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
       updated?.pcoWebhookUrl ?? org.pcoWebhookUrl,
     ),
     ...vapidStatus,
+    ...giphyStatus,
   });
 });

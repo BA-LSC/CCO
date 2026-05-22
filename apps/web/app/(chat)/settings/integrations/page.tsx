@@ -22,6 +22,7 @@ type IntegrationsSettings = {
   vapidKeysConfigured: boolean;
   vapidSubjectEmail: string;
   webPushConfigured: boolean;
+  giphyApiKeyConfigured: boolean;
 };
 
 function MaskedSecretField({
@@ -82,6 +83,8 @@ export default function IntegrationsSettingsPage() {
   const [vapidSubjectEmail, setVapidSubjectEmail] = useState("");
   const [vapidKeysConfigured, setVapidKeysConfigured] = useState(false);
   const [webPushConfigured, setWebPushConfigured] = useState(false);
+  const [giphyApiKey, setGiphyApiKey] = useState("");
+  const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -101,6 +104,7 @@ export default function IntegrationsSettingsPage() {
         setVapidSubjectEmail(settings.vapidSubjectEmail ?? "");
         setVapidKeysConfigured(settings.vapidKeysConfigured ?? false);
         setWebPushConfigured(settings.webPushConfigured ?? false);
+        setGiphyApiKeyConfigured(settings.giphyApiKeyConfigured ?? false);
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -136,6 +140,7 @@ export default function IntegrationsSettingsPage() {
     if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
+    if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
 
     try {
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
@@ -155,8 +160,10 @@ export default function IntegrationsSettingsPage() {
       setVapidSubjectEmail(updated.vapidSubjectEmail ?? "");
       setVapidKeysConfigured(updated.vapidKeysConfigured ?? false);
       setWebPushConfigured(updated.webPushConfigured ?? false);
+      setGiphyApiKeyConfigured(updated.giphyApiKeyConfigured ?? false);
       setClientSecret("");
       setWebhookSecret("");
+      setGiphyApiKey("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -260,6 +267,25 @@ export default function IntegrationsSettingsPage() {
                 placeholder="notifications@yourchurch.org"
               />
             </label>
+          </div>
+
+          <div className="settings-section">
+            <h2>Giphy search</h2>
+            <p className="help-text">
+              Add a Giphy API key to let chat members search and send GIFs from the composer.
+              Get one at{" "}
+              <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noreferrer">
+                developers.giphy.com
+              </a>
+              .
+            </p>
+            <MaskedSecretField
+              label="Giphy API key"
+              configured={giphyApiKeyConfigured}
+              value={giphyApiKey}
+              onChange={setGiphyApiKey}
+              placeholder="Leave blank to keep current"
+            />
           </div>
 
           {error && (

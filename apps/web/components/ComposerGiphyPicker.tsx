@@ -42,9 +42,7 @@ export function ComposerGiphyPicker({ open, disabled, onClose, onSelect }: Props
       setHasMore(data.results.length > 0);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not load GIFs";
-      if (message.includes("not configured") || message.includes("(503)")) {
-        setError("Giphy search is not configured yet. Ask your administrator to add a GIPHY API key.");
-      } else {
+      if (!message.includes("(503)")) {
         setError(message);
       }
       if (!append) setResults([]);

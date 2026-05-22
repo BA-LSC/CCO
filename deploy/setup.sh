@@ -267,6 +267,7 @@ fi
 
 echo ""
 echo "Setup complete. Deploy when ready:"
+echo "  ./deploy/update.sh"
 echo "  ./deploy/bootstrap.sh"
 echo ""
 echo "Day-two commands:"

@@ -63,6 +63,7 @@ Open `https://chat.example.com/setup` and complete first-time app setup.
 | `deploy/install.sh` | **Start here** — clone/update + full wizard |
 | `deploy/setup.sh` | Same wizard (if repo already cloned) |
 | `deploy/bootstrap.sh` | Deploy when `.env` is already complete |
+| `deploy/update.sh` | **Day-two updates** — `git pull`, build, migrate, restart |
 | `deploy/compose.sh` | Day-two `docker compose` (auto picks DB mode) |
 | `deploy/check-database.sh` | Test `DATABASE_URL` only |
 | `deploy/configure-vultr-db.sh` | Vultr `DATABASE_URL` only (also in setup) |
@@ -148,9 +149,9 @@ Open `https://chat.example.com/setup`.
 ### Day-two
 
 ```bash
+./deploy/update.sh
 ./deploy/compose.sh ps
 ./deploy/compose.sh logs -f api
-./deploy/compose.sh run --rm migrate          # after git pull
 ./deploy/compose.sh --profile jobs run --rm reconcile
 ```
 
@@ -477,11 +478,10 @@ Use `./deploy/compose.sh` for all commands below (picks bundled vs external Post
 
 ### Run migrations after pulling updates
 
+Migrations run automatically during `./deploy/update.sh` and `./deploy/bootstrap.sh`. To run them alone:
+
 ```bash
-git pull
-./deploy/compose.sh build migrate api
 ./deploy/compose.sh run --rm migrate
-./deploy/compose.sh up -d api
 ```
 
 ### Restart a service
@@ -493,8 +493,7 @@ git pull
 ### Update to a new release
 
 ```bash
-git pull
-./deploy/compose.sh up -d --build
+./deploy/update.sh
 ```
 
 ### Backups
@@ -575,7 +574,8 @@ If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in or
 | `deploy/harden-server.sh` | UFW apply (SSH only) |
 | `deploy/.env.production.example` | Environment template |
 | `deploy/setup.sh` | Guided setup wizard |
-| `deploy/bootstrap.sh` | Validate `.env`, test DB, start stack |
+| `deploy/bootstrap.sh` | Validate `.env`, migrate, build, start stack |
+| `deploy/update.sh` | Pull latest code and redeploy |
 | `deploy/compose.sh` | `docker compose` wrapper for your DB mode |
 | `deploy/lib/env.sh` | URL derivation, secret helpers |
 | `deploy/lib/database.sh` | Auto-detect external DB, TLS normalization |

@@ -29,6 +29,7 @@ Then open `https://<your-web-domain>/setup` for app configuration (church name, 
 **Day-two:**
 
 ```bash
+./deploy/update.sh
 ./deploy/compose.sh ps
 ./deploy/compose.sh logs -f api
 ./deploy/compose.sh --profile jobs run --rm reconcile
@@ -38,8 +39,9 @@ Then open `https://<your-web-domain>/setup` for app configuration (church name, 
 |--------|-------------|
 | `./deploy/install.sh` | First-time server setup (recommended) |
 | `./deploy/setup.sh` | Same wizard if repo is already cloned |
-| `./deploy/bootstrap.sh` | Redeploy when `.env` is ready |
-| `./deploy/compose.sh` | Logs, migrations, cron |
+| `./deploy/update.sh` | Pull latest code, migrate, and redeploy |
+| `./deploy/bootstrap.sh` | Redeploy without pulling (when `.env` is ready) |
+| `./deploy/compose.sh` | Logs, one-off commands, cron |
 | `bun run deploy:install` | Same as `./deploy/install.sh` |
 
 ---

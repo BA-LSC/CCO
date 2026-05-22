@@ -99,3 +99,13 @@ cco_test_bundled_postgres_connection() {
     postgres psql -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" \
     -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'
 }
+
+cco_run_migrations() {
+  local -n _files=$1
+  echo "Running database migrations..."
+  if ! cco_should_use_external_db; then
+    cco_wait_for_bundled_postgres _files 60
+  fi
+  docker compose "${_files[@]}" run --rm migrate
+  echo "  Migrations complete."
+}

@@ -100,6 +100,8 @@ export CCO_BUILD_ID
 echo "  Web build id: ${CCO_BUILD_ID}"
 "${COMPOSE[@]}" build
 
+cco_run_migrations files
+
 mark_deploy_draining
 echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
 sleep "$DEPLOY_DRAIN_WAIT_SEC"

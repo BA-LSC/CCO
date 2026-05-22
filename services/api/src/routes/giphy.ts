@@ -14,12 +14,12 @@ export const giphyRouter = new Hono<Env>();
 
 giphyRouter.use("*", requireAuth);
 
-giphyRouter.get("/status", (c) => {
-  return c.json({ enabled: isGiphyConfigured() });
+giphyRouter.get("/status", async (c) => {
+  return c.json({ enabled: await isGiphyConfigured() });
 });
 
 giphyRouter.get("/search", async (c) => {
-  if (!isGiphyConfigured()) {
+  if (!(await isGiphyConfigured())) {
     return c.json({ error: "Giphy is not configured" }, 503);
   }
 
@@ -36,7 +36,7 @@ giphyRouter.get("/search", async (c) => {
 });
 
 giphyRouter.get("/trending", async (c) => {
-  if (!isGiphyConfigured()) {
+  if (!(await isGiphyConfigured())) {
     return c.json({ error: "Giphy is not configured" }, 503);
   }
 
@@ -56,7 +56,7 @@ const ImportSchema = z.object({
 });
 
 giphyRouter.post("/import", async (c) => {
-  if (!isGiphyConfigured()) {
+  if (!(await isGiphyConfigured())) {
     return c.json({ error: "Giphy is not configured" }, 503);
   }
 

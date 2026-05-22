@@ -4,6 +4,7 @@ import {
   getUploadDir,
   safeUploadPath,
 } from "../lib/uploads";
+import { resolveGiphyApiKey } from "./org-giphy";
 
 const GIPHY_API = "https://api.giphy.com/v1/gifs";
 const MAX_GIF_BYTES = 15 * 1024 * 1024;
@@ -33,15 +34,6 @@ type GiphyApiGif = {
   };
 };
 
-function giphyApiKey(): string | undefined {
-  const key = process.env.GIPHY_API_KEY?.trim();
-  return key || undefined;
-}
-
-export function isGiphyConfigured(): boolean {
-  return Boolean(giphyApiKey());
-}
-
 function mapGiphyResult(gif: GiphyApiGif): GiphyGifResult | null {
   const previewUrl = gif.images.fixed_width?.url ?? gif.images.downsized?.url;
   const importUrl =
@@ -62,8 +54,12 @@ function mapGiphyResult(gif: GiphyApiGif): GiphyGifResult | null {
   };
 }
 
+export async function isGiphyConfigured(): Promise<boolean> {
+  return Boolean(await resolveGiphyApiKey());
+}
+
 async function fetchGiphy(path: string, params: Record<string, string>): Promise<GiphyApiGif[]> {
-  const apiKey = giphyApiKey();
+  const apiKey = await resolveGiphyApiKey();
   if (!apiKey) {
     throw new Error("Giphy is not configured");
   }

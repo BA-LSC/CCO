@@ -24,6 +24,7 @@ export const organizations = pgTable("organizations", {
   vapidPublicKey: text("vapid_public_key"),
   vapidPrivateKeyEnc: text("vapid_private_key_enc"),
   vapidSubject: text("vapid_subject"),
+  giphyApiKeyEnc: text("giphy_api_key_enc"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
