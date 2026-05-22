@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { USER_STATUS_PRESETS, parseUserStatusPreset } from "@cco/shared";
+import { USER_STATUS_PICKER_PRESETS, parseUserStatusPreset } from "@cco/shared";
 import { db } from "../db";
 import { users } from "../db/schema";
 import { signWsToken } from "../auth/session";
@@ -13,7 +13,7 @@ import { updateUserStatus } from "../services/user-status";
 type Env = { Variables: AuthVariables };
 
 const StatusPatchSchema = z.object({
-  preset: z.enum(USER_STATUS_PRESETS).optional(),
+  preset: z.enum(USER_STATUS_PICKER_PRESETS).optional(),
   message: z.string().max(80).nullable().optional(),
 });
 

@@ -2,6 +2,11 @@ export const USER_STATUS_PRESETS = ["active", "away", "busy", "offline"] as cons
 
 export type UserStatusPreset = (typeof USER_STATUS_PRESETS)[number];
 
+/** Presets shown in the status picker (legacy away/busy remain in storage only). */
+export const USER_STATUS_PICKER_PRESETS = ["active", "offline"] as const;
+
+export type UserStatusPickerPreset = (typeof USER_STATUS_PICKER_PRESETS)[number];
+
 export type UserStatus = {
   preset: UserStatusPreset;
   message: string | null;
@@ -9,39 +14,39 @@ export type UserStatus = {
 
 export type PresenceDotState = "online" | "offline" | "away" | "busy";
 
-export const USER_STATUS_LABELS: Record<UserStatusPreset, string> = {
+export const USER_STATUS_LABELS: Record<UserStatusPickerPreset, string> = {
   active: "Active",
-  away: "Away",
-  busy: "Busy",
   offline: "Offline",
 };
 
+export function normalizeUserStatusPreset(
+  preset: UserStatusPreset,
+): UserStatusPickerPreset {
+  return preset === "offline" ? "offline" : "active";
+}
+
 export function parseUserStatusPreset(value: string | null | undefined): UserStatusPreset {
-  if (value === "away" || value === "busy" || value === "offline") return value;
+  if (value === "offline") return "offline";
   return "active";
 }
 
-/** True when the user has manually chosen a preset or status message. */
+/** True when the user has manually chosen offline or set a status message. */
 export function isManualUserStatus(status: UserStatus): boolean {
-  return status.preset !== "active" || status.message != null;
+  return status.preset === "offline" || status.message != null;
 }
 
 export function resolveEffectivePreset(
   status: UserStatus,
-  activity: { pageActive: boolean; idle: boolean },
+  _activity: { pageActive: boolean; idle: boolean },
 ): UserStatusPreset {
-  if (isManualUserStatus(status)) return status.preset;
-  if (activity.pageActive && !activity.idle) return "active";
-  return "away";
+  void _activity;
+  return normalizeUserStatusPreset(status.preset);
 }
 
 export function resolvePresenceDotState(
   preset: UserStatusPreset,
   online: boolean,
 ): PresenceDotState {
-  if (preset === "offline") return "offline";
-  if (preset === "away") return "away";
-  if (preset === "busy") return "busy";
-  if (online) return "online";
-  return "away";
+  if (normalizeUserStatusPreset(preset) === "offline") return "offline";
+  return online ? "online" : "offline";
 }

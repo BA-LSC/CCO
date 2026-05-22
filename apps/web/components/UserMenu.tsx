@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import {
-  isManualUserStatus,
   USER_STATUS_LABELS,
-  USER_STATUS_PRESETS,
-  type UserStatusPreset,
+  USER_STATUS_PICKER_PRESETS,
+  normalizeUserStatusPreset,
+  type UserStatusPickerPreset,
 } from "@cco/shared/user-status";
 import { useTheme } from "@/components/ThemeProvider";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
@@ -36,7 +36,7 @@ type Props = {
 };
 
 export function UserMenu({ variant = "default" }: Props) {
-  const { pageActive, myStatus, effectivePreset, setMyStatus, markUserActive } = usePresence();
+  const { pageActive, myStatus, setMyStatus, markUserActive } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -132,25 +132,26 @@ export function UserMenu({ variant = "default" }: Props) {
     await setTheme(next);
   }
 
-  async function handleStatusPreset(next: UserStatusPreset) {
+  async function handleStatusPreset(next: UserStatusPickerPreset) {
+    markUserActive();
+
     if (next === "active") {
-      if (isManualUserStatus(myStatus)) {
-        setStatusSaving(true);
-        try {
-          await setMyStatus({ preset: "active", message: null });
-        } finally {
-          setStatusSaving(false);
-        }
+      if (myStatus.preset === "active" && !myStatus.message) return;
+
+      setStatusSaving(true);
+      try {
+        await setMyStatus({ preset: "active", message: null });
+      } finally {
+        setStatusSaving(false);
       }
-      markUserActive();
       return;
     }
 
-    if (next === myStatus.preset && isManualUserStatus(myStatus)) return;
+    if (myStatus.preset === "offline") return;
 
     setStatusSaving(true);
     try {
-      await setMyStatus({ preset: next });
+      await setMyStatus({ preset: "offline" });
     } finally {
       setStatusSaving(false);
     }
@@ -170,7 +171,8 @@ export function UserMenu({ variant = "default" }: Props) {
   }
 
   const menuClass = variant === "sidebar" ? "user-menu user-menu-sidebar" : "user-menu";
-  const presenceState = resolvePresenceDotState(effectivePreset, pageActive);
+  const selectedPreset = normalizeUserStatusPreset(myStatus.preset);
+  const presenceState = resolvePresenceDotState(myStatus.preset, pageActive);
   const statusMessage = myStatus.message?.trim() ?? "";
 
   return (
@@ -267,14 +269,14 @@ export function UserMenu({ variant = "default" }: Props) {
           <div className="user-menu-status" role="group" aria-label="Status">
             <span className="user-menu-dropdown-label">Status</span>
             <div className="user-menu-status-grid">
-              {USER_STATUS_PRESETS.map((preset) => (
+              {USER_STATUS_PICKER_PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   className={`user-menu-status-btn user-menu-status-btn-${preset}${
-                    effectivePreset === preset ? " user-menu-status-btn-active" : ""
+                    selectedPreset === preset ? " user-menu-status-btn-active" : ""
                   }`}
-                  aria-pressed={effectivePreset === preset}
+                  aria-pressed={selectedPreset === preset}
                   disabled={statusSaving}
                   onClick={() => void handleStatusPreset(preset)}
                 >
