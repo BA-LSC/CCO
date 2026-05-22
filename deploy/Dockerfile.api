@@ -5,6 +5,8 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json bun.lock ./
+COPY apps/web/package.json apps/web/
+COPY apps/mobile/package.json apps/mobile/
 COPY packages/pco-client/package.json packages/pco-client/
 COPY packages/shared/package.json packages/shared/
 COPY services/api/package.json services/api/
