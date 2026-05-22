@@ -32,6 +32,7 @@ export default function GroupConversationPage() {
   const [editLeaderOnly, setEditLeaderOnly] = useState(false);
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [syncingRoster, setSyncingRoster] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
   const [conversationCanPost, setConversationCanPost] = useState<boolean | null>(null);
 
@@ -266,6 +267,19 @@ export default function GroupConversationPage() {
     await reloadDetail();
   }
 
+  async function syncRoster() {
+    setSyncingRoster(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/groups/${groupId}/roster/sync`, { method: "POST" });
+      await reloadDetail({ sync: true });
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSyncingRoster(false);
+    }
+  }
+
   async function removeFromGroup(userId: string, displayName: string) {
     if (!confirm(`Remove ${displayName} from this group in Planning Center?`)) return;
     setRemovingMemberId(userId);
@@ -449,6 +463,18 @@ export default function GroupConversationPage() {
             removingMemberId={removingMemberId}
             onInvite={isLeader ? inviteMember : undefined}
             onRemove={isLeader ? removeFromGroup : undefined}
+            headerAction={
+              isLeader ? (
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={syncingRoster}
+                  onClick={() => void syncRoster()}
+                >
+                  {syncingRoster ? "Refreshing…" : "Refresh from Planning Center"}
+                </button>
+              ) : undefined
+            }
             channelAccess={
               showChannelHiddenAccess
                 ? {

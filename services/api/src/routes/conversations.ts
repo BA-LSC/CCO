@@ -167,7 +167,8 @@ export function mountGroupConversationRoutes(groupsRouter: Hono<Env>): void {
 
     const accessToken = await resolvePcoAccessToken(session, c);
     const webhooksEnabled = await areOrgWebhooksEnabled();
-    const requestLiveSync = c.req.query("sync") === "1" && !webhooksEnabled;
+    // Leaders can force a PCO roster pull with ?sync=1 (fallback when webhooks missed a delivery).
+    const requestLiveSync = c.req.query("sync") === "1";
     const userRow = await db
       .select({ pcoPersonId: users.pcoPersonId })
       .from(users)
