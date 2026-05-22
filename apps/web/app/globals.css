@@ -3163,7 +3163,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .chat-thread .message-item--spacing-medium {
@@ -3210,7 +3210,7 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 10px;
 }
 
-.chat-thread .message-item:not(.message-item--group-last) + .message-item--own:not(.message-item--timestamp-start) {
+.chat-thread .message-item:not(.message-item--group-last) + .message-item--own:not(.message-item--spacing-tight):not(.message-item--timestamp-start) {
   margin-top: 6px;
 }
 
