@@ -37,6 +37,9 @@ export default function TeamChatPage() {
   useMarkConversationRead(conversationId);
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
+    null,
+  );
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -47,6 +50,10 @@ export default function TeamChatPage() {
 
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
+
+  const threadMessages =
+    messagesForConversationId === conversationId ? messages : [];
+  const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
   async function reloadDetail() {
     const data = await apiFetch<TeamDetail>(`/api/v1/services/teams/${teamId}`);
@@ -77,10 +84,12 @@ export default function TeamChatPage() {
     if (cached) {
       setMessages(cached.messages);
       setHasMore(cached.hasMore);
+      setMessagesForConversationId(conversationId);
       setMessagesLoading(false);
     } else {
       setMessages([]);
       setHasMore(false);
+      setMessagesForConversationId(null);
       setMessagesLoading(true);
     }
 
@@ -92,6 +101,7 @@ export default function TeamChatPage() {
         if (cancelled) return;
         setMessages(data.messages);
         setHasMore(data.hasMore);
+        setMessagesForConversationId(conversationId);
         setCachedMessages(conversationId, {
           messages: data.messages,
           hasMore: data.hasMore,
@@ -237,9 +247,10 @@ export default function TeamChatPage() {
 
       <div className="chat-panel-content">
         <ChatThread
+          key={conversationId ?? "team"}
           conversationId={detail?.conversation?.id ?? null}
-          initialMessages={messages}
-          hasMore={hasMore}
+          initialMessages={threadMessages}
+          hasMore={threadHasMore}
           members={activeTeamMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}

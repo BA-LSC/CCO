@@ -26,6 +26,9 @@ export default function GroupConversationPage() {
 
   const [detail, setDetail] = useState<GroupDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
+    null,
+  );
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -40,6 +43,10 @@ export default function GroupConversationPage() {
 
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
+
+  const threadMessages =
+    messagesForConversationId === conversationId ? messages : [];
+  const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
   async function reloadDetail() {
     const data = await apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`);
@@ -72,10 +79,12 @@ export default function GroupConversationPage() {
     if (cached) {
       setMessages(cached.messages);
       setHasMore(cached.hasMore);
+      setMessagesForConversationId(conversationId);
       setMessagesLoading(false);
     } else {
       setMessages([]);
       setHasMore(false);
+      setMessagesForConversationId(null);
       setMessagesLoading(true);
     }
 
@@ -87,6 +96,7 @@ export default function GroupConversationPage() {
         if (cancelled) return;
         setMessages(data.messages);
         setHasMore(data.hasMore);
+        setMessagesForConversationId(conversationId);
         setCachedMessages(conversationId, {
           messages: data.messages,
           hasMore: data.hasMore,
@@ -419,9 +429,10 @@ export default function GroupConversationPage() {
 
       <div className="chat-panel-content">
         <ChatThread
+          key={conversationId}
           conversationId={conversationId}
-          initialMessages={messages}
-          hasMore={hasMore}
+          initialMessages={threadMessages}
+          hasMore={threadHasMore}
           members={activeGroupMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}

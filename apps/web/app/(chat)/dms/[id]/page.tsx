@@ -21,11 +21,18 @@ export default function DmChatPage() {
 
   const [detail, setDetail] = useState<DmDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
+    null,
+  );
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [showOptions, setShowOptions] = useState(false);
+
+  const threadMessages =
+    messagesForConversationId === conversationId ? messages : [];
+  const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
   useEffect(() => {
     setDetailLoading(true);
@@ -42,10 +49,12 @@ export default function DmChatPage() {
     if (cached) {
       setMessages(cached.messages);
       setHasMore(cached.hasMore);
+      setMessagesForConversationId(conversationId);
       setMessagesLoading(false);
     } else {
       setMessages([]);
       setHasMore(false);
+      setMessagesForConversationId(null);
       setMessagesLoading(true);
     }
 
@@ -57,6 +66,7 @@ export default function DmChatPage() {
         if (cancelled) return;
         setMessages(data.messages);
         setHasMore(data.hasMore);
+        setMessagesForConversationId(conversationId);
         setCachedMessages(conversationId, {
           messages: data.messages,
           hasMore: data.hasMore,
@@ -148,9 +158,10 @@ export default function DmChatPage() {
 
       <div className="chat-panel-content">
         <ChatThread
+          key={conversationId}
           conversationId={conversationId}
-          initialMessages={messages}
-          hasMore={hasMore}
+          initialMessages={threadMessages}
+          hasMore={threadHasMore}
           members={members}
           currentUserId={session?.userId}
           layout="panel"

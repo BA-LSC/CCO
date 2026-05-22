@@ -1,4 +1,5 @@
 import type { Message, Reaction } from "@/lib/api";
+import { sortMessagesByCreatedAt } from "@/lib/message-order";
 
 function reactionKey(reaction: Reaction): string {
   return `${reaction.userId}:${reaction.emoji}`;
@@ -42,7 +43,7 @@ export function applyReactionChange(
 
 /** Merge a polled message page into the current list (new messages + reaction/edit updates). */
 export function mergeConversationMessages(prev: Message[], polled: Message[]): Message[] {
-  if (prev.length === 0) return polled;
+  if (prev.length === 0) return sortMessagesByCreatedAt(polled);
 
   const polledById = new Map(polled.map((message) => [message.id, message]));
   let changed = false;
@@ -67,9 +68,9 @@ export function mergeConversationMessages(prev: Message[], polled: Message[]): M
 
   const ids = new Set(prev.map((message) => message.id));
   const newMessages = polled.filter((message) => !ids.has(message.id));
-  if (newMessages.length > 0) {
-    return [...merged, ...newMessages];
+  if (newMessages.length > 0 || changed) {
+    return sortMessagesByCreatedAt([...merged, ...newMessages]);
   }
 
-  return changed ? merged : prev;
+  return prev;
 }

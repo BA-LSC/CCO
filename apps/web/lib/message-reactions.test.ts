@@ -44,4 +44,19 @@ describe("mergeConversationMessages", () => {
     const next = mergeConversationMessages([baseMessage], [baseMessage, other]);
     expect(next).toHaveLength(2);
   });
+
+  test("re-sorts when polled batch is out of order", () => {
+    const older: Message = {
+      ...baseMessage,
+      id: "m1",
+      createdAt: "2026-01-01T12:00:00.000Z",
+    };
+    const newer: Message = {
+      ...baseMessage,
+      id: "m2",
+      createdAt: "2026-01-01T13:00:00.000Z",
+    };
+    const next = mergeConversationMessages([older], [newer, older]);
+    expect(next.map((m) => m.id)).toEqual(["m1", "m2"]);
+  });
 });

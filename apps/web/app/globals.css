@@ -2994,6 +2994,7 @@ html[data-theme="6"] .user-menu-dropdown {
   margin: 0 0 16px;
   max-height: min(60vh, 520px);
   overflow-y: auto;
+  overflow-anchor: none;
   scroll-behavior: smooth;
   display: flex;
   flex-direction: column;
@@ -3957,7 +3958,8 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  overflow-anchor: auto;
+  /* Prevent the browser from anchoring mid-thread when new messages arrive. */
+  overflow-anchor: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   padding: 0 var(--chat-inset-x);

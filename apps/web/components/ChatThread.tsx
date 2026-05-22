@@ -24,6 +24,12 @@ import { dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { getMessageLayoutInfo } from "@/lib/message-grouping";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { applyReactionChange } from "@/lib/message-reactions";
+import { sortMessagesByCreatedAt } from "@/lib/message-order";
+import {
+  maxScrollTop,
+  scheduleScrollMessagesToBottom,
+  scrollMessagesToBottom,
+} from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
 
 function formatMessageTime(iso: string): string {
@@ -173,15 +179,18 @@ export function ChatThread({
 
   useLayoutEffect(() => {
     syncComposerTextareaHeight(composerRef.current);
-  }, [body, composerDisabled, conversationId]);
+    if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
+    const container = getScrollContainer();
+    if (container) scrollMessagesToBottom(container);
+  }, [body, composerDisabled, conversationId, layout, messages.length]);
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     const container = getScrollContainer();
     if (container) {
       if (behavior === "instant") {
-        container.scrollTop = container.scrollHeight;
+        scrollMessagesToBottom(container);
       } else {
-        container.scrollTo({ top: container.scrollHeight, behavior });
+        container.scrollTo({ top: maxScrollTop(container), behavior });
       }
       return;
     }
@@ -242,25 +251,24 @@ export function ChatThread({
       if (pendingScrollRestoreRef.current) return;
       if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
 
-      container.scrollTop = container.scrollHeight;
-      messagesEndRef.current?.scrollIntoView({ block: "end", behavior: "auto" });
-
-      if (isAtScrollBottom(container)) {
-        pinnedToBottomRef.current = true;
-        setShowScrollToBottom(false);
-      }
+      scrollMessagesToBottom(container);
+      pinnedToBottomRef.current = true;
+      autoScrollToBottomRef.current = true;
+      setShowScrollToBottom(false);
     };
 
     followLatest();
-    const raf = requestAnimationFrame(followLatest);
+    const cancelScheduled = scheduleScrollMessagesToBottom(container);
 
     const resizeObserver = new ResizeObserver(followLatest);
     resizeObserver.observe(container);
+    const inner = container.querySelector<HTMLElement>(".chat-panel-messages-inner");
+    if (inner) resizeObserver.observe(inner);
     const list = messagesListRef.current;
     if (list) resizeObserver.observe(list);
 
     return () => {
-      cancelAnimationFrame(raf);
+      cancelScheduled();
       resizeObserver.disconnect();
     };
   }, [lastMessageId, messages.length, messagesLoading, identityPending, layout]);
@@ -277,19 +285,42 @@ export function ChatThread({
   }, [conversationId]);
 
   useEffect(() => {
-    if (messagesRef.current.length > initialMessages.length) return;
-    setMessages(initialMessages);
+    setMessages(sortMessagesByCreatedAt(initialMessages));
     setHasMore(initialHasMore);
     autoScrollToBottomRef.current = true;
+    pinnedToBottomRef.current = true;
+  }, [conversationId]);
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (initialMessages.length === 0) return prev;
+      if (prev.length > initialMessages.length) return prev;
+      return sortMessagesByCreatedAt(initialMessages);
+    });
+    setHasMore((prev) =>
+      messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
+    );
   }, [initialMessages, initialHasMore]);
 
   useEffect(() => {
     const container = getScrollContainer();
     if (!container) return;
 
+    const onResize = () => {
+      if (pinnedToBottomRef.current || autoScrollToBottomRef.current) {
+        scrollMessagesToBottom(container);
+        return;
+      }
+      updateScrollPinned();
+    };
+
     updateScrollPinned();
-    const observer = new ResizeObserver(() => updateScrollPinned());
+    const observer = new ResizeObserver(onResize);
     observer.observe(container);
+    const inner = container.querySelector<HTMLElement>(".chat-panel-messages-inner");
+    if (inner) observer.observe(inner);
+    const list = messagesListRef.current;
+    if (list) observer.observe(list);
     return () => observer.disconnect();
   }, [layout, messages.length, updateScrollPinned]);
 
@@ -309,7 +340,7 @@ export function ChatThread({
           if (shouldFollow) {
             autoScrollToBottomRef.current = true;
           }
-          return [...prev, event.message!];
+          return sortMessagesByCreatedAt([...prev, event.message!]);
         });
         if (event.message.authorId !== resolvedUserId && conversationId) {
           void apiFetch(`/api/v1/conversations/${conversationId}/read`, { method: "POST" }).catch(
@@ -367,7 +398,7 @@ export function ChatThread({
     setMessages((prev) => {
       if (prev.some((m) => m.id === message.id)) return prev;
       autoScrollToBottomRef.current = true;
-      return [...prev, message];
+      return sortMessagesByCreatedAt([...prev, message]);
     });
   }
 
@@ -403,7 +434,7 @@ export function ChatThread({
       }
       setMessages((prev) => {
         const ids = new Set(prev.map((m) => m.id));
-        return [...incoming.filter((m) => !ids.has(m.id)), ...prev];
+        return sortMessagesByCreatedAt([...incoming.filter((m) => !ids.has(m.id)), ...prev]);
       });
       setHasMore(data.hasMore);
     } finally {
