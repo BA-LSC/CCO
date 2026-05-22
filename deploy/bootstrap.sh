@@ -84,6 +84,9 @@ fi
 cco_stop_setup_connector
 
 echo "Building and starting CCO production stack..."
+CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
+export CCO_BUILD_ID
+echo "  Web build id: ${CCO_BUILD_ID}"
 "${COMPOSE[@]}" up -d --build
 
 echo ""

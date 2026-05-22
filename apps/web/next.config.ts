@@ -1,14 +1,11 @@
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
 import type { NextConfig } from "next";
+import { resolveAppBuildVersion } from "./lib/build-version";
 
 loadEnv({ path: path.resolve(__dirname, "../../.env") });
 
-const appVersion =
-  process.env.VERCEL_GIT_COMMIT_SHA ??
-  process.env.GITHUB_SHA ??
-  process.env.CCO_BUILD_ID ??
-  (process.env.NODE_ENV === "production" ? `build-${Date.now()}` : "dev");
+const appVersion = resolveAppBuildVersion();
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@cco/pco-client", "@cco/shared"],

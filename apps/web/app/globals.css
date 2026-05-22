@@ -3098,7 +3098,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 3px;
+  margin-top: 2px;
 }
 
 .chat-thread .message-item--spacing-medium {
@@ -3375,7 +3375,7 @@ html[data-theme="6"] .user-menu-dropdown {
   z-index: 4;
   max-width: min(320px, calc(100vw - 32px));
   flex-wrap: nowrap;
-  --message-actions-edge-inset: 8px;
+  --message-actions-edge-inset: 14px;
 }
 
 .chat-thread .message-item--other .message-actions {
@@ -4016,7 +4016,7 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread
   .message-item:has(.message-bubble-stack--has-reactions):has(+ .message-item--spacing-tight)
   .message-reaction-row {
-  margin-bottom: 6px;
+  margin-bottom: 3px;
 }
 
 .chat-thread .message-reaction-pills {

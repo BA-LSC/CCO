@@ -1,7 +1,8 @@
 import { APP_BUILD_VERSION } from "@/lib/build-version";
+import { showAppUpdateOverlay } from "@/lib/app-update-overlay";
 
 const SW_URL = "/sw.js";
-const UPDATE_CHECK_MS = 5 * 60 * 1000;
+const UPDATE_CHECK_MS = 60 * 1000;
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -21,10 +22,15 @@ export function waitForOverlayPaint(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setTimeout(resolve, 250);
+        setTimeout(resolve, 400);
       });
     });
   });
+}
+
+async function notifyUpdating(onUpdating: () => Promise<void>): Promise<void> {
+  showAppUpdateOverlay();
+  await onUpdating();
 }
 
 export async function checkAppVersion(onUpdating: () => Promise<void>): Promise<boolean> {
@@ -37,7 +43,7 @@ export async function checkAppVersion(onUpdating: () => Promise<void>): Promise<
     const { version } = (await res.json()) as { version?: string };
     if (!version || version === APP_BUILD_VERSION) return false;
 
-    await onUpdating();
+    await notifyUpdating(onUpdating);
     window.location.reload();
     return true;
   } catch {
@@ -47,7 +53,7 @@ export async function checkAppVersion(onUpdating: () => Promise<void>): Promise<
 
 /** Register the app service worker and auto-apply updates with a reload. */
 export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+  if (typeof window === "undefined") {
     return () => {};
   }
 
@@ -59,7 +65,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     if (applying || !reg.waiting) return;
     applying = true;
 
-    await onUpdating();
+    await notifyUpdating(onUpdating);
     reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
   };
 
@@ -69,7 +75,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     window.location.reload();
   };
 
-  navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+  navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
 
   const runUpdateChecks = async () => {
     if (await checkAppVersion(onUpdating)) return;
@@ -80,37 +86,45 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     if (document.visibilityState === "visible") void runUpdateChecks();
   };
 
+  const onPageShow = (event: PageTransitionEvent) => {
+    if (event.persisted) void runUpdateChecks();
+  };
+
   document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pageshow", onPageShow);
   const intervalId = window.setInterval(() => void runUpdateChecks(), UPDATE_CHECK_MS);
-
-  void registerAppServiceWorker().then((reg) => {
-    if (!reg) return;
-    registration = reg;
-
-    if (reg.waiting && navigator.serviceWorker.controller) {
-      void applyServiceWorkerUpdate(reg);
-    }
-
-    reg.addEventListener("updatefound", () => {
-      const installing = reg.installing;
-      if (!installing) return;
-
-      installing.addEventListener("statechange", () => {
-        if (installing.state !== "installed") return;
-        if (!navigator.serviceWorker.controller) return;
-        void applyServiceWorkerUpdate(reg);
-      });
-    });
-
-    void runUpdateChecks();
-  });
 
   void runUpdateChecks();
 
+  if ("serviceWorker" in navigator) {
+    void registerAppServiceWorker().then((reg) => {
+      if (!reg) return;
+      registration = reg;
+
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        void applyServiceWorkerUpdate(reg);
+      }
+
+      reg.addEventListener("updatefound", () => {
+        const installing = reg.installing;
+        if (!installing) return;
+
+        installing.addEventListener("statechange", () => {
+          if (installing.state !== "installed") return;
+          if (!navigator.serviceWorker.controller) return;
+          void applyServiceWorkerUpdate(reg);
+        });
+      });
+
+      void runUpdateChecks();
+    });
+  }
+
   return () => {
     document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pageshow", onPageShow);
     window.clearInterval(intervalId);
-    navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    navigator.serviceWorker?.removeEventListener("controllerchange", onControllerChange);
   };
 }
 
