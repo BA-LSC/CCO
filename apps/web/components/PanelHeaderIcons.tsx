@@ -36,3 +36,31 @@ export function PanelHeaderSettingsIcon({ className = "panel-header-icon" }: Ico
     </svg>
   );
 }
+
+export function SidebarPlusIcon({ className = "sidebar-add-channel-icon-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 5v14M5 12h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function SidebarCloseIcon({ className = "sidebar-add-channel-icon-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M8 8l8 8M16 8l-8 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

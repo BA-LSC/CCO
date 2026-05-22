@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
+import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import {
   apiFetch,
   slugify,
@@ -177,7 +178,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                             }
                           }}
                         >
-                          {creatingForGroup === group.id ? "×" : "+"}
+                          {creatingForGroup === group.id ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
                         </button>
                       </div>
                     )}

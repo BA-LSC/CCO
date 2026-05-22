@@ -8,6 +8,7 @@ import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
+import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { UserMenu } from "@/components/UserMenu";
 import {
   apiFetch,
@@ -200,7 +201,7 @@ export function ChatSidebar() {
                     setDmPeople([]);
                   }}
                 >
-                  {showNewDm ? "×" : "+"}
+                  {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
                 </button>
               </div>
 
