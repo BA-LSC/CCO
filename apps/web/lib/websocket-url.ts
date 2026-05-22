@@ -11,8 +11,9 @@ function isLocalhostHost(host: string): boolean {
 export function deriveApiHostname(webHostname: string): string {
   const host = webHostname.split(":")[0]?.toLowerCase() ?? webHostname;
   if (host.startsWith("api.")) return host;
-  if (host.startsWith("chat.")) return `api.chat.${host.slice(5)}`;
-  return `api.${host}`;
+  const parts = host.split(".");
+  if (parts.length <= 2) return `api.${host}`;
+  return `api.${parts.slice(1).join(".")}`;
 }
 
 export type ResolveWebSocketBaseOptions = {

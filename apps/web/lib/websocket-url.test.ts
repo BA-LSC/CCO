@@ -6,8 +6,9 @@ import {
 } from "./websocket-url";
 
 describe("deriveApiHostname", () => {
-  test("maps chat subdomain to api.chat", () => {
-    expect(deriveApiHostname("chat.example.com")).toBe("api.chat.example.com");
+  test("maps web subdomain to api on the zone root", () => {
+    expect(deriveApiHostname("chat.example.com")).toBe("api.example.com");
+    expect(deriveApiHostname("cco.lscavl.dev")).toBe("api.lscavl.dev");
   });
 
   test("prefixes api for bare hostnames", () => {
@@ -22,8 +23,8 @@ describe("deriveApiHostname", () => {
 describe("resolveWebSocketBase", () => {
   test("uses configured production URL", () => {
     expect(
-      resolveWebSocketBase({ configured: "wss://api.chat.example.com" }),
-    ).toBe("wss://api.chat.example.com");
+      resolveWebSocketBase({ configured: "wss://api.example.com" }),
+    ).toBe("wss://api.example.com");
   });
 
   test("ignores localhost config on HTTPS pages", () => {
@@ -33,7 +34,7 @@ describe("resolveWebSocketBase", () => {
         windowProtocol: "https:",
         windowHost: "chat.example.com",
       }),
-    ).toBe("wss://api.chat.example.com");
+    ).toBe("wss://api.example.com");
   });
 
   test("derives from NEXT_PUBLIC_WEB_URL when config missing", () => {
@@ -41,7 +42,7 @@ describe("resolveWebSocketBase", () => {
       resolveWebSocketBase({
         webUrl: "https://chat.example.com",
       }),
-    ).toBe("wss://api.chat.example.com");
+    ).toBe("wss://api.example.com");
   });
 
   test("falls back to localhost for dev", () => {

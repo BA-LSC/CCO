@@ -9,7 +9,7 @@ Deploy **CCO (Chat Center Online)** on a single Linux server with Docker, **[Clo
 | Service | Example URL |
 |---------|-------------|
 | Web app | `https://chat.example.com` |
-| API (REST, WebSocket, uploads, webhooks) | `https://api.chat.example.com` |
+| API (REST, WebSocket, uploads, webhooks) | `https://api.example.com` |
 
 ---
 
@@ -50,7 +50,7 @@ Verify after deploy:
 ```bash
 cd ~/cco   # or your CCO_DIR
 ./deploy/compose.sh ps
-curl -s "https://api.chat.example.com/health"
+curl -s "https://api.example.com/health"
 # {"ok":true}
 ```
 
@@ -140,7 +140,7 @@ At the database prompt, choose **2** and enter VPC host, port, user, and passwor
 ### Verify
 
 ```bash
-curl -s "https://api.chat.example.com/health"
+curl -s "https://api.example.com/health"
 # {"ok":true}
 ```
 
@@ -161,8 +161,8 @@ Open `https://chat.example.com/setup`.
 
 - **Server:** Ubuntu 22.04+ or similar (2 GB RAM minimum, 4 GB recommended)
 - **Docker:** Engine 24+ and Docker Compose v2
-- **DNS:** [Cloudflare](https://dash.cloudflare.com/) with A records for `chat` and `api.chat` → server IP
-- **Domains:** `chat.example.com` (web), `api.chat.example.com` (API)
+- **DNS:** [Cloudflare](https://dash.cloudflare.com/) proxied CNAMEs for `chat` and `api` on your zone (e.g. `chat.example.com`, `api.example.com`)
+- **Domains:** `chat.example.com` (web), `api.example.com` (API)
 - **Planning Center:** Developer app at [developer.planning.center](https://developer.planning.center/)
 
 ---
@@ -311,7 +311,7 @@ Use the HTTPS or SSH URL from your GitHub repository page.
 | Variable | Description |
 |----------|-------------|
 | `CCO_DOMAIN` | Public web hostname (e.g. `chat.example.com`) |
-| `API_DOMAIN` | Public API hostname (e.g. `api.chat.example.com`) |
+| `API_DOMAIN` | Public API hostname (e.g. `api.example.com`) |
 | `WEB_URL` | `https://` + `CCO_DOMAIN` |
 | `NEXT_PUBLIC_WS_URL` | `wss://` + `API_DOMAIN` |
 | `NEXT_PUBLIC_WEB_URL` | Same as `WEB_URL` |
@@ -381,7 +381,7 @@ Optional on the VPS: `sudo ./deploy/harden-server.sh` (UFW: SSH only).
 
 ```bash
 ./deploy/compose.sh logs cloudflared
-curl -s "https://api.chat.example.com/health"
+curl -s "https://api.example.com/health"
 ```
 
 `cloudflared` should show registered connections. Health check returns `{"ok":true}`.
@@ -397,12 +397,12 @@ In your [Planning Center developer app](https://developer.planning.center/):
 Add **exactly** (the `/setup` wizard shows the same URIs for your deployment):
 
 - `https://chat.example.com/api/auth/pco/callback` (your `PCO_WEB_REDIRECT_URI`)
-- `https://api.chat.example.com/auth/pco/mobile/callback` (your `PCO_MOBILE_REDIRECT_URI`)
+- `https://api.example.com/auth/pco/mobile/callback` (your `PCO_MOBILE_REDIRECT_URI`)
 
 ### Webhooks (recommended)
 
 ```text
-https://api.chat.example.com/webhooks/pco
+https://api.example.com/webhooks/pco
 ```
 
 Subscribe to:
@@ -431,7 +431,7 @@ Or run the full wizard again: `./deploy/setup.sh`
 
 ```bash
 ./deploy/compose.sh ps
-curl -s "https://api.chat.example.com/health"
+curl -s "https://api.example.com/health"
 ```
 
 Expected: `{"ok":true}`

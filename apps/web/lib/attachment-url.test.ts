@@ -4,7 +4,7 @@ import { extractUploadFilename, resolveAttachmentDisplayUrl } from "./attachment
 describe("extractUploadFilename", () => {
   test("parses API upload URLs", () => {
     expect(
-      extractUploadFilename("https://api.cco.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999"),
+      extractUploadFilename("https://api.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
   });
 
@@ -25,7 +25,7 @@ describe("resolveAttachmentDisplayUrl", () => {
   test("rewrites API upload URLs to same-origin proxy and keeps signed params", () => {
     expect(
       resolveAttachmentDisplayUrl(
-        "https://api.cco.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999",
+        "https://api.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
     ).toBe("/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });

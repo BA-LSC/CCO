@@ -49,7 +49,7 @@ cco_env_is_placeholder() {
   [[ -z "$val" || "$val" == CHANGE_ME* ]]
 }
 
-# chat.example.com → api.chat.example.com
+# chat.example.com → api.example.com (one subdomain level for Cloudflare Universal SSL)
 cco_normalize_hostname() {
   local h="$1"
   h="${h#https://}"
@@ -64,8 +64,10 @@ cco_normalize_hostname() {
 
 cco_default_api_domain() {
   local cco="$1"
-  if [[ "$cco" == chat.* ]]; then
-    printf 'api.chat.%s' "${cco#chat.}"
+  cco="$(cco_normalize_hostname "$cco")"
+  local rest="${cco#*.}"
+  if [[ "$rest" == *.* ]]; then
+    printf 'api.%s' "$rest"
   else
     printf 'api.%s' "$cco"
   fi

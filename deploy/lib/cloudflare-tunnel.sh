@@ -773,6 +773,8 @@ cco_print_cloudflare_hardening_guide() {
     • Always Use HTTPS: On
     • Minimum TLS Version: TLS 1.2 (or 1.3)
     • Automatic HTTPS Rewrites: On
+    • API hostname must be one level (e.g. api.example.com), not nested
+      (api.chat.example.com is not covered by Universal SSL *.example.com)
 
   Network → WebSockets
     • Enabled (required for chat — on by default)
