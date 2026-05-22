@@ -44,6 +44,8 @@ html.standalone-display:has(.chat-shell) body {
   height: 100%;
   height: -webkit-fill-available;
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
@@ -52,6 +54,8 @@ html.standalone-display:has(.chat-shell) body {
     height: 100%;
     height: -webkit-fill-available;
     overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 }
 
@@ -3094,16 +3098,16 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 5px;
+  margin-top: 3px;
 }
 
 .chat-thread .message-item--spacing-medium {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 /* New segment after a 5+ minute gap — room before the timestamp label */
 .chat-thread .message-item--timestamp-start {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 /* Message ends a segment before a long gap — room after bubble/reactions */
@@ -3117,15 +3121,21 @@ html[data-theme="6"] .user-menu-dropdown {
 
 /* Room before the next cluster after a grouped stack ends */
 .chat-thread .message-item--group-last + .message-item {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .chat-thread .message-item--group-last + .message-item--spacing-tight {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .chat-thread .message-item--group-single + .message-item--timestamp-start {
-  margin-top: 16px;
+  margin-top: 14px;
+}
+
+/* Slight extra room when the conversation switches between you and someone else */
+.chat-thread .message-item:not(.message-item--group-last) + .message-item--other:not(.message-item--timestamp-start),
+.chat-thread .message-item:not(.message-item--group-last) + .message-item--own:not(.message-item--timestamp-start) {
+  margin-top: 6px;
 }
 
 .chat-thread .message-item:first-child {
@@ -3510,6 +3520,7 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-bg);
   color: var(--color-text);
   font: inherit;
+  font-size: 16px;
   line-height: 1.4;
 }
 
@@ -3563,7 +3574,7 @@ html[data-theme="6"] .user-menu-dropdown {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 16px;
   resize: none;
   overflow-y: hidden;
   background: var(--color-surface);
@@ -3684,7 +3695,7 @@ html[data-theme="6"] .user-menu-dropdown {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 16px;
   resize: none;
   min-height: 42px;
   background: var(--color-surface);
