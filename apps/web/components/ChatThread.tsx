@@ -1183,8 +1183,8 @@ export function ChatThread({
                     {!isOwn && layoutInfo.showAuthorName && (
                       <div className="message-meta">
                         <strong>{m.authorName}</strong>
-                        {m.editedAt ? <span className="message-edited">edited · </span> : null}
                         <time dateTime={m.createdAt}>{formatMessageTime(m.createdAt)}</time>
+                        {m.editedAt ? <span className="message-edited"> · edited</span> : null}
                       </div>
                     )}
                     {!isOwn && m.editedAt && !layoutInfo.showAuthorName && (

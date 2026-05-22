@@ -3869,13 +3869,17 @@ html[data-theme="6"] .user-menu-dropdown {
   color: var(--color-muted);
 }
 
+.chat-thread .message-content:has(.edit-form) {
+  width: 100%;
+}
+
 .chat-thread .edit-form {
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: nowrap;
-  width: fit-content;
-  max-width: 70%;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
   padding: 6px;
   border-radius: 18px;
   background: var(--color-surface-2);
@@ -3884,10 +3888,10 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .edit-form input {
-  flex: 1 1 auto;
-  min-width: 180px;
-  width: 240px;
-  max-width: min(360px, 100%);
+  flex: 1 1 120px;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
@@ -5100,7 +5104,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread-panel .edit-form {
-  max-width: 70%;
+  max-width: 100%;
 }
 
 .chat-thread-panel .messages-history-top {
@@ -5495,6 +5499,20 @@ html.standalone-display .chat-thread-panel {
 
   .chat-thread .message-content {
     max-width: 70%;
+  }
+
+  .chat-thread .message-content:has(.edit-form) {
+    max-width: 88%;
+  }
+
+  .chat-thread .edit-form input {
+    flex: 1 1 100%;
+  }
+
+  .chat-thread .edit-form .btn-send,
+  .chat-thread .edit-form .btn-secondary {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .channel-settings-actions {
