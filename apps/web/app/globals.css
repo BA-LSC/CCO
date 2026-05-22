@@ -3896,6 +3896,23 @@ html[data-theme="6"] .user-menu-dropdown {
   text-align: center;
 }
 
+.chat-thread .composer.composer--readonly {
+  opacity: 0.72;
+  pointer-events: none;
+  filter: grayscale(0.15);
+}
+
+.chat-thread .composer.composer--readonly textarea {
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.chat-thread .composer.composer--readonly .composer-send,
+.chat-thread .composer.composer--readonly .composer-attach-menu {
+  opacity: 0.55;
+}
+
 .chat-thread input[type="text"],
 .chat-thread textarea {
   flex: 1;

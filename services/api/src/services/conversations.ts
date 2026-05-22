@@ -8,6 +8,7 @@ import {
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
+import { publishMessageEvent } from "../realtime/pubsub";
 import { unreadFlagsForConversations } from "./unread";
 
 export async function markConversationRead(
@@ -141,6 +142,13 @@ export async function updateConversation(params: {
     .update(conversations)
     .set(updates)
     .where(eq(conversations.id, params.conversationId));
+
+  await publishMessageEvent({
+    type: "conversation.updated",
+    conversationId: params.conversationId,
+    ...(updates.leaderOnly !== undefined ? { leaderOnly: updates.leaderOnly } : {}),
+    ...(updates.title !== undefined ? { title: updates.title } : {}),
+  });
 
   return true;
 }

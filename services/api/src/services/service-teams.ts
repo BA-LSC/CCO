@@ -16,6 +16,7 @@ import {
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
+import { upsertUserFromPco } from "./bootstrap";
 import {
   buildLocalMemberLookups,
   buildSignedUpMemberIndexFromRecords,
@@ -44,6 +45,55 @@ async function upsertServiceTeamMembership(params: {
       target: [serviceTeamMemberships.teamId, serviceTeamMemberships.userId],
       set: { role: params.role, syncedAt: new Date() },
     });
+}
+
+async function ensureTeamConversationAccess(
+  teamId: string,
+  userId: string,
+  teamName: string,
+): Promise<void> {
+  const conv = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(eq(conversations.serviceTeamId, teamId))
+    .limit(1);
+
+  let conversationId = conv[0]?.id;
+  if (!conversationId) {
+    const [created] = await db
+      .insert(conversations)
+      .values({
+        serviceTeamId: teamId,
+        slug: "general",
+        title: `${teamName} Chat`,
+      })
+      .returning({ id: conversations.id });
+    conversationId = created.id;
+  }
+
+  await db
+    .insert(conversationMembers)
+    .values({ conversationId, userId })
+    .onConflictDoNothing();
+}
+
+async function removeUserFromServiceTeam(teamId: string, userId: string): Promise<void> {
+  await db
+    .delete(serviceTeamMemberships)
+    .where(and(eq(serviceTeamMemberships.teamId, teamId), eq(serviceTeamMemberships.userId, userId)));
+
+  const convs = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(eq(conversations.serviceTeamId, teamId));
+
+  for (const conv of convs) {
+    await db
+      .delete(conversationMembers)
+      .where(
+        and(eq(conversationMembers.conversationId, conv.id), eq(conversationMembers.userId, userId)),
+      );
+  }
 }
 
 export async function persistServiceTeamSync(params: {
@@ -78,32 +128,7 @@ export async function persistServiceTeamSync(params: {
     }
 
     await upsertServiceTeamMembership({ teamId, userId: params.userId, role: team.role });
-
-    const conv = await db
-      .select({ id: conversations.id })
-      .from(conversations)
-      .where(eq(conversations.serviceTeamId, teamId))
-      .limit(1);
-
-    if (!conv[0]) {
-      const [newConv] = await db
-        .insert(conversations)
-        .values({
-          serviceTeamId: teamId,
-          slug: "general",
-          title: `${team.name} Chat`,
-        })
-        .returning({ id: conversations.id });
-      await db
-        .insert(conversationMembers)
-        .values({ conversationId: newConv.id, userId: params.userId })
-        .onConflictDoNothing();
-    } else {
-      await db
-        .insert(conversationMembers)
-        .values({ conversationId: conv[0].id, userId: params.userId })
-        .onConflictDoNothing();
-    }
+    await ensureTeamConversationAccess(teamId, params.userId, team.name);
   }
 
   const userTeams = await db
@@ -141,6 +166,84 @@ export async function persistServiceTeamSync(params: {
   }
 
   return { created, removed };
+}
+
+/** Pull the full PCO roster into local team memberships and chat access. */
+export async function syncServiceTeamRoster(params: {
+  organizationId: string;
+  teamId: string;
+  pcoTeamId: string;
+  accessToken: string;
+}): Promise<{ upserted: number; removed: number }> {
+  const team = await db
+    .select({ name: serviceTeams.name })
+    .from(serviceTeams)
+    .where(eq(serviceTeams.id, params.teamId))
+    .limit(1);
+
+  if (!team[0]) return { upserted: 0, removed: 0 };
+
+  const client = new PlanningCenterClient({ accessToken: params.accessToken });
+  const roster = await fetchServiceTeamRoster(client, params.pcoTeamId);
+  const rosterPcoPersonIds = new Set(roster.map((member) => member.pcoPersonId));
+  let upserted = 0;
+
+  for (const member of roster) {
+    const userId = await upsertUserFromPco(params.organizationId, {
+      personId: member.pcoPersonId,
+      email: member.email ?? `${member.pcoPersonId}@placeholder.local`,
+      displayName: member.displayName,
+      avatarUrl: member.avatarUrl ?? null,
+    });
+
+    await upsertServiceTeamMembership({
+      teamId: params.teamId,
+      userId,
+      role: member.role,
+    });
+    await ensureTeamConversationAccess(params.teamId, userId, team[0].name);
+    upserted += 1;
+  }
+
+  const localMembers = await db
+    .select({ userId: serviceTeamMemberships.userId, pcoPersonId: users.pcoPersonId })
+    .from(serviceTeamMemberships)
+    .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
+    .where(eq(serviceTeamMemberships.teamId, params.teamId));
+
+  let removed = 0;
+  for (const local of localMembers) {
+    if (rosterPcoPersonIds.has(local.pcoPersonId)) continue;
+    await removeUserFromServiceTeam(params.teamId, local.userId);
+    removed += 1;
+  }
+
+  return { upserted, removed };
+}
+
+/** Refresh roster when a team leader opens team settings (best-effort). */
+export async function trySyncServiceTeamRosterForLeader(params: {
+  organizationId: string;
+  teamId: string;
+  pcoTeamId: string;
+  userId: string;
+  membershipRole: string;
+  accessToken: string | undefined;
+}): Promise<boolean> {
+  if (!params.accessToken || !isLeaderRole(params.membershipRole)) return false;
+
+  try {
+    await syncServiceTeamRoster({
+      organizationId: params.organizationId,
+      teamId: params.teamId,
+      pcoTeamId: params.pcoTeamId,
+      accessToken: params.accessToken,
+    });
+    return true;
+  } catch (err) {
+    console.warn(`Auto roster sync failed for team ${params.teamId}:`, err);
+    return false;
+  }
 }
 
 export async function syncServiceTeamsFromPco(params: {

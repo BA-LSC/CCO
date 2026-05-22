@@ -87,6 +87,15 @@ export function ChatSidebar() {
   }, [loadSidebar]);
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadSidebar({ silent: true });
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadSidebar]);
+
+  useEffect(() => {
     return subscribeUnreadChanged(({ conversationId, hasUnread }) => {
       setDms((prev) =>
         prev.map((dm) => (dm.id === conversationId ? { ...dm, hasUnread } : dm)),

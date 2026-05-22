@@ -11,6 +11,12 @@ export type RealtimeEvent =
       messageId: string;
       action: "added" | "removed";
       reaction: ReactionDto;
+    }
+  | {
+      type: "conversation.updated";
+      conversationId: string;
+      leaderOnly?: boolean;
+      title?: string;
     };
 
 export function redisChannelForConversation(conversationId: string): string {

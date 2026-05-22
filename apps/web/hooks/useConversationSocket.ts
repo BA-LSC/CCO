@@ -8,7 +8,13 @@ type RealtimeEvent =
   | { type: "message.created"; message: Message }
   | { type: "message.updated"; message: Message }
   | { type: "message.deleted"; messageId: string }
-  | { type: "reaction.changed"; messageId: string; reaction: Reaction; action?: string };
+  | { type: "reaction.changed"; messageId: string; reaction: Reaction; action?: string }
+  | {
+      type: "conversation.updated";
+      conversationId: string;
+      leaderOnly?: boolean;
+      title?: string;
+    };
 
 export type { RealtimeEvent };
 

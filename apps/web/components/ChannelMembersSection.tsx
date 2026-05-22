@@ -49,6 +49,7 @@ type Props = {
   onRemove?: (memberId: string, displayName: string) => void;
   channelAccess?: ChannelAccessProps;
   watchPresence?: boolean;
+  headerAction?: React.ReactNode;
 };
 
 export function ChannelMembersSection({
@@ -62,6 +63,7 @@ export function ChannelMembersSection({
   onRemove,
   channelAccess,
   watchPresence = true,
+  headerAction,
 }: Props) {
   const presenceUserIds = members.filter((member) => member.onCco && member.id).map((member) => member.id);
   usePresenceWatch(presenceUserIds, watchPresence && members.length > 0);
@@ -76,6 +78,7 @@ export function ChannelMembersSection({
         <h3 className="channel-settings-group-label">
           {`${title} · ${countLabel}`}
         </h3>
+        {headerAction}
       </div>
       {inviteFeedback && (
         <p className="channel-settings-invite-feedback" role="status">

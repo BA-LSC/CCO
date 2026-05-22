@@ -4,6 +4,11 @@ export type UnreadChangedDetail = {
 };
 
 export const UNREAD_CHANGED_EVENT = "cco:unread-changed";
+export const SIDEBAR_RELOAD_EVENT = "cco:sidebar-reload";
+
+export function dispatchSidebarReload(): void {
+  window.dispatchEvent(new CustomEvent(SIDEBAR_RELOAD_EVENT));
+}
 
 export function dispatchUnreadChanged(detail: UnreadChangedDetail): void {
   window.dispatchEvent(new CustomEvent<UnreadChangedDetail>(UNREAD_CHANGED_EVENT, { detail }));

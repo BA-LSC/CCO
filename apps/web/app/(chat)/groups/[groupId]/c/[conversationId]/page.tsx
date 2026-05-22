@@ -11,6 +11,7 @@ import { ChatThread } from "@/components/ChatThread";
 import { ErrorState } from "@/components/PageStates";
 import { apiFetch, getErrorMessage, type GroupDetail, type Message, type MessageListResponse } from "@/lib/api";
 import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
+import { canPostInGroupChannel } from "@/lib/group-permissions";
 import { conversationMessagesPath } from "@/lib/messages";
 
 type ConversationMember = { id: string; displayName: string; role: string };
@@ -163,14 +164,28 @@ export default function GroupConversationPage() {
           body: JSON.stringify(payload),
         },
       );
-      await reloadDetail();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save channel settings");
+      await reloadDetail().catch(() => undefined);
       if (activeConversation) {
         setEditTitle(activeConversation.title);
         setEditLeaderOnly(activeConversation.leaderOnly);
       }
     }
+  }
+
+  function applyConversationUpdate(updates: { leaderOnly?: boolean; title?: string }) {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        conversations: prev.conversations.map((conversation) =>
+          conversation.id === conversationId ? { ...conversation, ...updates } : conversation,
+        ),
+      };
+    });
+    if (updates.leaderOnly !== undefined) setEditLeaderOnly(updates.leaderOnly);
+    if (updates.title !== undefined) setEditTitle(updates.title);
   }
 
   async function saveChannelMembersAccess(userIds: string[]) {
@@ -193,7 +208,7 @@ export default function GroupConversationPage() {
   }
 
   function handleLeaderOnlyChange(leaderOnly: boolean) {
-    setEditLeaderOnly(leaderOnly);
+    applyConversationUpdate({ leaderOnly });
     void patchConversationSettings({ leaderOnly });
   }
 
@@ -290,11 +305,12 @@ export default function GroupConversationPage() {
   const showChannelHiddenAccess =
     isLeader && activeConversation?.slug !== "general";
   const canPostInActive =
-    activeConversation &&
-    (!activeConversation.leaderOnly ||
-      detail?.membershipRole === "leader" ||
-      detail?.membershipRole === "admin");
-  const composerDisabled = detailLoading || messagesLoading || !canPostInActive;
+    Boolean(activeConversation) &&
+    canPostInGroupChannel({
+      membershipRole: detail?.membershipRole,
+      leaderOnly: activeConversation?.leaderOnly ?? false,
+    });
+  const composerDisabled = detailLoading || messagesLoading;
 
   function openChannelSettings() {
     setShowChannelSettings((open) => {
@@ -443,12 +459,13 @@ export default function GroupConversationPage() {
           members={mentionMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}
-          canPost={Boolean(canPostInActive) || detailLoading}
+          canPost={canPostInActive}
           readOnlyReason={
-            !detailLoading && !canPostInActive
+            !canPostInActive
               ? "Only group leaders can post in this channel."
               : undefined
           }
+          onConversationSettingsChange={applyConversationUpdate}
           layout="panel"
           messagesLoading={messagesLoading}
           composerDisabled={composerDisabled}

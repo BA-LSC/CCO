@@ -138,6 +138,7 @@ type Props = {
   isGroupLeader?: boolean;
   canPost?: boolean;
   readOnlyReason?: string;
+  onConversationSettingsChange?: (settings: { leaderOnly?: boolean; title?: string }) => void;
   layout?: "card" | "panel";
   composerPlaceholder?: string;
   messagesLoading?: boolean;
@@ -154,6 +155,7 @@ export function ChatThread({
   isGroupLeader = false,
   canPost = true,
   readOnlyReason,
+  onConversationSettingsChange,
   layout = "card",
   composerPlaceholder = "Message your group… (@ to mention)",
   messagesLoading = false,
@@ -595,6 +597,8 @@ export function ChatThread({
       messageId?: string;
       reaction?: Reaction;
       action?: string;
+      leaderOnly?: boolean;
+      title?: string;
     }) => {
       if (event.type === "message.created" && event.message) {
         setMessages((prev) => {
@@ -629,8 +633,14 @@ export function ChatThread({
           ),
         );
       }
+      if (event.type === "conversation.updated") {
+        onConversationSettingsChange?.({
+          leaderOnly: event.leaderOnly,
+          title: event.title,
+        });
+      }
     },
-    [conversationId, resolvedUserId, markConversationRead],
+    [conversationId, markConversationRead, onConversationSettingsChange, resolvedUserId],
   );
 
   useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
@@ -1414,8 +1424,32 @@ export function ChatThread({
           </button>
         </form>
       ) : (
-        <div className="composer-readonly" role="status">
-          {readOnlyReason ?? "You cannot post in this conversation."}
+        <div className="composer composer--readonly" aria-disabled="true" role="status">
+          <span className="composer-attach-menu composer-attach-menu--disabled" aria-hidden>
+            <span className="composer-attach-trigger" aria-hidden>
+              +
+            </span>
+          </span>
+          <textarea
+            disabled
+            readOnly
+            value=""
+            placeholder={readOnlyReason ?? "You cannot post in this conversation."}
+            rows={1}
+            aria-label="Message"
+          />
+          <button type="button" className="composer-send" disabled aria-hidden tabIndex={-1}>
+            <svg className="composer-send-icon" viewBox="0 0 24 24" aria-hidden>
+              <path
+                d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
       )}
       </div>

@@ -11,7 +11,9 @@ import {
   getServiceTeamDetail,
   listServiceTeamsForUser,
   removeMemberFromServiceTeamWithPco,
+  syncServiceTeamRoster,
   syncServiceTeamsFromPco,
+  trySyncServiceTeamRosterForLeader,
 } from "../services/service-teams";
 
 type Env = { Variables: AuthVariables };
@@ -86,12 +88,31 @@ servicesRouter.get("/teams", async (c) => {
 
 servicesRouter.get("/teams/:id", async (c) => {
   const session = c.get("session");
+  const teamId = c.req.param("id");
   const accessToken = await resolvePcoAccessToken(session, c);
-  const detail = await getServiceTeamDetail(c.req.param("id"), session.userId, {
+  let detail = await getServiceTeamDetail(teamId, session.userId, {
     accessToken: accessToken ?? undefined,
     organizationId: session.organizationId,
   });
   if (!detail) return c.json({ error: "Not found" }, 404);
+
+  if (accessToken && c.req.query("sync") === "1") {
+    const synced = await trySyncServiceTeamRosterForLeader({
+      organizationId: session.organizationId,
+      teamId,
+      pcoTeamId: detail.team.pcoTeamId,
+      userId: session.userId,
+      membershipRole: detail.membershipRole,
+      accessToken,
+    });
+    if (synced) {
+      const updated = await getServiceTeamDetail(teamId, session.userId, {
+        accessToken,
+        organizationId: session.organizationId,
+      });
+      if (updated) detail = updated;
+    }
+  }
 
   let serviceTypeNames: string[] = [];
   try {
@@ -123,6 +144,46 @@ servicesRouter.post("/teams/sync", async (c) => {
     }
     const message = err instanceof Error ? err.message : "Planning Center sync failed";
     return c.json({ error: message }, 502);
+  }
+});
+
+servicesRouter.post("/teams/:id/roster/sync", async (c) => {
+  const session = c.get("session");
+  const teamId = c.req.param("id");
+
+  const membership = await db
+    .select({ role: serviceTeamMemberships.role, pcoTeamId: serviceTeams.pcoTeamId })
+    .from(serviceTeamMemberships)
+    .innerJoin(serviceTeams, eq(serviceTeams.id, serviceTeamMemberships.teamId))
+    .where(
+      and(eq(serviceTeamMemberships.teamId, teamId), eq(serviceTeamMemberships.userId, session.userId)),
+    )
+    .limit(1);
+
+  if (!membership[0]) return c.json({ error: "Not found" }, 404);
+  if (!isLeaderRole(membership[0].role)) {
+    return c.json({ error: "Team leader role required" }, 403);
+  }
+
+  const accessToken = await resolvePcoAccessToken(session, c);
+  if (!accessToken) {
+    return c.json({ error: "Planning Center is not linked", needsReconnect: true }, 401);
+  }
+
+  try {
+    const result = await syncServiceTeamRoster({
+      organizationId: session.organizationId,
+      teamId,
+      pcoTeamId: membership[0].pcoTeamId,
+      accessToken,
+    });
+    return c.json({ synced: true, upserted: result.upserted, removed: result.removed });
+  } catch (err) {
+    if (err instanceof PcoApiError) {
+      return c.json({ error: err.message, needsReconnect: err.status === 401 }, 403);
+    }
+    console.error("team roster sync failed:", err);
+    return c.json({ error: "Roster sync failed" }, 500);
   }
 });
 

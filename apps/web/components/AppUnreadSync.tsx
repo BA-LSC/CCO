@@ -7,7 +7,7 @@ import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
 import { syncAppBadge, appBadgeSupported } from "@/lib/app-badge";
 import { apiFetch } from "@/lib/api";
 import { isPushClientMessage } from "@/lib/push-client-events";
-import { dispatchUnreadChanged, subscribeUnreadChanged } from "@/lib/sidebar-events";
+import { dispatchSidebarReload, dispatchUnreadChanged, subscribeUnreadChanged } from "@/lib/sidebar-events";
 
 const STANDALONE_POLL_MS = 30_000;
 
@@ -21,7 +21,7 @@ export function AppUnreadSync() {
     try {
       const { count } = await apiFetch<{ count: number }>("/api/v1/unread/summary");
       await syncAppBadge(count);
-      window.dispatchEvent(new CustomEvent("cco:sidebar-reload"));
+      dispatchSidebarReload();
     } catch {
       // Ignore transient API errors during deploy.
     }

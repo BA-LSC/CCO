@@ -9,6 +9,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { ChatThread } from "@/components/ChatThread";
 import { ErrorState } from "@/components/PageStates";
 import { PanelSettingsButton } from "@/components/PanelSettingsButton";
+import { dispatchSidebarReload } from "@/lib/sidebar-events";
 import { apiFetch, type Message, type MessageListResponse } from "@/lib/api";
 import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
 import { conversationMessagesPath } from "@/lib/messages";
@@ -45,6 +46,7 @@ export default function TeamChatPage() {
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [syncingRoster, setSyncingRoster] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   const isLeader =
@@ -54,8 +56,9 @@ export default function TeamChatPage() {
     messagesForConversationId === conversationId ? messages : [];
   const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
-  async function reloadDetail() {
-    const data = await apiFetch<TeamDetail>(`/api/v1/services/teams/${teamId}`);
+  async function reloadDetail(options?: { sync?: boolean }) {
+    const query = options?.sync ? "?sync=1" : "";
+    const data = await apiFetch<TeamDetail>(`/api/v1/services/teams/${teamId}${query}`);
     setDetail(data);
     return data;
   }
@@ -65,8 +68,11 @@ export default function TeamChatPage() {
     setDetailLoading(true);
     setError(null);
 
-    apiFetch<TeamDetail>(`/api/v1/services/teams/${teamId}`)
-      .then((teamData) => setDetail(teamData))
+    apiFetch<TeamDetail>(`/api/v1/services/teams/${teamId}?sync=1`)
+      .then((teamData) => {
+        setDetail(teamData);
+        dispatchSidebarReload();
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load team"))
       .finally(() => setDetailLoading(false));
   }, [teamId]);
@@ -134,13 +140,28 @@ export default function TeamChatPage() {
     });
   }
 
+  async function syncRoster() {
+    setSyncingRoster(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/services/teams/${teamId}/roster/sync`, { method: "POST" });
+      await reloadDetail({ sync: true });
+      dispatchSidebarReload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Roster sync failed");
+    } finally {
+      setSyncingRoster(false);
+    }
+  }
+
   async function removeFromTeam(userId: string, displayName: string) {
     if (!confirm(`Remove ${displayName} from this team in Planning Center?`)) return;
     setRemovingMemberId(userId);
     setError(null);
     try {
       await apiFetch(`/api/v1/services/teams/${teamId}/members/${userId}`, { method: "DELETE" });
-      await reloadDetail();
+      await reloadDetail({ sync: true });
+      dispatchSidebarReload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not remove member");
     } finally {
@@ -245,6 +266,18 @@ export default function TeamChatPage() {
             removingMemberId={removingMemberId}
             onInvite={isLeader ? inviteMember : undefined}
             onRemove={isLeader ? removeFromTeam : undefined}
+            headerAction={
+              isLeader ? (
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={syncingRoster}
+                  onClick={() => void syncRoster()}
+                >
+                  {syncingRoster ? "Refreshing…" : "Refresh from Planning Center"}
+                </button>
+              ) : undefined
+            }
           />
         </ChannelSettingsPanel>
       )}
