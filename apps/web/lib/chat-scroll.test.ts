@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { maxScrollTop, scrollMessagesToBottom } from "./chat-scroll";
+import {
+  maxScrollTop,
+  scrollContainerToElement,
+  scrollMessagesToBottom,
+} from "./chat-scroll";
 
 describe("chat-scroll", () => {
   test("maxScrollTop is scrollHeight minus clientHeight", () => {
@@ -21,5 +25,18 @@ describe("chat-scroll", () => {
 
     scrollMessagesToBottom(el);
     expect(el.scrollTop).toBe(300);
+  });
+
+  test("scrollContainerToElement offsets target below container top", () => {
+    const container = {
+      scrollTop: 0,
+      getBoundingClientRect: () => ({ top: 100 }),
+    } as HTMLElement;
+    const target = {
+      getBoundingClientRect: () => ({ top: 420 }),
+    } as HTMLElement;
+
+    scrollContainerToElement(container, target, 24);
+    expect(container.scrollTop).toBe(296);
   });
 });

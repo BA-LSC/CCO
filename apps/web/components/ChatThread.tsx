@@ -29,6 +29,7 @@ import { sortMessagesByCreatedAt } from "@/lib/message-order";
 import {
   maxScrollTop,
   scheduleScrollMessagesToBottom,
+  scrollContainerToElement,
   scrollMessagesToBottom,
 } from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
@@ -124,7 +125,7 @@ export function ChatThread({
 }: Props) {
   const coarsePointer = useCoarsePointer();
   const placeholder = composerPlaceholderForDevice(composerPlaceholder, coarsePointer);
-  const { setRealtimeConnected, session, sessionLoading } = useChatLayout();
+  const { setRealtimeConnected, session } = useChatLayout();
   const resolvedUserId = currentUserId ?? session?.userId;
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -159,14 +160,15 @@ export function ChatThread({
   messagesRef.current = messages;
   hasMoreRef.current = hasMore;
   loadingMoreRef.current = loadingMore;
-  const autoScrollToBottomRef = useRef(true);
-  const pinnedToBottomRef = useRef(true);
+  const autoScrollToBottomRef = useRef(initialFirstUnreadMessageId == null);
+  const pinnedToBottomRef = useRef(initialFirstUnreadMessageId == null);
+  const initialScrollDoneRef = useRef(false);
   const bottomSeenMessageIdRef = useRef<string | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
+  const [scrollReady, setScrollReady] = useState(false);
 
   const scrollBottomThresholdPx = 72;
-  const identityPending = !resolvedUserId && sessionLoading && messages.length > 0;
 
   const markBottomSeen = useCallback(() => {
     bottomSeenMessageIdRef.current = messagesRef.current.at(-1)?.id ?? null;
@@ -207,10 +209,12 @@ export function ChatThread({
 
   useLayoutEffect(() => {
     syncComposerTextareaHeight(composerRef.current);
+    if (!initialScrollDoneRef.current) return;
+    if (firstUnreadMessageId) return;
     if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
     const container = getScrollContainer();
     if (container) scrollMessagesToBottom(container);
-  }, [body, composerDisabled, conversationId, layout, messages.length]);
+  }, [body, composerDisabled, conversationId, firstUnreadMessageId, layout, messages.length]);
 
   function scrollToBottom(behavior: ScrollBehavior = "smooth") {
     const container = getScrollContainer();
@@ -280,8 +284,52 @@ export function ChatThread({
   const lastMessageId = messages[messages.length - 1]?.id;
 
   useLayoutEffect(() => {
-    if (messagesLoading || identityPending || messages.length === 0) return;
+    if (messagesLoading || messages.length === 0) return;
+    if (initialScrollDoneRef.current) return;
     if (pendingScrollRestoreRef.current) return;
+
+    const container = getScrollContainer();
+    if (!container) return;
+
+    const unreadAnchorId = firstUnreadMessageId ?? initialFirstUnreadMessageId;
+    const unreadTarget =
+      unreadAnchorId &&
+      messages.some((message) => message.id === unreadAnchorId)
+        ? container.querySelector<HTMLElement>(`[data-message-id="${unreadAnchorId}"]`)
+        : null;
+
+    if (unreadTarget) {
+      scrollContainerToElement(container, unreadTarget);
+      autoScrollToBottomRef.current = false;
+      pinnedToBottomRef.current = false;
+      bottomSeenMessageIdRef.current = messages.at(-1)?.id ?? null;
+      setHasNewMessagesBelow(false);
+      setShowScrollToBottom(true);
+    } else {
+      scrollMessagesToBottom(container);
+      pinnedToBottomRef.current = true;
+      autoScrollToBottomRef.current = true;
+      setShowScrollToBottom(false);
+      markBottomSeen();
+    }
+
+    initialScrollDoneRef.current = true;
+    setScrollReady(true);
+  }, [
+    firstUnreadMessageId,
+    initialFirstUnreadMessageId,
+    layout,
+    markBottomSeen,
+    messages,
+    messages.length,
+    messagesLoading,
+  ]);
+
+  useLayoutEffect(() => {
+    if (messagesLoading || messages.length === 0) return;
+    if (!initialScrollDoneRef.current) return;
+    if (pendingScrollRestoreRef.current) return;
+    if (firstUnreadMessageId) return;
     if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
 
     const container = getScrollContainer();
@@ -289,6 +337,7 @@ export function ChatThread({
 
     const followLatest = () => {
       if (pendingScrollRestoreRef.current) return;
+      if (firstUnreadMessageId) return;
       if (!pinnedToBottomRef.current && !autoScrollToBottomRef.current) return;
 
       scrollMessagesToBottom(container);
@@ -312,7 +361,7 @@ export function ChatThread({
       cancelScheduled();
       resizeObserver.disconnect();
     };
-  }, [lastMessageId, messages.length, messagesLoading, identityPending, layout, markBottomSeen]);
+  }, [firstUnreadMessageId, lastMessageId, messages.length, messagesLoading, layout, markBottomSeen]);
 
   useEffect(() => {
     const latestId = messages.at(-1)?.id;
@@ -333,6 +382,8 @@ export function ChatThread({
     if (switchedConversation) {
       autoScrollToBottomRef.current = !initialFirstUnreadMessageId;
       pinnedToBottomRef.current = !initialFirstUnreadMessageId;
+      initialScrollDoneRef.current = false;
+      setScrollReady(false);
       setShowScrollToBottom(false);
       setHasNewMessagesBelow(false);
       bottomSeenMessageIdRef.current = null;
@@ -362,24 +413,6 @@ export function ChatThread({
     initialFirstUnreadMessageId,
     messagesLoading,
   ]);
-
-  useLayoutEffect(() => {
-    if (messagesLoading || identityPending || !firstUnreadMessageId) return;
-    if (!messages.some((message) => message.id === firstUnreadMessageId)) return;
-
-    const container = getScrollContainer();
-    const target = container?.querySelector<HTMLElement>(
-      `[data-message-id="${firstUnreadMessageId}"]`,
-    );
-    if (!target) return;
-
-    target.scrollIntoView({ block: "center" });
-    autoScrollToBottomRef.current = false;
-    pinnedToBottomRef.current = false;
-    bottomSeenMessageIdRef.current = messages.at(-1)?.id ?? null;
-    setHasNewMessagesBelow(false);
-    setShowScrollToBottom(true);
-  }, [firstUnreadMessageId, messagesLoading, identityPending, messages, layout]);
 
   useEffect(() => {
     if (!firstUnreadMessageId || messagesLoading) return;
@@ -751,10 +784,6 @@ export function ChatThread({
           <div className="messages-loading" role="status" aria-live="polite">
             <div className="spinner" aria-hidden />
           </div>
-        ) : identityPending ? (
-          <div className="messages-loading" role="status" aria-live="polite">
-            <div className="spinner" aria-hidden />
-          </div>
         ) : messages.length === 0 ? (
           <div className="empty-state">
             <h3>No messages yet</h3>
@@ -971,11 +1000,22 @@ export function ChatThread({
   );
 
   return (
-    <div className={`chat-thread ${layout === "panel" ? "chat-thread-panel" : ""}`}>
+    <div
+      className={[
+        "chat-thread",
+        layout === "panel" ? "chat-thread-panel" : "",
+        messages.length > 0 && !scrollReady ? "chat-thread--scroll-init" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {layout === "panel" ? (
         <div
           ref={panelBodyRef}
-          className="chat-panel-body"
+          className={[
+            "chat-panel-body",
+            scrollReady ? "chat-panel-body--scroll-ready" : "chat-panel-body--scroll-init",
+          ].join(" ")}
           onScroll={handleScrollContainer}
         >
           <div className="chat-panel-messages-inner">{messageScrollContent}</div>

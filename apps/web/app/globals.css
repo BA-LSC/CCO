@@ -4235,6 +4235,18 @@ html[data-theme="6"] .user-menu-dropdown {
   padding: 0 var(--chat-inset-x);
 }
 
+.chat-thread-panel .chat-panel-body--scroll-init {
+  visibility: hidden;
+}
+
+.chat-thread-panel .chat-panel-body--scroll-ready {
+  visibility: visible;
+}
+
+.chat-thread--scroll-init .messages {
+  visibility: hidden;
+}
+
 .chat-thread-panel .chat-panel-messages-inner {
   min-height: 100%;
   display: flex;

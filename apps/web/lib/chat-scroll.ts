@@ -8,6 +8,20 @@ export function scrollMessagesToBottom(container: HTMLElement): void {
   container.scrollTop = maxScrollTop(container);
 }
 
+/** Scroll so `target` sits below the top edge of `container` (no smooth centering jump). */
+export function scrollContainerToElement(
+  container: HTMLElement,
+  target: HTMLElement,
+  insetTop = 24,
+): void {
+  const containerRect = container.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  container.scrollTop = Math.max(
+    0,
+    targetRect.top - containerRect.top + container.scrollTop - insetTop,
+  );
+}
+
 /**
  * Scroll to the bottom on the next frames — content height often settles after paint
  * (composer resize, reactions row, images, flex layout).
@@ -18,15 +32,9 @@ export function scheduleScrollMessagesToBottom(container: HTMLElement): () => vo
   run();
   const raf1 = requestAnimationFrame(run);
   const raf2 = requestAnimationFrame(() => requestAnimationFrame(run));
-  const t0 = window.setTimeout(run, 0);
-  const t1 = window.setTimeout(run, 50);
-  const t2 = window.setTimeout(run, 150);
 
   return () => {
     cancelAnimationFrame(raf1);
     cancelAnimationFrame(raf2);
-    window.clearTimeout(t0);
-    window.clearTimeout(t1);
-    window.clearTimeout(t2);
   };
 }
