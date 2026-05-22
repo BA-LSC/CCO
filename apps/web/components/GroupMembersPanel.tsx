@@ -7,8 +7,6 @@ import { usePresenceWatch } from "@/components/PresenceProvider";
 import { apiFetch, type GroupDetail } from "@/lib/api";
 import { resolveMemberAvatarUrl } from "@/lib/member-avatar";
 
-type SessionInfo = { userId: string; displayName?: string };
-
 type Props = {
   groupId: string;
 };
@@ -17,7 +15,6 @@ type Props = {
 export function GroupMembersPanel({ groupId }: Props) {
   const { session } = useChatLayout();
   const [detail, setDetail] = useState<GroupDetail | null>(null);
-  const [session, setSession] = useState<SessionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
@@ -37,14 +34,8 @@ export function GroupMembersPanel({ groupId }: Props) {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    Promise.all([
-      apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`),
-      apiFetch<SessionInfo>("/api/v1/session/me").catch(() => null),
-    ])
-      .then(([groupData, sessionData]) => {
-        setDetail(groupData);
-        setSession(sessionData);
-      })
+    apiFetch<GroupDetail>(`/api/v1/groups/${groupId}`)
+      .then((groupData) => setDetail(groupData))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load members"))
       .finally(() => setLoading(false));
   }, [groupId]);
