@@ -3236,14 +3236,14 @@ html[data-theme="6"] .user-menu-dropdown {
   bottom: -18px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
+  padding: 4px 8px;
   box-shadow: var(--shadow-md);
   font-size: 0.875rem;
   z-index: 4;
@@ -3280,7 +3280,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-thread .message-actions .link-btn {
-  padding: 6px 10px;
+  padding: 4px 6px;
   font-size: 0.875rem;
   border-radius: 6px;
   line-height: 1.2;
@@ -3307,9 +3307,9 @@ html[data-theme="6"] .user-menu-dropdown {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 36px;
-  padding: 0 4px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 2px;
   border: none;
   background: none;
   cursor: pointer;
@@ -3329,12 +3329,12 @@ html[data-theme="6"] .user-menu-dropdown {
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--color-muted);
-  min-width: 36px;
+  min-width: 30px;
 }
 
 .chat-thread .message-actions-divider {
   width: 1px;
-  height: 24px;
+  height: 18px;
   background: var(--color-border);
   flex-shrink: 0;
 }
@@ -3662,7 +3662,6 @@ html[data-theme="6"] .user-menu-dropdown {
   max-width: 100%;
   gap: 4px;
   overflow: visible;
-  padding-bottom: 10px;
 }
 
 .chat-thread .message-item--own .message-bubble-stack {
