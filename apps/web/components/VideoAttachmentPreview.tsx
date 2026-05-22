@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { getVideoThumbnailUrl } from "@/lib/video-thumbnail-cache";
 
 type Props = {
   label: string;
@@ -9,33 +10,20 @@ type Props = {
 };
 
 export function VideoAttachmentPreview({ label, src, onPlay }: Props) {
-  const [frameReady, setFrameReady] = useState(false);
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    setFrameReady(false);
-  }, [src]);
+    let cancelled = false;
+    setPosterUrl(null);
 
-  const primeFirstFrame = useCallback((video: HTMLVideoElement) => {
-    const markReady = () => setFrameReady(true);
+    void getVideoThumbnailUrl(src).then((url) => {
+      if (!cancelled) setPosterUrl(url);
+    });
 
-    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      markReady();
-      return;
-    }
-
-    const onSeeked = () => {
-      markReady();
-      video.removeEventListener("seeked", onSeeked);
+    return () => {
+      cancelled = true;
     };
-
-    video.addEventListener("seeked", onSeeked);
-
-    try {
-      video.currentTime = 0.001;
-    } catch {
-      markReady();
-    }
-  }, []);
+  }, [src]);
 
   return (
     <button
@@ -48,18 +36,14 @@ export function VideoAttachmentPreview({ label, src, onPlay }: Props) {
       }}
     >
       <span className="attachment attachment-video-preview-frame" aria-hidden="true">
-        <video
-          className={`attachment-video-preview-video ${frameReady ? "attachment-video-preview-video--ready" : ""}`}
-          src={src}
-          muted
-          playsInline
-          preload="metadata"
-          tabIndex={-1}
-          aria-hidden="true"
-          onLoadedMetadata={(event) => primeFirstFrame(event.currentTarget)}
-          onLoadedData={(event) => primeFirstFrame(event.currentTarget)}
-          onError={() => setFrameReady(false)}
-        />
+        {posterUrl ? (
+          <img
+            className="attachment-video-preview-video attachment-video-preview-video--ready"
+            src={posterUrl}
+            alt=""
+            draggable={false}
+          />
+        ) : null}
         <span className="attachment-video-preview-scrim" aria-hidden="true" />
         <span className="attachment-video-preview-play">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
