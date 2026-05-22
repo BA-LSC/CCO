@@ -16,11 +16,11 @@ async function readDeployUpdating(): Promise<boolean> {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
-    if (!res.ok) return true;
+    if (!res.ok) return false;
     const data = (await res.json()) as { draining?: boolean };
     return Boolean(data.draining);
   } catch {
-    return true;
+    return false;
   }
 }
 

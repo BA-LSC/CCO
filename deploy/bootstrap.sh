@@ -84,20 +84,28 @@ fi
 cco_stop_setup_connector
 
 mark_deploy_draining() {
-  echo "  Signaling deploy in progress to connected clients..."
-  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX 900 >/dev/null 2>&1 || true
+  echo "  Signaling connected clients before container swap..."
+  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" SET cco:deploy:draining 1 EX 120 >/dev/null 2>&1 || true
 }
 
 clear_deploy_draining() {
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
 }
 
-echo "Building and starting CCO production stack..."
+DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-4}"
+
+echo "Building CCO production images..."
 CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
 export CCO_BUILD_ID
 echo "  Web build id: ${CCO_BUILD_ID}"
+"${COMPOSE[@]}" build
+
 mark_deploy_draining
-"${COMPOSE[@]}" up -d --build
+echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
+sleep "$DEPLOY_DRAIN_WAIT_SEC"
+
+echo "Recreating containers with new images..."
+"${COMPOSE[@]}" up -d --no-build
 
 echo ""
 echo "Waiting for services..."

@@ -105,38 +105,43 @@ function applyUpdate(){
   overlay();
   waitForSendIdle(reloadAfterOverlay);
 }
+function handleVersionPayload(d){
+  if(d.updating){
+    markDeployPending();
+    return;
+  }
+  if(deployPending){
+    if(d.version&&d.version!==CLIENT){
+      applyUpdate();
+      return;
+    }
+    if(d.version===CLIENT){
+      clearDeployPending();
+    }
+    return;
+  }
+  if(d.version&&d.version!==CLIENT){
+    applyUpdate();
+  }
+}
 function check(){
   if(applying)return;
   fetch("/api/app-version",{cache:"no-store",headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}})
     .then(function(r){
       if(isDeployStatus(r.status)){
-        markDeployPending();
+        if(deployPending)overlay();
         return null;
       }
-      if(!r.ok){
-        markDeployPending();
-        return null;
-      }
+      if(!r.ok)return null;
       return r.json();
     })
     .then(function(d){
       if(!d)return;
-      if(d.updating){
-        markDeployPending();
-        return;
-      }
-      if(!d.version){
-        markDeployPending();
-        return;
-      }
-      if(d.version===CLIENT){
-        if(deployPending)clearDeployPending();
-        return;
-      }
-      applyUpdate();
+      if(!d.version)return;
+      handleVersionPayload(d);
     })
     .catch(function(){
-      markDeployPending();
+      if(deployPending)overlay();
     });
 }
 function wire(){

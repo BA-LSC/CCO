@@ -101,8 +101,11 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
-    if (DEPLOY_HTTP_STATUSES.has(res.status) || !res.ok) {
-      return { version: null, unavailable: true, updating: true };
+    if (DEPLOY_HTTP_STATUSES.has(res.status)) {
+      return { version: null, unavailable: true, updating: deployWaitActive };
+    }
+    if (!res.ok) {
+      return { version: null, unavailable: true, updating: false };
     }
 
     const data = (await res.json()) as { version?: string; updating?: boolean };
@@ -112,7 +115,7 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
 
     return { version: data.version ?? null, unavailable: false, updating: false };
   } catch {
-    return { version: null, unavailable: true, updating: true };
+    return { version: null, unavailable: true, updating: deployWaitActive };
   }
 }
 
@@ -128,13 +131,23 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
 
   const { version: serverVersion, unavailable, updating } = await probeServerAppVersion();
 
-  if (updating || unavailable) {
+  if (updating) {
     markDeployWait(onUpdating);
     return false;
   }
 
+  if (deployWaitActive) {
+    if (!unavailable && serverVersion && serverVersion !== APP_BUILD_VERSION) {
+      await applyAppUpdate(onUpdating);
+      return true;
+    }
+    if (!unavailable && serverVersion === APP_BUILD_VERSION) {
+      clearDeployWait();
+    }
+    return false;
+  }
+
   if (!serverVersion || serverVersion === APP_BUILD_VERSION) {
-    if (deployWaitActive) clearDeployWait();
     return false;
   }
 
