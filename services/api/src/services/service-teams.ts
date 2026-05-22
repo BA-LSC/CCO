@@ -16,7 +16,7 @@ import {
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
-import { buildSignedUpMemberIndex, memberIsOnCco } from "./cco-member-status";
+import { buildSignedUpMemberIndex, buildLocalMemberLookups, findLocalMember, memberIsOnCco } from "./cco-member-status";
 import { unreadFlagsForConversations } from "./unread";
 
 async function upsertServiceTeamMembership(params: {
@@ -240,16 +240,25 @@ async function listTeamMembersForDetail(params: {
   try {
     const client = new PlanningCenterClient({ accessToken: params.accessToken });
     const roster = await fetchServiceTeamRoster(client, params.pcoTeamId);
-    const memberByPcoId = new Map(ccoMembers.map((member) => [member.pcoPersonId, member]));
+    const localLookups = buildLocalMemberLookups(ccoMembers);
 
     return sortTeamMembersByName(
       roster.map((person) => {
-        const local = memberByPcoId.get(person.pcoPersonId);
-        const onCco = memberIsOnCco(person, local?.id, signedUp);
+        const local = findLocalMember(person, localLookups);
+        const displayName = local?.displayName ?? person.displayName;
+        const onCco = memberIsOnCco(
+          {
+            pcoPersonId: person.pcoPersonId,
+            email: person.email ?? local?.email,
+            displayName,
+          },
+          local?.id,
+          signedUp,
+        );
         return {
           id: local?.id,
           pcoPersonId: person.pcoPersonId,
-          displayName: local?.displayName ?? person.displayName,
+          displayName,
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
           onCco,
@@ -270,7 +279,11 @@ async function listTeamMembersForDetail(params: {
         avatarUrl: member.avatarUrl,
         role: member.role,
         onCco: memberIsOnCco(
-          { pcoPersonId: member.pcoPersonId, email: member.email },
+          {
+            pcoPersonId: member.pcoPersonId,
+            email: member.email,
+            displayName: member.displayName,
+          },
           member.id,
           signedUp,
         ),

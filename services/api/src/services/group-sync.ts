@@ -12,7 +12,7 @@ import {
 import { isLeaderRole } from "../permissions";
 import { mergeGroups } from "../sync/groups";
 import { upsertUserFromPco } from "./bootstrap";
-import { buildSignedUpMemberIndex, memberIsOnCco } from "./cco-member-status";
+import { buildSignedUpMemberIndex, buildLocalMemberLookups, findLocalMember, memberIsOnCco } from "./cco-member-status";
 import { ensureConversationMembers, ensureGeneralConversation, ensureGeneralConversationMembers } from "./conversations";
 
 export async function persistGroupSync(params: {
@@ -364,16 +364,25 @@ export async function listGroupMembersForDetail(params: {
   try {
     const client = new PlanningCenterClient({ accessToken: params.accessToken });
     const roster = await fetchGroupRoster(client, params.pcoGroupId);
-    const memberByPcoId = new Map(ccoMembers.map((member) => [member.pcoPersonId, member]));
+    const localLookups = buildLocalMemberLookups(ccoMembers);
 
     return sortGroupMembersByName(
       roster.map((person) => {
-        const local = memberByPcoId.get(person.pcoPersonId);
-        const onCco = memberIsOnCco(person, local?.id, signedUp);
+        const local = findLocalMember(person, localLookups);
+        const displayName = local?.displayName ?? rosterDisplayName(person);
+        const onCco = memberIsOnCco(
+          {
+            pcoPersonId: person.pcoPersonId,
+            email: person.email ?? local?.email,
+            displayName,
+          },
+          local?.id,
+          signedUp,
+        );
         return {
           id: local?.id,
           pcoPersonId: person.pcoPersonId,
-          displayName: local?.displayName ?? rosterDisplayName(person),
+          displayName,
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
           onCco,
@@ -394,7 +403,11 @@ export async function listGroupMembersForDetail(params: {
         avatarUrl: member.avatarUrl,
         role: member.role,
         onCco: memberIsOnCco(
-          { pcoPersonId: member.pcoPersonId, email: member.email },
+          {
+            pcoPersonId: member.pcoPersonId,
+            email: member.email,
+            displayName: member.displayName,
+          },
           member.id,
           signedUp,
         ),
