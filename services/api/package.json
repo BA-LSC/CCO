@@ -7,8 +7,8 @@
     "dev": "bun --env-file=../../.env run --watch src/main.ts",
     "start": "bun run src/main.ts",
     "test": "SESSION_SECRET=test-secret-must-be-at-least-32-characters-long!! bun test",
-    "db:migrate": "bunx drizzle-kit migrate",
-    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
     "jobs:reconcile": "bun run src/jobs/runner.ts"
   },
   "dependencies": {
