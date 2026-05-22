@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
 import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
+import { WebPushRegistrar } from "@/components/WebPushRegistrar";
 
 type Props = {
   children: ReactNode;
@@ -19,6 +20,7 @@ export function ChatShell({ children }: Props) {
 
   return (
     <ChatLayoutProvider>
+      <WebPushRegistrar />
       <div className={`chat-shell${hideSidebar ? " chat-shell--no-sidebar" : ""}`}>
         {!hideSidebar ? <ChatSidebar /> : null}
         <main className="chat-main">{children}</main>

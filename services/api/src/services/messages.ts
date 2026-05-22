@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, ne } from "drizzle-orm";
 import { db } from "../db";
 import {
   conversationMembers,
@@ -11,11 +11,12 @@ import {
 } from "../db/schema";
 import { extractMentionedUserIds } from "../lib/mentions";
 import { isAllowedAttachmentUrl, refreshAttachmentUrl } from "../lib/uploads";
-import { markConversationRead } from "./conversations";
 import { directMessageParticipantsAreSignedUp } from "./dms";
+import { markConversationRead } from "./conversations";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
 import { publishMessageEvent } from "../realtime/pubsub";
 import { notifyConversationOfMessage, notifyMentionedUsers } from "./push-notify";
+import { lastReadAtIso } from "./unread";
 import type { ReactionDto } from "./reactions";
 
 export type MessageDto = {
@@ -150,10 +151,15 @@ async function attachReactions(messageIds: string[]): Promise<Map<string, Reacti
 export async function listMessages(
   conversationId: string,
   userId: string,
-  options?: { limit?: number; before?: string },
-): Promise<{ messages: MessageDto[]; hasMore: boolean } | null> {
+  options?: { limit?: number; before?: string; anchorUnread?: boolean },
+): Promise<{
+  messages: MessageDto[];
+  hasMore: boolean;
+  firstUnreadMessageId: string | null;
+  lastReadAt: string | null;
+} | null> {
   const member = await db
-    .select({ id: conversationMembers.id })
+    .select({ id: conversationMembers.id, lastReadAt: conversationMembers.lastReadAt })
     .from(conversationMembers)
     .where(
       and(
@@ -165,11 +171,43 @@ export async function listMessages(
 
   if (!member[0]) return null;
 
+  const lastReadAt = member[0].lastReadAt;
   const limit = Math.min(options?.limit ?? 50, 100);
-  const conditions = [
+  const baseConditions = [
     eq(messages.conversationId, conversationId),
     isNull(messages.deletedAt),
   ];
+
+  let firstUnreadMessageId: string | null = null;
+
+  const unreadConditions = [...baseConditions, ne(messages.authorId, userId)];
+  if (lastReadAt) {
+    unreadConditions.push(gt(messages.createdAt, lastReadAt));
+  }
+
+  const firstUnread = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(and(...unreadConditions))
+    .orderBy(asc(messages.createdAt))
+    .limit(1);
+
+  firstUnreadMessageId = firstUnread[0]?.id ?? null;
+
+  async function fetchPage(whereExtra?: ReturnType<typeof and>, order: "desc" | "asc" = "desc") {
+    const conditions = whereExtra ? [...baseConditions, whereExtra] : baseConditions;
+    const rows = await db
+      .select(messageSelect)
+      .from(messages)
+      .innerJoin(users, eq(users.id, messages.authorId))
+      .where(and(...conditions))
+      .orderBy(order === "desc" ? desc(messages.createdAt) : asc(messages.createdAt))
+      .limit(limit + 1);
+    return rows;
+  }
+
+  let rows: MessageRow[] = [];
+  let hasMore = false;
 
   if (options?.before) {
     const anchor = await db
@@ -178,30 +216,68 @@ export async function listMessages(
       .where(eq(messages.id, options.before))
       .limit(1);
     if (anchor[0]) {
-      conditions.push(lt(messages.createdAt, anchor[0].createdAt));
+      const pageRows = await fetchPage(lt(messages.createdAt, anchor[0].createdAt));
+      hasMore = pageRows.length > limit;
+      rows = (hasMore ? pageRows.slice(0, limit) : pageRows).reverse() as MessageRow[];
     }
+  } else if (options?.anchorUnread && firstUnreadMessageId) {
+    const anchor = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
+      .where(eq(messages.id, firstUnreadMessageId))
+      .limit(1);
+
+    if (anchor[0]) {
+      const contextBefore = await db
+        .select(messageSelect)
+        .from(messages)
+        .innerJoin(users, eq(users.id, messages.authorId))
+        .where(and(...baseConditions, lt(messages.createdAt, anchor[0].createdAt)))
+        .orderBy(desc(messages.createdAt))
+        .limit(6);
+
+      const fromUnread = await db
+        .select(messageSelect)
+        .from(messages)
+        .innerJoin(users, eq(users.id, messages.authorId))
+        .where(and(...baseConditions, gt(messages.createdAt, anchor[0].createdAt)))
+        .orderBy(asc(messages.createdAt))
+        .limit(limit);
+
+      const anchorRow = await db
+        .select(messageSelect)
+        .from(messages)
+        .innerJoin(users, eq(users.id, messages.authorId))
+        .where(eq(messages.id, firstUnreadMessageId))
+        .limit(1);
+
+      const context = contextBefore.reverse() as MessageRow[];
+      hasMore = contextBefore.length === 6;
+      rows = [
+        ...context,
+        ...(anchorRow as MessageRow[]),
+        ...(fromUnread as MessageRow[]),
+      ];
+    }
+  } else {
+    const pageRows = await fetchPage();
+    hasMore = pageRows.length > limit;
+    rows = (hasMore ? pageRows.slice(0, limit) : pageRows).reverse() as MessageRow[];
   }
 
-  const rows = await db
-    .select(messageSelect)
-    .from(messages)
-    .innerJoin(users, eq(users.id, messages.authorId))
-    .where(and(...conditions))
-    .orderBy(desc(messages.createdAt))
-    .limit(limit + 1);
+  const reactionMap = await attachReactions(rows.map((r) => r.id));
 
-  const hasMore = rows.length > limit;
-  const page = (hasMore ? rows.slice(0, limit) : rows).reverse();
-  const reactionMap = await attachReactions(page.map((r) => r.id));
-
-  const messagesDto = page.map((row) => ({
+  const messagesDto = rows.map((row) => ({
     ...toDto(row),
     reactions: reactionMap.get(row.id) ?? [],
   }));
 
-  await markConversationRead(conversationId, userId);
-
-  return { messages: messagesDto, hasMore };
+  return {
+    messages: messagesDto,
+    hasMore,
+    firstUnreadMessageId,
+    lastReadAt: lastReadAtIso(lastReadAt),
+  };
 }
 
 export async function createMessage(params: {
@@ -290,6 +366,8 @@ export async function createMessage(params: {
     conversationId: params.conversationId,
     message: dto,
   });
+
+  void markConversationRead(params.conversationId, params.userId);
 
   const mentionedIds = extractMentionedUserIds(params.body);
   if (mentionedIds.length > 0) {

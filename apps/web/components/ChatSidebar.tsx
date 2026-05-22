@@ -79,6 +79,11 @@ export function ChatSidebar() {
       setDms((prev) =>
         prev.map((dm) => (dm.id === conversationId ? { ...dm, hasUnread } : dm)),
       );
+      setTeams((prev) =>
+        prev.map((team) =>
+          team.conversationId === conversationId ? { ...team, hasUnread } : team,
+        ),
+      );
     });
   }, []);
 
@@ -87,6 +92,7 @@ export function ChatSidebar() {
   }, [pathname, closeSidebar]);
 
   const activeDmId = pathname.match(/^\/dms\/([^/]+)/)?.[1] ?? null;
+  const activeTeamId = pathname.match(/^\/teams\/([^/]+)/)?.[1] ?? null;
 
   useEffect(() => {
     if (!activeDmId) return;
@@ -94,6 +100,13 @@ export function ChatSidebar() {
       prev.map((dm) => (dm.id === activeDmId ? { ...dm, hasUnread: false } : dm)),
     );
   }, [activeDmId]);
+
+  useEffect(() => {
+    if (!activeTeamId) return;
+    setTeams((prev) =>
+      prev.map((team) => (team.id === activeTeamId ? { ...team, hasUnread: false } : team)),
+    );
+  }, [activeTeamId]);
 
   useEffect(() => {
     if (!showNewDm) return;
@@ -133,8 +146,6 @@ export function ChatSidebar() {
       setCreatingDm(null);
     }
   }
-
-  const activeTeamId = pathname.match(/^\/teams\/([^/]+)/)?.[1] ?? null;
 
   return (
     <>
@@ -277,6 +288,9 @@ export function ChatSidebar() {
                             </span>
                           )}
                         </span>
+                        {team.hasUnread && activeTeamId !== team.id && (
+                          <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                        )}
                       </Link>
                     </li>
                   ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, Fragment } from "react";
 import { syncComposerTextareaHeight } from "@/lib/composer-textarea";
 import {
   MessageBubbleStack,
@@ -93,6 +93,7 @@ type Props = {
   conversationId: string | null;
   initialMessages: Message[];
   hasMore?: boolean;
+  firstUnreadMessageId?: string | null;
   members?: Member[];
   currentUserId?: string;
   /** Group/team leader — may delete other members' messages (not your own-only case). */
@@ -109,6 +110,7 @@ export function ChatThread({
   conversationId,
   initialMessages,
   hasMore: initialHasMore = false,
+  firstUnreadMessageId: initialFirstUnreadMessageId = null,
   members = [],
   currentUserId,
   isGroupLeader = false,
@@ -125,6 +127,11 @@ export function ChatThread({
   const resolvedUserId = currentUserId ?? session?.userId;
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [hasMore, setHasMore] = useState(initialHasMore);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(
+    initialFirstUnreadMessageId,
+  );
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
+  const hasMarkedReadRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [body, setBody] = useState("");
   const sendInFlightRef = useRef(false);
@@ -156,6 +163,18 @@ export function ChatThread({
 
   const scrollBottomThresholdPx = 72;
   const identityPending = !resolvedUserId && sessionLoading && messages.length > 0;
+
+  const markConversationRead = useCallback(() => {
+    if (!conversationId || hasMarkedReadRef.current) return;
+    hasMarkedReadRef.current = true;
+    setFirstUnreadMessageId(null);
+    void apiFetch(`/api/v1/conversations/${conversationId}/read`, { method: "POST" }).catch(
+      () => {
+        hasMarkedReadRef.current = false;
+      },
+    );
+    dispatchUnreadChanged({ conversationId, hasUnread: false });
+  }, [conversationId]);
 
   function getScrollContainer(): HTMLElement | null {
     if (layout === "panel") return panelBodyRef.current;
@@ -209,11 +228,12 @@ export function ChatThread({
     pinnedToBottomRef.current = atBottom;
     if (atBottom) {
       autoScrollToBottomRef.current = true;
+      markConversationRead();
     } else {
       autoScrollToBottomRef.current = false;
     }
     setShowScrollToBottom(!atBottom && messages.length > 0);
-  }, [layout, messages.length]);
+  }, [layout, messages.length, markConversationRead]);
 
   const handleScrollContainer = useCallback(() => {
     updateScrollPinned();
@@ -224,6 +244,7 @@ export function ChatThread({
     pinnedToBottomRef.current = true;
     setShowScrollToBottom(false);
     scrollToBottom();
+    markConversationRead();
   }
 
   useLayoutEffect(() => {
@@ -274,22 +295,65 @@ export function ChatThread({
   }, [lastMessageId, messages.length, messagesLoading, identityPending, layout]);
 
   useEffect(() => {
-    autoScrollToBottomRef.current = true;
-    pinnedToBottomRef.current = true;
+    autoScrollToBottomRef.current = !initialFirstUnreadMessageId;
+    pinnedToBottomRef.current = !initialFirstUnreadMessageId;
     setShowScrollToBottom(false);
     setBody("");
     setMentionQuery(null);
     setSendError(null);
     setEditingId(null);
     setEditBody("");
-  }, [conversationId]);
+    setFirstUnreadMessageId(initialFirstUnreadMessageId);
+    hasMarkedReadRef.current = false;
+  }, [conversationId, initialFirstUnreadMessageId]);
 
   useEffect(() => {
     setMessages(sortMessagesByCreatedAt(initialMessages));
     setHasMore(initialHasMore);
-    autoScrollToBottomRef.current = true;
-    pinnedToBottomRef.current = true;
-  }, [conversationId]);
+    if (!initialFirstUnreadMessageId) {
+      autoScrollToBottomRef.current = true;
+      pinnedToBottomRef.current = true;
+    }
+  }, [conversationId, initialFirstUnreadMessageId, initialHasMore, initialMessages]);
+
+  useLayoutEffect(() => {
+    if (messagesLoading || identityPending || !firstUnreadMessageId) return;
+    if (!messages.some((message) => message.id === firstUnreadMessageId)) return;
+
+    const container = getScrollContainer();
+    const target = container?.querySelector<HTMLElement>(
+      `[data-message-id="${firstUnreadMessageId}"]`,
+    );
+    if (!target) return;
+
+    target.scrollIntoView({ block: "center" });
+    autoScrollToBottomRef.current = false;
+    pinnedToBottomRef.current = false;
+    setShowScrollToBottom(true);
+  }, [firstUnreadMessageId, messagesLoading, identityPending, messages, layout]);
+
+  useEffect(() => {
+    if (!firstUnreadMessageId || messagesLoading) return;
+    const divider = unreadDividerRef.current;
+    if (!divider) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          markConversationRead();
+        }
+      },
+      { root: getScrollContainer(), threshold: 0.5 },
+    );
+
+    observer.observe(divider);
+    return () => observer.disconnect();
+  }, [firstUnreadMessageId, messagesLoading, layout, markConversationRead]);
+
+  useEffect(() => {
+    if (firstUnreadMessageId || messagesLoading || messages.length === 0) return;
+    markConversationRead();
+  }, [firstUnreadMessageId, messagesLoading, messages.length, markConversationRead]);
 
   useEffect(() => {
     setMessages((prev) => {
@@ -300,7 +364,8 @@ export function ChatThread({
     setHasMore((prev) =>
       messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
     );
-  }, [initialMessages, initialHasMore]);
+    setFirstUnreadMessageId((prev) => prev ?? initialFirstUnreadMessageId);
+  }, [initialMessages, initialHasMore, initialFirstUnreadMessageId]);
 
   useEffect(() => {
     const container = getScrollContainer();
@@ -342,11 +407,8 @@ export function ChatThread({
           }
           return sortMessagesByCreatedAt([...prev, event.message!]);
         });
-        if (event.message.authorId !== resolvedUserId && conversationId) {
-          void apiFetch(`/api/v1/conversations/${conversationId}/read`, { method: "POST" }).catch(
-            () => {},
-          );
-          dispatchUnreadChanged({ conversationId, hasUnread: false });
+        if (event.message.authorId !== resolvedUserId && conversationId && pinnedToBottomRef.current) {
+          markConversationRead();
         }
       }
       if (event.type === "message.updated" && event.message) {
@@ -369,7 +431,7 @@ export function ChatThread({
         );
       }
     },
-    [conversationId, resolvedUserId],
+    [conversationId, resolvedUserId, markConversationRead],
   );
 
   const { connected } = useConversationSocket(conversationId, onEvent);
@@ -682,8 +744,16 @@ export function ChatThread({
               showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
 
             return (
+            <Fragment key={m.id}>
+              {firstUnreadMessageId === m.id && (
+                <li className="messages-unread-divider-wrap" aria-hidden={false}>
+                  <div ref={unreadDividerRef} className="messages-unread-divider" role="separator">
+                    <span>New messages</span>
+                  </div>
+                </li>
+              )}
             <li
-              key={m.id}
+              data-message-id={m.id}
               className={[
                 "message-item",
                 isOwn ? "message-item--own" : "message-item--other",
@@ -827,6 +897,7 @@ export function ChatThread({
                 )}
               </div>
             </li>
+            </Fragment>
             );
           })}
           <li className="messages-scroll-anchor" ref={messagesEndRef} aria-hidden />

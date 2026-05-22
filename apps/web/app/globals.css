@@ -839,6 +839,31 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-shrink: 0;
 }
 
+.messages-unread-divider-wrap {
+  list-style: none;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0 0.75rem;
+}
+
+.messages-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.messages-unread-divider::before,
+.messages-unread-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
 .sidebar-hash {
   flex-shrink: 0;
   color: var(--color-muted);
@@ -3945,6 +3970,7 @@ html[data-theme="6"] .user-menu-dropdown {
   --chat-inset-x: 144px;
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
+  --chat-composer-bottom-padding: max(20px, calc(8px + env(safe-area-inset-bottom, 0px)));
   --chat-scroll-fade-height: 48px;
   flex: 1;
   min-height: 0;
@@ -4105,7 +4131,8 @@ html[data-theme="6"] .user-menu-dropdown {
 .chat-thread-panel .composer-readonly {
   flex-shrink: 0;
   margin: 0;
-  padding: var(--chat-composer-top-padding) var(--chat-inset-x) 20px;
+  padding: var(--chat-composer-top-padding) var(--chat-inset-x)
+    var(--chat-composer-bottom-padding);
   background: transparent;
   border-top: none;
   border-radius: 0;
@@ -4190,6 +4217,7 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 16px;
     --chat-messages-bottom-gap: 36px;
     --chat-composer-top-padding: 6px;
+    --chat-composer-bottom-padding: max(24px, calc(12px + env(safe-area-inset-bottom, 0px)));
     --chat-scroll-fade-height: 40px;
   }
 
@@ -4256,12 +4284,8 @@ html[data-theme="6"] .user-menu-dropdown {
     --chat-inset-x: 12px;
     --chat-messages-bottom-gap: 28px;
     --chat-composer-top-padding: 4px;
+    --chat-composer-bottom-padding: max(28px, calc(14px + env(safe-area-inset-bottom, 0px)));
     --chat-scroll-fade-height: 32px;
-  }
-
-  .chat-thread-panel .composer,
-  .chat-thread-panel .composer-readonly {
-    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   }
 }
 

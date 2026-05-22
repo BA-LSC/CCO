@@ -9,8 +9,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { PanelSettingsButton } from "@/components/PanelSettingsButton";
 import { ChatThread } from "@/components/ChatThread";
 import { ErrorState } from "@/components/PageStates";
-import { useMarkConversationRead } from "@/hooks/useMarkConversationRead";
-import { apiFetch, getErrorMessage, type GroupDetail, type Message } from "@/lib/api";
+import { apiFetch, getErrorMessage, type GroupDetail, type Message, type MessageListResponse } from "@/lib/api";
 import { getCachedMessages, setCachedMessages } from "@/lib/message-cache";
 import { conversationMessagesPath } from "@/lib/messages";
 
@@ -22,10 +21,10 @@ export default function GroupConversationPage() {
   const groupId = params.groupId as string;
   const conversationId = params.conversationId as string;
   const { session } = useChatLayout();
-  useMarkConversationRead(conversationId);
 
   const [detail, setDetail] = useState<GroupDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
   const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
     null,
   );
@@ -79,6 +78,7 @@ export default function GroupConversationPage() {
     if (cached) {
       setMessages(cached.messages);
       setHasMore(cached.hasMore);
+      setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
       setMessagesForConversationId(conversationId);
       setMessagesLoading(false);
     } else {
@@ -89,17 +89,19 @@ export default function GroupConversationPage() {
     }
 
     let cancelled = false;
-    apiFetch<{ messages: Message[]; hasMore: boolean }>(
-      conversationMessagesPath(conversationId),
+    apiFetch<MessageListResponse>(
+      conversationMessagesPath(conversationId, { anchorUnread: true }),
     )
       .then((data) => {
         if (cancelled) return;
         setMessages(data.messages);
         setHasMore(data.hasMore);
+        setFirstUnreadMessageId(data.firstUnreadMessageId);
         setMessagesForConversationId(conversationId);
         setCachedMessages(conversationId, {
           messages: data.messages,
           hasMore: data.hasMore,
+          firstUnreadMessageId: data.firstUnreadMessageId,
         });
       })
       .catch((err) => {
@@ -433,6 +435,7 @@ export default function GroupConversationPage() {
           conversationId={conversationId}
           initialMessages={threadMessages}
           hasMore={threadHasMore}
+          firstUnreadMessageId={firstUnreadMessageId}
           members={activeGroupMembers}
           currentUserId={session?.userId}
           isGroupLeader={isLeader}

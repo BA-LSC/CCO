@@ -105,6 +105,22 @@ export const pushTokens = pgTable(
   (t) => [uniqueIndex("push_tokens_user_token").on(t.userId, t.expoPushToken)],
 );
 
+export const webPushSubscriptions = pgTable(
+  "web_push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("web_push_subscriptions_user_endpoint").on(t.userId, t.endpoint)],
+);
+
 export const serviceTeams = pgTable(
   "service_teams",
   {

@@ -94,6 +94,7 @@ export type GroupSidebarConversation = {
   title: string;
   leaderOnly: boolean;
   muted: boolean;
+  hasUnread: boolean;
 };
 
 export type GroupSidebarItem = GroupSummary & {
@@ -107,6 +108,8 @@ export type ServiceTeamSummary = {
   pcoTeamId: string;
   role?: string;
   serviceTypeNames?: string[];
+  conversationId?: string | null;
+  hasUnread?: boolean;
 };
 
 export type DmParticipant = { id: string; displayName: string; avatarUrl?: string | null };
@@ -154,6 +157,13 @@ export type GroupDetail = {
     muted?: boolean;
     memberCount?: number;
   }>;
+};
+
+export type MessageListResponse = {
+  messages: Message[];
+  hasMore: boolean;
+  firstUnreadMessageId: string | null;
+  lastReadAt: string | null;
 };
 
 export type Message = {

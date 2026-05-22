@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   fetchMyServiceTeams,
   fetchServiceTeamRoster,
@@ -17,6 +17,7 @@ import {
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
 import { buildSignedUpMemberIndex, memberIsOnCco } from "./cco-member-status";
+import { unreadFlagsForConversations } from "./unread";
 
 async function upsertServiceTeamMembership(params: {
   teamId: string;
@@ -146,7 +147,7 @@ export async function syncServiceTeamsFromPco(params: {
 }
 
 export async function listServiceTeamsForUser(userId: string) {
-  return db
+  const teams = await db
     .select({
       id: serviceTeams.id,
       name: serviceTeams.name,
@@ -156,6 +157,31 @@ export async function listServiceTeamsForUser(userId: string) {
     .from(serviceTeams)
     .innerJoin(serviceTeamMemberships, eq(serviceTeamMemberships.teamId, serviceTeams.id))
     .where(eq(serviceTeamMemberships.userId, userId));
+
+  if (teams.length === 0) return [];
+
+  const teamIds = teams.map((team) => team.id);
+  const convRows = await db
+    .select({ teamId: conversations.serviceTeamId, id: conversations.id })
+    .from(conversations)
+    .where(inArray(conversations.serviceTeamId, teamIds));
+
+  const convByTeam = new Map(
+    convRows
+      .filter((row): row is { teamId: string; id: string } => row.teamId !== null)
+      .map((row) => [row.teamId, row.id]),
+  );
+  const convIds = [...convByTeam.values()];
+  const unreadByConv = await unreadFlagsForConversations(convIds, userId);
+
+  return teams.map((team) => {
+    const conversationId = convByTeam.get(team.id) ?? null;
+    return {
+      ...team,
+      conversationId,
+      hasUnread: conversationId ? (unreadByConv.get(conversationId) ?? false) : false,
+    };
+  });
 }
 
 export type TeamMemberView = {

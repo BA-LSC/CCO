@@ -31,7 +31,12 @@ conversationsRouter.get("/:id/messages", async (c) => {
   const conversationId = c.req.param("id");
   const before = c.req.query("before") ?? undefined;
   const limit = c.req.query("limit") ? Number(c.req.query("limit")) : undefined;
-  const result = await listMessages(conversationId, session.userId, { before, limit });
+  const anchorUnread = c.req.query("anchorUnread") === "1";
+  const result = await listMessages(conversationId, session.userId, {
+    before,
+    limit,
+    anchorUnread,
+  });
   if (!result) return c.json({ error: "Forbidden" }, 403);
   return c.json(result);
 });

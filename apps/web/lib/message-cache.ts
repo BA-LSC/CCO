@@ -3,6 +3,7 @@ import type { Message } from "@/lib/api";
 export type CachedConversationMessages = {
   messages: Message[];
   hasMore: boolean;
+  firstUnreadMessageId?: string | null;
   fetchedAt: number;
 };
 
@@ -32,11 +33,12 @@ export function getCachedMessages(conversationId: string): CachedConversationMes
 
 export function setCachedMessages(
   conversationId: string,
-  data: Pick<CachedConversationMessages, "messages" | "hasMore">,
+  data: Pick<CachedConversationMessages, "messages" | "hasMore" | "firstUnreadMessageId">,
 ): void {
   touch(conversationId, {
     messages: data.messages,
     hasMore: data.hasMore,
+    firstUnreadMessageId: data.firstUnreadMessageId ?? null,
     fetchedAt: Date.now(),
   });
   evictIfNeeded();

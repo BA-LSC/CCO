@@ -1,7 +1,8 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../db";
-import { conversationMembers, pushTokens } from "../db/schema";
+import { conversationMembers, conversations, pushTokens } from "../db/schema";
 import type { MessageDto } from "./messages";
+import { collectWebPushSubscriptions, sendWebPushNotifications } from "./web-push";
 
 async function collectPushTokens(userIds: string[]): Promise<string[]> {
   if (userIds.length === 0) return [];
@@ -10,6 +11,52 @@ async function collectPushTokens(userIds: string[]): Promise<string[]> {
     .from(pushTokens)
     .where(inArray(pushTokens.userId, userIds));
   return rows.map((r) => r.token);
+}
+
+async function resolveConversationDeepLink(conversationId: string): Promise<string> {
+  const row = await db
+    .select({
+      groupId: conversations.groupId,
+      serviceTeamId: conversations.serviceTeamId,
+      dmPairKey: conversations.dmPairKey,
+    })
+    .from(conversations)
+    .where(eq(conversations.id, conversationId))
+    .limit(1);
+
+  const conv = row[0];
+  if (!conv) return "/";
+  if (conv.groupId) return `/groups/${conv.groupId}/c/${conversationId}`;
+  if (conv.serviceTeamId) return `/teams/${conv.serviceTeamId}`;
+  if (conv.dmPairKey) return `/dms/${conversationId}`;
+  return "/";
+}
+
+async function notifyUsersOfMessage(params: {
+  userIds: string[];
+  conversationId: string;
+  title: string;
+  body: string;
+}): Promise<void> {
+  if (params.userIds.length === 0) return;
+
+  const [expoTokens, webSubscriptions, url] = await Promise.all([
+    collectPushTokens(params.userIds),
+    collectWebPushSubscriptions(params.userIds),
+    resolveConversationDeepLink(params.conversationId),
+  ]);
+
+  const payload = {
+    title: params.title,
+    body: params.body,
+    url,
+    conversationId: params.conversationId,
+  };
+
+  await Promise.all([
+    sendExpoPush(expoTokens, params.title, params.body, url),
+    sendWebPushNotifications(webSubscriptions, payload),
+  ]);
 }
 
 export async function notifyConversationOfMessage(
@@ -28,15 +75,17 @@ export async function notifyConversationOfMessage(
       ),
     );
 
-  const tokens = await collectPushTokens(members.map((m) => m.userId));
-  if (tokens.length === 0) return;
-
   const title = message.authorName;
   const body = message.attachmentUrl
     ? message.body.trim() || "Sent an image"
     : message.body.slice(0, 120);
 
-  await sendExpoPush(tokens, title, body);
+  await notifyUsersOfMessage({
+    userIds: members.map((m) => m.userId),
+    conversationId,
+    title,
+    body,
+  });
 }
 
 export async function notifyMentionedUsers(params: {
@@ -46,13 +95,13 @@ export async function notifyMentionedUsers(params: {
   message: MessageDto;
 }): Promise<void> {
   const mentioned = params.mentionedUserIds.filter((id) => id !== params.authorUserId);
-  const mentionTokens = await collectPushTokens(mentioned);
-  if (mentionTokens.length > 0) {
-    await sendExpoPush(
-      mentionTokens,
-      `${params.message.authorName} mentioned you`,
-      params.message.body.slice(0, 120) || "New mention",
-    );
+  if (mentioned.length > 0) {
+    await notifyUsersOfMessage({
+      userIds: mentioned,
+      conversationId: params.conversationId,
+      title: `${params.message.authorName} mentioned you`,
+      body: params.message.body.slice(0, 120) || "New mention",
+    });
   }
 
   const others = await db
@@ -70,20 +119,30 @@ export async function notifyMentionedUsers(params: {
     .map((m) => m.userId)
     .filter((id) => !mentioned.includes(id));
 
-  const otherTokens = await collectPushTokens(otherIds);
-  if (otherTokens.length === 0) return;
-
   const title = params.message.authorName;
   const body = params.message.body.slice(0, 120);
-  await sendExpoPush(otherTokens, title, body);
+  await notifyUsersOfMessage({
+    userIds: otherIds,
+    conversationId: params.conversationId,
+    title,
+    body,
+  });
 }
 
-async function sendExpoPush(tokens: string[], title: string, body: string): Promise<void> {
+async function sendExpoPush(
+  tokens: string[],
+  title: string,
+  body: string,
+  url: string,
+): Promise<void> {
+  if (tokens.length === 0) return;
+
   const messages = tokens.map((to) => ({
     to,
     sound: "default" as const,
     title,
     body,
+    data: { url },
   }));
 
   try {
@@ -109,3 +168,9 @@ export async function registerPushToken(userId: string, expoPushToken: string): 
     .values({ userId, expoPushToken })
     .onConflictDoNothing();
 }
+
+export {
+  getVapidPublicKey,
+  registerWebPushSubscription,
+  unregisterWebPushSubscription,
+} from "./web-push";

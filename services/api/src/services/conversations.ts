@@ -8,6 +8,7 @@ import {
   users,
 } from "../db/schema";
 import { isLeaderRole } from "../permissions";
+import { unreadFlagsForConversations } from "./unread";
 
 export async function markConversationRead(
   conversationId: string,
@@ -271,6 +272,8 @@ export async function listGroupsForSidebar(userId: string) {
 
   const convIds = convRows.map((c) => c.id);
   const mutedByConv = new Map<string, boolean>();
+  const unreadByConv =
+    convIds.length > 0 ? await unreadFlagsForConversations(convIds, userId) : new Map();
 
   if (convIds.length > 0) {
     const mutedRows = await db
@@ -311,6 +314,7 @@ export async function listGroupsForSidebar(userId: string) {
       title: conv.title,
       leaderOnly: conv.leaderOnly,
       muted: mutedByConv.get(conv.id) ?? false,
+      hasUnread: unreadByConv.get(conv.id) ?? false,
     })),
   }));
 }

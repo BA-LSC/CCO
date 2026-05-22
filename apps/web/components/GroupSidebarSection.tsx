@@ -10,6 +10,7 @@ import {
   type GroupDetail,
   type GroupSidebarItem,
 } from "@/lib/api";
+import { subscribeUnreadChanged } from "@/lib/sidebar-events";
 
 type Props = {
   groups: GroupSidebarItem[];
@@ -20,9 +21,10 @@ function isLeaderRole(role: string | undefined): boolean {
   return role === "leader" || role === "admin";
 }
 
-export function GroupSidebarSection({ groups, onGroupsReload }: Props) {
+export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const [groups, setGroups] = useState(initialGroups);
   const [creatingForGroup, setCreatingForGroup] = useState<string | null>(null);
   const [newChannelName, setNewChannelName] = useState("");
   const [creating, setCreating] = useState(false);
@@ -34,6 +36,35 @@ export function GroupSidebarSection({ groups, onGroupsReload }: Props) {
   const activeGroupId = activeGroupMatch?.[1] ?? null;
   const activeConvMatch = pathname.match(/^\/groups\/[^/]+\/c\/([^/]+)/);
   const activeConversationId = activeConvMatch?.[1] ?? null;
+
+  useEffect(() => {
+    setGroups(initialGroups);
+  }, [initialGroups]);
+
+  useEffect(() => {
+    return subscribeUnreadChanged(({ conversationId, hasUnread }) => {
+      setGroups((prev) =>
+        prev.map((group) => ({
+          ...group,
+          conversations: group.conversations.map((conv) =>
+            conv.id === conversationId ? { ...conv, hasUnread } : conv,
+          ),
+        })),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+    setGroups((prev) =>
+      prev.map((group) => ({
+        ...group,
+        conversations: group.conversations.map((conv) =>
+          conv.id === activeConversationId ? { ...conv, hasUnread: false } : conv,
+        ),
+      })),
+    );
+  }, [activeConversationId]);
 
   const loadGroupDetailForChannel = useCallback(async (groupId: string) => {
     setLoadingChannelMembers(true);
@@ -222,6 +253,9 @@ export function GroupSidebarSection({ groups, onGroupsReload }: Props) {
                             <span className="sidebar-badge" title="Muted">
                               🔕
                             </span>
+                          )}
+                          {conv.hasUnread && activeConversationId !== conv.id && (
+                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
                           )}
                         </Link>
                       </li>
