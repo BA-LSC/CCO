@@ -3,6 +3,7 @@ import {
   WEBHOOK_EVENT_TYPES,
   computeWebhookAuthenticity,
   normalizeWebhookPayload,
+  resolveWebhookEventType,
   resolveWebhookHandler,
   shouldAcceptWebhookWithoutSecret,
   verifyHmacAuthenticity,
@@ -94,6 +95,55 @@ describe("verifyWebhookAuth", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("invalid_hmac");
+  });
+});
+
+describe("resolveWebhookEventType", () => {
+  test("prefers X-PCO-Webhooks-Name header", () => {
+    expect(
+      resolveWebhookEventType({
+        nameHeader: "groups.v2.events.membership.created",
+        legacyEventTypeHeader: undefined,
+        rawPayload: {},
+      }),
+    ).toBe("groups.v2.events.membership.created");
+  });
+
+  test("falls back to legacy X-PCO-Webhooks-Event-Type header", () => {
+    expect(
+      resolveWebhookEventType({
+        nameHeader: undefined,
+        legacyEventTypeHeader: "people.v2.events.person.updated",
+        rawPayload: {},
+      }),
+    ).toBe("people.v2.events.person.updated");
+  });
+
+  test("extracts event name from EventDelivery wrapper body", () => {
+    expect(
+      resolveWebhookEventType({
+        nameHeader: undefined,
+        legacyEventTypeHeader: undefined,
+        rawPayload: {
+          data: [
+            {
+              type: "EventDelivery",
+              attributes: { name: "groups.v2.events.membership.destroyed" },
+            },
+          ],
+        },
+      }),
+    ).toBe("groups.v2.events.membership.destroyed");
+  });
+
+  test("returns null when event type cannot be resolved", () => {
+    expect(
+      resolveWebhookEventType({
+        nameHeader: undefined,
+        legacyEventTypeHeader: undefined,
+        rawPayload: { data: [{ type: "Person" }] },
+      }),
+    ).toBeNull();
   });
 });
 

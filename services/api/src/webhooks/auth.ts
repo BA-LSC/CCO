@@ -65,6 +65,31 @@ export type WebhookHandlerKind =
   | "membership_upsert"
   | "person_updated";
 
+type EventDeliveryRow = {
+  attributes?: { name?: string };
+};
+
+/** PCO sends the event name in X-PCO-Webhooks-Name; fall back to body wrapper. */
+export function resolveWebhookEventType(params: {
+  nameHeader: string | undefined;
+  legacyEventTypeHeader: string | undefined;
+  rawPayload: unknown;
+}): string | null {
+  const fromHeader = params.nameHeader?.trim() || params.legacyEventTypeHeader?.trim();
+  if (fromHeader) return fromHeader;
+
+  if (!params.rawPayload || typeof params.rawPayload !== "object") {
+    return null;
+  }
+
+  const data = (params.rawPayload as { data?: unknown }).data;
+  if (!Array.isArray(data)) return null;
+
+  const delivery = data[0] as EventDeliveryRow | undefined;
+  const name = delivery?.attributes?.name?.trim();
+  return name || null;
+}
+
 export function resolveWebhookHandler(eventType: string): WebhookHandlerKind | null {
   switch (eventType) {
     case WEBHOOK_EVENT_TYPES.MEMBERSHIP_DESTROYED:
@@ -79,7 +104,7 @@ export function resolveWebhookHandler(eventType: string): WebhookHandlerKind | n
   }
 }
 
-type EventDeliveryRow = {
+type EventDeliveryPayloadRow = {
   id?: string;
   type?: string;
   attributes?: { payload?: string };
@@ -103,7 +128,7 @@ export function normalizeWebhookPayload(raw: unknown): NormalizedWebhookPayload 
 
   const data = outer.data;
   if (Array.isArray(data)) {
-    const delivery = data[0] as EventDeliveryRow | undefined;
+    const delivery = data[0] as EventDeliveryPayloadRow | undefined;
     if (delivery?.type === "EventDelivery") {
       const innerJson = delivery.attributes?.payload;
       if (typeof innerJson === "string") {

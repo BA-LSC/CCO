@@ -4,6 +4,7 @@ import { recordWebhookDelivery } from "./delivery";
 import {
   normalizeWebhookPayload,
   resolveWebhookHandler,
+  resolveWebhookEventType,
   verifyWebhookAuth,
 } from "./auth";
 import {
@@ -36,9 +37,13 @@ webhooksRouter.post("/pco", async (c) => {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
 
-  const eventType = c.req.header("X-PCO-Webhooks-Event-Type");
+  const eventType = resolveWebhookEventType({
+    nameHeader: c.req.header("X-PCO-Webhooks-Name"),
+    legacyEventTypeHeader: c.req.header("X-PCO-Webhooks-Event-Type"),
+    rawPayload,
+  });
   if (!eventType) {
-    return c.json({ error: "Missing X-PCO-Webhooks-Event-Type header" }, 400);
+    return c.json({ error: "Missing webhook event type" }, 400);
   }
 
   const handlerKind = resolveWebhookHandler(eventType);
