@@ -231,7 +231,13 @@ function CloudflareSection({
           body: JSON.stringify({ cloudflareApiToken: token }),
         },
       );
-      onStatusChange(updated);
+      onStatusChange({
+        ...updated,
+        cloudflareApiTokenConfigured:
+          updated.cloudflareApiTokenConfigured ?? updated.realtimeKitTokenConfigured ?? true,
+        realtimeKitTokenConfigured:
+          updated.realtimeKitTokenConfigured ?? updated.cloudflareApiTokenConfigured ?? true,
+      });
       setCloudflareApiToken("");
       setSuccess("Cloudflare API token saved.");
     } catch (err) {
@@ -243,11 +249,6 @@ function CloudflareSection({
 
   async function handleCallsToggle(enabled: boolean) {
     if (busy) return;
-
-    if (enabled && !tokenConfigured && !fromEnv) {
-      setError("Save a Cloudflare API token before enabling calls.");
-      return;
-    }
 
     setBusy(true);
     setError(null);
@@ -553,13 +554,6 @@ export default function IntegrationsSettingsPage() {
         <div className="integrations-section-head">
           <h2 id="pco-sync-heading">Planning Center sync</h2>
           <p>Refresh groups, teams, and rosters for your account.</p>
-          {pcoLastSyncedAt ? (
-            <p className="integrations-field-hint">
-              Last synced {formatPcoLastSynced(pcoLastSyncedAt)}
-            </p>
-          ) : (
-            <p className="integrations-field-hint">Not synced yet</p>
-          )}
         </div>
         <Feedback error={pcoSyncError} success={pcoSyncResult} />
         <button
@@ -570,6 +564,13 @@ export default function IntegrationsSettingsPage() {
         >
           {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
         </button>
+        {pcoLastSyncedAt ? (
+          <p className="integrations-field-hint">
+            Last synced {formatPcoLastSynced(pcoLastSyncedAt)}
+          </p>
+        ) : (
+          <p className="integrations-field-hint">Not synced yet</p>
+        )}
       </section>
 
       <CloudflareSection

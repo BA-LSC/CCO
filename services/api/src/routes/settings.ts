@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { users, organizations } from "../db/schema";
 import {
   getDefaultPcoWebRedirectUri,
   getPcoWebRedirectUri,
@@ -29,6 +29,8 @@ import {
   getOrganizationRealtimeKitStatus,
   saveOrganizationCloudflareApiToken,
 } from "../services/org-realtimekit";
+import { selectConfiguredOrganizationRow } from "../services/configured-org-query";
+import { invalidateOrgContextCache } from "../services/org-context-cache";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
@@ -243,8 +245,10 @@ settingsRouter.post("/integrations/realtimekit", requireAuth, async (c) => {
     return c.json({ error: message }, 400);
   }
 
-  const updated = await getConfiguredOrganization();
-  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
+  invalidateOrgContextCache();
+  const updated =
+    (await selectConfiguredOrganizationRow(eq(organizations.id, org.id))) ?? org;
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated);
   return c.json({
     ok: true,
     ...realtimeKitStatus,
@@ -287,8 +291,10 @@ settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
     return c.json({ error: message }, 400);
   }
 
-  const updated = await getConfiguredOrganization();
-  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
+  invalidateOrgContextCache();
+  const updated =
+    (await selectConfiguredOrganizationRow(eq(organizations.id, org.id))) ?? org;
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated);
   return c.json({
     ok: true,
     ...realtimeKitStatus,

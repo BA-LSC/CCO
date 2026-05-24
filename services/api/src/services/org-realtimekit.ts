@@ -11,7 +11,6 @@ import {
   provisionRealtimeKitFromApiToken,
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
-import { selectConfiguredOrganizationRow } from "./configured-org-query";
 import { invalidateOrgContextCache } from "./org-context-cache";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 
@@ -171,12 +170,44 @@ export async function disableOrganizationRealtimeKitCalls(organizationId: string
   invalidateOrgContextCache();
 }
 
+type RealtimeKitOrganizationRow = {
+  id: string;
+  name: string;
+  cloudflareAccountId: string | null;
+  cloudflareApiTokenEnc: string | null;
+  realtimeKitAppId: string | null;
+  realtimeKitPresetHost: string | null;
+  realtimeKitPresetMember: string | null;
+  realtimeKitPresetGuest: string | null;
+};
+
+async function fetchRealtimeKitOrganizationRow(
+  organizationId: string,
+): Promise<RealtimeKitOrganizationRow | null> {
+  await ensureCloudflareOrganizationColumns();
+  const rows = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      cloudflareAccountId: organizations.cloudflareAccountId,
+      cloudflareApiTokenEnc: organizations.cloudflareApiTokenEnc,
+      realtimeKitAppId: organizations.realtimeKitAppId,
+      realtimeKitPresetHost: organizations.realtimeKitPresetHost,
+      realtimeKitPresetMember: organizations.realtimeKitPresetMember,
+      realtimeKitPresetGuest: organizations.realtimeKitPresetGuest,
+    })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function enableOrganizationRealtimeKit(params: {
   organizationId: string;
   organizationName?: string;
   cloudflareApiToken?: string;
 }): Promise<{ createdApp: boolean; presetsResolved: boolean; reconfigured: boolean }> {
-  const row = await selectConfiguredOrganizationRow(eq(organizations.id, params.organizationId));
+  const row = await fetchRealtimeKitOrganizationRow(params.organizationId);
   if (!row) throw new Error("Organization not found");
 
   const status = getOrganizationRealtimeKitStatus(row);
@@ -210,7 +241,17 @@ export async function enableOrganizationRealtimeKit(params: {
   throw new Error("Save a Cloudflare API token before enabling calls");
 }
 
-export function getOrganizationRealtimeKitStatus(org: typeof organizations.$inferSelect) {
+export function getOrganizationRealtimeKitStatus(
+  org: Pick<
+    typeof organizations.$inferSelect,
+    | "cloudflareAccountId"
+    | "cloudflareApiTokenEnc"
+    | "realtimeKitAppId"
+    | "realtimeKitPresetHost"
+    | "realtimeKitPresetMember"
+    | "realtimeKitPresetGuest"
+  >,
+) {
   const presets = getPresetNames(org);
   const tokenFromDb = Boolean(org.cloudflareApiTokenEnc);
   const callsFromDb = Boolean(org.realtimeKitAppId && org.cloudflareApiTokenEnc);
