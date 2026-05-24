@@ -102,6 +102,7 @@ services:
       API_URL: http://api:3001
       API_DOMAIN: ${API_DOMAIN}
       WEB_URL: ${WEB_URL}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
       PORT: "3000"
       HOSTNAME: 0.0.0.0
     depends_on:

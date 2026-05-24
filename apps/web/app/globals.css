@@ -6178,13 +6178,6 @@ html.standalone-display .chat-thread-panel {
   background: #111;
 }
 
-.call-overlay-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.65);
-}
-
 .call-overlay-meeting {
   flex: 1;
   min-height: 0;

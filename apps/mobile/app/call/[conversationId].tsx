@@ -52,7 +52,10 @@ export default function CallScreen() {
         const result = params.callId
           ? await joinCallById(token, params.callId)
           : await startOrJoinCall(token, params.conversationId);
-        await initMeeting({ authToken: result.authToken });
+        await initMeeting({
+          authToken: result.authToken,
+          defaults: { video: false },
+        });
         setReady(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not join call");

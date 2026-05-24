@@ -1,5 +1,6 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
+import { markDeployWait, probeServerAppVersion } from "@/lib/app-update";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -36,6 +37,25 @@ function parseApiError(text: string, status: number): string {
   return trimmed;
 }
 
+async function maybeHandleDeployUnavailable(res: Response, text: string): Promise<boolean> {
+  if (res.status !== 503) return false;
+  try {
+    const body = JSON.parse(text) as { updating?: boolean };
+    if (body.updating) {
+      markDeployWait();
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  const probe = await probeServerAppVersion();
+  if (probe.updating) {
+    markDeployWait();
+    return true;
+  }
+  return false;
+}
+
 /** Safe message for UI when catching unknown errors. */
 export function getErrorMessage(err: unknown): string {
   if (err instanceof Error) {
@@ -60,6 +80,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (!res.ok) {
     const text = await res.text();
+    if (await maybeHandleDeployUnavailable(res, text)) {
+      throw new Error("Updating CCO…");
+    }
     throw new Error(parseApiError(text, res.status));
   }
 

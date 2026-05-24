@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { getErrorMessage } from "@/lib/api";
+import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 
 type LoadingStateProps = {
   label?: string;
@@ -40,7 +43,12 @@ export function ErrorState({
   backLabel?: string;
   variant?: "panel" | "page";
 }) {
+  const deployBlocked = useAppUpdateGuard();
   const safeMessage = sanitizeDisplayMessage(message);
+
+  if (deployBlocked || safeMessage === "Updating CCO…") {
+    return <LoadingState label="Updating CCO…" variant={variant} />;
+  }
 
   const content = (
     <div className="state-card state-error state-card-compact">

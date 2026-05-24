@@ -1,3 +1,5 @@
+import { isDeployDraining } from "@/lib/deploy-status.server";
+
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 const UPLOAD_PROXY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_PROXY_TIMEOUT_MS = 30_000;
@@ -127,12 +129,13 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
     });
   } catch (err) {
     console.error("API proxy failed:", target, err);
-    return Response.json(
-      {
-        error:
-          "CCO API is unavailable. Start it with: cd services/api && bun run dev",
-      },
-      { status: 503 },
-    );
+    const updating = await isDeployDraining();
+    const error =
+      updating
+        ? "CCO is updating. Please wait a moment."
+        : process.env.NODE_ENV === "production"
+          ? "The server is temporarily unavailable. Please try again in a moment."
+          : "CCO API is unavailable. Start it with: cd services/api && bun run dev";
+    return Response.json({ error, updating }, { status: 503 });
   }
 }
