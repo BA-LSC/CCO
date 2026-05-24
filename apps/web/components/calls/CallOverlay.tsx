@@ -85,6 +85,10 @@ function MeetingInner({
   const { meeting } = useRealtimeKitMeeting();
   const rtkRef = useRef<HTMLRtkMeetingElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const onLeaveRef = useRef(onLeave);
+  const leftRef = useRef(false);
+
+  onLeaveRef.current = onLeave;
 
   useSoloCallBehavior(meeting, overlayRef);
 
@@ -95,12 +99,17 @@ function MeetingInner({
 
   useEffect(() => {
     if (!meeting) return;
-    const handler = () => onLeave();
+    leftRef.current = false;
+    const handler = () => {
+      if (leftRef.current) return;
+      leftRef.current = true;
+      onLeaveRef.current();
+    };
     meeting.self.on("roomLeft", handler);
     return () => {
       meeting.self.off("roomLeft", handler);
     };
-  }, [meeting, onLeave]);
+  }, [meeting]);
 
   useEffect(() => {
     if (!meeting || showSetupScreen || meeting.self.roomJoined) return;

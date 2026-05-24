@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CallSummaryDto } from "@cco/shared/calls";
 import {
   endCall,
@@ -16,6 +16,8 @@ export function useCallSession(conversationId: string | null) {
   const [inCall, setInCall] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const leavingRef = useRef(false);
+  const activeCallIdRef = useRef<string | null>(null);
 
   const refreshActive = useCallback(async () => {
     if (!conversationId) return;
@@ -33,10 +35,12 @@ export function useCallSession(conversationId: string | null) {
 
   const join = useCallback(async () => {
     if (!conversationId) return;
+    leavingRef.current = false;
     setLoading(true);
     setError(null);
     try {
       const result = await startOrJoinCall(conversationId);
+      activeCallIdRef.current = result.call.id;
       setActiveCall(result.call);
       setAuthToken(result.authToken);
       setInCall(true);
@@ -48,10 +52,12 @@ export function useCallSession(conversationId: string | null) {
   }, [conversationId]);
 
   const joinExisting = useCallback(async (callId: string) => {
+    leavingRef.current = false;
     setLoading(true);
     setError(null);
     try {
       const result = await joinCallById(callId);
+      activeCallIdRef.current = result.call.id;
       setActiveCall(result.call);
       setAuthToken(result.authToken);
       setInCall(true);
@@ -63,34 +69,47 @@ export function useCallSession(conversationId: string | null) {
   }, []);
 
   const hangUp = useCallback(async () => {
-    if (!activeCall) {
-      setInCall(false);
-      setAuthToken(null);
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+
+    const callId = activeCall?.id ?? activeCallIdRef.current;
+    setInCall(false);
+    setAuthToken(null);
+    setError(null);
+    activeCallIdRef.current = null;
+
+    if (!callId) {
+      leavingRef.current = false;
       return;
     }
+
     setLoading(true);
     try {
-      await leaveCall(activeCall.id);
+      await leaveCall(callId);
     } catch {
       // still close local UI
     } finally {
-      setInCall(false);
-      setAuthToken(null);
       setLoading(false);
-      void refreshActive();
+      leavingRef.current = false;
     }
-  }, [activeCall, refreshActive]);
+  }, [activeCall]);
 
   const endForAll = useCallback(async () => {
-    if (!activeCall) return;
+    if (!activeCall || leavingRef.current) return;
+    leavingRef.current = true;
+
+    const callId = activeCall.id;
+    activeCallIdRef.current = null;
+    setInCall(false);
+    setAuthToken(null);
+    setActiveCall(null);
+    setError(null);
     setLoading(true);
     try {
-      await endCall(activeCall.id);
+      await endCall(callId);
     } finally {
-      setInCall(false);
-      setAuthToken(null);
-      setActiveCall(null);
       setLoading(false);
+      leavingRef.current = false;
     }
   }, [activeCall]);
 

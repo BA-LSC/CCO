@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
@@ -15,6 +15,8 @@ type Props = {
 
 export function ConversationCallKit({ conversationId }: Props) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const { subscribeRealtime, session } = useChatLayout();
   const {
     activeCall,
@@ -29,6 +31,23 @@ export function ConversationCallKit({ conversationId }: Props) {
   } = useCallSession(conversationId);
 
   const [incoming, setIncoming] = useState<CallSummaryDto | null>(null);
+  const inCallRef = useRef(inCall);
+  const endedCallIdsRef = useRef(new Set<string>());
+
+  inCallRef.current = inCall;
+
+  const clearCallQueryParam = useCallback(() => {
+    if (!searchParams.get("call")) return;
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("call");
+    const query = nextParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }, [pathname, router, searchParams]);
+
+  const handleLeave = useCallback(() => {
+    clearCallQueryParam();
+    void hangUp();
+  }, [clearCallQueryParam, hangUp]);
 
   useEffect(() => {
     return subscribeRealtime((event: RealtimeEvent) => {
@@ -42,7 +61,7 @@ export function ConversationCallKit({ conversationId }: Props) {
           if (
             event.type === "call.started" &&
             event.call.hostUserId !== session?.userId &&
-            !inCall &&
+            !inCallRef.current &&
             event.call.participantCount > 0
           ) {
             setIncoming(event.call);
@@ -50,17 +69,21 @@ export function ConversationCallKit({ conversationId }: Props) {
         }
       }
       if (event.type === "call.ended" && event.conversationId === conversationId) {
+        endedCallIdsRef.current.add(event.callId);
         setActiveCall(null);
         setIncoming(null);
+        clearCallQueryParam();
       }
     });
-  }, [conversationId, inCall, session?.userId, setActiveCall, subscribeRealtime]);
+  }, [clearCallQueryParam, conversationId, session?.userId, setActiveCall, subscribeRealtime]);
 
   useEffect(() => {
     const callParam = searchParams.get("call");
-    if (callParam && !inCall && !loading) {
-      void joinExisting(callParam);
-    }
+    if (!callParam || inCall || loading) return;
+    if (endedCallIdsRef.current.has(callParam)) return;
+    void joinExisting(callParam).catch(() => {
+      endedCallIdsRef.current.add(callParam);
+    });
   }, [searchParams, inCall, loading, joinExisting]);
 
   useEffect(() => {
@@ -95,7 +118,7 @@ export function ConversationCallKit({ conversationId }: Props) {
         </div>
       ) : null}
 
-      {inCall && authToken ? <CallOverlay authToken={authToken} onLeave={() => void hangUp()} /> : null}
+      {inCall && authToken ? <CallOverlay authToken={authToken} onLeave={handleLeave} /> : null}
 
       <CallActionButton
         activeCall={activeCall}
