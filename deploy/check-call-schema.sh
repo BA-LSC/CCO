@@ -32,7 +32,7 @@ SELECT CASE
       AND table_name = 'call_participants'
       AND column_name = 'realtime_kit_participant_id'
   ) THEN 'call_participants: OK'
-  ELSE 'call_participants: MISSING — run ./deploy/compose.sh run --rm migrate'
+  ELSE 'call_participants: MISSING — run ./deploy/apply-call-migrations.sh (or rebuild migrate: ./deploy/compose.sh build migrate && ./deploy/compose.sh run --rm migrate)'
 END;
 "
 
