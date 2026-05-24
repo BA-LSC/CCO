@@ -13,6 +13,10 @@ import {
   startOrJoinConversationCall,
 } from "../services/calls";
 import { isConversationMember } from "../services/call-access";
+import {
+  isMissingOrgMigrationColumnsError,
+  ORG_MIGRATIONS_0021_0023_MESSAGE,
+} from "../services/org-db-migrations";
 
 type Env = { Variables: AuthVariables };
 
@@ -133,6 +137,9 @@ export function mountConversationCallRoutes(conversationsRouter: Hono<Env>): voi
       if (!result) return c.json({ error: "Forbidden" }, 403);
       return c.json(result);
     } catch (err) {
+      if (isMissingOrgMigrationColumnsError(err)) {
+        return c.json({ error: ORG_MIGRATIONS_0021_0023_MESSAGE }, 503);
+      }
       const message = err instanceof Error ? err.message : "Failed to start call";
       return c.json({ error: message }, 503);
     }

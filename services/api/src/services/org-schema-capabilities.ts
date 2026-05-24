@@ -84,11 +84,28 @@ async function runEnsureCloudflareOrganizationColumns(): Promise<void> {
   orgColumnsReady = true;
 }
 
+async function callParticipantsTableExists(): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'call_participants'
+      AND column_name = 'realtime_kit_participant_id'
+    LIMIT 1
+  `);
+  return result.length > 0;
+}
+
 async function runEnsureCallSessionSchema(): Promise<void> {
   for (const statement of CALL_SCHEMA_STATEMENTS) {
     await executeOptionalDdl(statement);
   }
-  callSchemaReady = true;
+  if (await callParticipantsTableExists()) {
+    callSchemaReady = true;
+  } else {
+    console.warn(
+      "[schema ensure] call_participants table missing — run migrations 0021–0023 (./deploy/compose.sh run --rm migrate)",
+    );
+  }
 }
 
 /** Org columns for Cloudflare / RealtimeKit settings (required, small, safe). */
