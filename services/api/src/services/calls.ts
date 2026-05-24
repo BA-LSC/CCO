@@ -180,7 +180,7 @@ async function ensureParticipantToken(params: {
   const added = await addRealtimeKitParticipant({
     meetingId: params.meetingId,
     name: params.displayName,
-    presetName: presetForRole(params.role),
+    presetName: await presetForRole(params.role),
     customParticipantId: customId,
   });
 

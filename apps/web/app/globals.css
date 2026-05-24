@@ -3311,6 +3311,28 @@ html[data-theme="6"] .user-menu-dropdown {
   align-self: flex-start;
 }
 
+.integrations-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.integrations-toggle-label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.integrations-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
 .integrations-form-footer {
   display: flex;
   flex-direction: column;

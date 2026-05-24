@@ -24,8 +24,9 @@ import {
   updateOrganizationGiphyApiKey,
 } from "../services/org-giphy";
 import {
+  clearOrganizationRealtimeKitConfig,
+  enableOrganizationRealtimeKit,
   getOrganizationRealtimeKitStatus,
-  updateOrganizationRealtimeKitConfig,
 } from "../services/org-realtimekit";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -42,8 +43,10 @@ const IntegrationsPatchSchema = z.object({
   webhookUrl: z.string().url().optional(),
   vapidSubjectEmail: z.string().email().optional(),
   giphyApiKey: z.string().min(1).optional(),
-  cloudflareAccountId: z.string().min(1).optional(),
-  realtimeKitAppId: z.string().min(1).optional(),
+});
+
+const RealtimeKitSetupSchema = z.object({
+  enabled: z.boolean(),
   cloudflareApiToken: z.string().min(1).optional(),
 });
 
@@ -160,27 +163,6 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     }
   }
 
-  if (
-    data.cloudflareAccountId !== undefined ||
-    data.realtimeKitAppId !== undefined ||
-    data.cloudflareApiToken !== undefined
-  ) {
-    const current = getOrganizationRealtimeKitStatus(org);
-    try {
-      await updateOrganizationRealtimeKitConfig({
-        organizationId: org.id,
-        accountId: data.cloudflareAccountId ?? current.realtimeKitAccountId,
-        appId: data.realtimeKitAppId ?? current.realtimeKitAppId,
-        apiToken:
-          data.cloudflareApiToken ??
-          (current.realtimeKitTokenConfigured ? "__keep__" : ""),
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Invalid RealtimeKit configuration";
-      return c.json({ error: message }, 400);
-    }
-  }
-
   const updated = await getConfiguredOrganization();
   const webhookSecrets = decryptWebhookSecrets(
     updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
@@ -206,6 +188,61 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     ),
     ...vapidStatus,
     ...giphyStatus,
+    ...realtimeKitStatus,
+  });
+});
+
+settingsRouter.post("/integrations/realtimekit", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  const org = await getConfiguredOrganization();
+  if (!org) return c.json({ error: "Organization not found" }, 404);
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = RealtimeKitSetupSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  const { enabled, cloudflareApiToken } = parsed.data;
+  const current = getOrganizationRealtimeKitStatus(org);
+
+  try {
+    if (enabled) {
+      await enableOrganizationRealtimeKit({
+        organizationId: org.id,
+        organizationName: org.name,
+        cloudflareApiToken,
+      });
+    } else {
+      if (current.realtimeKitFromEnv) {
+        return c.json(
+          { error: "Calls are configured via server environment and cannot be disabled here." },
+          400,
+        );
+      }
+      await clearOrganizationRealtimeKitConfig(org.id);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "RealtimeKit setup failed";
+    return c.json({ error: message }, 400);
+  }
+
+  const updated = await getConfiguredOrganization();
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
+  return c.json({
+    ok: true,
     ...realtimeKitStatus,
   });
 });

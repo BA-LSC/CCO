@@ -3,6 +3,7 @@ import {
   resolveRealtimeKitConfig,
   type RealtimeKitConfig,
 } from "./org-realtimekit";
+import { getConfiguredOrganization } from "./org-oauth";
 
 type CloudflareResult<T> = {
   success: boolean;
@@ -100,8 +101,9 @@ export async function refreshRealtimeKitParticipantToken(params: {
   );
 }
 
-export function presetForRole(role: "host" | "member" | "guest"): string {
-  const presets = getPresetNames();
+export async function presetForRole(role: "host" | "member" | "guest"): Promise<string> {
+  const org = await getConfiguredOrganization();
+  const presets = getPresetNames(org);
   if (role === "host") return presets.host;
   if (role === "guest") return presets.guest;
   return presets.member;

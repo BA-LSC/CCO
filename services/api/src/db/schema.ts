@@ -30,6 +30,9 @@ export const organizations = pgTable("organizations", {
   cloudflareAccountId: text("cloudflare_account_id"),
   realtimeKitAppId: text("realtime_kit_app_id"),
   cloudflareApiTokenEnc: text("cloudflare_api_token_enc"),
+  realtimeKitPresetHost: text("realtime_kit_preset_host"),
+  realtimeKitPresetMember: text("realtime_kit_preset_member"),
+  realtimeKitPresetGuest: text("realtime_kit_preset_guest"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

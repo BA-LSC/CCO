@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LoadingState } from "@/components/PageStates";
@@ -22,9 +22,11 @@ type IntegrationsSettings = {
   webPushConfigured: boolean;
   giphyApiKeyConfigured: boolean;
   realtimeKitConfigured?: boolean;
+  realtimeKitFromEnv?: boolean;
   realtimeKitAccountId?: string;
   realtimeKitAppId?: string;
   realtimeKitTokenConfigured?: boolean;
+  realtimeKitPresetsConfigured?: boolean;
   realtimeKitPresetHost?: string;
   realtimeKitPresetMember?: string;
   realtimeKitPresetGuest?: string;
@@ -155,6 +157,216 @@ function Feedback({ error, success }: { error?: string | null; success?: string 
   );
 }
 
+function CloudflareCallsSection({
+  name,
+  configured,
+  fromEnv,
+  accountId,
+  appId,
+  presetsConfigured,
+  onStatusChange,
+}: {
+  name: string;
+  configured: boolean;
+  fromEnv: boolean;
+  accountId: string;
+  appId: string;
+  presetsConfigured: boolean;
+  onStatusChange: (status: Pick<
+    IntegrationsSettings,
+    | "realtimeKitConfigured"
+    | "realtimeKitFromEnv"
+    | "realtimeKitAccountId"
+    | "realtimeKitAppId"
+    | "realtimeKitTokenConfigured"
+    | "realtimeKitPresetsConfigured"
+  >) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [awaitingToken, setAwaitingToken] = useState(false);
+  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
+  const provisionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function applyCallsSetting(enabled: boolean, token?: string) {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const updated = await apiFetch<
+        Pick<
+          IntegrationsSettings,
+          | "realtimeKitConfigured"
+          | "realtimeKitFromEnv"
+          | "realtimeKitAccountId"
+          | "realtimeKitAppId"
+          | "realtimeKitTokenConfigured"
+          | "realtimeKitPresetsConfigured"
+        > & { ok: boolean }
+      >("/api/v1/settings/integrations/realtimekit", {
+        method: "POST",
+        body: JSON.stringify({
+          enabled,
+          ...(token?.trim() ? { cloudflareApiToken: token.trim() } : {}),
+        }),
+      });
+      onStatusChange(updated);
+      setCloudflareApiToken("");
+      setAwaitingToken(false);
+      setSuccess(
+        enabled
+          ? updated.realtimeKitPresetsConfigured
+            ? "Audio & video calls enabled."
+            : "Calls enabled. Create host, group_call_participant, and guest presets in RealtimeKit if needed."
+          : "Audio & video calls disabled.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cloudflare setup failed");
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggle(enabled: boolean) {
+    if (busy) return;
+
+    if (!enabled) {
+      await applyCallsSetting(false);
+      return;
+    }
+
+    if (configured || fromEnv) {
+      await applyCallsSetting(true);
+      return;
+    }
+
+    setAwaitingToken(true);
+    setError(null);
+    setSuccess(null);
+  }
+
+  useEffect(() => {
+    if (!awaitingToken || busy) return;
+    const token = cloudflareApiToken.trim();
+    if (token.length < 20) return;
+
+    if (provisionTimerRef.current) clearTimeout(provisionTimerRef.current);
+    provisionTimerRef.current = setTimeout(() => {
+      void applyCallsSetting(true, token).catch(() => {
+        /* error state handled in applyCallsSetting */
+      });
+    }, 600);
+
+    return () => {
+      if (provisionTimerRef.current) clearTimeout(provisionTimerRef.current);
+    };
+  }, [awaitingToken, busy, cloudflareApiToken]);
+
+  const toggleChecked = configured || fromEnv;
+  const toggleDisabled = busy || fromEnv;
+  const showTokenSetup = awaitingToken && !configured && !fromEnv;
+
+  return (
+    <section className="integrations-section" aria-labelledby="cloudflare-heading">
+      <div className="integrations-section-top">
+        <div className="integrations-section-head">
+          <h2 id="cloudflare-heading">Cloudflare</h2>
+          <p>
+            RealtimeKit powers group calls without opening ports. Media runs on Cloudflare&apos;s
+            edge. Free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
+            <a
+              href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Create API token
+            </a>
+          </p>
+        </div>
+        {configured ? (
+          <div className="integrations-section-badges">
+            <span className="integrations-badge integrations-badge--success">Calls enabled</span>
+          </div>
+        ) : null}
+      </div>
+
+      <label className="integrations-toggle channel-settings-toggle">
+        <span className="integrations-toggle-label">Audio &amp; video calls</span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={toggleChecked}
+          disabled={toggleDisabled}
+          aria-label="Enable audio and video calls"
+          onChange={(e) => void handleToggle(e.target.checked)}
+        />
+        <span className="toggle-switch" aria-hidden="true" />
+      </label>
+
+      {fromEnv ? (
+        <p className="integrations-field-hint">
+          Configured via server environment. Toggle is locked while env credentials are present.
+        </p>
+      ) : null}
+
+      {showTokenSetup ? (
+        <div className="integrations-fields">
+          <SecretInput
+            label="Cloudflare API token (Realtime Admin)"
+            configured={false}
+            value={cloudflareApiToken}
+            onChange={setCloudflareApiToken}
+            placeholder="Paste token to connect automatically"
+          />
+          <p className="integrations-field-hint">
+            {busy
+              ? "Connecting to Cloudflare and setting up RealtimeKit…"
+              : `CCO will verify the token, connect to Cloudflare, and create a RealtimeKit app for ${name || "your church"} if needed.`}
+          </p>
+          {!busy ? (
+            <button
+              type="button"
+              className="btn btn-secondary integrations-action-btn"
+              onClick={() => setAwaitingToken(false)}
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {configured && !showTokenSetup ? (
+        <div className="integrations-field-hint">
+          {accountId ? (
+            <p>
+              Account <code>{accountId}</code>
+              {appId ? (
+                <>
+                  {" · "}
+                  App <code>{appId}</code>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          {presetsConfigured ? (
+            <p>Preset roles detected from your RealtimeKit app.</p>
+          ) : (
+            <p>
+              Presets not auto-detected. Create <code>host</code>, <code>group_call_participant</code>
+              , and <code>guest</code> in the RealtimeKit dashboard, or override via env vars.
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      <Feedback error={error} success={success} />
+    </section>
+  );
+}
+
 export default function IntegrationsSettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -176,11 +388,11 @@ export default function IntegrationsSettingsPage() {
   const [webPushConfigured, setWebPushConfigured] = useState(false);
   const [giphyApiKey, setGiphyApiKey] = useState("");
   const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
-  const [cloudflareAccountId, setCloudflareAccountId] = useState("");
-  const [realtimeKitAppId, setRealtimeKitAppId] = useState("");
-  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [realtimeKitConfigured, setRealtimeKitConfigured] = useState(false);
-  const [realtimeKitTokenConfigured, setRealtimeKitTokenConfigured] = useState(false);
+  const [realtimeKitFromEnv, setRealtimeKitFromEnv] = useState(false);
+  const [realtimeKitAccountId, setRealtimeKitAccountId] = useState("");
+  const [realtimeKitAppId, setRealtimeKitAppId] = useState("");
+  const [realtimeKitPresetsConfigured, setRealtimeKitPresetsConfigured] = useState(false);
   const [pcoSyncing, setPcoSyncing] = useState(false);
   const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
   const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
@@ -204,10 +416,11 @@ export default function IntegrationsSettingsPage() {
         setVapidKeysConfigured(settings.vapidKeysConfigured ?? false);
         setWebPushConfigured(settings.webPushConfigured ?? false);
         setGiphyApiKeyConfigured(settings.giphyApiKeyConfigured ?? false);
-        setCloudflareAccountId(settings.realtimeKitAccountId ?? "");
+        setRealtimeKitAccountId(settings.realtimeKitAccountId ?? "");
         setRealtimeKitAppId(settings.realtimeKitAppId ?? "");
         setRealtimeKitConfigured(settings.realtimeKitConfigured ?? false);
-        setRealtimeKitTokenConfigured(settings.realtimeKitTokenConfigured ?? false);
+        setRealtimeKitFromEnv(settings.realtimeKitFromEnv ?? false);
+        setRealtimeKitPresetsConfigured(settings.realtimeKitPresetsConfigured ?? false);
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -244,9 +457,6 @@ export default function IntegrationsSettingsPage() {
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
-    if (cloudflareAccountId.trim()) payload.cloudflareAccountId = cloudflareAccountId.trim();
-    if (realtimeKitAppId.trim()) payload.realtimeKitAppId = realtimeKitAppId.trim();
-    if (cloudflareApiToken.trim()) payload.cloudflareApiToken = cloudflareApiToken.trim();
 
     try {
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
@@ -267,14 +477,9 @@ export default function IntegrationsSettingsPage() {
       setVapidKeysConfigured(updated.vapidKeysConfigured ?? false);
       setWebPushConfigured(updated.webPushConfigured ?? false);
       setGiphyApiKeyConfigured(updated.giphyApiKeyConfigured ?? false);
-      setRealtimeKitConfigured(updated.realtimeKitConfigured ?? false);
-      setRealtimeKitTokenConfigured(updated.realtimeKitTokenConfigured ?? false);
-      if (updated.realtimeKitAccountId) setCloudflareAccountId(updated.realtimeKitAccountId);
-      if (updated.realtimeKitAppId) setRealtimeKitAppId(updated.realtimeKitAppId);
       setClientSecret("");
       setWebhookSecret("");
       setGiphyApiKey("");
-      setCloudflareApiToken("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -337,6 +542,22 @@ export default function IntegrationsSettingsPage() {
           {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
         </button>
       </section>
+
+      <CloudflareCallsSection
+        name={name}
+        configured={realtimeKitConfigured}
+        fromEnv={realtimeKitFromEnv}
+        accountId={realtimeKitAccountId}
+        appId={realtimeKitAppId}
+        presetsConfigured={realtimeKitPresetsConfigured}
+        onStatusChange={(status) => {
+          setRealtimeKitConfigured(status.realtimeKitConfigured ?? false);
+          setRealtimeKitFromEnv(status.realtimeKitFromEnv ?? false);
+          setRealtimeKitPresetsConfigured(status.realtimeKitPresetsConfigured ?? false);
+          if (status.realtimeKitAccountId) setRealtimeKitAccountId(status.realtimeKitAccountId);
+          if (status.realtimeKitAppId) setRealtimeKitAppId(status.realtimeKitAppId);
+        }}
+      />
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
         <IntegrationsSection
@@ -424,57 +645,6 @@ export default function IntegrationsSettingsPage() {
               autoComplete="email"
               placeholder="notifications@yourchurch.org"
             />
-          </div>
-        </IntegrationsSection>
-
-        <IntegrationsSection
-          id="realtimekit-heading"
-          heading="Audio & video calls"
-          description={
-            <>
-              Cloudflare RealtimeKit powers group calls without opening ports on your server. Media
-              runs on Cloudflare&apos;s edge. Free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
-              <a
-                href="https://developers.cloudflare.com/realtime/realtimekit/quickstart/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Setup guide
-              </a>
-            </>
-          }
-          badge={
-            realtimeKitConfigured
-              ? "Calls enabled"
-              : realtimeKitTokenConfigured
-                ? "Configured"
-                : null
-          }
-        >
-          <div className="integrations-fields">
-            <TextInput
-              label="Cloudflare account ID"
-              value={cloudflareAccountId}
-              onChange={setCloudflareAccountId}
-              placeholder="From Cloudflare dashboard"
-            />
-            <TextInput
-              label="RealtimeKit app ID"
-              value={realtimeKitAppId}
-              onChange={setRealtimeKitAppId}
-              placeholder="From RealtimeKit app settings"
-            />
-            <SecretInput
-              label="Cloudflare API token (Realtime Admin)"
-              configured={realtimeKitTokenConfigured}
-              value={cloudflareApiToken}
-              onChange={setCloudflareApiToken}
-              placeholder="Paste new token"
-            />
-            <p className="integrations-field-hint">
-              Create presets named <code>host</code>, <code>group_call_participant</code>, and{" "}
-              <code>guest</code> in the RealtimeKit dashboard (or override via env vars).
-            </p>
           </div>
         </IntegrationsSection>
 
