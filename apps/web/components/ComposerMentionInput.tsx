@@ -178,6 +178,17 @@ export const ComposerMentionInput = forwardRef<ComposerMentionInputHandle, Props
               deleteRange.setEnd(range.startContainer, range.startOffset);
               deleteRange.deleteContents();
               range = deleteRange;
+            } else {
+              const tail = textBefore.slice(at);
+              if (tail && root.textContent?.endsWith(tail)) {
+                const lastText = root.lastChild;
+                if (lastText?.nodeType === Node.TEXT_NODE) {
+                  const text = lastText.textContent ?? "";
+                  if (text.endsWith(tail)) {
+                    lastText.textContent = text.slice(0, -tail.length);
+                  }
+                }
+              }
             }
           }
 
@@ -242,7 +253,13 @@ export const ComposerMentionInput = forwardRef<ComposerMentionInputHandle, Props
           syncFromEditor();
         }}
         onKeyDown={onKeyDown}
-        onBlur={() => onMentionQueryChange(null)}
+        onBlur={(event) => {
+          const related = event.relatedTarget;
+          if (related instanceof HTMLElement && related.closest(".mention-suggestions")) {
+            return;
+          }
+          onMentionQueryChange(null);
+        }}
       />
     );
   },

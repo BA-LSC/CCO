@@ -4953,13 +4953,19 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .mention-suggestions {
   list-style: none;
-  padding: 0;
+  padding: 6px;
   margin: 0 0 8px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.mention-suggestions li + li {
+  margin-top: 2px;
 }
 
 .mention-suggestions button {
@@ -4968,14 +4974,55 @@ html[data-theme="6"] .user-menu-dropdown {
   background: none;
   color: var(--color-text);
   border: none;
-  padding: 10px 14px;
+  padding: 8px 10px;
   cursor: pointer;
   font-family: inherit;
   font-size: 0.9rem;
+  border-radius: calc(var(--radius-md) - 4px);
+  display: block;
+}
+
+.mention-suggestion-main {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mention-suggestion-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.mention-suggestion-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mention-suggestion-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mention-suggestion-name {
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mention-suggestions button.mention-suggestion--pending {
@@ -4988,6 +5035,7 @@ html[data-theme="6"] .user-menu-dropdown {
   flex-shrink: 0;
   font-size: 0.75rem;
   color: var(--color-muted);
+  line-height: 1.2;
 }
 
 .mention-suggestions button:hover,

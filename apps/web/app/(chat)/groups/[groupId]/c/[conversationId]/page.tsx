@@ -315,6 +315,7 @@ export default function GroupConversationPage() {
       id: member.id,
       displayName: member.displayName,
       onCco: member.onCco,
+      avatarUrl: member.avatarUrl,
     })) ?? [];
 
   async function archiveConversation() {

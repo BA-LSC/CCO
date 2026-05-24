@@ -136,6 +136,7 @@ export default function TeamChatPage() {
       id: member.id,
       displayName: member.displayName,
       onCco: member.onCco,
+      avatarUrl: member.avatarUrl,
     })) ?? [];
 
   if (!detailLoading && displayError && !detail) {

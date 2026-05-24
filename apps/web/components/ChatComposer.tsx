@@ -8,6 +8,7 @@ import {
   ComposerMentionInput,
   type ComposerMentionInputHandle,
 } from "@/components/ComposerMentionInput";
+import { MentionSuggestions, type MentionMember } from "@/components/MentionSuggestions";
 import { fetchGiphyEnabled } from "@/lib/api";
 import { isAppUpdateInProgress } from "@/lib/app-update";
 import {
@@ -25,7 +26,7 @@ import {
   type PendingComposerMedia,
 } from "@/lib/composer-media";
 
-type Member = { id?: string; displayName: string; onCco?: boolean };
+type Member = MentionMember;
 
 function memberCanMention(member: Member): boolean {
   return Boolean(member.id && member.onCco !== false);
@@ -165,6 +166,7 @@ export function ChatComposer({
     if (!memberCanMention(member) || !member.id) return;
     composerRef.current?.insertMention(member.displayName, member.id);
     setMentionQuery(null);
+    composerRef.current?.focus();
   }, []);
 
   const handleSend = useCallback(
@@ -231,11 +233,19 @@ export function ChatComposer({
   const mentionCandidates =
     mentionQuery === null
       ? []
-      : members.filter(
-          (m) =>
-            m.id !== resolvedUserId &&
-            m.displayName.toLowerCase().includes(mentionQuery),
-        );
+      : members
+          .filter(
+            (m) =>
+              m.id !== resolvedUserId &&
+              m.displayName.toLowerCase().includes(mentionQuery),
+          )
+          .sort((a, b) => {
+            const query = mentionQuery;
+            const aStarts = a.displayName.toLowerCase().startsWith(query);
+            const bStarts = b.displayName.toLowerCase().startsWith(query);
+            if (aStarts !== bStarts) return aStarts ? -1 : 1;
+            return a.displayName.localeCompare(b.displayName);
+          });
 
   const handleComposerKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -273,30 +283,12 @@ export function ChatComposer({
 
   return (
     <>
-      {mentionQuery !== null && mentionCandidates.length > 0 && (
-        <ul className="mention-suggestions" role="listbox" aria-label="Mention suggestions">
-          {mentionCandidates.slice(0, 8).map((m) => {
-            const canMention = memberCanMention(m);
-            return (
-              <li key={m.id ?? m.displayName}>
-                <button
-                  type="button"
-                  role="option"
-                  className={canMention ? undefined : "mention-suggestion--pending"}
-                  disabled={!canMention}
-                  aria-disabled={!canMention}
-                  onClick={() => insertMention(m)}
-                >
-                  <span className="mention-suggestion-name">@{m.displayName}</span>
-                  {!canMention ? (
-                    <span className="mention-suggestion-hint">Not on CCO yet</span>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {mentionQuery !== null ? (
+        <MentionSuggestions
+          members={mentionCandidates}
+          onSelect={insertMention}
+        />
+      ) : null}
 
       {pendingMedia ? (
         <ComposerPendingMedia
