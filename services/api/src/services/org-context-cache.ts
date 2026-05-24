@@ -2,10 +2,8 @@ import { isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
-import {
-  configuredOrganizationColumns,
-  type ConfiguredOrganizationRow,
-} from "./org-select";
+import { selectConfiguredOrganizationRow } from "./configured-org-query";
+import type { ConfiguredOrganizationRow } from "./org-select";
 
 const ORG_CACHE_TTL_MS = 60_000;
 
@@ -27,13 +25,7 @@ export async function getCachedConfiguredOrganization(): Promise<ConfiguredOrgan
     return cachedOrg;
   }
 
-  const rows = await db
-    .select(configuredOrganizationColumns)
-    .from(organizations)
-    .where(isNotNull(organizations.setupCompletedAt))
-    .limit(1);
-
-  cachedOrg = rows[0] ?? null;
+  cachedOrg = await selectConfiguredOrganizationRow(isNotNull(organizations.setupCompletedAt));
   cachedOrgAt = now;
   cachedWebhooksEnabled = null;
   return cachedOrg;

@@ -9,7 +9,7 @@ import {
   getCachedConfiguredOrganization,
   invalidateOrgContextCache,
 } from "./org-context-cache";
-import { configuredOrganizationColumns } from "./org-select";
+import { selectConfiguredOrganizationRow } from "./configured-org-query";
 
 export type OrgOAuthCredentials = {
   clientId: string;
@@ -47,23 +47,14 @@ export async function getOrganizationWithOAuthCredentials() {
     return completed;
   }
 
-  const rows = await db
-    .select(configuredOrganizationColumns)
-    .from(organizations)
-    .where(
-      and(isNotNull(organizations.pcoClientId), isNotNull(organizations.pcoClientSecretEnc)),
-    )
-    .limit(1);
-  return rows[0] ?? null;
+  const rows = await selectConfiguredOrganizationRow(
+    and(isNotNull(organizations.pcoClientId), isNotNull(organizations.pcoClientSecretEnc)),
+  );
+  return rows;
 }
 
 export async function getPendingSetupOrganization() {
-  const rows = await db
-    .select(configuredOrganizationColumns)
-    .from(organizations)
-    .where(isNull(organizations.setupCompletedAt))
-    .limit(1);
-  return rows[0] ?? null;
+  return selectConfiguredOrganizationRow(isNull(organizations.setupCompletedAt));
 }
 
 export function draftHasSensitiveData(org: typeof organizations.$inferSelect): boolean {

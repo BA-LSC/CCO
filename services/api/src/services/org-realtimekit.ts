@@ -11,21 +11,14 @@ import {
   provisionRealtimeKitFromApiToken,
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
-
-function isMissingCloudflareColumnsError(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return (
-    message.includes("cloudflare_account_id") ||
-    message.includes("cloudflare_api_token_enc") ||
-    message.includes("realtime_kit_app_id")
-  );
-}
+import {
+  isMissingOrgMigrationColumnsError,
+  ORG_MIGRATIONS_0021_0023_MESSAGE,
+} from "./org-db-migrations";
 
 function rethrowCloudflareSaveError(err: unknown): never {
-  if (isMissingCloudflareColumnsError(err)) {
-    throw new Error(
-      "Database is missing Cloudflare columns. Run API migrations 0021–0023, then try again.",
-    );
+  if (isMissingOrgMigrationColumnsError(err)) {
+    throw new Error(ORG_MIGRATIONS_0021_0023_MESSAGE);
   }
   throw err;
 }
