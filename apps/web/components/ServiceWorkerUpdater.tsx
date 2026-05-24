@@ -7,7 +7,7 @@ import {
   isAppUpdateInProgress,
   resumeAppUpdateUi,
 } from "@/lib/app-update";
-import { showAppUpdateOverlay } from "@/lib/app-update-overlay";
+import { showAppUpdateOverlay, hideAppUpdateOverlay } from "@/lib/app-update-overlay";
 import { listenForAppUpdates } from "@/lib/service-worker-client";
 
 export function ServiceWorkerUpdater() {
@@ -29,13 +29,23 @@ export function ServiceWorkerUpdater() {
   useEffect(() => {
     const resume = () => {
       if (document.visibilityState === "hidden") return;
-      resumeAppUpdateUi();
-      void checkAppVersion();
+      void checkAppVersion().finally(() => {
+        if (isAppUpdateInProgress()) {
+          resumeAppUpdateUi();
+        } else {
+          hideAppUpdateOverlay();
+        }
+      });
     };
 
     const onFocus = () => {
-      resumeAppUpdateUi();
-      void checkAppVersion();
+      void checkAppVersion().finally(() => {
+        if (isAppUpdateInProgress()) {
+          resumeAppUpdateUi();
+        } else {
+          hideAppUpdateOverlay();
+        }
+      });
     };
 
     document.addEventListener("visibilitychange", resume);

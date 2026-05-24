@@ -28,6 +28,14 @@ var DEPLOY_CHECK_MS=750;
 var OVERLAY_MS=2500;
 var SEND_WAIT_MS=8000;
 var DEPLOY_SEND_WAIT_MS=500;
+function getClientVersion(){
+  try{
+    var meta=document.querySelector('meta[name="cco-app-version"]');
+    var content=meta&&meta.getAttribute("content");
+    if(content&&content.trim())return content.trim();
+  }catch(e){}
+  return CLIENT;
+}
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
   var s=document.createElement("style");
@@ -89,7 +97,7 @@ function maybeCompletePostDeploy(d){
       sessionStorage.removeItem(DEPLOY_RELOAD_KEY);
       return false;
     }
-    if(!d.version||d.version!==CLIENT)return false;
+    if(!d.version||d.version!==getClientVersion())return false;
     sessionStorage.removeItem(DEPLOY_RELOAD_KEY);
     clearDeployPending();
     return true;
@@ -141,7 +149,8 @@ function applyUpdate(fromDeploy){
 function handleVersionPayload(d){
   if(!d.version)return;
   if(maybeCompletePostDeploy(d))return;
-  var needsReload=d.version!==CLIENT;
+  var clientVersion=getClientVersion();
+  var needsReload=d.version!==clientVersion;
   if(d.updating){
     markDeployPending();
     if(needsReload){
@@ -152,6 +161,7 @@ function handleVersionPayload(d){
   if(deployPending){
     if(!needsReload){
       clearDeployPending();
+      applying=false;
       return;
     }
     applyUpdate(true);
@@ -159,7 +169,10 @@ function handleVersionPayload(d){
   }
   if(needsReload){
     applyUpdate(false);
+    return;
   }
+  clearDeployPending();
+  applying=false;
 }
 function check(){
   if(applying){
@@ -188,21 +201,12 @@ function wire(){
   wired=true;
   document.addEventListener("visibilitychange",function(){
     if(document.visibilityState!=="visible")return;
-    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
-      overlay();
-    }
     check();
   });
   window.addEventListener("pageshow",function(){
-    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
-      overlay();
-    }
     check();
   });
   window.addEventListener("focus",function(){
-    if(deployPending||applying||window.__ccoApplyingUpdate||window.__ccoDeployPending){
-      overlay();
-    }
     check();
   });
   setInterval(check,CHECK_MS);
