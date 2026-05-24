@@ -1,6 +1,6 @@
 import { organizations } from "../db/schema";
 
-/** Columns that exist before migration 0021 (RealtimeKit). */
+/** Columns loaded for configured org reads (requires migrations through 0023). */
 export const configuredOrganizationColumns = {
   id: organizations.id,
   name: organizations.name,
@@ -19,6 +19,12 @@ export const configuredOrganizationColumns = {
   vapidPrivateKeyEnc: organizations.vapidPrivateKeyEnc,
   vapidSubject: organizations.vapidSubject,
   giphyApiKeyEnc: organizations.giphyApiKeyEnc,
+  cloudflareAccountId: organizations.cloudflareAccountId,
+  realtimeKitAppId: organizations.realtimeKitAppId,
+  cloudflareApiTokenEnc: organizations.cloudflareApiTokenEnc,
+  realtimeKitPresetHost: organizations.realtimeKitPresetHost,
+  realtimeKitPresetMember: organizations.realtimeKitPresetMember,
+  realtimeKitPresetGuest: organizations.realtimeKitPresetGuest,
   pcoLastSyncedAt: organizations.pcoLastSyncedAt,
   createdAt: organizations.createdAt,
 };
@@ -41,6 +47,12 @@ export type ConfiguredOrganizationRow = {
   vapidPrivateKeyEnc: string | null;
   vapidSubject: string | null;
   giphyApiKeyEnc: string | null;
+  cloudflareAccountId: string | null;
+  realtimeKitAppId: string | null;
+  cloudflareApiTokenEnc: string | null;
+  realtimeKitPresetHost: string | null;
+  realtimeKitPresetMember: string | null;
+  realtimeKitPresetGuest: string | null;
   pcoLastSyncedAt: Date | null;
   createdAt: Date;
 };

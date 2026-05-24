@@ -12,6 +12,24 @@ import {
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
 
+function isMissingCloudflareColumnsError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("cloudflare_account_id") ||
+    message.includes("cloudflare_api_token_enc") ||
+    message.includes("realtime_kit_app_id")
+  );
+}
+
+function rethrowCloudflareSaveError(err: unknown): never {
+  if (isMissingCloudflareColumnsError(err)) {
+    throw new Error(
+      "Database is missing Cloudflare columns. Run API migrations 0021–0023, then try again.",
+    );
+  }
+  throw err;
+}
+
 export type RealtimeKitConfig = {
   accountId: string;
   appId: string;
@@ -93,13 +111,17 @@ export async function saveOrganizationCloudflareApiToken(params: {
   const accounts = await listCloudflareAccounts(apiToken);
   const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
 
-  await db
-    .update(organizations)
-    .set({
-      cloudflareApiTokenEnc: encryptSecret(apiToken),
-      cloudflareAccountId: accountId,
-    })
-    .where(eq(organizations.id, params.organizationId));
+  try {
+    await db
+      .update(organizations)
+      .set({
+        cloudflareApiTokenEnc: encryptSecret(apiToken),
+        cloudflareAccountId: accountId,
+      })
+      .where(eq(organizations.id, params.organizationId));
+  } catch (err) {
+    rethrowCloudflareSaveError(err);
+  }
 
   return { accountId };
 }
@@ -125,17 +147,21 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
     autoCreateApp: params.autoCreateApp ?? true,
   });
 
-  await db
-    .update(organizations)
-    .set({
-      cloudflareAccountId: provisioned.accountId,
-      realtimeKitAppId: provisioned.appId,
-      cloudflareApiTokenEnc: encryptSecret(apiToken),
-      realtimeKitPresetHost: provisioned.presets?.host ?? null,
-      realtimeKitPresetMember: provisioned.presets?.member ?? null,
-      realtimeKitPresetGuest: provisioned.presets?.guest ?? null,
-    })
-    .where(eq(organizations.id, params.organizationId));
+  try {
+    await db
+      .update(organizations)
+      .set({
+        cloudflareAccountId: provisioned.accountId,
+        realtimeKitAppId: provisioned.appId,
+        cloudflareApiTokenEnc: encryptSecret(apiToken),
+        realtimeKitPresetHost: provisioned.presets?.host ?? null,
+        realtimeKitPresetMember: provisioned.presets?.member ?? null,
+        realtimeKitPresetGuest: provisioned.presets?.guest ?? null,
+      })
+      .where(eq(organizations.id, params.organizationId));
+  } catch (err) {
+    rethrowCloudflareSaveError(err);
+  }
 
   return {
     createdApp: provisioned.createdApp,
