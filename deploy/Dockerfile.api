@@ -14,8 +14,10 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
 
 FROM base AS package-build
 COPY package.json bun.lock tsconfig.base.json ./
+COPY apps/web/package.json apps/web/
 COPY packages/pco-client/package.json packages/pco-client/
 COPY packages/shared/package.json packages/shared/
+COPY services/api/package.json services/api/
 COPY packages ./packages
 COPY --from=deps /app/node_modules ./node_modules
 # Install package devDependencies (typescript) omitted by --filter @cco/api.
