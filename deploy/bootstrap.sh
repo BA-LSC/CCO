@@ -106,7 +106,7 @@ DEPLOY_DRAIN_WAIT_SEC="${DEPLOY_DRAIN_WAIT_SEC:-8}"
 DEPLOY_DRAINING_TTL_SEC="${DEPLOY_DRAINING_TTL_SEC:-600}"
 
 ensure_deploy_signal_services() {
-  # Keep the previous stack reachable so /health can report draining during build/migrate.
+  # Ensure redis and api are reachable so /health can report draining to clients.
   "${COMPOSE[@]}" up -d redis api >/dev/null 2>&1 || true
   for _ in $(seq 1 20); do
     if "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" ping 2>/dev/null | grep -q PONG; then
@@ -152,13 +152,9 @@ mark_deploy_draining || true
 echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
 sleep "$DEPLOY_DRAIN_WAIT_SEC"
 
+echo "Running database migrations..."
 cco_run_migrations files
 
-echo "Recreating containers with new images..."
-"${COMPOSE[@]}" up -d --no-build
-
-echo ""
-echo "Waiting for services..."
 wait_for_service() {
   local label="$1"
   shift
@@ -172,14 +168,22 @@ wait_for_service() {
   return 1
 }
 
-wait_for_service "api" \
-  "${COMPOSE[@]}" exec -T api bun -e "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-wait_for_service "web" \
-  "${COMPOSE[@]}" exec -T web bun -e "fetch('http://127.0.0.1:3000/api/app-version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+echo "Recreating containers with new images..."
+if ! "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 120; then
+  echo "  Compose --wait did not complete; probing endpoints..." >&2
+  "${COMPOSE[@]}" up -d --no-build
+  wait_for_service "api" \
+    "${COMPOSE[@]}" exec -T api bun -e "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  wait_for_service "web" \
+    "${COMPOSE[@]}" exec -T web bun -e "fetch('http://127.0.0.1:3000/api/app-version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+fi
+
+echo ""
+echo "Waiting for services..."
+"${COMPOSE[@]}" ps
 
 echo "  Signaling connected clients to hide the update screen..."
 clear_deploy_draining
-"${COMPOSE[@]}" ps
 
 echo ""
 echo "Deployment started."
