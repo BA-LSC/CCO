@@ -77,19 +77,20 @@ export function resolveCloudflareAccountId(
 }
 
 export function resolveRealtimeKitAppSelection(
-  apps: Array<{ id: string; name: string }>,
+  apps: Array<{ id: string; name: string }> | null | undefined,
   options: { preferredAppId?: string; appName?: string },
 ): { id: string; name: string } | "create" {
+  const list = apps ?? [];
   if (options.preferredAppId) {
-    const existing = apps.find((app) => app.id === options.preferredAppId);
+    const existing = list.find((app) => app.id === options.preferredAppId);
     if (existing) return existing;
   }
 
   const targetName = (options.appName ?? CCO_REALTIMEKIT_APP_NAME).trim().toLowerCase();
-  const byName = apps.find((app) => app.name.trim().toLowerCase() === targetName);
+  const byName = list.find((app) => app.name.trim().toLowerCase() === targetName);
   if (byName) return byName;
 
-  if (apps.length === 1) return apps[0]!;
+  if (list.length === 1) return list[0]!;
 
   return "create";
 }

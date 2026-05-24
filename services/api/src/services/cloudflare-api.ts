@@ -1,8 +1,15 @@
 const CF_API = "https://api.cloudflare.com/client/v4";
 
-type CloudflareResult<T> = {
+type CloudflareV4Result<T> = {
   success: boolean;
   result: T;
+  errors?: Array<{ message: string }>;
+};
+
+/** Realtime Kit endpoints use `data` instead of the standard v4 `result` envelope. */
+type RealtimeKitResult<T> = {
+  success: boolean;
+  data: T;
   errors?: Array<{ message: string }>;
 };
 
@@ -16,6 +23,13 @@ export class CloudflareApiError extends Error {
   }
 }
 
+function cloudflareErrorDetail(
+  res: Response,
+  errors?: Array<{ message: string }>,
+): string {
+  return errors?.map((e) => e.message).join("; ") ?? res.statusText;
+}
+
 async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${CF_API}${path}`, {
     ...init,
@@ -26,13 +40,40 @@ async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit):
     },
   });
 
-  const json = (await res.json()) as CloudflareResult<T>;
+  const json = (await res.json()) as CloudflareV4Result<T>;
   if (!res.ok || !json.success) {
-    const detail = json.errors?.map((e) => e.message).join("; ") ?? res.statusText;
-    throw new CloudflareApiError(detail || "Cloudflare API request failed", res.status);
+    throw new CloudflareApiError(
+      cloudflareErrorDetail(res, json.errors) || "Cloudflare API request failed",
+      res.status,
+    );
   }
 
   return json.result;
+}
+
+async function cfRealtimeKitRequest<T>(
+  apiToken: string,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(`${CF_API}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  const json = (await res.json()) as RealtimeKitResult<T>;
+  if (!res.ok || !json.success) {
+    throw new CloudflareApiError(
+      cloudflareErrorDetail(res, json.errors) || "Cloudflare Realtime Kit request failed",
+      res.status,
+    );
+  }
+
+  return json.data;
 }
 
 export async function verifyCloudflareApiToken(
@@ -59,7 +100,11 @@ export async function listRealtimeKitApps(
   accountId: string,
   apiToken: string,
 ): Promise<RealtimeKitApp[]> {
-  return cfRequest<RealtimeKitApp[]>(apiToken, `/accounts/${accountId}/realtime/kit/apps`);
+  const apps = await cfRealtimeKitRequest<RealtimeKitApp[] | undefined>(
+    apiToken,
+    `/accounts/${accountId}/realtime/kit/apps`,
+  );
+  return apps ?? [];
 }
 
 export async function createRealtimeKitApp(
@@ -67,10 +112,18 @@ export async function createRealtimeKitApp(
   apiToken: string,
   name: string,
 ): Promise<RealtimeKitApp> {
-  return cfRequest<RealtimeKitApp>(apiToken, `/accounts/${accountId}/realtime/kit/apps`, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
+  const data = await cfRealtimeKitRequest<{ app: RealtimeKitApp }>(
+    apiToken,
+    `/accounts/${accountId}/realtime/kit/apps`,
+    {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    },
+  );
+  if (!data?.app?.id) {
+    throw new CloudflareApiError("Unexpected RealtimeKit app create response");
+  }
+  return data.app;
 }
 
 export type RealtimeKitPreset = {
@@ -82,8 +135,9 @@ export async function listRealtimeKitPresets(
   appId: string,
   apiToken: string,
 ): Promise<RealtimeKitPreset[]> {
-  return cfRequest<RealtimeKitPreset[]>(
+  const presets = await cfRealtimeKitRequest<RealtimeKitPreset[] | undefined>(
     apiToken,
     `/accounts/${accountId}/realtime/kit/${appId}/presets`,
   );
+  return presets ?? [];
 }

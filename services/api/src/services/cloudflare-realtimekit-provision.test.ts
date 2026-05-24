@@ -83,4 +83,8 @@ describe("resolveRealtimeKitAppSelection", () => {
     ];
     expect(resolveRealtimeKitAppSelection(apps, {})).toBe("create");
   });
+
+  test("treats missing app list as empty", () => {
+    expect(resolveRealtimeKitAppSelection(undefined, {})).toBe("create");
+  });
 });
