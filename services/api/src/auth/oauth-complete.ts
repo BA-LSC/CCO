@@ -113,20 +113,12 @@ export async function completeOAuthLogin(
   };
 }
 
-export function setSessionCookies(c: Context, sessionToken: string, pcoAccessToken: string): void {
+export function setSessionCookies(c: Context, sessionToken: string): void {
   setCookie(c, "connect_session", sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Lax",
     maxAge: 60 * 60 * 24 * 7,
-    path: "/",
-  });
-
-  setCookie(c, "pco_access_token", pcoAccessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Lax",
-    maxAge: 60 * 60 * 24,
     path: "/",
   });
 }

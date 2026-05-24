@@ -46,7 +46,12 @@ cco_env_get() {
 
 cco_env_is_placeholder() {
   local val="${1:-}"
-  [[ -z "$val" || "$val" == CHANGE_ME* ]]
+  [[ -z "$val" || "$val" == CHANGE_ME* || "$val" == REPLACE_WITH_* ]]
+}
+
+cco_value_contains_placeholder() {
+  local val="${1:-}"
+  [[ -z "$val" || "$val" == *CHANGE_ME* || "$val" == *REPLACE_WITH_* ]]
 }
 
 # chat.example.com → api.example.com (one subdomain level for Cloudflare Universal SSL)

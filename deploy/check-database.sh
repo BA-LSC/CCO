@@ -19,7 +19,7 @@ source .env
 set +a
 
 url="${DATABASE_URL:-}"
-if [[ -z "$url" || "$url" == *CHANGE_ME* ]]; then
+if [[ -z "$url" || "$url" == *CHANGE_ME* || "$url" == *REPLACE_WITH_* ]]; then
   echo "Set DATABASE_URL in .env first."
   exit 1
 fi

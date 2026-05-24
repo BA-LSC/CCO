@@ -45,20 +45,20 @@ COMPOSE=(docker compose "${files[@]}")
 missing=()
 for key in SESSION_SECRET TOKEN_ENCRYPTION_KEY CCO_DOMAIN API_DOMAIN REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN; do
   val="${!key:-}"
-  if [[ -z "$val" || "$val" == CHANGE_ME* ]]; then
+  if cco_env_is_placeholder "$val"; then
     missing+=("$key")
   fi
 done
 
 if cco_should_use_external_db; then
   db_url="${DATABASE_URL:-}"
-  if [[ -z "$db_url" || "$db_url" == *CHANGE_ME* || "$db_url" == *@postgres:* ]]; then
+  if [[ -z "$db_url" || "$db_url" == *@postgres:* ]] || cco_value_contains_placeholder "$db_url"; then
     missing+=("DATABASE_URL (external VPC host — use ./deploy/configure-vultr-db.sh)")
   fi
 else
   for key in POSTGRES_PASSWORD; do
     val="${!key:-}"
-    if [[ -z "$val" || "$val" == CHANGE_ME* ]]; then
+    if cco_env_is_placeholder "$val"; then
       missing+=("$key")
     fi
   done

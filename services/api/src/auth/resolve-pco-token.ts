@@ -9,7 +9,7 @@ export async function resolvePcoAccessToken(
   const fromRequest =
     session.pcoAccessToken ??
     c.req.header("x-pco-access-token") ??
-    getCookie(c, "pco_access_token");
+    getCookie(c, "pco_access_token"); // legacy web sessions; new logins use encrypted DB storage
   if (fromRequest) return fromRequest;
 
   return (await getPcoAccessToken(session.userId)) ?? undefined;

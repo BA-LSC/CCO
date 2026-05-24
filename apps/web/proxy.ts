@@ -35,11 +35,6 @@ export function proxy(request: NextRequest) {
     headers.set("authorization", `Bearer ${session}`);
   }
 
-  const pcoToken = request.cookies.get("pco_access_token")?.value;
-  if (pcoToken && !headers.has("x-pco-access-token")) {
-    headers.set("x-pco-access-token", pcoToken);
-  }
-
   return NextResponse.next({ request: { headers } });
 }
 

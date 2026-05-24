@@ -7,7 +7,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env.sh"
 # True when DATABASE_URL targets a host other than the bundled postgres service.
 cco_database_is_external() {
   local url="${1:-}"
-  [[ -z "$url" || "$url" == *CHANGE_ME* ]] && return 1
+  [[ -z "$url" || "$url" == *CHANGE_ME* || "$url" == *REPLACE_WITH_* ]] && return 1
   [[ "$url" == *@postgres:* || "$url" == *@postgres/* ]] && return 1
   return 0
 }

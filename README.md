@@ -68,6 +68,8 @@ cd cco
 bun install
 ```
 
+Git hooks (secret scanning on commit) install automatically via `bun install`. To reinstall manually: `bash scripts/install-git-hooks.sh`.
+
 ### 2. Start infrastructure
 
 ```bash
@@ -80,8 +82,8 @@ Edit `.env` and set at minimum:
 | Variable | Notes |
 |----------|--------|
 | `PCO_CLIENT_ID` / `PCO_CLIENT_SECRET` | From [Planning Center Developers](https://developer.planning.center/) |
-| `SESSION_SECRET` | 32+ characters (`openssl rand -hex 32`) |
-| `TOKEN_ENCRYPTION_KEY` | 64 hex characters (`openssl rand -hex 32`) |
+| `SESSION_SECRET` | Run `openssl rand -hex 32` (32+ characters) |
+| `TOKEN_ENCRYPTION_KEY` | Same command — use the full 64-character hex output |
 
 ### 3. Database migrations
 

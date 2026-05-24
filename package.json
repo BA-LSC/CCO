@@ -18,6 +18,7 @@
     "db:migrate": "bun run --cwd services/api db:migrate",
     "deploy:install": "./deploy/install.sh",
     "deploy:setup": "./deploy/setup.sh",
+    "prepare": "bash scripts/install-git-hooks.sh",
     "audit": "bun audit",
     "audit:ci": "bun audit --audit-level=high"
   },

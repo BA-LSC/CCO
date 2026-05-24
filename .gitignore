@@ -66,6 +66,9 @@ Thumbs.db
 *.swo
 *~
 
+# Cursor (local hook state)
+.cursor/hooks/state/
+
 # Deploy / hosting
 .vercel
 

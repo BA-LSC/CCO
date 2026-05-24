@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Block committing secrets and sensitive files.
+set -euo pipefail
+
+ALLOWED_ENV_REGEX='^\.env\.example$|^deploy/\.env\.production\.example$'
+
+blocked=0
+
+is_allowed_env() {
+  [[ "$1" =~ $ALLOWED_ENV_REGEX ]]
+}
+
+while IFS= read -r -d '' file; do
+  [[ -z "$file" ]] && continue
+
+  case "$file" in
+    .env|.env.*)
+      if ! is_allowed_env "$file"; then
+        echo "pre-commit: blocked $file — do not commit environment files." >&2
+        blocked=1
+      fi
+      ;;
+    *.pem|*.key|*.p12|*.p8|*.jks|*.mobileprovision)
+      echo "pre-commit: blocked $file — key/certificate files must not be committed." >&2
+      blocked=1
+      ;;
+    id_rsa|id_rsa.pub|id_ed25519|id_ed25519.pub)
+      echo "pre-commit: blocked $file — SSH private keys must not be committed." >&2
+      blocked=1
+      ;;
+  esac
+done < <(git diff --cached --name-only -z --diff-filter=ACM)
+
+if [[ "$blocked" -ne 0 ]]; then
+  exit 1
+fi
+
+# Scan added lines in the staged diff (skip allowed env templates).
+while IFS= read -r -d '' file; do
+  [[ -z "$file" ]] && continue
+  is_allowed_env "$file" && continue
+
+  while IFS= read -r line; do
+    [[ "$line" != +* ]] && continue
+    content="${line#+}"
+
+    if [[ "$content" =~ (ghp_[a-zA-Z0-9]{20,}|github_pat_[a-zA-Z0-9_]{20,}|sk-[a-zA-Z0-9_-]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[a-zA-Z0-9-]{10,}) ]]; then
+      echo "pre-commit: blocked possible API token in $file" >&2
+      echo "  ${content:0:120}" >&2
+      blocked=1
+      continue
+    fi
+
+    if [[ "$content" =~ BEGIN[[:space:]]+(RSA[[:space:]]+)?PRIVATE[[:space:]]+KEY ]]; then
+      echo "pre-commit: blocked private key material in $file" >&2
+      blocked=1
+      continue
+    fi
+
+    if [[ "$content" =~ ^[[:space:]]*(SESSION_SECRET|TOKEN_ENCRYPTION_KEY|PCO_CLIENT_SECRET|SETUP_BOOTSTRAP_SECRET|REDIS_PASSWORD|POSTGRES_PASSWORD|VAPID_PRIVATE_KEY|GIPHY_API_KEY|CLOUDFLARE_TUNNEL_TOKEN)[[:space:]]*=[[:space:]]*([^[:space:]#]+) ]]; then
+      value="${BASH_REMATCH[2]}"
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+      if [[ -n "$value" && "$value" != REPLACE_WITH_* && "$value" != CHANGE_ME* ]]; then
+        echo "pre-commit: blocked possible secret assignment in $file ($BASH_REMATCH[1])" >&2
+        blocked=1
+      fi
+    fi
+  done < <(git diff --cached -U0 --no-color -- "$file" 2>/dev/null || true)
+done < <(git diff --cached --name-only -z --diff-filter=ACM)
+
+if [[ "$blocked" -ne 0 ]]; then
+  echo "pre-commit: if this is a false positive, split the change or use a placeholder (REPLACE_WITH_*)." >&2
+  exit 1
+fi
+
+exit 0

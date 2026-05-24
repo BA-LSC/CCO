@@ -98,7 +98,7 @@ async function handleCallback(c: Context, platform: "web" | "mobile") {
     return c.redirect(`${scheme}://oauth/callback?code=${encodeURIComponent(code)}`);
   }
 
-  setSessionCookies(c, result.sessionToken, result.pcoAccessToken);
+  setSessionCookies(c, result.sessionToken);
   const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
   const redirectPath = result.redirectTo.startsWith("/groups")
     ? `${result.redirectTo}${result.redirectTo.includes("?") ? "&" : "?"}synced=1`
