@@ -11,7 +11,10 @@ function GuestCallJoinContent() {
   const token = params.token as string;
   const [displayName, setDisplayName] = useState("");
   const [preview, setPreview] = useState<CallGuestPreview | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [joinedCall, setJoinedCall] = useState<{
+    authToken: string;
+    participantCount: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,12 +42,13 @@ function GuestCallJoinContent() {
     );
   }
 
-  if (authToken) {
+  if (joinedCall) {
     return (
       <CallOverlay
-        authToken={authToken}
+        authToken={joinedCall.authToken}
+        sessionParticipantCount={joinedCall.participantCount}
         onLeave={() => {
-          setAuthToken(null);
+          setJoinedCall(null);
         }}
       />
     );
@@ -74,7 +78,12 @@ function GuestCallJoinContent() {
         onClick={() => {
           setError(null);
           void joinGuestCall(token, displayName.trim())
-            .then((res) => setAuthToken(res.authToken))
+            .then((res) =>
+              setJoinedCall({
+                authToken: res.authToken,
+                participantCount: res.call.participantCount,
+              }),
+            )
             .catch((err) => setError(err instanceof Error ? err.message : "Could not join"));
         }}
       >
