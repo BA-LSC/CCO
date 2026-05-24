@@ -9,8 +9,10 @@ import {
   isDeployWaitActive,
   isPostDeployGracePeriod,
   prepareAppUpdate,
+  probeServerAppVersion,
   shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
+import { getClientBuildVersion } from "@/lib/build-version";
 
 export const SKIP_WAITING_MESSAGE = { type: "SKIP_WAITING" } as const;
 
@@ -71,7 +73,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
       return;
     }
     if (await isAppVersionCurrent()) {
-      reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+      // Ignore stale waiting workers — activating them reloads the page for no reason.
       return;
     }
     if (isAppUpdateInProgress()) return;
@@ -82,19 +84,25 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   };
 
   const onControllerChange = () => {
-    if (reloaded) return;
-    if (shouldSuppressServiceWorkerUpdateAfterDeploy()) {
+    void (async () => {
+      if (reloaded) return;
+      if (shouldSuppressServiceWorkerUpdateAfterDeploy()) {
+        reloaded = true;
+        return;
+      }
+      if (await isAppVersionCurrent()) {
+        reloaded = true;
+        return;
+      }
       reloaded = true;
-      return;
-    }
-    reloaded = true;
 
-    if (isAppUpdateInProgress()) {
-      completeAppUpdateReload();
-      return;
-    }
+      if (isAppUpdateInProgress()) {
+        completeAppUpdateReload();
+        return;
+      }
 
-    void applyAppUpdate(onUpdating);
+      void applyAppUpdate(onUpdating);
+    })();
   };
 
   navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
@@ -108,7 +116,9 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     }
     if (isAppUpdateInProgress() && !isDeployWaitActive() && !isPostDeployGracePeriod()) return;
     if (await checkAppVersion(onUpdating)) return;
-    if (!(await isAppVersionCurrent())) {
+    const { version: serverVersion, unavailable } = await probeServerAppVersion();
+    const clientVersion = getClientBuildVersion();
+    if (!unavailable && serverVersion && serverVersion !== clientVersion) {
       void registration?.update();
     }
     syncDeployPoll();

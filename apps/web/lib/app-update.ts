@@ -94,6 +94,19 @@ function clearReloadLoopGuard(): void {
   }
 }
 
+function isReloadLoopBlocked(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(RELOAD_LOOP_KEY);
+    const now = Date.now();
+    const entries: number[] = raw ? (JSON.parse(raw) as number[]) : [];
+    const recent = entries.filter((timestamp) => now - timestamp < RELOAD_LOOP_WINDOW_MS);
+    return recent.length >= RELOAD_LOOP_MAX;
+  } catch {
+    return false;
+  }
+}
+
 function shouldBlockReloadLoop(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -202,6 +215,11 @@ export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<
     markDeployReload();
     await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
     completeAppUpdateReload();
+    return;
+  }
+
+  if (isReloadLoopBlocked()) {
+    forceClearStaleUpdateState();
     return;
   }
 
