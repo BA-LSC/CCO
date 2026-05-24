@@ -3095,6 +3095,13 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-surface);
 }
 
+.integrations-section-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: flex-start;
+}
+
 .integrations-section-head {
   display: flex;
   flex-direction: column;

@@ -9,7 +9,6 @@ type WebhookSecretsFieldProps = {
   value: string;
   onChange: (value: string) => void;
   configured?: boolean;
-  configuredCount?: number;
   placeholder?: string;
   helpText?: string;
 };
@@ -18,7 +17,6 @@ export function WebhookSecretsField({
   value,
   onChange,
   configured = false,
-  configuredCount = 0,
   placeholder = "Paste one secret per line (same order as below)",
   helpText,
 }: WebhookSecretsFieldProps) {
@@ -27,14 +25,7 @@ export function WebhookSecretsField({
 
   return (
     <div className="integrations-field">
-      <div className="integrations-field-head">
-        <span className="integrations-field-label">Webhook secrets</span>
-        {showConfigured && configuredCount > 0 ? (
-          <span className="integrations-badge integrations-badge--success">
-            {configuredCount} configured
-          </span>
-        ) : null}
-      </div>
+      <span className="integrations-field-label">Webhook secrets</span>
 
       <details className="integrations-details">
         <summary>Subscription events to create in Planning Center</summary>

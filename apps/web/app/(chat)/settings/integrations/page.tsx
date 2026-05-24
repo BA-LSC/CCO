@@ -60,16 +60,11 @@ function SecretInput({
   placeholder: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const showConfigured = configured && value === "" && !focused;
+  const keepCurrent = configured && value === "" && !focused;
 
   return (
     <label className="integrations-field">
-      <div className="integrations-field-head">
-        <span className="integrations-field-label">{label}</span>
-        {showConfigured ? (
-          <span className="integrations-badge integrations-badge--success">Configured</span>
-        ) : null}
-      </div>
+      <span className="integrations-field-label">{label}</span>
       <input
         className="integrations-input"
         value={value}
@@ -78,9 +73,38 @@ function SecretInput({
         onBlur={() => setFocused(false)}
         type="password"
         autoComplete="new-password"
-        placeholder={showConfigured ? "Leave blank to keep current" : placeholder}
+        placeholder={keepCurrent ? "Leave blank to keep current" : placeholder}
       />
     </label>
+  );
+}
+
+function IntegrationsSection({
+  id,
+  heading,
+  description,
+  badge,
+  children,
+}: {
+  id: string;
+  heading: string;
+  description?: React.ReactNode;
+  badge?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="integrations-section" aria-labelledby={id}>
+      {badge ? (
+        <div className="integrations-section-badges">
+          <span className="integrations-badge integrations-badge--success">{badge}</span>
+        </div>
+      ) : null}
+      <div className="integrations-section-head">
+        <h2 id={id}>{heading}</h2>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -313,10 +337,11 @@ export default function IntegrationsSettingsPage() {
       </section>
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
-        <section className="integrations-section" aria-labelledby="pco-oauth-heading">
-          <div className="integrations-section-head">
-            <h2 id="pco-oauth-heading">Planning Center OAuth</h2>
-          </div>
+        <IntegrationsSection
+          id="pco-oauth-heading"
+          heading="Planning Center OAuth"
+          badge={clientSecretConfigured ? "Configured" : null}
+        >
           <div className="integrations-fields">
             <TextInput label="Church name" value={name} onChange={setName} required placeholder="My Church" />
             <TextInput
@@ -334,13 +359,13 @@ export default function IntegrationsSettingsPage() {
               placeholder="Paste new secret"
             />
           </div>
-        </section>
+        </IntegrationsSection>
 
-        <section className="integrations-section" aria-labelledby="pco-urls-heading">
-          <div className="integrations-section-head">
-            <h2 id="pco-urls-heading">Callback URLs</h2>
-            <p>Use these in your Planning Center OAuth app and webhook subscriptions.</p>
-          </div>
+        <IntegrationsSection
+          id="pco-urls-heading"
+          heading="Callback URLs"
+          description="Use these in your Planning Center OAuth app and webhook subscriptions."
+        >
           <div className="integrations-fields">
             <TextInput
               label="OAuth redirect URI"
@@ -363,32 +388,32 @@ export default function IntegrationsSettingsPage() {
               placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
             />
           </div>
-        </section>
+        </IntegrationsSection>
 
-        <section className="integrations-section" aria-labelledby="pco-webhooks-heading">
-          <div className="integrations-section-head">
-            <h2 id="pco-webhooks-heading">Webhooks</h2>
-          </div>
+        <IntegrationsSection
+          id="pco-webhooks-heading"
+          heading="Webhooks"
+          badge={
+            webhookConfigured && webhookSecretCount > 0
+              ? `${webhookSecretCount} configured`
+              : null
+          }
+        >
           <WebhookSecretsField
             value={webhookSecret}
             onChange={setWebhookSecret}
             configured={webhookConfigured}
-            configuredCount={webhookSecretCount}
             helpText="Saving replaces all stored webhook secrets."
           />
-        </section>
+        </IntegrationsSection>
 
-        <section className="integrations-section" aria-labelledby="push-heading">
-          <div className="integrations-section-head">
-            <h2 id="push-heading">Push notifications</h2>
-            <p>VAPID keys are generated automatically. Add a contact email for installed PWA users.</p>
-          </div>
+        <IntegrationsSection
+          id="push-heading"
+          heading="Push notifications"
+          description="VAPID keys are generated automatically. Add a contact email for installed PWA users."
+          badge={pushStatus}
+        >
           <div className="integrations-fields">
-            {pushStatus ? (
-              <p className="integrations-inline-status">
-                <span className="integrations-badge integrations-badge--success">{pushStatus}</span>
-              </p>
-            ) : null}
             <TextInput
               label="VAPID contact email"
               value={vapidSubjectEmail}
@@ -398,12 +423,13 @@ export default function IntegrationsSettingsPage() {
               placeholder="notifications@yourchurch.org"
             />
           </div>
-        </section>
+        </IntegrationsSection>
 
-        <section className="integrations-section" aria-labelledby="realtimekit-heading">
-          <div className="integrations-section-head">
-            <h2 id="realtimekit-heading">Audio &amp; video calls</h2>
-            <p>
+        <IntegrationsSection
+          id="realtimekit-heading"
+          heading="Audio & video calls"
+          description={
+            <>
               Cloudflare RealtimeKit powers group calls without opening ports on your server. Media
               runs on Cloudflare&apos;s edge. Free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
               <a
@@ -413,14 +439,17 @@ export default function IntegrationsSettingsPage() {
               >
                 Setup guide
               </a>
-            </p>
-          </div>
+            </>
+          }
+          badge={
+            realtimeKitConfigured
+              ? "Calls enabled"
+              : realtimeKitTokenConfigured
+                ? "Configured"
+                : null
+          }
+        >
           <div className="integrations-fields">
-            {realtimeKitConfigured ? (
-              <p className="integrations-inline-status">
-                <span className="integrations-badge integrations-badge--success">Calls enabled</span>
-              </p>
-            ) : null}
             <TextInput
               label="Cloudflare account ID"
               value={cloudflareAccountId}
@@ -445,18 +474,21 @@ export default function IntegrationsSettingsPage() {
               <code>guest</code> in the RealtimeKit dashboard (or override via env vars).
             </p>
           </div>
-        </section>
+        </IntegrationsSection>
 
-        <section className="integrations-section" aria-labelledby="giphy-heading">
-          <div className="integrations-section-head">
-            <h2 id="giphy-heading">Giphy</h2>
-            <p>
+        <IntegrationsSection
+          id="giphy-heading"
+          heading="Giphy"
+          description={
+            <>
               Optional API key for GIF search in chat.{" "}
               <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noreferrer">
                 Get a key
               </a>
-            </p>
-          </div>
+            </>
+          }
+          badge={giphyApiKeyConfigured ? "Configured" : null}
+        >
           <SecretInput
             label="API key"
             configured={giphyApiKeyConfigured}
@@ -464,7 +496,7 @@ export default function IntegrationsSettingsPage() {
             onChange={setGiphyApiKey}
             placeholder="Paste new key"
           />
-        </section>
+        </IntegrationsSection>
 
         <footer className="integrations-form-footer">
           <Feedback error={error} success={saved ? "Settings saved." : null} />
