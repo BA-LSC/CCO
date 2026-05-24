@@ -154,19 +154,30 @@ sleep "$DEPLOY_DRAIN_WAIT_SEC"
 
 cco_run_migrations files
 
-mark_deploy_draining || true
-
 echo "Recreating containers with new images..."
 "${COMPOSE[@]}" up -d --no-build
 
 echo ""
 echo "Waiting for services..."
-for _ in $(seq 1 30); do
-  if "${COMPOSE[@]}" exec -T web bun -e "fetch('http://127.0.0.1:3000/api/app-version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
+wait_for_service() {
+  local label="$1"
+  shift
+  for _ in $(seq 1 60); do
+    if "$@" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "  Warning: ${label} did not become ready in time." >&2
+  return 1
+}
+
+wait_for_service "api" \
+  "${COMPOSE[@]}" exec -T api bun -e "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+wait_for_service "web" \
+  "${COMPOSE[@]}" exec -T web bun -e "fetch('http://127.0.0.1:3000/api/app-version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+echo "  Signaling connected clients to hide the update screen..."
 clear_deploy_draining
 "${COMPOSE[@]}" ps
 

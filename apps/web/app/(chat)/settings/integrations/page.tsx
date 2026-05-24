@@ -8,8 +8,6 @@ import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
 import type { SetupRedirectUris } from "@/lib/setup";
 
-const SECRET_MASK_DISPLAY = "•".repeat(20);
-
 type IntegrationsSettings = {
   configured: boolean;
   name: string;
@@ -41,7 +39,7 @@ type PcoSyncResult = {
   };
 };
 
-function MaskedSecretField({
+function SecretInput({
   label,
   configured,
   value,
@@ -55,28 +53,72 @@ function MaskedSecretField({
   placeholder: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const showMask = configured && value === "" && !focused;
+  const showConfigured = configured && value === "" && !focused;
 
   return (
-    <label className="field secret-field">
-      <span>{label}</span>
-      <div className="secret-field-input-wrap">
-        {showMask ? (
-          <span className="secret-field-mask" aria-hidden="true">
-            {SECRET_MASK_DISPLAY}
-          </span>
+    <label className="integrations-field">
+      <div className="integrations-field-head">
+        <span className="integrations-field-label">{label}</span>
+        {showConfigured ? (
+          <span className="integrations-badge integrations-badge--success">Configured</span>
         ) : null}
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          type="password"
-          autoComplete="new-password"
-          placeholder={showMask ? undefined : placeholder}
-        />
       </div>
+      <input
+        className="integrations-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        type="password"
+        autoComplete="new-password"
+        placeholder={showConfigured ? "Leave blank to keep current" : placeholder}
+      />
     </label>
+  );
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required,
+  placeholder,
+  autoComplete,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+  placeholder?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <label className="integrations-field">
+      <span className="integrations-field-label">{label}</span>
+      <input
+        className="integrations-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        type={type}
+        required={required}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+      />
+    </label>
+  );
+}
+
+function Feedback({ error, success }: { error?: string | null; success?: string | null }) {
+  if (!error && !success) return null;
+  return (
+    <p
+      className={`integrations-feedback${error ? " integrations-feedback--error" : " integrations-feedback--success"}`}
+      role={error ? "alert" : "status"}
+    >
+      {error ?? success}
+    </p>
   );
 }
 
@@ -202,7 +244,7 @@ export default function IntegrationsSettingsPage() {
       });
       const { groups, teams } = result;
       setPcoSyncResult(
-        `Synced ${groups.total} groups (${groups.created} new, ${groups.updated} updated) and ${teams.total} teams. Refreshed ${groups.rosterSync.groupsSynced} group rosters and ${teams.rosterSync.teamsSynced} team rosters.`,
+        `Synced ${groups.total} groups and ${teams.total} teams. Refreshed ${groups.rosterSync.groupsSynced} group rosters and ${teams.rosterSync.teamsSynced} team rosters.`,
       );
     } catch (err) {
       setPcoSyncError(err instanceof Error ? err.message : "Planning Center sync failed");
@@ -213,167 +255,153 @@ export default function IntegrationsSettingsPage() {
 
   if (loading) return <LoadingState variant="page" label="Loading settings" />;
 
+  const pushStatus =
+    vapidKeysConfigured && webPushConfigured
+      ? "Enabled for PWA users"
+      : vapidKeysConfigured
+        ? "Keys ready"
+        : null;
+
   return (
-    <div className="page page-narrow settings-page">
-      <div className="state-card setup-card">
-        <p className="settings-back">
-          <Link href="/groups">← Back to chats</Link>
-        </p>
-        <h1>Integration settings</h1>
-        <p>
-          Update Planning Center OAuth credentials, callback URL, and webhook configuration.
-          Secret fields are stored encrypted and never shown after saving.
-        </p>
+    <div className="page page-narrow settings-page integrations-settings">
+      <header className="integrations-settings-header">
+        <Link href="/groups" className="back-link">
+          ← Back to chats
+        </Link>
+        <h1>Integrations</h1>
+        <p>OAuth, webhooks, and connected services. Saved secrets stay encrypted.</p>
+      </header>
 
-        <div className="settings-section">
-          <h2>Planning Center data sync</h2>
-          <p className="help-text">
-            Pull the latest groups, teams, and member rosters from Planning Center for your
-            account. Use this when webhooks are disabled or you need a full refresh across the
-            organization.
-          </p>
-          {pcoSyncError && (
-            <p className="help-text error-text" role="alert">
-              {pcoSyncError}
-            </p>
-          )}
-          {pcoSyncResult && (
-            <p className="help-text" role="status">
-              {pcoSyncResult}
-            </p>
-          )}
-          <div className="dialog-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={pcoSyncing}
-              onClick={() => void handlePcoSync()}
-            >
-              {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
-            </button>
-          </div>
+      <section className="integrations-section" aria-labelledby="pco-sync-heading">
+        <div className="integrations-section-head">
+          <h2 id="pco-sync-heading">Planning Center sync</h2>
+          <p>Refresh groups, teams, and rosters for your account.</p>
         </div>
+        <Feedback error={pcoSyncError} success={pcoSyncResult} />
+        <button
+          type="button"
+          className="btn btn-secondary integrations-action-btn"
+          disabled={pcoSyncing}
+          onClick={() => void handlePcoSync()}
+        >
+          {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
+        </button>
+      </section>
 
-        <form className="setup-form" onSubmit={(e) => void handleSubmit(e)}>
-          <label className="field">
-            <span>OAuth redirect URI</span>
-            <input
-              value={signInRedirectUri}
-              onChange={(e) => setSignInRedirectUri(e.target.value)}
+      <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
+        <section className="integrations-section" aria-labelledby="pco-oauth-heading">
+          <div className="integrations-section-head">
+            <h2 id="pco-oauth-heading">Planning Center OAuth</h2>
+          </div>
+          <div className="integrations-fields">
+            <TextInput label="Church name" value={name} onChange={setName} required placeholder="My Church" />
+            <TextInput
+              label="Client ID"
+              value={clientId}
+              onChange={setClientId}
               required
+              autoComplete="off"
+            />
+            <SecretInput
+              label="Client secret"
+              configured={clientSecretConfigured}
+              value={clientSecret}
+              onChange={setClientSecret}
+              placeholder="Paste new secret"
+            />
+          </div>
+        </section>
+
+        <section className="integrations-section" aria-labelledby="pco-urls-heading">
+          <div className="integrations-section-head">
+            <h2 id="pco-urls-heading">Callback URLs</h2>
+            <p>Use these in your Planning Center OAuth app and webhook subscriptions.</p>
+          </div>
+          <div className="integrations-fields">
+            <TextInput
+              label="OAuth redirect URI"
+              value={signInRedirectUri}
+              onChange={setSignInRedirectUri}
               type="url"
+              required
               autoComplete="off"
               placeholder={
-                uris?.defaultSignInRedirectUri ??
-                "https://chat.example.com/api/auth/pco/callback"
+                uris?.defaultSignInRedirectUri ?? "https://chat.example.com/api/auth/pco/callback"
               }
             />
-          </label>
-          <label className="field">
-            <span>Webhook endpoint URL</span>
-            <input
+            <TextInput
+              label="Webhook endpoint URL"
               value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              required
+              onChange={setWebhookUrl}
               type="url"
+              required
               autoComplete="off"
               placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
             />
-          </label>
-          <label className="field">
-            <span>Church name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder="My Church"
-            />
-          </label>
-          <label className="field">
-            <span>OAuth client ID</span>
-            <input
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              required
-              autoComplete="off"
-            />
-          </label>
-          <MaskedSecretField
-            label="OAuth client secret"
-            configured={clientSecretConfigured}
-            value={clientSecret}
-            onChange={setClientSecret}
-            placeholder="Leave blank to keep current"
-          />
+          </div>
+        </section>
+
+        <section className="integrations-section" aria-labelledby="pco-webhooks-heading">
+          <div className="integrations-section-head">
+            <h2 id="pco-webhooks-heading">Webhooks</h2>
+          </div>
           <WebhookSecretsField
             value={webhookSecret}
             onChange={setWebhookSecret}
             configured={webhookConfigured}
             configuredCount={webhookSecretCount}
-            placeholder="Leave blank to keep current secrets"
-            helpText="Saving replaces all stored secrets."
+            helpText="Saving replaces all stored webhook secrets."
           />
+        </section>
 
-          <div className="settings-section">
-            <h2>PWA push notifications</h2>
-            <p className="help-text">
-              VAPID keys are generated automatically. Set a contact email so installed PWA users
-              can enable message notifications.
-            </p>
-            {vapidKeysConfigured ? (
-              <p className="help-text" role="status">
-                Push keys are ready{webPushConfigured ? " and notifications are enabled for PWA users." : "."}
+        <section className="integrations-section" aria-labelledby="push-heading">
+          <div className="integrations-section-head">
+            <h2 id="push-heading">Push notifications</h2>
+            <p>VAPID keys are generated automatically. Add a contact email for installed PWA users.</p>
+          </div>
+          <div className="integrations-fields">
+            {pushStatus ? (
+              <p className="integrations-inline-status">
+                <span className="integrations-badge integrations-badge--success">{pushStatus}</span>
               </p>
             ) : null}
-            <label className="field">
-              <span>VAPID contact email</span>
-              <input
-                value={vapidSubjectEmail}
-                onChange={(e) => setVapidSubjectEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                placeholder="notifications@yourchurch.org"
-              />
-            </label>
-          </div>
-
-          <div className="settings-section">
-            <h2>Giphy search</h2>
-            <p className="help-text">
-              Add a Giphy API key to let chat members search and send GIFs from the composer.
-              Get one at{" "}
-              <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noreferrer">
-                developers.giphy.com
-              </a>
-              .
-            </p>
-            <MaskedSecretField
-              label="Giphy API key"
-              configured={giphyApiKeyConfigured}
-              value={giphyApiKey}
-              onChange={setGiphyApiKey}
-              placeholder="Leave blank to keep current"
+            <TextInput
+              label="VAPID contact email"
+              value={vapidSubjectEmail}
+              onChange={setVapidSubjectEmail}
+              type="email"
+              autoComplete="email"
+              placeholder="notifications@yourchurch.org"
             />
           </div>
+        </section>
 
-          {error && (
-            <p className="help-text error-text" role="alert">
-              {error}
+        <section className="integrations-section" aria-labelledby="giphy-heading">
+          <div className="integrations-section-head">
+            <h2 id="giphy-heading">Giphy</h2>
+            <p>
+              Optional API key for GIF search in chat.{" "}
+              <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noreferrer">
+                Get a key
+              </a>
             </p>
-          )}
-          {saved && (
-            <p className="help-text" role="status">
-              Settings saved.
-            </p>
-          )}
-
-          <div className="dialog-actions">
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </button>
           </div>
-        </form>
-      </div>
+          <SecretInput
+            label="API key"
+            configured={giphyApiKeyConfigured}
+            value={giphyApiKey}
+            onChange={setGiphyApiKey}
+            placeholder="Paste new key"
+          />
+        </section>
+
+        <footer className="integrations-form-footer">
+          <Feedback error={error} success={saved ? "Settings saved." : null} />
+          <button type="submit" className="btn btn-primary integrations-save-btn" disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </footer>
+      </form>
     </div>
   );
 }
