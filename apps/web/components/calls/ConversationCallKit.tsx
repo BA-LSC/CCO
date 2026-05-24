@@ -21,7 +21,6 @@ export function ConversationCallKit({ conversationId }: Props) {
   const { subscribeRealtime, session } = useChatLayout();
   const {
     activeCall,
-    setActiveCall,
     authToken,
     inCall,
     loading,
@@ -29,6 +28,9 @@ export function ConversationCallKit({ conversationId }: Props) {
     join,
     joinExisting,
     hangUp,
+    acknowledgeCallEnded,
+    acceptCallUpdate,
+    shouldIgnoreCall,
   } = useCallSession(conversationId);
 
   const [incoming, setIncoming] = useState<CallSummaryDto | null>(null);
@@ -54,11 +56,10 @@ export function ConversationCallKit({ conversationId }: Props) {
     return subscribeRealtime((event: RealtimeEvent) => {
       if (event.type === "call.started" || event.type === "call.updated") {
         if (event.conversationId === conversationId) {
-          if (event.call.participantCount === 0) {
-            setActiveCall(null);
-          } else {
-            setActiveCall(event.call);
+          if (shouldIgnoreCall(event.call.id) || endedCallIdsRef.current.has(event.call.id)) {
+            return;
           }
+          acceptCallUpdate(event.call);
           if (
             event.type === "call.started" &&
             event.call.hostUserId !== session?.userId &&
@@ -71,7 +72,7 @@ export function ConversationCallKit({ conversationId }: Props) {
       }
       if (event.type === "call.ended" && event.conversationId === conversationId) {
         endedCallIdsRef.current.add(event.callId);
-        setActiveCall(null);
+        acknowledgeCallEnded(event.callId);
         setIncoming(null);
         clearCallQueryParam();
         if (inCallRef.current) {
@@ -79,7 +80,16 @@ export function ConversationCallKit({ conversationId }: Props) {
         }
       }
     });
-  }, [clearCallQueryParam, conversationId, hangUp, session?.userId, setActiveCall, subscribeRealtime]);
+  }, [
+    acceptCallUpdate,
+    acknowledgeCallEnded,
+    clearCallQueryParam,
+    conversationId,
+    hangUp,
+    session?.userId,
+    shouldIgnoreCall,
+    subscribeRealtime,
+  ]);
 
   useEffect(() => {
     const callParam = searchParams.get("call");

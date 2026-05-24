@@ -18,16 +18,25 @@ export function useCallSession(conversationId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const leavingRef = useRef(false);
   const activeCallIdRef = useRef<string | null>(null);
+  const ignoredCallIdsRef = useRef(new Set<string>());
+
+  const applyActiveCall = useCallback((call: CallSummaryDto | null) => {
+    if (call && ignoredCallIdsRef.current.has(call.id)) {
+      setActiveCall(null);
+      return;
+    }
+    setActiveCall(call?.participantCount ? call : null);
+  }, []);
 
   const refreshActive = useCallback(async () => {
     if (!conversationId) return;
     try {
       const { call } = await fetchActiveCall(conversationId);
-      setActiveCall(call?.participantCount ? call : null);
+      applyActiveCall(call ?? null);
     } catch {
       // ignore poll errors
     }
-  }, [conversationId]);
+  }, [applyActiveCall, conversationId]);
 
   useEffect(() => {
     void refreshActive();
@@ -40,6 +49,7 @@ export function useCallSession(conversationId: string | null) {
     setError(null);
     try {
       const result = await startOrJoinCall(conversationId);
+      ignoredCallIdsRef.current.delete(result.call.id);
       activeCallIdRef.current = result.call.id;
       setActiveCall(result.call);
       setAuthToken(result.authToken);
@@ -57,6 +67,7 @@ export function useCallSession(conversationId: string | null) {
     setError(null);
     try {
       const result = await joinCallById(callId);
+      ignoredCallIdsRef.current.delete(result.call.id);
       activeCallIdRef.current = result.call.id;
       setActiveCall(result.call);
       setAuthToken(result.authToken);
@@ -78,7 +89,10 @@ export function useCallSession(conversationId: string | null) {
     setError(null);
     activeCallIdRef.current = null;
 
-    if (!callId) {
+    if (callId) {
+      ignoredCallIdsRef.current.add(callId);
+      setActiveCall(null);
+    } else {
       leavingRef.current = false;
       return;
     }
@@ -88,7 +102,6 @@ export function useCallSession(conversationId: string | null) {
       await leaveCall(callId);
       await refreshActive();
     } catch {
-      // still close local UI
       await refreshActive();
     } finally {
       setLoading(false);
@@ -101,6 +114,7 @@ export function useCallSession(conversationId: string | null) {
     leavingRef.current = true;
 
     const callId = activeCall.id;
+    ignoredCallIdsRef.current.add(callId);
     activeCallIdRef.current = null;
     setInCall(false);
     setAuthToken(null);
@@ -115,9 +129,31 @@ export function useCallSession(conversationId: string | null) {
     }
   }, [activeCall]);
 
+  const ignoreCall = useCallback((callId: string) => {
+    ignoredCallIdsRef.current.add(callId);
+    setActiveCall(null);
+  }, []);
+
+  const acknowledgeCallEnded = useCallback((callId: string) => {
+    ignoredCallIdsRef.current.add(callId);
+    setActiveCall(null);
+  }, []);
+
+  const acceptCallUpdate = useCallback(
+    (call: CallSummaryDto) => {
+      applyActiveCall(call);
+    },
+    [applyActiveCall],
+  );
+
+  const shouldIgnoreCall = useCallback(
+    (callId: string) => ignoredCallIdsRef.current.has(callId),
+    [],
+  );
+
   return {
     activeCall,
-    setActiveCall,
+    setActiveCall: applyActiveCall,
     authToken,
     inCall,
     loading,
@@ -127,5 +163,9 @@ export function useCallSession(conversationId: string | null) {
     hangUp,
     endForAll,
     refreshActive,
+    ignoreCall,
+    acknowledgeCallEnded,
+    acceptCallUpdate,
+    shouldIgnoreCall,
   };
-}
+};

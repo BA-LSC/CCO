@@ -31,6 +31,7 @@ import {
 import { getOrgPcoAccessToken } from "./org-config";
 import { ensureCallSessionSchema } from "./org-schema-capabilities";
 import { isConversationMember } from "./call-access";
+import { getUsersPresenceState } from "./presence";
 const GUEST_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function hashInviteToken(raw: string): string {
@@ -89,7 +90,10 @@ async function getUserDisplay(userId: string): Promise<{ displayName: string; av
 
 async function countActiveParticipants(callSessionId: string): Promise<number> {
   const rows = await db
-    .select({ id: callParticipants.id })
+    .select({
+      id: callParticipants.id,
+      userId: callParticipants.userId,
+    })
     .from(callParticipants)
     .where(
       and(
@@ -98,7 +102,38 @@ async function countActiveParticipants(callSessionId: string): Promise<number> {
         sql`${callParticipants.joinedAt} IS NOT NULL`,
       ),
     );
-  return rows.length;
+
+  const userIds = rows
+    .map((row) => row.userId)
+    .filter((userId): userId is string => userId != null);
+  const presence =
+    userIds.length > 0
+      ? await getUsersPresenceState(userIds)
+      : { inCall: {} as Record<string, string | null> };
+
+  let activeCount = 0;
+  const staleParticipantIds: string[] = [];
+
+  for (const row of rows) {
+    if (!row.userId) {
+      activeCount++;
+      continue;
+    }
+    if (presence.inCall[row.userId] === callSessionId) {
+      activeCount++;
+    } else {
+      staleParticipantIds.push(row.id);
+    }
+  }
+
+  if (staleParticipantIds.length > 0) {
+    await db
+      .update(callParticipants)
+      .set({ leftAt: new Date() })
+      .where(inArray(callParticipants.id, staleParticipantIds));
+  }
+
+  return activeCount;
 }
 
 async function buildCallSummary(callSessionId: string): Promise<CallSummaryDto | null> {
