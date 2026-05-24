@@ -12,7 +12,7 @@ import {
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
-import { ensureExtendedOrganizationSchema } from "./org-schema-capabilities";
+import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 
 export type RealtimeKitConfig = {
   accountId: string;
@@ -95,7 +95,7 @@ export async function saveOrganizationCloudflareApiToken(params: {
   const accounts = await listCloudflareAccounts(apiToken);
   const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
 
-  await ensureExtendedOrganizationSchema();
+  await ensureCloudflareOrganizationColumns();
 
   await db
     .update(organizations)
@@ -129,7 +129,7 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
     autoCreateApp: params.autoCreateApp ?? true,
   });
 
-  await ensureExtendedOrganizationSchema();
+  await ensureCloudflareOrganizationColumns();
   await db
     .update(organizations)
     .set({
@@ -153,7 +153,7 @@ export { provisionRealtimeKitFromApiToken } from "./cloudflare-realtimekit-provi
 
 /** Disable RealtimeKit calls while keeping the Cloudflare API token for other features. */
 export async function disableOrganizationRealtimeKitCalls(organizationId: string): Promise<void> {
-  await ensureExtendedOrganizationSchema();
+  await ensureCloudflareOrganizationColumns();
   await db
     .update(organizations)
     .set({

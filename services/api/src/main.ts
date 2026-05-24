@@ -1,5 +1,8 @@
 import app from "./app";
-import { ensureExtendedOrganizationSchema } from "./services/org-schema-capabilities";
+import {
+  ensureCallSessionSchema,
+  ensureCloudflareOrganizationColumns,
+} from "./services/org-schema-capabilities";
 import {
   handleWebSocketClose,
   handleWebSocketOpen,
@@ -41,8 +44,11 @@ const server = Bun.serve({
   },
 });
 
-void ensureExtendedOrganizationSchema().catch((err) => {
-  console.error("Extended organization schema ensure failed:", err);
+void ensureCloudflareOrganizationColumns().catch((err) => {
+  console.error("Cloudflare organization columns ensure failed:", err);
+});
+void ensureCallSessionSchema().catch((err) => {
+  console.error("Call session schema ensure failed:", err);
 });
 
 console.log(`CCO API listening on http://localhost:${port}`);

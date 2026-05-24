@@ -27,6 +27,7 @@ import {
   refreshRealtimeKitParticipantToken,
 } from "./realtimekit";
 import { getOrgPcoAccessToken } from "./org-config";
+import { ensureCallSessionSchema } from "./org-schema-capabilities";
 import { isConversationMember } from "./call-access";
 const GUEST_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -237,6 +238,8 @@ export async function startOrJoinConversationCall(params: {
   if (!(await isRealtimeKitConfigured())) {
     throw new Error("Video calls are not configured for this organization");
   }
+
+  await ensureCallSessionSchema();
 
   const isMember = await isConversationMember(params.conversationId, params.userId);
   if (!isMember) return null;

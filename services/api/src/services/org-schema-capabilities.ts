@@ -1,8 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 
-/** Idempotent DDL for RealtimeKit / Cloudflare (0021–0023). Safe to run on every deploy. */
-const ENSURE_EXTENDED_SCHEMA_STATEMENTS = [
+const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_account_id" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_app_id" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_api_token_enc" text`,
@@ -10,6 +9,10 @@ const ENSURE_EXTENDED_SCHEMA_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_member" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_guest" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_last_synced_at" timestamp`,
+] as const;
+
+/** Call tables from 0021 — optional; must not block Cloudflare token save. */
+const CALL_SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS "call_sessions" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
     "conversation_id" uuid NOT NULL REFERENCES "conversations"("id"),
@@ -55,35 +58,78 @@ const ENSURE_EXTENDED_SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS "call_invite_tokens_call_session_id_idx" ON "call_invite_tokens" ("call_session_id")`,
 ] as const;
 
-let ensurePromise: Promise<void> | null = null;
-let extendedSchemaReady = false;
+let orgColumnsPromise: Promise<void> | null = null;
+let orgColumnsReady = false;
 
-async function runEnsureExtendedOrganizationSchema(): Promise<void> {
-  for (const statement of ENSURE_EXTENDED_SCHEMA_STATEMENTS) {
-    await db.execute(sql.raw(statement));
-  }
-  extendedSchemaReady = true;
+let callSchemaPromise: Promise<void> | null = null;
+let callSchemaReady = false;
+
+async function executeDdl(statement: string): Promise<void> {
+  await db.execute(sql.raw(statement));
 }
 
-/** Create Cloudflare / RealtimeKit columns and call tables if missing. */
-export async function ensureExtendedOrganizationSchema(): Promise<void> {
-  if (extendedSchemaReady) return;
-  if (!ensurePromise) {
-    ensurePromise = runEnsureExtendedOrganizationSchema().catch((err) => {
-      ensurePromise = null;
+async function executeOptionalDdl(statement: string): Promise<void> {
+  try {
+    await executeDdl(statement);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[schema ensure] optional call DDL skipped:", detail);
+  }
+}
+
+async function runEnsureCloudflareOrganizationColumns(): Promise<void> {
+  for (const statement of ORG_COLUMN_STATEMENTS) {
+    await executeDdl(statement);
+  }
+  orgColumnsReady = true;
+}
+
+async function runEnsureCallSessionSchema(): Promise<void> {
+  for (const statement of CALL_SCHEMA_STATEMENTS) {
+    await executeOptionalDdl(statement);
+  }
+  callSchemaReady = true;
+}
+
+/** Org columns for Cloudflare / RealtimeKit settings (required, small, safe). */
+export async function ensureCloudflareOrganizationColumns(): Promise<void> {
+  if (orgColumnsReady) return;
+  if (!orgColumnsPromise) {
+    orgColumnsPromise = runEnsureCloudflareOrganizationColumns().catch((err) => {
+      orgColumnsPromise = null;
       throw err;
     });
   }
-  await ensurePromise;
+  await orgColumnsPromise;
 }
 
-/** @deprecated Use ensureExtendedOrganizationSchema — kept for callers that probed before ensure existed. */
+/** Call session tables (best-effort; logged and skipped on failure). */
+export async function ensureCallSessionSchema(): Promise<void> {
+  if (callSchemaReady) return;
+  if (!callSchemaPromise) {
+    callSchemaPromise = runEnsureCallSessionSchema().catch((err) => {
+      callSchemaPromise = null;
+      console.warn("[schema ensure] call schema ensure failed:", err);
+    });
+  }
+  await callSchemaPromise;
+}
+
+/** Org columns plus call tables. Cloudflare paths should use ensureCloudflareOrganizationColumns only. */
+export async function ensureExtendedOrganizationSchema(): Promise<void> {
+  await ensureCloudflareOrganizationColumns();
+  await ensureCallSessionSchema();
+}
+
+/** @deprecated Use ensureCloudflareOrganizationColumns. */
 export async function hasExtendedOrganizationColumns(): Promise<boolean> {
-  await ensureExtendedOrganizationSchema();
+  await ensureCloudflareOrganizationColumns();
   return true;
 }
 
 export function resetExtendedOrganizationColumnsCache(): void {
-  extendedSchemaReady = false;
-  ensurePromise = null;
+  orgColumnsReady = false;
+  orgColumnsPromise = null;
+  callSchemaReady = false;
+  callSchemaPromise = null;
 }

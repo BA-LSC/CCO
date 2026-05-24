@@ -1,7 +1,7 @@
 import type { SQL } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
-import { ensureExtendedOrganizationSchema } from "./org-schema-capabilities";
+import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import {
   configuredOrganizationColumns,
   type ConfiguredOrganizationRow,
@@ -10,7 +10,7 @@ import {
 export async function selectConfiguredOrganizationRow(
   where: SQL | undefined,
 ): Promise<ConfiguredOrganizationRow | null> {
-  await ensureExtendedOrganizationSchema();
+  await ensureCloudflareOrganizationColumns();
 
   const rows = await db
     .select(configuredOrganizationColumns)
