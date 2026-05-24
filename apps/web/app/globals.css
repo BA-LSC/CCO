@@ -1882,20 +1882,18 @@ html[data-theme="6"] .user-menu-dropdown {
   width: 44px;
   height: 44px;
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  background: transparent;
   color: var(--color-muted);
   cursor: pointer;
   transition:
     background 0.15s ease,
-    border-color 0.15s ease,
     color 0.15s ease;
 }
 
 .panel-header-icon-btn:hover {
-  background: var(--color-bg);
-  border-color: var(--color-muted);
+  background: transparent;
   color: var(--color-text);
 }
 
@@ -1905,8 +1903,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .panel-header-icon-btn[aria-expanded="true"] {
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary);
+  background: transparent;
   color: var(--color-primary);
 }
 
@@ -2113,20 +2110,18 @@ html[data-theme="6"] .user-menu-dropdown {
   width: 44px;
   height: 44px;
   padding: 0;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--color-muted);
   cursor: pointer;
   transition:
     background 0.15s ease,
-    border-color 0.15s ease,
     color 0.15s ease;
 }
 
 .chat-sidebar-toggle:hover {
-  background: var(--color-bg);
-  border-color: var(--color-muted);
+  background: transparent;
   color: var(--color-text);
 }
 
