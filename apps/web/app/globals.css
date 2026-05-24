@@ -3095,17 +3095,27 @@ html[data-theme="6"] .user-menu-dropdown {
   background: var(--color-surface);
 }
 
+.integrations-section-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .integrations-section-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-self: flex-start;
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 
 .integrations-section-head {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .integrations-section-head h2 {

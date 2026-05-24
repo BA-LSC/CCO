@@ -94,14 +94,16 @@ function IntegrationsSection({
 }) {
   return (
     <section className="integrations-section" aria-labelledby={id}>
-      {badge ? (
-        <div className="integrations-section-badges">
-          <span className="integrations-badge integrations-badge--success">{badge}</span>
+      <div className="integrations-section-top">
+        <div className="integrations-section-head">
+          <h2 id={id}>{heading}</h2>
+          {description ? <p>{description}</p> : null}
         </div>
-      ) : null}
-      <div className="integrations-section-head">
-        <h2 id={id}>{heading}</h2>
-        {description ? <p>{description}</p> : null}
+        {badge ? (
+          <div className="integrations-section-badges">
+            <span className="integrations-badge integrations-badge--success">{badge}</span>
+          </div>
+        ) : null}
       </div>
       {children}
     </section>
