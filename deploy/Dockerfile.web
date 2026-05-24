@@ -13,9 +13,14 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --filter @cco/web
 
 FROM base AS package-build
-COPY tsconfig.base.json ./
+COPY package.json bun.lock tsconfig.base.json ./
+COPY packages/pco-client/package.json packages/pco-client/
+COPY packages/shared/package.json packages/shared/
 COPY packages ./packages
 COPY --from=deps /app/node_modules ./node_modules
+# Install package devDependencies (typescript) omitted by --filter @cco/web.
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+    bun install --frozen-lockfile --filter @cco/shared --filter @cco/pco-client
 RUN bun run --cwd packages/shared build && bun run --cwd packages/pco-client build
 
 FROM node:26-alpine AS builder

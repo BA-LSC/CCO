@@ -12,6 +12,17 @@ COPY services/api/package.json services/api/
 RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --filter @cco/api
 
+FROM base AS package-build
+COPY package.json bun.lock tsconfig.base.json ./
+COPY packages/pco-client/package.json packages/pco-client/
+COPY packages/shared/package.json packages/shared/
+COPY packages ./packages
+COPY --from=deps /app/node_modules ./node_modules
+# Install package devDependencies (typescript) omitted by --filter @cco/api.
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+    bun install --frozen-lockfile --filter @cco/shared --filter @cco/pco-client
+RUN bun run --cwd packages/shared build && bun run --cwd packages/pco-client build
+
 FROM base AS deps-prod
 COPY package.json bun.lock tsconfig.base.json ./
 COPY apps/web/package.json apps/web/
@@ -26,12 +37,11 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY package.json bun.lock tsconfig.base.json ./
-COPY packages ./packages
+COPY --from=package-build /app/packages ./packages
 COPY services/api ./services/api
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/services/api/node_modules ./services/api/node_modules
-RUN bun run --cwd packages/shared build && bun run --cwd packages/pco-client build
 
 WORKDIR /app/services/api
 CMD ["bun", "run", "db:migrate"]
@@ -41,12 +51,11 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY package.json bun.lock tsconfig.base.json ./
-COPY packages ./packages
+COPY --from=package-build /app/packages ./packages
 COPY services/api ./services/api
 COPY --from=deps-prod /app/node_modules ./node_modules
 COPY --from=deps-prod /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps-prod /app/services/api/node_modules ./services/api/node_modules
-RUN bun run --cwd packages/shared build && bun run --cwd packages/pco-client build
 
 RUN mkdir -p /data/uploads
 VOLUME ["/data/uploads"]
