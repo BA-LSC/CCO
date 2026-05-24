@@ -24,8 +24,7 @@ if [[ -z "$url" || "$url" == *CHANGE_ME* ]]; then
   exit 1
 fi
 
-echo "Checking call schema on DATABASE_URL..."
-docker run --rm postgres:18.3-alpine psql "$url" -v ON_ERROR_STOP=1 -At -c "
+CALL_SCHEMA_SQL="
 SELECT CASE
   WHEN EXISTS (
     SELECT 1 FROM information_schema.columns
@@ -36,3 +35,21 @@ SELECT CASE
   ELSE 'call_participants: MISSING — run ./deploy/compose.sh run --rm migrate'
 END;
 "
+
+if cco_should_use_external_db; then
+  echo "Mode: external PostgreSQL"
+  echo "Checking call schema..."
+  docker run --rm postgres:18.3-alpine psql "$url" -v ON_ERROR_STOP=1 -At -c "$CALL_SCHEMA_SQL"
+else
+  echo "Mode: bundled PostgreSQL (host postgres in DATABASE_URL)"
+  files=()
+  cco_compose_files files
+  if ! cco_wait_for_bundled_postgres files 60; then
+    exit 1
+  fi
+  echo "Checking call schema..."
+  docker compose "${files[@]}" exec -T \
+    -e PGPASSWORD="${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}" \
+    postgres psql -U "${POSTGRES_USER:-cco}" -d "${POSTGRES_DB:-cco}" \
+    -v ON_ERROR_STOP=1 -At -c "$CALL_SCHEMA_SQL"
+fi
