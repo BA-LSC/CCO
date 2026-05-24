@@ -20,26 +20,42 @@ function presenceKey(userId: string): string {
 }
 
 /** Mark a user as actively viewing the app (page visible). */
-export async function touchUserPresence(userId: string): Promise<void> {
+export async function touchUserPresence(userId: string, callId?: string | null): Promise<void> {
   const client = getRedis();
   if (!client) return;
-  await client.set(presenceKey(userId), "1", "EX", PRESENCE_TTL_SECONDS);
+  const value = callId ? `call:${callId}` : "1";
+  await client.set(presenceKey(userId), value, "EX", PRESENCE_TTL_SECONDS);
+}
+
+/** Returns online map and optional active call ids per user. */
+export async function getUsersPresenceState(
+  userIds: string[],
+): Promise<{ online: Record<string, boolean>; inCall: Record<string, string | null> }> {
+  const online: Record<string, boolean> = {};
+  const inCall: Record<string, string | null> = {};
+  for (const userId of userIds) {
+    online[userId] = false;
+    inCall[userId] = null;
+  }
+
+  const client = getRedis();
+  if (!client || userIds.length === 0) return { online, inCall };
+
+  const values = await client.mget(...userIds.map(presenceKey));
+  userIds.forEach((userId, index) => {
+    const raw = values[index];
+    online[userId] = raw != null;
+    if (raw?.startsWith("call:")) {
+      inCall[userId] = raw.slice("call:".length) || null;
+    }
+  });
+
+  return { online, inCall };
 }
 
 /** Batch lookup for online users based on recent heartbeats. */
 export async function getUsersOnline(userIds: string[]): Promise<Record<string, boolean>> {
-  const online: Record<string, boolean> = {};
-  for (const userId of userIds) online[userId] = false;
-
-  const client = getRedis();
-  if (!client || userIds.length === 0) return online;
-
-  const values = await client.mget(...userIds.map(presenceKey));
-  userIds.forEach((userId, index) => {
-    online[userId] = values[index] != null;
-  });
-
-  return online;
+  return (await getUsersPresenceState(userIds)).online;
 }
 
 /** Users whose presence the viewer is allowed to see. */

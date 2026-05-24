@@ -209,11 +209,54 @@ export async function notifyMentionedUsers(params: {
   });
 }
 
+export async function notifyIncomingCall(params: {
+  callId: string;
+  conversationId: string;
+  hostUserId: string;
+  hostDisplayName: string;
+  targetUserIds?: string[];
+}): Promise<void> {
+  const meta = await resolveConversationNotificationMeta(params.conversationId);
+  const callUrl = `${meta.url}?call=${encodeURIComponent(params.callId)}`;
+
+  const userIds =
+    params.targetUserIds ??
+    (await listUnmutedConversationMemberIds({
+      conversationId: params.conversationId,
+      excludeUserId: params.hostUserId,
+    }));
+
+  if (userIds.length === 0) return;
+
+  const title = meta.title;
+  const body = `${params.hostDisplayName} started a call`;
+
+  const [expoTokens, webSubscriptions] = await Promise.all([
+    collectPushTokens(userIds),
+    collectWebPushSubscriptions(userIds),
+  ]);
+
+  const payload = {
+    title,
+    body,
+    url: appendNotificationAnchorToUrl(callUrl),
+    conversationId: params.conversationId,
+    icon: null,
+    image: null,
+  };
+
+  await Promise.all([
+    sendExpoPush(expoTokens, title, body, callUrl, { type: "call", callId: params.callId }),
+    sendWebPushNotifications(webSubscriptions, payload),
+  ]);
+}
+
 async function sendExpoPush(
   tokens: string[],
   title: string,
   body: string,
   url: string,
+  extraData?: Record<string, string>,
 ): Promise<void> {
   if (tokens.length === 0) return;
 
@@ -222,7 +265,7 @@ async function sendExpoPush(
     sound: "default" as const,
     title,
     body,
-    data: { url },
+    data: { url, ...extraData },
   }));
 
   try {

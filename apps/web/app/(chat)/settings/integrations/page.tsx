@@ -21,6 +21,13 @@ type IntegrationsSettings = {
   vapidSubjectEmail: string;
   webPushConfigured: boolean;
   giphyApiKeyConfigured: boolean;
+  realtimeKitConfigured?: boolean;
+  realtimeKitAccountId?: string;
+  realtimeKitAppId?: string;
+  realtimeKitTokenConfigured?: boolean;
+  realtimeKitPresetHost?: string;
+  realtimeKitPresetMember?: string;
+  realtimeKitPresetGuest?: string;
 };
 
 type PcoSyncResult = {
@@ -143,6 +150,11 @@ export default function IntegrationsSettingsPage() {
   const [webPushConfigured, setWebPushConfigured] = useState(false);
   const [giphyApiKey, setGiphyApiKey] = useState("");
   const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
+  const [cloudflareAccountId, setCloudflareAccountId] = useState("");
+  const [realtimeKitAppId, setRealtimeKitAppId] = useState("");
+  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
+  const [realtimeKitConfigured, setRealtimeKitConfigured] = useState(false);
+  const [realtimeKitTokenConfigured, setRealtimeKitTokenConfigured] = useState(false);
   const [pcoSyncing, setPcoSyncing] = useState(false);
   const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
   const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
@@ -166,6 +178,10 @@ export default function IntegrationsSettingsPage() {
         setVapidKeysConfigured(settings.vapidKeysConfigured ?? false);
         setWebPushConfigured(settings.webPushConfigured ?? false);
         setGiphyApiKeyConfigured(settings.giphyApiKeyConfigured ?? false);
+        setCloudflareAccountId(settings.realtimeKitAccountId ?? "");
+        setRealtimeKitAppId(settings.realtimeKitAppId ?? "");
+        setRealtimeKitConfigured(settings.realtimeKitConfigured ?? false);
+        setRealtimeKitTokenConfigured(settings.realtimeKitTokenConfigured ?? false);
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -202,6 +218,9 @@ export default function IntegrationsSettingsPage() {
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
+    if (cloudflareAccountId.trim()) payload.cloudflareAccountId = cloudflareAccountId.trim();
+    if (realtimeKitAppId.trim()) payload.realtimeKitAppId = realtimeKitAppId.trim();
+    if (cloudflareApiToken.trim()) payload.cloudflareApiToken = cloudflareApiToken.trim();
 
     try {
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
@@ -222,9 +241,14 @@ export default function IntegrationsSettingsPage() {
       setVapidKeysConfigured(updated.vapidKeysConfigured ?? false);
       setWebPushConfigured(updated.webPushConfigured ?? false);
       setGiphyApiKeyConfigured(updated.giphyApiKeyConfigured ?? false);
+      setRealtimeKitConfigured(updated.realtimeKitConfigured ?? false);
+      setRealtimeKitTokenConfigured(updated.realtimeKitTokenConfigured ?? false);
+      if (updated.realtimeKitAccountId) setCloudflareAccountId(updated.realtimeKitAccountId);
+      if (updated.realtimeKitAppId) setRealtimeKitAppId(updated.realtimeKitAppId);
       setClientSecret("");
       setWebhookSecret("");
       setGiphyApiKey("");
+      setCloudflareApiToken("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -373,6 +397,53 @@ export default function IntegrationsSettingsPage() {
               autoComplete="email"
               placeholder="notifications@yourchurch.org"
             />
+          </div>
+        </section>
+
+        <section className="integrations-section" aria-labelledby="realtimekit-heading">
+          <div className="integrations-section-head">
+            <h2 id="realtimekit-heading">Audio &amp; video calls</h2>
+            <p>
+              Cloudflare RealtimeKit powers group calls without opening ports on your server. Media
+              runs on Cloudflare&apos;s edge. Free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
+              <a
+                href="https://developers.cloudflare.com/realtime/realtimekit/quickstart/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Setup guide
+              </a>
+            </p>
+          </div>
+          <div className="integrations-fields">
+            {realtimeKitConfigured ? (
+              <p className="integrations-inline-status">
+                <span className="integrations-badge integrations-badge--success">Calls enabled</span>
+              </p>
+            ) : null}
+            <TextInput
+              label="Cloudflare account ID"
+              value={cloudflareAccountId}
+              onChange={setCloudflareAccountId}
+              placeholder="From Cloudflare dashboard"
+            />
+            <TextInput
+              label="RealtimeKit app ID"
+              value={realtimeKitAppId}
+              onChange={setRealtimeKitAppId}
+              placeholder="From RealtimeKit app settings"
+            />
+            <SecretInput
+              label="Cloudflare API token (Realtime Admin)"
+              configured={realtimeKitTokenConfigured}
+              value={cloudflareApiToken}
+              onChange={setCloudflareApiToken}
+              placeholder="Paste new token"
+            />
+            <p className="integrations-field-hint">
+              Create presets named <code>host</code>, <code>group_call_participant</code>, and{" "}
+              <code>guest</code> in the RealtimeKit dashboard (or override via env vars).
+            </p>
           </div>
         </section>
 

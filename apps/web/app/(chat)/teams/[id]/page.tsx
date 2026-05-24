@@ -2,7 +2,9 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Suspense } from "react";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
+import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
 import { ChannelMembersSection, type ChannelMember } from "@/components/ChannelMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -168,6 +170,11 @@ export default function TeamChatPage() {
         subtitle={formatServiceTypeSubtitle(detail?.serviceTypeNames) ?? "Services team"}
         loading={detailLoading}
       >
+        <Suspense fallback={null}>
+          {detail?.conversation?.id ? (
+            <ConversationCallKit conversationId={detail.conversation.id} />
+          ) : null}
+        </Suspense>
         <PanelSettingsButton
           expanded={showSettings}
           label="Team settings"

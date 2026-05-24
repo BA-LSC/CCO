@@ -14,7 +14,18 @@ type RealtimeEvent =
       conversationId: string;
       leaderOnly?: boolean;
       title?: string;
-    };
+    }
+  | {
+      type: "call.started";
+      conversationId: string;
+      call: import("@cco/shared/calls").CallSummaryDto;
+    }
+  | {
+      type: "call.updated";
+      conversationId: string;
+      call: import("@cco/shared/calls").CallSummaryDto;
+    }
+  | { type: "call.ended"; conversationId: string; callId: string };
 
 export type { RealtimeEvent };
 

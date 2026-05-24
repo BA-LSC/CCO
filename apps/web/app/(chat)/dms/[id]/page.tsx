@@ -2,7 +2,9 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Suspense } from "react";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
+import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
 import { PresenceMembersSection } from "@/components/PresenceMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -115,6 +117,9 @@ export default function DmChatPage() {
         avatarUrl={detail?.participant.avatarUrl ?? null}
         loading={detailLoading}
       >
+        <Suspense fallback={null}>
+          <ConversationCallKit conversationId={conversationId} />
+        </Suspense>
         <PanelSettingsButton
           expanded={showOptions}
           label="Conversation settings"

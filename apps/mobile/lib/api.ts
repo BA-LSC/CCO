@@ -151,4 +151,38 @@ export function wsUrl(conversationId: string, wsToken: string): string {
   return `${base}/v1/ws?conversationId=${conversationId}&token=${encodeURIComponent(wsToken)}`;
 }
 
+export type CallJoinResponse = {
+  call: {
+    id: string;
+    conversationId: string;
+    hostDisplayName: string;
+    participantCount: number;
+  };
+  authToken: string;
+};
+
+export async function startOrJoinCall(
+  sessionToken: string,
+  conversationId: string,
+): Promise<CallJoinResponse> {
+  const res = await fetch(`${API_URL}/v1/conversations/${conversationId}/calls`, {
+    method: "POST",
+    headers: authHeaders(sessionToken),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Call failed: ${res.status}`);
+  }
+  return (await res.json()) as CallJoinResponse;
+}
+
+export async function joinCallById(sessionToken: string, callId: string): Promise<CallJoinResponse> {
+  const res = await fetch(`${API_URL}/v1/calls/${callId}/join`, {
+    method: "POST",
+    headers: authHeaders(sessionToken),
+  });
+  if (!res.ok) throw new Error(`Join call failed: ${res.status}`);
+  return (await res.json()) as CallJoinResponse;
+}
+
 export { API_URL };

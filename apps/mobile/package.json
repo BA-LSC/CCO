@@ -9,15 +9,25 @@
     "ios": "expo start --ios"
   },
   "dependencies": {
+    "@cloudflare/react-native-webrtc": "^125.0.5",
+    "@cloudflare/realtimekit-react-native": "^1.0.0",
+    "@cloudflare/realtimekit-react-native-ui": "^1.0.0",
+    "@expo/config-plugins": "^56.0.8",
+    "@react-native-documents/picker": "^12.0.1",
     "expo": "~55.0.25",
+    "expo-auth-session": "~55.0.16",
     "expo-router": "~55.0.15",
     "expo-secure-store": "~55.0.14",
-    "expo-auth-session": "~55.0.16",
     "expo-web-browser": "~55.0.16",
     "react": "19.2.6",
     "react-native": "0.85.3",
+    "react-native-file-viewer": "^2.1.5",
+    "react-native-fs": "^2.20.0",
     "react-native-safe-area-context": "5.8.0",
-    "react-native-screens": "~4.25.1"
+    "react-native-screens": "~4.25.1",
+    "react-native-sound-player": "^0.14.5",
+    "react-native-svg": "^15.15.5",
+    "react-native-webview": "^13.16.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.15",

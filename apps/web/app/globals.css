@@ -6078,3 +6078,122 @@ html.standalone-display .chat-thread-panel {
     scroll-behavior: auto;
   }
 }
+
+.call-action-btn {
+  margin-left: 4px;
+}
+
+.active-call-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 20px;
+  padding: 10px 14px;
+  background: var(--color-accent-soft, #eef4ff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.incoming-call-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1200;
+  max-width: 320px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.12));
+}
+
+.incoming-call-toast-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  background: #111;
+}
+
+.call-overlay-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.call-overlay-meeting {
+  flex: 1;
+  min-height: 0;
+}
+
+.call-invite-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 16px;
+}
+
+.call-invite-dialog {
+  width: min(480px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 16px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.call-invite-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.call-invite-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.call-invite-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.call-invite-link {
+  font-size: 0.75rem;
+  word-break: break-all;
+  margin-top: 8px;
+}
+
+.guest-call-page {
+  max-width: 420px;
+  margin: 48px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.call-error {
+  margin: 8px 20px 0;
+}

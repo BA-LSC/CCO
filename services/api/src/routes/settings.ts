@@ -23,6 +23,10 @@ import {
   getOrganizationGiphyStatus,
   updateOrganizationGiphyApiKey,
 } from "../services/org-giphy";
+import {
+  getOrganizationRealtimeKitStatus,
+  updateOrganizationRealtimeKitConfig,
+} from "../services/org-realtimekit";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
@@ -38,6 +42,9 @@ const IntegrationsPatchSchema = z.object({
   webhookUrl: z.string().url().optional(),
   vapidSubjectEmail: z.string().email().optional(),
   giphyApiKey: z.string().min(1).optional(),
+  cloudflareAccountId: z.string().min(1).optional(),
+  realtimeKitAppId: z.string().min(1).optional(),
+  cloudflareApiToken: z.string().min(1).optional(),
 });
 
 export const settingsRouter = new Hono<Env>();
@@ -73,6 +80,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   const refreshed = (await getConfiguredOrganization()) ?? org;
   const vapidStatus = await getOrganizationVapidStatus(refreshed);
   const giphyStatus = getOrganizationGiphyStatus(refreshed);
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(refreshed);
   const webhookSecrets = decryptWebhookSecrets(refreshed.pcoWebhookSecretEnc);
 
   return c.json({
@@ -86,6 +94,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     webhookUrl: await getPcoWebhookUrl(),
     ...vapidStatus,
     ...giphyStatus,
+    ...realtimeKitStatus,
   });
 });
 
@@ -151,12 +160,34 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     }
   }
 
+  if (
+    data.cloudflareAccountId !== undefined ||
+    data.realtimeKitAppId !== undefined ||
+    data.cloudflareApiToken !== undefined
+  ) {
+    const current = getOrganizationRealtimeKitStatus(org);
+    try {
+      await updateOrganizationRealtimeKitConfig({
+        organizationId: org.id,
+        accountId: data.cloudflareAccountId ?? current.realtimeKitAccountId,
+        appId: data.realtimeKitAppId ?? current.realtimeKitAppId,
+        apiToken:
+          data.cloudflareApiToken ??
+          (current.realtimeKitTokenConfigured ? "__keep__" : ""),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid RealtimeKit configuration";
+      return c.json({ error: message }, 400);
+    }
+  }
+
   const updated = await getConfiguredOrganization();
   const webhookSecrets = decryptWebhookSecrets(
     updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
   );
   const vapidStatus = await getOrganizationVapidStatus(updated ?? org);
   const giphyStatus = getOrganizationGiphyStatus(updated ?? org);
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
   return c.json({
     ok: true,
     name: updated?.name ?? org.name,
@@ -175,6 +206,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     ),
     ...vapidStatus,
     ...giphyStatus,
+    ...realtimeKitStatus,
   });
 });
 

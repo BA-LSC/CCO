@@ -166,7 +166,18 @@ export default function GroupChatScreen() {
         <Pressable onPress={() => router.back()}>
           <Text style={styles.back}>← Back</Text>
         </Pressable>
-        <Text style={styles.title}>{title}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>{title}</Text>
+          {conversationId ? (
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: "/call/[conversationId]", params: { conversationId } })
+              }
+            >
+              <Text style={styles.callBtn}>Call</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
@@ -231,8 +242,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   back: { color: theme.colors.primary, marginBottom: 8, fontWeight: "500" },
-  title: { fontSize: 22, fontWeight: "700", color: theme.colors.text },
+  title: { fontSize: 22, fontWeight: "700", color: theme.colors.text, flex: 1 },
+  callBtn: { color: theme.colors.primary, fontWeight: "600", fontSize: 16 },
   error: { color: theme.colors.danger, padding: 12, backgroundColor: theme.colors.dangerSoft },
   list: { padding: 16 },
   listEmpty: { flexGrow: 1, justifyContent: "center" },

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
-  getUsersOnline,
+  getUsersPresenceState,
   resolvePresenceVisibleUserIds,
   touchUserPresence,
 } from "../services/presence";
@@ -17,7 +17,16 @@ export const presenceRouter = new Hono<Env>();
 
 presenceRouter.post("/heartbeat", requireAuth, async (c) => {
   const session = c.get("session");
-  await touchUserPresence(session.userId);
+  let callId: string | null = null;
+  try {
+    const body = (await c.req.json()) as { callId?: unknown };
+    if (typeof body.callId === "string" && UUID_RE.test(body.callId)) {
+      callId = body.callId;
+    }
+  } catch {
+    // empty body is fine
+  }
+  await touchUserPresence(session.userId, callId);
   return c.json({ ok: true });
 });
 
@@ -55,14 +64,19 @@ presenceRouter.post("/query", requireAuth, async (c) => {
     userIds,
   );
   const allowedSet = new Set(allowedIds);
-  const [onlineStatus, statuses] = await Promise.all([
-    getUsersOnline(allowedIds),
+  const [presenceState, statuses] = await Promise.all([
+    getUsersPresenceState(allowedIds),
     getUsersStatus(allowedIds),
   ]);
 
   for (const userId of userIds) {
-    online[userId] = allowedSet.has(userId) ? (onlineStatus[userId] ?? false) : false;
+    online[userId] = allowedSet.has(userId) ? (presenceState.online[userId] ?? false) : false;
   }
 
-  return c.json({ online, statuses });
+  const inCall: Record<string, string | null> = {};
+  for (const userId of userIds) {
+    inCall[userId] = allowedSet.has(userId) ? (presenceState.inCall[userId] ?? null) : null;
+  }
+
+  return c.json({ online, inCall, statuses });
 });

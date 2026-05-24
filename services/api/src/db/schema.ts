@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -26,6 +27,9 @@ export const organizations = pgTable("organizations", {
   vapidPrivateKeyEnc: text("vapid_private_key_enc"),
   vapidSubject: text("vapid_subject"),
   giphyApiKeyEnc: text("giphy_api_key_enc"),
+  cloudflareAccountId: text("cloudflare_account_id"),
+  realtimeKitAppId: text("realtime_kit_app_id"),
+  cloudflareApiTokenEnc: text("cloudflare_api_token_enc"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -252,4 +256,70 @@ export const messageReactions = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("message_reactions_unique").on(t.messageId, t.userId, t.emoji)],
+);
+
+export const callSessions = pgTable(
+  "call_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .references(() => conversations.id)
+      .notNull(),
+    hostUserId: uuid("host_user_id")
+      .references(() => users.id)
+      .notNull(),
+    realtimeKitMeetingId: text("realtime_kit_meeting_id").notNull(),
+    status: text("status").notNull().default("ringing"),
+    startedAt: timestamp("started_at").defaultNow().notNull(),
+    endedAt: timestamp("ended_at"),
+  },
+  (t) => [
+    index("call_sessions_conversation_id_idx").on(t.conversationId),
+    index("call_sessions_realtime_kit_meeting_id_idx").on(t.realtimeKitMeetingId),
+  ],
+);
+
+export const callParticipants = pgTable(
+  "call_participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    callSessionId: uuid("call_session_id")
+      .references(() => callSessions.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    guestLabel: text("guest_label"),
+    realtimeKitParticipantId: text("realtime_kit_participant_id"),
+    role: text("role").notNull().default("member"),
+    invitedAt: timestamp("invited_at").defaultNow().notNull(),
+    joinedAt: timestamp("joined_at"),
+    leftAt: timestamp("left_at"),
+  },
+  (t) => [
+    index("call_participants_call_session_id_idx").on(t.callSessionId),
+    index("call_participants_user_id_idx").on(t.userId),
+  ],
+);
+
+export const callInviteTokens = pgTable(
+  "call_invite_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    callSessionId: uuid("call_session_id")
+      .references(() => callSessions.id, { onDelete: "cascade" })
+      .notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    kind: text("kind").notNull(),
+    targetUserId: uuid("target_user_id").references(() => users.id),
+    targetEmail: text("target_email"),
+    targetDisplayName: text("target_display_name"),
+    createdByUserId: uuid("created_by_user_id")
+      .references(() => users.id)
+      .notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    revokedAt: timestamp("revoked_at"),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("call_invite_tokens_call_session_id_idx").on(t.callSessionId)],
 );

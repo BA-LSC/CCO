@@ -10,11 +10,22 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.connect.app"
+      "bundleIdentifier": "com.connect.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Access camera to enable video during calls.",
+        "NSMicrophoneUsageDescription": "Access microphone to enable audio during calls.",
+        "NSPhotoLibraryUsageDescription": "Access photos to share images during calls.",
+        "UIBackgroundModes": ["audio", "voip"]
+      }
     },
     "android": {
-      "package": "com.connect.app"
+      "package": "com.connect.app",
+      "permissions": ["CAMERA", "RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS"]
     },
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      "@cloudflare/realtimekit-react-native",
+      "@cloudflare/react-native-webrtc"
+    ]
   }
 }

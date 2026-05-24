@@ -24,6 +24,10 @@
     "./pco-webhooks": {
       "types": "./dist/pco-webhooks.d.ts",
       "default": "./dist/pco-webhooks.js"
+    },
+    "./calls": {
+      "types": "./dist/calls.d.ts",
+      "default": "./dist/calls.js"
     }
   },
   "scripts": {
