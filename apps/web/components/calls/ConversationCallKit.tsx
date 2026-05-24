@@ -74,9 +74,12 @@ export function ConversationCallKit({ conversationId }: Props) {
         setActiveCall(null);
         setIncoming(null);
         clearCallQueryParam();
+        if (inCallRef.current) {
+          void hangUp();
+        }
       }
     });
-  }, [clearCallQueryParam, conversationId, session?.userId, setActiveCall, subscribeRealtime]);
+  }, [clearCallQueryParam, conversationId, hangUp, session?.userId, setActiveCall, subscribeRealtime]);
 
   useEffect(() => {
     const callParam = searchParams.get("call");
@@ -119,7 +122,13 @@ export function ConversationCallKit({ conversationId }: Props) {
         </ChatHomeBanner>
       ) : null}
 
-      {inCall && authToken ? <CallOverlay authToken={authToken} onLeave={handleLeave} /> : null}
+      {inCall && authToken ? (
+        <CallOverlay
+          authToken={authToken}
+          sessionParticipantCount={activeCall?.participantCount ?? 1}
+          onLeave={handleLeave}
+        />
+      ) : null}
 
       <CallActionButton
         activeCall={activeCall}

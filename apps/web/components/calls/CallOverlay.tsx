@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import {
   RealtimeKitProvider,
   useRealtimeKitClient,
@@ -8,12 +8,13 @@ import {
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
 import { RtkMeeting } from "@cloudflare/realtimekit-react-ui";
-import { isSoloCall } from "@/lib/call-solo";
+import { shouldApplySoloCallBehavior } from "@/lib/call-solo";
 
 const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
 
 type Props = {
   authToken: string;
+  sessionParticipantCount: number;
   onLeave: () => void;
   /** When false, join immediately using the participant name from the auth token. */
   showSetupScreen?: boolean;
@@ -22,9 +23,37 @@ type Props = {
 function useSoloCallBehavior(
   meeting: ReturnType<typeof useRealtimeKitMeeting>["meeting"],
   overlayRef: RefObject<HTMLDivElement | null>,
+  sessionParticipantCount: number,
 ) {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const participantCount = useRealtimeKitSelector((m) => m.participants.count);
+  const [othersJoinedInRoom, setOthersJoinedInRoom] = useState(false);
+  const sessionParticipantCountRef = useRef(sessionParticipantCount);
+
+  sessionParticipantCountRef.current = sessionParticipantCount;
+
+  useEffect(() => {
+    if (!meeting) return;
+    if (meeting.participants.count > 0) {
+      setOthersJoinedInRoom(true);
+    }
+
+    const onParticipantJoined = () => {
+      setOthersJoinedInRoom(true);
+    };
+
+    meeting.participants.joined.on("participantJoined", onParticipantJoined);
+    return () => {
+      meeting.participants.joined.off("participantJoined", onParticipantJoined);
+    };
+  }, [meeting]);
+
+  const isSoloNow = () =>
+    shouldApplySoloCallBehavior(
+      sessionParticipantCountRef.current,
+      meeting?.participants.count ?? 0,
+      othersJoinedInRoom,
+    );
 
   useEffect(() => {
     if (!meeting) return;
@@ -36,7 +65,7 @@ function useSoloCallBehavior(
     };
 
     const onLeaveClick = (event: MouseEvent) => {
-      if (!isSoloCall(meeting.participants.count)) return;
+      if (!isSoloNow()) return;
       const hitLeaveButton = event.composedPath().some(
         (el) => el instanceof HTMLElement && el.tagName === "RTK-LEAVE-BUTTON",
       );
@@ -48,9 +77,7 @@ function useSoloCallBehavior(
 
     const onLeaveConfirmation = (event: Event) => {
       const detail = (event as CustomEvent<{ activeLeaveConfirmation?: boolean }>).detail;
-      if (detail?.activeLeaveConfirmation !== true || !isSoloCall(meeting.participants.count)) {
-        return;
-      }
+      if (detail?.activeLeaveConfirmation !== true || !isSoloNow()) return;
       event.stopImmediatePropagation();
       leaveImmediately();
     };
@@ -61,24 +88,26 @@ function useSoloCallBehavior(
       root.removeEventListener("click", onLeaveClick, true);
       root.removeEventListener("rtkStateUpdate", onLeaveConfirmation, true);
     };
-  }, [meeting, overlayRef]);
+  }, [meeting, overlayRef, othersJoinedInRoom, sessionParticipantCount]);
 
   useEffect(() => {
-    if (!meeting || !roomJoined || !isSoloCall(participantCount)) return;
+    if (!meeting || !roomJoined || !isSoloNow()) return;
     const timer = setTimeout(() => {
-      if (!isSoloCall(meeting.participants.count)) return;
+      if (!isSoloNow()) return;
       void meeting.leaveRoom();
     }, SOLO_CALL_AUTO_LEAVE_MS);
     return () => clearTimeout(timer);
-  }, [meeting, roomJoined, participantCount]);
+  }, [meeting, roomJoined, participantCount, othersJoinedInRoom, sessionParticipantCount]);
 }
 
 function MeetingInner({
   authToken,
+  sessionParticipantCount,
   onLeave,
   showSetupScreen = false,
 }: {
   authToken: string;
+  sessionParticipantCount: number;
   onLeave: () => void;
   showSetupScreen?: boolean;
 }) {
@@ -90,7 +119,7 @@ function MeetingInner({
 
   onLeaveRef.current = onLeave;
 
-  useSoloCallBehavior(meeting, overlayRef);
+  useSoloCallBehavior(meeting, overlayRef, sessionParticipantCount);
 
   useLayoutEffect(() => {
     if (showSetupScreen || !rtkRef.current) return;
@@ -108,6 +137,11 @@ function MeetingInner({
     meeting.self.on("roomLeft", handler);
     return () => {
       meeting.self.off("roomLeft", handler);
+      if (!leftRef.current && meeting.self.roomJoined) {
+        leftRef.current = true;
+        void meeting.leaveRoom();
+        onLeaveRef.current();
+      }
     };
   }, [meeting]);
 
@@ -134,7 +168,12 @@ function MeetingInner({
   );
 }
 
-export function CallOverlay({ authToken, onLeave, showSetupScreen = false }: Props) {
+export function CallOverlay({
+  authToken,
+  sessionParticipantCount,
+  onLeave,
+  showSetupScreen = false,
+}: Props) {
   const [meeting, initMeeting] = useRealtimeKitClient();
 
   useEffect(() => {
@@ -149,6 +188,7 @@ export function CallOverlay({ authToken, onLeave, showSetupScreen = false }: Pro
       <RealtimeKitProvider value={meeting}>
         <MeetingInner
           authToken={authToken}
+          sessionParticipantCount={sessionParticipantCount}
           onLeave={onLeave}
           showSetupScreen={showSetupScreen}
         />

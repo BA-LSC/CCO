@@ -22,6 +22,8 @@ import { notifyIncomingCall } from "./push-notify";
 import {
   addRealtimeKitParticipant,
   createRealtimeKitMeeting,
+  deactivateRealtimeKitMeeting,
+  endRealtimeKitMeetingSession,
   isRealtimeKitConfigured,
   presetForRole,
   refreshRealtimeKitParticipantToken,
@@ -140,6 +142,12 @@ async function publishCallEvent(
 }
 
 async function finalizeCallSession(callSessionId: string, conversationId: string): Promise<void> {
+  const row = await db
+    .select({ meetingId: callSessions.realtimeKitMeetingId })
+    .from(callSessions)
+    .where(eq(callSessions.id, callSessionId))
+    .limit(1);
+
   await db
     .update(callSessions)
     .set({ status: "ended", endedAt: new Date() })
@@ -151,6 +159,12 @@ async function finalizeCallSession(callSessionId: string, conversationId: string
     .where(
       and(eq(callParticipants.callSessionId, callSessionId), isNull(callParticipants.leftAt)),
     );
+
+  const meetingId = row[0]?.meetingId;
+  if (meetingId) {
+    await endRealtimeKitMeetingSession(meetingId);
+    await deactivateRealtimeKitMeeting(meetingId);
+  }
 
   await publishCallEvent(conversationId, {
     type: "call.ended",
@@ -418,7 +432,21 @@ export async function leaveCall(params: { callId: string; userId: string }): Pro
     )
     .returning({ id: callParticipants.id });
 
-  if (updated.length === 0) return false;
+  if (updated.length === 0) {
+    const stillActive = await db
+      .select({ id: callParticipants.id })
+      .from(callParticipants)
+      .where(
+        and(
+          eq(callParticipants.callSessionId, params.callId),
+          eq(callParticipants.userId, params.userId),
+          isNull(callParticipants.leftAt),
+          sql`${callParticipants.joinedAt} IS NOT NULL`,
+        ),
+      )
+      .limit(1);
+    if (stillActive[0]) return false;
+  }
 
   const call = await db
     .select({ conversationId: callSessions.conversationId })

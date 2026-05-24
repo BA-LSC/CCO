@@ -86,13 +86,15 @@ export function useCallSession(conversationId: string | null) {
     setLoading(true);
     try {
       await leaveCall(callId);
+      await refreshActive();
     } catch {
       // still close local UI
+      await refreshActive();
     } finally {
       setLoading(false);
       leavingRef.current = false;
     }
-  }, [activeCall]);
+  }, [activeCall, refreshActive]);
 
   const endForAll = useCallback(async () => {
     if (!activeCall || leavingRef.current) return;

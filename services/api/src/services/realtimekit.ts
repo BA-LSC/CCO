@@ -115,3 +115,32 @@ export async function presetForRole(role: "host" | "member" | "guest"): Promise<
 export async function isRealtimeKitConfigured(): Promise<boolean> {
   return (await resolveRealtimeKitConfig()) != null;
 }
+
+/** End the active RealtimeKit session for everyone still connected. */
+export async function endRealtimeKitMeetingSession(meetingId: string): Promise<void> {
+  const config = await resolveRealtimeKitConfig();
+  if (!config) return;
+
+  try {
+    await realtimeKitAppRequest(config, `/meetings/${meetingId}/active-session/kick-all`, {
+      method: "POST",
+    });
+  } catch (err) {
+    console.warn("RealtimeKit kick-all failed:", err);
+  }
+}
+
+/** Prevent new joins after a CCO call ends. */
+export async function deactivateRealtimeKitMeeting(meetingId: string): Promise<void> {
+  const config = await resolveRealtimeKitConfig();
+  if (!config) return;
+
+  try {
+    await realtimeKitAppRequest(config, `/meetings/${meetingId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "INACTIVE" }),
+    });
+  } catch (err) {
+    console.warn("RealtimeKit deactivate meeting failed:", err);
+  }
+}
