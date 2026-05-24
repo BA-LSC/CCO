@@ -27,6 +27,7 @@ import {
   findLocalMember,
   memberIsOnCco,
   mergeSignedUpMemberRecords,
+  normalizeMemberEmail,
   resolveRosterMemberLink,
 } from "./cco-member-status";
 import { refreshUserAvatarFromPco } from "./user-profile";
@@ -451,7 +452,7 @@ function mapCcoTeamMembers(
     avatarUrl: member.avatarUrl ?? rosterAvatars.get(member.pcoPersonId) ?? null,
     role: member.role,
     onCco: typeof onCco === "boolean" ? onCco : onCco(member),
-    email: null,
+    email: normalizeMemberEmail(member.email),
   }));
 }
 
@@ -486,7 +487,8 @@ async function listTeamMembersForDetail(params: {
   const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, teamRecords);
   const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
-  const useCachedRoster = !params.liveRoster || (await areOrgWebhooksEnabled());
+  // Service teams have no PCO webhook roster feed — rely on live PCO when sync is requested.
+  const useCachedRoster = !params.liveRoster;
 
   if (useCachedRoster || !isLeader || !params.accessToken) {
     return sortTeamMembersByName(

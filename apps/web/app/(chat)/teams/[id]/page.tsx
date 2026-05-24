@@ -76,6 +76,13 @@ export default function TeamChatPage() {
       .finally(() => setDetailLoading(false));
   }, [teamId]);
 
+  useEffect(() => {
+    if (!showSettings || !isLeader) return;
+    void reloadDetail({ sync: true }).catch((err) =>
+      setError(err instanceof Error ? err.message : "Failed to refresh team members"),
+    );
+  }, [showSettings, isLeader, teamId]);
+
   async function toggleMute(muted: boolean) {
     if (!detail?.conversation) return;
     await apiFetch(`/api/v1/conversations/${detail.conversation.id}/mute`, {

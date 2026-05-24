@@ -7,7 +7,6 @@ import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { db } from "../db";
 import { serviceTeamMemberships, serviceTeams, users } from "../db/schema";
 import { isLeaderRole } from "../permissions";
-import { areOrgWebhooksEnabled } from "../services/pco-cache";
 import {
   getServiceTeamDetail,
   listServiceTeamsForUser,
@@ -78,8 +77,7 @@ servicesRouter.get("/teams/:id", async (c) => {
   const session = c.get("session");
   const teamId = c.req.param("id");
   const accessToken = await resolvePcoAccessToken(session, c);
-  const webhooksEnabled = await areOrgWebhooksEnabled();
-  const requestLiveSync = c.req.query("sync") === "1" && !webhooksEnabled;
+  const requestLiveSync = c.req.query("sync") === "1";
 
   let detail = await getServiceTeamDetail(teamId, session.userId, {
     accessToken: accessToken ?? undefined,
