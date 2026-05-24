@@ -30,7 +30,6 @@ export function ConversationCallKit({ conversationId }: Props) {
     join,
     joinExisting,
     hangUp,
-    refreshActive,
   } = useCallSession(conversationId);
 
   const [incoming, setIncoming] = useState<CallSummaryDto | null>(null);
