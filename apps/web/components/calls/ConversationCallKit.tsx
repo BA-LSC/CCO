@@ -34,11 +34,16 @@ export function ConversationCallKit({ conversationId }: Props) {
     return subscribeRealtime((event: RealtimeEvent) => {
       if (event.type === "call.started" || event.type === "call.updated") {
         if (event.conversationId === conversationId) {
-          setActiveCall(event.call);
+          if (event.call.participantCount === 0) {
+            setActiveCall(null);
+          } else {
+            setActiveCall(event.call);
+          }
           if (
             event.type === "call.started" &&
             event.call.hostUserId !== session?.userId &&
-            !inCall
+            !inCall &&
+            event.call.participantCount > 0
           ) {
             setIncoming(event.call);
           }

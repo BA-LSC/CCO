@@ -21,7 +21,7 @@ export function useCallSession(conversationId: string | null) {
     if (!conversationId) return;
     try {
       const { call } = await fetchActiveCall(conversationId);
-      setActiveCall(call);
+      setActiveCall(call?.participantCount ? call : null);
     } catch {
       // ignore poll errors
     }

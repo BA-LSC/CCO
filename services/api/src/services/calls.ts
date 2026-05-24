@@ -139,6 +139,26 @@ async function publishCallEvent(
   await publishMessageEvent(event);
 }
 
+async function finalizeCallSession(callSessionId: string, conversationId: string): Promise<void> {
+  await db
+    .update(callSessions)
+    .set({ status: "ended", endedAt: new Date() })
+    .where(eq(callSessions.id, callSessionId));
+
+  await db
+    .update(callParticipants)
+    .set({ leftAt: new Date() })
+    .where(
+      and(eq(callParticipants.callSessionId, callSessionId), isNull(callParticipants.leftAt)),
+    );
+
+  await publishCallEvent(conversationId, {
+    type: "call.ended",
+    conversationId,
+    callId: callSessionId,
+  });
+}
+
 async function ensureParticipantToken(params: {
   callSessionId: string;
   meetingId: string;
@@ -227,7 +247,13 @@ export async function getActiveCallForConversation(
     .limit(1);
 
   if (!row[0]) return null;
-  return buildCallSummary(row[0].id);
+  const summary = await buildCallSummary(row[0].id);
+  if (!summary) return null;
+  if (summary.participantCount === 0) {
+    await finalizeCallSession(row[0].id, conversationId);
+    return null;
+  }
+  return summary;
 }
 
 export async function startOrJoinConversationCall(params: {
@@ -401,13 +427,18 @@ export async function leaveCall(params: { callId: string; userId: string }): Pro
     .limit(1);
 
   if (call[0]) {
-    const summary = await buildCallSummary(params.callId);
-    if (summary) {
-      await publishCallEvent(call[0].conversationId, {
-        type: "call.updated",
-        conversationId: call[0].conversationId,
-        call: summary,
-      });
+    const remaining = await countActiveParticipants(params.callId);
+    if (remaining === 0) {
+      await finalizeCallSession(params.callId, call[0].conversationId);
+    } else {
+      const summary = await buildCallSummary(params.callId);
+      if (summary) {
+        await publishCallEvent(call[0].conversationId, {
+          type: "call.updated",
+          conversationId: call[0].conversationId,
+          call: summary,
+        });
+      }
     }
   }
 
@@ -429,23 +460,7 @@ export async function endCall(params: { callId: string; userId: string }): Promi
   if (!call || call.status === "ended") return false;
   if (call.hostUserId !== params.userId) return false;
 
-  await db
-    .update(callSessions)
-    .set({ status: "ended", endedAt: new Date() })
-    .where(eq(callSessions.id, params.callId));
-
-  await db
-    .update(callParticipants)
-    .set({ leftAt: new Date() })
-    .where(
-      and(eq(callParticipants.callSessionId, params.callId), isNull(callParticipants.leftAt)),
-    );
-
-  await publishCallEvent(call.conversationId, {
-    type: "call.ended",
-    conversationId: call.conversationId,
-    callId: params.callId,
-  });
+  await finalizeCallSession(params.callId, call.conversationId);
 
   return true;
 }
