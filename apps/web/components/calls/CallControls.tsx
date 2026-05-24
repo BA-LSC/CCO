@@ -1,82 +1,56 @@
 "use client";
 
-import { useState } from "react";
 import type { CallSummaryDto } from "@cco/shared/calls";
-import { CallInviteDialog } from "./CallInviteDialog";
+import { PanelHeaderPhoneIcon } from "@/components/PanelHeaderIcons";
+
+type CallIconState = "idle" | "waiting" | "joinable" | "in-call";
 
 type Props = {
   activeCall: CallSummaryDto | null;
+  inCall: boolean;
   loading: boolean;
   onStart: () => void;
   onJoin: () => void;
-  callId?: string | null;
 };
 
-export function CallActionButton({ activeCall, loading, onStart, onJoin, callId }: Props) {
-  const [inviteOpen, setInviteOpen] = useState(false);
-
-  if (activeCall && !callId) {
-    return (
-      <>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm call-action-btn"
-          disabled={loading}
-          onClick={onJoin}
-        >
-          Join call
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm call-action-btn"
-          disabled={loading}
-          onClick={() => setInviteOpen(true)}
-          aria-label="Invite to call"
-        >
-          Invite
-        </button>
-        {inviteOpen ? (
-          <CallInviteDialog callId={activeCall.id} onClose={() => setInviteOpen(false)} />
-        ) : null}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm call-action-btn"
-        disabled={loading}
-        onClick={onStart}
-        aria-label="Start call"
-      >
-        Call
-      </button>
-      {inviteOpen && callId ? (
-        <CallInviteDialog callId={callId} onClose={() => setInviteOpen(false)} />
-      ) : null}
-    </>
-  );
+function getCallIconState(activeCall: CallSummaryDto | null, inCall: boolean): CallIconState {
+  if (inCall) return "in-call";
+  if (!activeCall) return "idle";
+  if (activeCall.participantCount === 0) return "waiting";
+  return "joinable";
 }
 
-export function ActiveCallBanner({
-  activeCall,
-  onJoin,
-}: {
-  activeCall: CallSummaryDto;
-  onJoin: () => void;
-}) {
+function getCallLabel(state: CallIconState, activeCall: CallSummaryDto | null): string {
+  switch (state) {
+    case "in-call":
+      return "In call";
+    case "waiting":
+      return "Call in progress — join";
+    case "joinable":
+      return `Join call (${activeCall!.participantCount} participant${
+        activeCall!.participantCount === 1 ? "" : "s"
+      })`;
+    case "idle":
+      return "Start call";
+  }
+}
+
+export function CallActionButton({ activeCall, inCall, loading, onStart, onJoin }: Props) {
+  const state = getCallIconState(activeCall, inCall);
+  const label = getCallLabel(state, activeCall);
+
   return (
-    <div className="active-call-banner" role="status">
-      <span>
-        Call in progress · {activeCall.participantCount} participant
-        {activeCall.participantCount === 1 ? "" : "s"}
-      </span>
-      <button type="button" className="btn btn-primary btn-sm" onClick={onJoin}>
-        Join
-      </button>
-    </div>
+    <button
+      type="button"
+      className={`panel-header-icon-btn call-header-btn call-header-btn--${state}`}
+      disabled={loading || inCall}
+      onClick={() => (activeCall && !inCall ? onJoin() : onStart())}
+      aria-label={label}
+      title={label}
+      aria-pressed={state === "in-call" || state === "waiting" || state === "joinable"}
+    >
+      <PanelHeaderPhoneIcon />
+    </button>
   );
 }
 

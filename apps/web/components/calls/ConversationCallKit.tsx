@@ -6,11 +6,7 @@ import type { CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
-import {
-  ActiveCallBanner,
-  CallActionButton,
-  IncomingCallToast,
-} from "@/components/calls/CallControls";
+import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
 import { CallOverlay } from "@/components/calls/CallOverlay";
 
 type Props = {
@@ -77,10 +73,6 @@ export function ConversationCallKit({ conversationId }: Props) {
 
   return (
     <>
-      {activeCall && !inCall ? (
-        <ActiveCallBanner activeCall={activeCall} onJoin={() => void join()} />
-      ) : null}
-
       {incoming ? (
         <IncomingCallToast
           hostName={incoming.hostDisplayName}
@@ -102,10 +94,10 @@ export function ConversationCallKit({ conversationId }: Props) {
 
       <CallActionButton
         activeCall={activeCall}
+        inCall={inCall}
         loading={loading}
         onStart={() => void join()}
         onJoin={() => void join()}
-        callId={activeCall?.id ?? null}
       />
     </>
   );

@@ -65,6 +65,21 @@ export function SidebarCloseIcon({ className = "sidebar-add-channel-icon-glyph" 
   );
 }
 
+export function PanelHeaderPhoneIcon({ className = "panel-header-icon" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M6.5 4h3l1.5 5-2 1.2a11 11 0 0 0 5.3 5.3L17.5 14l5 1.5v3a1.5 1.5 0 0 1-1.6 1.5C9.8 20 4 14.2 4 6.1 4 5 4.9 4 6.5 4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SidebarLockIcon({ className = "sidebar-channel-lock-glyph" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
