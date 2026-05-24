@@ -77,17 +77,19 @@ function captureVideoFrame(src: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let revokeSource: (() => void) | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
     const finish = (blob: Blob | null, error?: Error) => {
       if (settled) return;
       settled = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       cleanup();
       revokeSource?.();
       if (blob) resolve(blob);
       else reject(error ?? new Error("Failed to capture video frame"));
     };
+
+    const timeoutId = setTimeout(() => {
+      finish(null, new Error("Video thumbnail capture timed out"));
+    }, CAPTURE_TIMEOUT_MS);
 
     const video = document.createElement("video");
     video.muted = true;
@@ -149,10 +151,6 @@ function captureVideoFrame(src: string): Promise<Blob> {
         drawFrame();
       }
     };
-
-    timeoutId = setTimeout(() => {
-      finish(null, new Error("Video thumbnail capture timed out"));
-    }, CAPTURE_TIMEOUT_MS);
 
     video.onloadedmetadata = seekToPreviewFrame;
     video.onloadeddata = seekToPreviewFrame;

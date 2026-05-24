@@ -8,6 +8,7 @@
     "postbuild": "node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/apps/web/server.js",
     "start:next": "next start",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:e2e": "playwright test",
     "generate:emoji-picker": "node scripts/generate-emoji-picker-data.mjs"

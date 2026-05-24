@@ -63,7 +63,7 @@ Open `https://chat.example.com/setup` and complete first-time app setup.
 | `deploy/install.sh` | **Start here** — clone/update + full wizard |
 | `deploy/setup.sh` | Same wizard (if repo already cloned) |
 | `deploy/bootstrap.sh` | Deploy when `.env` is already complete |
-| `deploy/update.sh` | **Day-two updates** — `git pull`, build, migrate, restart |
+| `deploy/update.sh` | **Day-two updates** — `git pull`, selective build, migrate, restart |
 | `deploy/compose.sh` | Day-two `docker compose` (auto picks DB mode) |
 | `deploy/check-database.sh` | Test `DATABASE_URL` only |
 | `deploy/configure-vultr-db.sh` | Vultr `DATABASE_URL` only (also in setup) |
@@ -72,6 +72,21 @@ Open `https://chat.example.com/setup` and complete first-time app setup.
 External PostgreSQL is auto-detected from `DATABASE_URL`. Set `BUNDLED_DATABASE=1` to force the container.
 
 For manual `.env` editing and troubleshooting, continue below.
+
+### Selective deploy builds
+
+`./deploy/update.sh` builds only images affected by the pulled commits (API package changes → `migrate` + `api`; web changes → `web`). Override when needed:
+
+```bash
+./deploy/update.sh --all          # rebuild migrate, api, and web
+./deploy/update.sh --api-only     # migrate + api only
+./deploy/update.sh --web-only     # web only
+./deploy/bootstrap.sh --all       # same flags without git pull
+```
+
+### Docker registry build cache (optional)
+
+Set `CCO_BUILD_CACHE_IMAGE` in `.env` to a registry prefix (e.g. `ghcr.io/org/cco/cache`) before deploy. Builds use `docker buildx` with `--cache-from` / `--cache-to` for faster VPS rebuilds. Requires `docker buildx` and registry push access.
 
 ---
 

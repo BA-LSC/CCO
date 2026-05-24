@@ -10,6 +10,25 @@ source deploy/lib/database.sh
 source deploy/lib/cloudflare-tunnel.sh
 # shellcheck disable=SC1091
 source deploy/lib/env.sh
+# shellcheck disable=SC1091
+source deploy/lib/build.sh
+
+BUILD_ARGS=()
+while (("$#")); do
+  case "$1" in
+    --all | --api-only | --web-only | --since)
+      BUILD_ARGS+=("$1")
+      if [[ "$1" == "--since" ]]; then
+        BUILD_ARGS+=("${2:-}")
+        shift
+      fi
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 if [[ ! -f .env ]]; then
   cp deploy/.env.production.example .env
@@ -119,7 +138,12 @@ CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
 export CCO_BUILD_ID
 cco_env_upsert "CCO_BUILD_ID" "$CCO_BUILD_ID" .env
 echo "  Web build id: ${CCO_BUILD_ID}"
-"${COMPOSE[@]}" build
+
+BUILD_SERVICES=()
+while IFS= read -r svc; do
+  [[ -n "$svc" ]] && BUILD_SERVICES+=("$svc")
+done < <(cco_resolve_build_services "${BUILD_ARGS[@]}")
+cco_compose_build files "${BUILD_SERVICES[@]}"
 
 echo ""
 echo "Build complete. Showing the update screen before migrations..."

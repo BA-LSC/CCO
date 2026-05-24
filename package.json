@@ -6,12 +6,15 @@
     "node": ">=26"
   },
   "packageManager": "bun@1.3.14",
-  "workspaces": ["apps/*", "packages/*", "services/*"],
+  "workspaces": ["apps/web", "packages/*", "services/*"],
   "scripts": {
     "dev": "turbo run dev",
-    "dev:api": "bun run --cwd services/api dev",
-    "dev:web": "bun run --cwd apps/web dev",
+    "dev:api": "bun run build:packages && bun run --cwd services/api dev",
+    "dev:web": "bun run build:packages && bun run --cwd apps/web dev",
     "dev:all": "bun run dev:api & bun run dev:web",
+    "build": "turbo run build",
+    "build:packages": "turbo run build --filter=@cco/shared --filter=@cco/pco-client",
+    "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:unit": "bun test packages services/api",
     "lint": "turbo run lint",

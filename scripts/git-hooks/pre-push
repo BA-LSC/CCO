@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Run lint and unit tests before pushing.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+echo "pre-push: running lint..."
+bun run lint
+
+echo "pre-push: running unit tests..."
+bun run test:unit
+
+echo "pre-push: OK"

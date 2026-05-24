@@ -68,7 +68,11 @@ cd cco
 bun install
 ```
 
-Git hooks (secret scanning on commit) install automatically via `bun install`. To reinstall manually: `bash scripts/install-git-hooks.sh`.
+Git hooks install automatically via `bun install` (pre-commit secret scan, pre-push lint + unit tests). To reinstall manually: `bash scripts/install-git-hooks.sh`.
+
+Shared packages compile to `dist/` — `bun run build:packages` runs automatically before `dev:api` / `dev:web`. For a full production build: `bun run build`.
+
+**Mobile** is outside the root workspace (keeps Expo out of web/API installs). See [apps/mobile/README.md](apps/mobile/README.md).
 
 ### 2. Start infrastructure
 
