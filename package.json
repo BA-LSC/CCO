@@ -17,10 +17,17 @@
     "lint": "turbo run lint",
     "db:migrate": "bun run --cwd services/api db:migrate",
     "deploy:install": "./deploy/install.sh",
-    "deploy:setup": "./deploy/setup.sh"
+    "deploy:setup": "./deploy/setup.sh",
+    "audit": "bun audit",
+    "audit:ci": "bun audit --audit-level=high"
   },
   "devDependencies": {
     "turbo": "^2.9.14",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.10",
+    "esbuild": "^0.25.12",
+    "@esbuild-kit/core-utils/esbuild": "^0.25.12"
   }
 }

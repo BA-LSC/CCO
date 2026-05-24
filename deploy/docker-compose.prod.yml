@@ -11,7 +11,7 @@ name: cco
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18.3-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cco}
@@ -51,6 +51,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      target: migrate
     env_file:
       - ../.env
     environment:
@@ -65,6 +66,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      target: runner
     restart: unless-stopped
     env_file:
       - ../.env
@@ -109,7 +111,7 @@ services:
       - "3000"
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.5.0
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:

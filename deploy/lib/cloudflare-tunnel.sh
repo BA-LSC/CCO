@@ -836,7 +836,7 @@ cco_start_setup_connector() {
   if ! docker run -d \
     --name "$CCO_SETUP_CLOUDFLARED_CONTAINER" \
     --restart unless-stopped \
-    cloudflare/cloudflared:latest \
+    cloudflare/cloudflared:2026.5.0 \
     tunnel --no-autoupdate run --token "$token" >/dev/null; then
     echo "Failed to start cloudflared. Is Docker running?" >&2
     return 1

@@ -33,7 +33,7 @@ fi
 if cco_should_use_external_db; then
   echo "Mode: external PostgreSQL (bundled postgres container will not run)."
   echo "Testing connection..."
-  if docker run --rm postgres:18-alpine psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
+  if docker run --rm postgres:18.3-alpine psql "$url" -v ON_ERROR_STOP=1 -c 'SELECT 1 AS ok'; then
     echo "Database connection OK."
   else
     echo "Connection failed. For Vultr: same region/VPC, VPC hostname (not public), trusted sources."

@@ -74,7 +74,7 @@ fi
 
 if cco_should_use_external_db; then
   echo "External PostgreSQL detected — testing connection..."
-  if ! docker run --rm postgres:18-alpine psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1; then
+  if ! docker run --rm postgres:18.3-alpine psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null 2>&1; then
     echo "Database connection failed. Fix DATABASE_URL or VPC, then run: ./deploy/check-database.sh"
     exit 1
   fi

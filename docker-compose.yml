@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18.3-alpine
     environment:
       POSTGRES_USER: connect
       POSTGRES_PASSWORD: connect
@@ -8,6 +8,6 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
   redis:
-    image: redis:8
+    image: redis:8-alpine
     ports:
       - "127.0.0.1:6379:6379"

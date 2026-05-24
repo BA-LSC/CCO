@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM oven/bun:1.3-alpine AS base
+FROM oven/bun:1.3.14-alpine AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -13,7 +13,17 @@ COPY services/api/package.json services/api/
 RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     bun install --frozen-lockfile --filter @cco/api
 
-FROM base AS runner
+FROM base AS deps-prod
+COPY package.json bun.lock ./
+COPY apps/web/package.json apps/web/
+COPY apps/mobile/package.json apps/mobile/
+COPY packages/pco-client/package.json packages/pco-client/
+COPY packages/shared/package.json packages/shared/
+COPY services/api/package.json services/api/
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+    bun install --frozen-lockfile --production --filter @cco/api
+
+FROM base AS migrate
 ENV NODE_ENV=production
 WORKDIR /app
 
@@ -24,6 +34,21 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/packages/pco-client/node_modules ./packages/pco-client/node_modules
 COPY --from=deps /app/services/api/node_modules ./services/api/node_modules
+
+WORKDIR /app/services/api
+CMD ["bun", "run", "db:migrate"]
+
+FROM base AS runner
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY packages ./packages
+COPY services/api ./services/api
+COPY --from=deps-prod /app/node_modules ./node_modules
+COPY --from=deps-prod /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=deps-prod /app/packages/pco-client/node_modules ./packages/pco-client/node_modules
+COPY --from=deps-prod /app/services/api/node_modules ./services/api/node_modules
 
 RUN mkdir -p /data/uploads
 VOLUME ["/data/uploads"]
