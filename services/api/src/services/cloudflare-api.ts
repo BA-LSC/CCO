@@ -51,7 +51,7 @@ async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit):
   return json.result;
 }
 
-async function cfRealtimeKitRequest<T>(
+export async function cfRealtimeKitRequest<T>(
   apiToken: string,
   path: string,
   init?: RequestInit,
