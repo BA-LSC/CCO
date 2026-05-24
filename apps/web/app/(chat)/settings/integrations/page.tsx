@@ -301,9 +301,9 @@ function CloudflareSection({
           <div className="integrations-section-badges">
             <span className="integrations-badge integrations-badge--success">Calls enabled</span>
           </div>
-        ) : tokenConfigured ? (
+        ) : tokenConfigured || fromEnv ? (
           <div className="integrations-section-badges">
-            <span className="integrations-badge integrations-badge--success">Token saved</span>
+            <span className="integrations-badge integrations-badge--success">Configured</span>
           </div>
         ) : null}
       </div>

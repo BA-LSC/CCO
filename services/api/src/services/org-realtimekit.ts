@@ -12,6 +12,7 @@ import {
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
+import { invalidateOrgContextCache } from "./org-context-cache";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 
 export type RealtimeKitConfig = {
@@ -105,6 +106,8 @@ export async function saveOrganizationCloudflareApiToken(params: {
     })
     .where(eq(organizations.id, params.organizationId));
 
+  invalidateOrgContextCache();
+
   return { accountId };
 }
 
@@ -142,6 +145,8 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
     })
     .where(eq(organizations.id, params.organizationId));
 
+  invalidateOrgContextCache();
+
   return {
     createdApp: provisioned.createdApp,
     presetsResolved: provisioned.presets != null,
@@ -163,6 +168,7 @@ export async function disableOrganizationRealtimeKitCalls(organizationId: string
       realtimeKitPresetGuest: null,
     })
     .where(eq(organizations.id, organizationId));
+  invalidateOrgContextCache();
 }
 
 export async function enableOrganizationRealtimeKit(params: {
