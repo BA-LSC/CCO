@@ -83,7 +83,7 @@ describe("resolveAppBuildVersion", () => {
 });
 
 describe("getClientBuildVersion", () => {
-  test("prefers the SSR meta tag", () => {
+  test("uses meta tag fallback when bundle is dev", () => {
     const meta = { getAttribute: () => "server-version" };
     const querySelector = () => meta;
     const originalDocument = globalThis.document;

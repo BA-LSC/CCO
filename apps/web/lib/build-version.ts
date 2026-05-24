@@ -28,16 +28,14 @@ export function publishClientBuildVersion(version = APP_BUILD_VERSION): void {
 /** Keep the SSR meta tag aligned with the running bundle after client navigation. */
 export function syncMetaBuildVersion(version: string): void {
   if (typeof document === "undefined" || !version) return;
-  publishClientBuildVersion(version);
   const meta = document.querySelector('meta[name="cco-app-version"]');
   meta?.setAttribute("content", version);
 }
 
-/** Prefer the running bundle version; SSR meta can lag after client-side navigation. */
+/** The running JS bundle is authoritative; SSR meta can lag after client navigation. */
 export function getClientBuildVersion(fallback = APP_BUILD_VERSION): string {
-  if (typeof window !== "undefined") {
-    const runtime = window.__ccoAppVersion?.trim();
-    if (runtime) return runtime;
+  if (typeof window !== "undefined" && APP_BUILD_VERSION !== "dev") {
+    return APP_BUILD_VERSION;
   }
   if (typeof document === "undefined") return fallback;
   const meta = document.querySelector('meta[name="cco-app-version"]');

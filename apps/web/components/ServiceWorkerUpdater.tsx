@@ -6,16 +6,14 @@ import {
   APP_UPDATE_EVENT,
   checkAppVersion,
   isAppUpdateInProgress,
-  resumeAppUpdateUi,
+  isDeployPending,
 } from "@/lib/app-update";
 import { hideAppUpdateOverlay } from "@/lib/app-update-overlay";
 import { listenForAppUpdates } from "@/lib/service-worker-client";
 
 function syncUpdateUi() {
   void checkAppVersion().finally(() => {
-    if (isAppUpdateInProgress()) {
-      resumeAppUpdateUi();
-    } else {
+    if (!isAppUpdateInProgress() && !isDeployPending()) {
       hideAppUpdateOverlay();
     }
   });
@@ -24,13 +22,7 @@ function syncUpdateUi() {
 export function ServiceWorkerUpdater() {
   const pathname = usePathname();
 
-  useEffect(
-    () =>
-      listenForAppUpdates(async () => {
-        resumeAppUpdateUi();
-      }),
-    [],
-  );
+  useEffect(() => listenForAppUpdates(async () => {}), []);
 
   useEffect(() => {
     syncUpdateUi();

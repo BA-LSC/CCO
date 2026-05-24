@@ -154,6 +154,11 @@ export function clearDeployWait(): void {
   hideAppUpdateOverlay();
 }
 
+/** Clear stale overlay/flags when the running bundle already matches the server. */
+export function forceClearStaleUpdateState(): void {
+  clearDeployWait();
+}
+
 export function waitForOverlayPaint(ms = OVERLAY_MIN_MS): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
@@ -166,6 +171,13 @@ export function waitForOverlayPaint(ms = OVERLAY_MIN_MS): Promise<void> {
 
 export async function prepareAppUpdate(onUpdating?: () => Promise<void>): Promise<void> {
   if (typeof window === "undefined") return;
+  if (APP_BUILD_VERSION !== "dev") {
+    const { version: serverVersion } = await probeServerAppVersion();
+    if (serverVersion === APP_BUILD_VERSION) {
+      forceClearStaleUpdateState();
+      return;
+    }
+  }
   if (window.__ccoApplyingUpdate && !isDeployPending()) return;
   deployWaitActive = false;
   if (typeof window !== "undefined") window.__ccoDeployPending = false;
@@ -262,6 +274,13 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
+  if (serverVersion === clientVersion && clientVersion !== "dev") {
+    syncMetaBuildVersion(serverVersion);
+    forceClearStaleUpdateState();
+    clearReloadLoopGuard();
+    return false;
+  }
+
   // Deploy draining — only block clients that still need the new bundle.
   if (updating) {
     if (!unavailable && serverVersion && serverVersion !== clientVersion) {
@@ -271,13 +290,6 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     if (serverVersion && serverVersion === clientVersion) {
       clearDeployWait();
     }
-    return false;
-  }
-
-  if (serverVersion && serverVersion === clientVersion) {
-    syncMetaBuildVersion(serverVersion);
-    clearReloadLoopGuard();
-    if (isDeployPending()) clearDeployWait();
     return false;
   }
 
