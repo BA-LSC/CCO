@@ -66,8 +66,8 @@ Thumbs.db
 *.swo
 *~
 
-# Cursor (local hook state)
-.cursor/hooks/state/
+# Cursor (local IDE state)
+.cursor/
 AGENTS.md
 
 # Deploy / hosting
