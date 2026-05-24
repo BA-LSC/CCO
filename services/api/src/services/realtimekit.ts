@@ -96,7 +96,7 @@ export async function refreshRealtimeKitParticipantToken(params: {
   const refreshed = await realtimeKitAppRequest<{ token?: string } | undefined>(
     config,
     `/meetings/${params.meetingId}/participants/${params.participantId}/token`,
-    { method: "PUT" },
+    { method: "POST" },
   );
   if (!refreshed?.token) {
     throw new RealtimeKitError("Unexpected RealtimeKit participant token response");

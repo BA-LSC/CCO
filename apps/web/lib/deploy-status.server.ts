@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 
 const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
+export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 
 let redis: Redis | null = null;
 

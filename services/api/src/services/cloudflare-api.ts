@@ -30,6 +30,25 @@ function cloudflareErrorDetail(
   return errors?.map((e) => e.message).join("; ") ?? res.statusText;
 }
 
+async function readCloudflareJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new CloudflareApiError(
+      `Cloudflare API returned an empty response (${res.status})`,
+      res.status,
+    );
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    throw new CloudflareApiError(
+      `Cloudflare API returned a non-JSON response (${res.status})`,
+      res.status,
+    );
+  }
+}
+
 async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${CF_API}${path}`, {
     ...init,
@@ -40,7 +59,7 @@ async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit):
     },
   });
 
-  const json = (await res.json()) as CloudflareV4Result<T>;
+  const json = (await readCloudflareJson(res)) as CloudflareV4Result<T>;
   if (!res.ok || !json.success) {
     throw new CloudflareApiError(
       cloudflareErrorDetail(res, json.errors) || "Cloudflare API request failed",
@@ -65,7 +84,7 @@ export async function cfRealtimeKitRequest<T>(
     },
   });
 
-  const json = (await res.json()) as RealtimeKitResult<T>;
+  const json = (await readCloudflareJson(res)) as RealtimeKitResult<T>;
   if (!res.ok || !json.success) {
     throw new CloudflareApiError(
       cloudflareErrorDetail(res, json.errors) || "Cloudflare Realtime Kit request failed",

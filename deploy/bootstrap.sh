@@ -123,21 +123,17 @@ mark_deploy_draining() {
     echo "  Warning: could not set deploy draining flag in redis." >&2
     return 1
   fi
+  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" PUBLISH cco:deploy:signal updating >/dev/null 2>&1 || true
 }
 
 clear_deploy_draining() {
+  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" PUBLISH cco:deploy:signal ready >/dev/null 2>&1 || true
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
 }
 
 trap 'clear_deploy_draining || true' EXIT
 
 clear_deploy_draining
-
-echo "Signaling connected clients before build..."
-ensure_deploy_signal_services
-mark_deploy_draining || true
-echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
-sleep "$DEPLOY_DRAIN_WAIT_SEC"
 
 echo "Building CCO production images..."
 CCO_BUILD_ID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || date +%s)"
@@ -152,7 +148,13 @@ done < <(cco_resolve_build_services "${BUILD_ARGS[@]}")
 cco_compose_build files "${BUILD_SERVICES[@]}"
 
 echo ""
-echo "Build complete. Running database migrations..."
+echo "Build complete. Showing the update screen before migrations..."
+ensure_deploy_signal_services
+mark_deploy_draining || true
+echo "  Waiting ${DEPLOY_DRAIN_WAIT_SEC}s for clients to show the update screen..."
+sleep "$DEPLOY_DRAIN_WAIT_SEC"
+
+echo "Running database migrations..."
 cco_run_migrations files
 
 wait_for_service() {
