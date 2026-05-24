@@ -11,9 +11,17 @@ import { RtkMeeting } from "@cloudflare/realtimekit-react-ui";
 type Props = {
   authToken: string;
   onLeave: () => void;
+  /** When false, join immediately using the participant name from the auth token. */
+  showSetupScreen?: boolean;
 };
 
-function MeetingInner({ onLeave }: { onLeave: () => void }) {
+function MeetingInner({
+  onLeave,
+  showSetupScreen = false,
+}: {
+  onLeave: () => void;
+  showSetupScreen?: boolean;
+}) {
   const { meeting } = useRealtimeKitMeeting();
 
   useEffect(() => {
@@ -29,12 +37,12 @@ function MeetingInner({ onLeave }: { onLeave: () => void }) {
 
   return (
     <div className="call-overlay-meeting">
-      <RtkMeeting mode="fill" meeting={meeting} showSetupScreen={true} />
+      <RtkMeeting mode="fill" meeting={meeting} showSetupScreen={showSetupScreen} />
     </div>
   );
 }
 
-export function CallOverlay({ authToken, onLeave }: Props) {
+export function CallOverlay({ authToken, onLeave, showSetupScreen = false }: Props) {
   const [meeting, initMeeting] = useRealtimeKitClient();
 
   useEffect(() => {
@@ -49,7 +57,7 @@ export function CallOverlay({ authToken, onLeave }: Props) {
         </button>
       </div>
       <RealtimeKitProvider value={meeting}>
-        <MeetingInner onLeave={onLeave} />
+        <MeetingInner onLeave={onLeave} showSetupScreen={showSetupScreen} />
       </RealtimeKitProvider>
     </div>
   );
