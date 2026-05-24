@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PCO_WEBHOOK_SUBSCRIPTIONS } from "@cco/shared/pco-webhooks";
+import { secretMaskLines } from "@/lib/secret-field-mask";
 
 const PCO_WEBHOOKS_URL = "https://api.planningcenteronline.com/webhooks";
 
@@ -9,6 +10,7 @@ type WebhookSecretsFieldProps = {
   value: string;
   onChange: (value: string) => void;
   configured?: boolean;
+  secretCount?: number;
   placeholder?: string;
   helpText?: string;
 };
@@ -17,11 +19,12 @@ export function WebhookSecretsField({
   value,
   onChange,
   configured = false,
+  secretCount = 1,
   placeholder = "Paste one secret per line (same order as below)",
   helpText,
 }: WebhookSecretsFieldProps) {
   const [focused, setFocused] = useState(false);
-  const showConfigured = configured && value === "" && !focused;
+  const showMask = configured && value === "" && !focused;
 
   return (
     <div className="integrations-field">
@@ -51,14 +54,14 @@ export function WebhookSecretsField({
 
       <textarea
         className="integrations-input integrations-textarea"
-        value={value}
+        value={showMask ? secretMaskLines(secretCount) : value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         autoComplete="off"
         rows={4}
         spellCheck={false}
-        placeholder={showConfigured ? "Leave blank to keep current secrets" : placeholder}
+        placeholder={showMask ? undefined : placeholder}
       />
       {helpText ? <p className="integrations-field-hint">{helpText}</p> : null}
     </div>

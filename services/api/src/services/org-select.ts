@@ -19,6 +19,7 @@ export const configuredOrganizationColumns = {
   vapidPrivateKeyEnc: organizations.vapidPrivateKeyEnc,
   vapidSubject: organizations.vapidSubject,
   giphyApiKeyEnc: organizations.giphyApiKeyEnc,
+  pcoLastSyncedAt: organizations.pcoLastSyncedAt,
   createdAt: organizations.createdAt,
 };
 
@@ -40,5 +41,6 @@ export type ConfiguredOrganizationRow = {
   vapidPrivateKeyEnc: string | null;
   vapidSubject: string | null;
   giphyApiKeyEnc: string | null;
+  pcoLastSyncedAt: Date | null;
   createdAt: Date;
 };

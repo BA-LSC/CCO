@@ -10,11 +10,13 @@ import {
 import type { SessionPayload } from "../auth/session";
 import { resolvePcoAccessToken } from "../auth/resolve-pco-token";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { organizations, users } from "../db/schema";
 import { persistGroupSync, syncLeaderGroupRosters } from "./group-sync";
+import { invalidateOrgContextCache } from "./org-context-cache";
 import { syncLeaderTeamRosters, syncServiceTeamsFromPco } from "./service-teams";
 
 export type PcoDataSyncSuccess = {
+  syncedAt: Date;
   groups: {
     created: number;
     updated: number;
@@ -103,7 +105,15 @@ export async function syncPcoDataForUser(
       });
     }
 
+    const syncedAt = new Date();
+    await db
+      .update(organizations)
+      .set({ pcoLastSyncedAt: syncedAt })
+      .where(eq(organizations.id, session.organizationId));
+    invalidateOrgContextCache();
+
     return {
+      syncedAt,
       groups: {
         created: groupResult.created,
         updated: groupResult.updated,

@@ -33,6 +33,7 @@ export const organizations = pgTable("organizations", {
   realtimeKitPresetHost: text("realtime_kit_preset_host"),
   realtimeKitPresetMember: text("realtime_kit_preset_member"),
   realtimeKitPresetGuest: text("realtime_kit_preset_guest"),
+  pcoLastSyncedAt: timestamp("pco_last_synced_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

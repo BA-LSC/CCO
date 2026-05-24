@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LoadingState } from "@/components/PageStates";
@@ -17,6 +18,7 @@ type IntegrationsSettings = {
   webhookSecretCount: number;
   signInRedirectUri: string;
   webhookUrl: string;
+  pcoLastSyncedAt?: string | null;
   vapidKeysConfigured: boolean;
   vapidSubjectEmail: string;
   webPushConfigured: boolean;
@@ -35,6 +37,7 @@ type IntegrationsSettings = {
 
 type PcoSyncResult = {
   synced: boolean;
+  pcoLastSyncedAt?: string;
   groups: {
     created: number;
     updated: number;
@@ -63,20 +66,20 @@ function SecretInput({
   placeholder: string;
 }) {
   const [focused, setFocused] = useState(false);
-  const keepCurrent = configured && value === "" && !focused;
+  const showMask = configured && value === "" && !focused;
 
   return (
     <label className="integrations-field">
       <span className="integrations-field-label">{label}</span>
       <input
         className="integrations-input"
-        value={value}
+        value={showMask ? SECRET_MASK_LINE : value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         type="password"
         autoComplete="new-password"
-        placeholder={keepCurrent ? "Leave blank to keep current" : placeholder}
+        placeholder={showMask ? undefined : placeholder}
       />
     </label>
   );
@@ -156,6 +159,12 @@ function Feedback({ error, success }: { error?: string | null; success?: string 
       {error ?? success}
     </p>
   );
+}
+
+function formatPcoLastSynced(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function CloudflareSection({
@@ -403,6 +412,7 @@ export default function IntegrationsSettingsPage() {
   const [pcoSyncing, setPcoSyncing] = useState(false);
   const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
   const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
+  const [pcoLastSyncedAt, setPcoLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -414,6 +424,7 @@ export default function IntegrationsSettingsPage() {
 
         setName(settings.name);
         setClientId(settings.clientId);
+        setPcoLastSyncedAt(settings.pcoLastSyncedAt ?? null);
         setSignInRedirectUri(settings.signInRedirectUri);
         setWebhookUrl(settings.webhookUrl);
         setClientSecretConfigured(settings.clientSecretConfigured);
@@ -508,6 +519,7 @@ export default function IntegrationsSettingsPage() {
         method: "POST",
       });
       const { groups, teams } = result;
+      if (result.pcoLastSyncedAt) setPcoLastSyncedAt(result.pcoLastSyncedAt);
       setPcoSyncResult(
         `Synced ${groups.total} groups and ${teams.total} teams. Refreshed ${groups.rosterSync.groupsSynced} group rosters and ${teams.rosterSync.teamsSynced} team rosters.`,
       );
@@ -541,6 +553,13 @@ export default function IntegrationsSettingsPage() {
         <div className="integrations-section-head">
           <h2 id="pco-sync-heading">Planning Center sync</h2>
           <p>Refresh groups, teams, and rosters for your account.</p>
+          {pcoLastSyncedAt ? (
+            <p className="integrations-field-hint">
+              Last synced {formatPcoLastSynced(pcoLastSyncedAt)}
+            </p>
+          ) : (
+            <p className="integrations-field-hint">Not synced yet</p>
+          )}
         </div>
         <Feedback error={pcoSyncError} success={pcoSyncResult} />
         <button
@@ -640,6 +659,7 @@ export default function IntegrationsSettingsPage() {
             value={webhookSecret}
             onChange={setWebhookSecret}
             configured={webhookConfigured}
+            secretCount={webhookSecretCount}
             helpText="Saving replaces all stored webhook secrets."
           />
         </IntegrationsSection>

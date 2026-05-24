@@ -99,6 +99,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     webhookSecretCount: webhookSecrets.length,
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
+    pcoLastSyncedAt: refreshed.pcoLastSyncedAt?.toISOString() ?? null,
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
@@ -313,6 +314,7 @@ settingsRouter.post("/integrations/pco-sync", requireAuth, async (c) => {
 
   return c.json({
     synced: true,
+    pcoLastSyncedAt: result.syncedAt.toISOString(),
     groups: result.groups,
     teams: result.teams,
   });
