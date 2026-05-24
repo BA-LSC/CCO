@@ -8,6 +8,7 @@ import {
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
 import { RtkMeeting } from "@cloudflare/realtimekit-react-ui";
+import { isSoloCall } from "@/lib/call-solo";
 
 const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
 
@@ -17,10 +18,6 @@ type Props = {
   /** When false, join immediately using the participant name from the auth token. */
   showSetupScreen?: boolean;
 };
-
-function isSoloCall(meeting: NonNullable<ReturnType<typeof useRealtimeKitMeeting>["meeting"]>) {
-  return meeting.participants.count <= 1;
-}
 
 function useSoloCallBehavior(
   meeting: ReturnType<typeof useRealtimeKitMeeting>["meeting"],
@@ -39,7 +36,7 @@ function useSoloCallBehavior(
     };
 
     const onLeaveClick = (event: MouseEvent) => {
-      if (!isSoloCall(meeting)) return;
+      if (!isSoloCall(meeting.participants.count)) return;
       const hitLeaveButton = event.composedPath().some(
         (el) => el instanceof HTMLElement && el.tagName === "RTK-LEAVE-BUTTON",
       );
@@ -51,7 +48,9 @@ function useSoloCallBehavior(
 
     const onLeaveConfirmation = (event: Event) => {
       const detail = (event as CustomEvent<{ activeLeaveConfirmation?: boolean }>).detail;
-      if (detail?.activeLeaveConfirmation !== true || !isSoloCall(meeting)) return;
+      if (detail?.activeLeaveConfirmation !== true || !isSoloCall(meeting.participants.count)) {
+        return;
+      }
       event.stopImmediatePropagation();
       leaveImmediately();
     };
@@ -65,8 +64,9 @@ function useSoloCallBehavior(
   }, [meeting, overlayRef]);
 
   useEffect(() => {
-    if (!meeting || !roomJoined || participantCount > 1) return;
+    if (!meeting || !roomJoined || !isSoloCall(participantCount)) return;
     const timer = setTimeout(() => {
+      if (!isSoloCall(meeting.participants.count)) return;
       void meeting.leaveRoom();
     }, SOLO_CALL_AUTO_LEAVE_MS);
     return () => clearTimeout(timer);
