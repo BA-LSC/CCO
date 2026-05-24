@@ -975,9 +975,35 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-section-teams .sidebar-empty,
-.sidebar-section-teams .sidebar-list {
+.sidebar-section-teams .sidebar-list,
+.sidebar-section-teams .sidebar-team-groups {
   padding-left: 8px;
   padding-right: 8px;
+}
+
+.sidebar-team-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-team-service-block {
+  min-width: 0;
+}
+
+.sidebar-team-service-heading {
+  margin: 0;
+  padding: 2px 8px 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-muted);
+}
+
+.sidebar-section-teams .sidebar-team-service-block .sidebar-list {
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .sidebar-section-teams .sidebar-team-item {
@@ -1081,9 +1107,11 @@ html[data-theme="6"] .user-menu-dropdown {
   align-items: center;
 }
 
+.sidebar-dm-row > .avatar-with-presence,
 .sidebar-dm-row > .sidebar-dm-avatar {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 
 .sidebar-dm-row > .sidebar-dm-name {

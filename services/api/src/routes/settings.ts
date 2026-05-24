@@ -25,6 +25,7 @@ import {
 } from "../services/org-giphy";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
+import { syncPcoDataForUser } from "../services/pco-data-sync";
 
 type Env = { Variables: AuthVariables };
 
@@ -174,5 +175,29 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     ),
     ...vapidStatus,
     ...giphyStatus,
+  });
+});
+
+settingsRouter.post("/integrations/pco-sync", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  const session = c.get("session");
+  const result = await syncPcoDataForUser(session, c);
+  if ("status" in result) {
+    return c.json(
+      { error: result.error, needsReconnect: result.needsReconnect },
+      result.status as 401 | 403 | 500 | 502,
+    );
+  }
+
+  return c.json({
+    synced: true,
+    groups: result.groups,
+    teams: result.teams,
   });
 });

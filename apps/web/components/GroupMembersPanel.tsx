@@ -18,7 +18,6 @@ export function GroupMembersPanel({ groupId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
   const isLeader =
     detail?.membershipRole === "leader" || detail?.membershipRole === "admin";
@@ -39,19 +38,6 @@ export function GroupMembersPanel({ groupId }: Props) {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load members"))
       .finally(() => setLoading(false));
   }, [groupId]);
-
-  async function syncRoster() {
-    setSyncing(true);
-    setError(null);
-    try {
-      await apiFetch(`/api/v1/groups/${groupId}/roster/sync`, { method: "POST" });
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Roster sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  }
 
   async function removeFromGroup(userId: string, displayName: string) {
     if (!confirm(`Remove ${displayName} from this group in Planning Center?`)) return;
@@ -82,16 +68,6 @@ export function GroupMembersPanel({ groupId }: Props) {
           Everyone in {detail.group.name}. Channel access is managed separately in each channel&apos;s
           settings.
         </p>
-        {isLeader && (
-          <button
-            type="button"
-            className="link-btn"
-            disabled={syncing}
-            onClick={() => void syncRoster()}
-          >
-            {syncing ? "Refreshing…" : "Refresh from Planning Center"}
-          </button>
-        )}
       </div>
 
       {error && (

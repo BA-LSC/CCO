@@ -25,6 +25,22 @@ type IntegrationsSettings = {
   giphyApiKeyConfigured: boolean;
 };
 
+type PcoSyncResult = {
+  synced: boolean;
+  groups: {
+    created: number;
+    updated: number;
+    total: number;
+    rosterSync: { groupsSynced: number; upserted: number };
+  };
+  teams: {
+    created: number;
+    removed: number;
+    total: number;
+    rosterSync: { teamsSynced: number; upserted: number };
+  };
+};
+
 function MaskedSecretField({
   label,
   configured,
@@ -85,6 +101,9 @@ export default function IntegrationsSettingsPage() {
   const [webPushConfigured, setWebPushConfigured] = useState(false);
   const [giphyApiKey, setGiphyApiKey] = useState("");
   const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
+  const [pcoSyncing, setPcoSyncing] = useState(false);
+  const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
+  const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -172,6 +191,26 @@ export default function IntegrationsSettingsPage() {
     }
   }
 
+  async function handlePcoSync() {
+    setPcoSyncing(true);
+    setPcoSyncError(null);
+    setPcoSyncResult(null);
+
+    try {
+      const result = await apiFetch<PcoSyncResult>("/api/v1/settings/integrations/pco-sync", {
+        method: "POST",
+      });
+      const { groups, teams } = result;
+      setPcoSyncResult(
+        `Synced ${groups.total} groups (${groups.created} new, ${groups.updated} updated) and ${teams.total} teams. Refreshed ${groups.rosterSync.groupsSynced} group rosters and ${teams.rosterSync.teamsSynced} team rosters.`,
+      );
+    } catch (err) {
+      setPcoSyncError(err instanceof Error ? err.message : "Planning Center sync failed");
+    } finally {
+      setPcoSyncing(false);
+    }
+  }
+
   if (loading) return <LoadingState variant="page" label="Loading settings" />;
 
   return (
@@ -185,6 +224,35 @@ export default function IntegrationsSettingsPage() {
           Update Planning Center OAuth credentials, callback URL, and webhook configuration.
           Secret fields are stored encrypted and never shown after saving.
         </p>
+
+        <div className="settings-section">
+          <h2>Planning Center data sync</h2>
+          <p className="help-text">
+            Pull the latest groups, teams, and member rosters from Planning Center for your
+            account. Use this when webhooks are disabled or you need a full refresh across the
+            organization.
+          </p>
+          {pcoSyncError && (
+            <p className="help-text error-text" role="alert">
+              {pcoSyncError}
+            </p>
+          )}
+          {pcoSyncResult && (
+            <p className="help-text" role="status">
+              {pcoSyncResult}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pcoSyncing}
+              onClick={() => void handlePcoSync()}
+            >
+              {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
+            </button>
+          </div>
+        </div>
 
         <form className="setup-form" onSubmit={(e) => void handleSubmit(e)}>
           <label className="field">

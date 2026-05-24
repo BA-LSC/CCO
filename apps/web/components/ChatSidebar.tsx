@@ -22,6 +22,10 @@ import {
 } from "@/lib/api";
 import { subscribeUnreadChanged } from "@/lib/sidebar-events";
 import { fetchSetupStatus } from "@/lib/setup";
+import {
+  groupTeamsByServiceType,
+  shouldShowTeamServiceSections,
+} from "@/lib/service-team-sidebar";
 
 export function ChatSidebar() {
   const pathname = usePathname();
@@ -125,6 +129,35 @@ export function ChatSidebar() {
     () => dmPeople.filter((person) => !existingDmUserIds.has(person.id)),
     [dmPeople, existingDmUserIds],
   );
+
+  const teamGroups = useMemo(() => groupTeamsByServiceType(teams), [teams]);
+  const showTeamServiceSections = useMemo(
+    () => shouldShowTeamServiceSections(teamGroups),
+    [teamGroups],
+  );
+
+  function renderTeamItem(team: ServiceTeamSummary) {
+    return (
+      <Link
+        href={`/teams/${team.id}`}
+        className={`sidebar-item sidebar-team-item ${
+          activeTeamId === team.id ? "sidebar-item-active" : ""
+        }`}
+      >
+        <span className="sidebar-team-leader-slot" aria-hidden>
+          {team.role === "leader" && (
+            <span className="sidebar-team-leader-star" title="Team leader">
+              ★
+            </span>
+          )}
+        </span>
+        <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
+        {team.hasUnread && activeTeamId !== team.id && (
+          <span className="sidebar-unread-dot" aria-label="Unread messages" />
+        )}
+      </Link>
+    );
+  }
 
   usePresenceWatch(
     dms.map((dm) => dm.participant.id),
@@ -347,36 +380,23 @@ export function ChatSidebar() {
 
               {teams.length === 0 ? (
                 <p className="sidebar-empty">No teams yet.</p>
+              ) : showTeamServiceSections ? (
+                <div className="sidebar-team-groups">
+                  {teamGroups.map((group) => (
+                    <div key={group.serviceType} className="sidebar-team-service-block">
+                      <h3 className="sidebar-team-service-heading">{group.serviceType}</h3>
+                      <ul className="sidebar-list">
+                        {group.teams.map((team) => (
+                          <li key={team.id}>{renderTeamItem(team)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <ul className="sidebar-list">
                   {teams.map((team) => (
-                    <li key={team.id}>
-                      <Link
-                        href={`/teams/${team.id}`}
-                        className={`sidebar-item sidebar-team-item ${
-                          activeTeamId === team.id ? "sidebar-item-active" : ""
-                        }`}
-                      >
-                        <span className="sidebar-team-leader-slot" aria-hidden>
-                          {team.role === "leader" && (
-                            <span className="sidebar-team-leader-star" title="Team leader">
-                              ★
-                            </span>
-                          )}
-                        </span>
-                        <span className="sidebar-item-label sidebar-team-label">
-                          <span className="sidebar-team-name">{team.name}</span>
-                          {team.serviceTypeNames && team.serviceTypeNames.length > 0 && (
-                            <span className="sidebar-team-service-type">
-                              {team.serviceTypeNames.join(" · ")}
-                            </span>
-                          )}
-                        </span>
-                        {team.hasUnread && activeTeamId !== team.id && (
-                          <span className="sidebar-unread-dot" aria-label="Unread messages" />
-                        )}
-                      </Link>
-                    </li>
+                    <li key={team.id}>{renderTeamItem(team)}</li>
                   ))}
                 </ul>
               )}

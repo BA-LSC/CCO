@@ -259,6 +259,47 @@ export async function syncServiceTeamRoster(params: {
   return { upserted, removed };
 }
 
+/** Pull full PCO roster for service teams where the user is a leader. */
+export async function syncLeaderTeamRosters(params: {
+  organizationId: string;
+  userId: string;
+  accessToken: string;
+}): Promise<{ teamsSynced: number; upserted: number }> {
+  const leaderTeams = await db
+    .select({
+      teamId: serviceTeamMemberships.teamId,
+      pcoTeamId: serviceTeams.pcoTeamId,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(serviceTeams, eq(serviceTeams.id, serviceTeamMemberships.teamId))
+    .where(
+      and(
+        eq(serviceTeamMemberships.userId, params.userId),
+        inArray(serviceTeamMemberships.role, ["leader", "admin"]),
+      ),
+    );
+
+  let teamsSynced = 0;
+  let upserted = 0;
+
+  for (const team of leaderTeams) {
+    try {
+      const result = await syncServiceTeamRoster({
+        organizationId: params.organizationId,
+        teamId: team.teamId,
+        pcoTeamId: team.pcoTeamId,
+        accessToken: params.accessToken,
+      });
+      teamsSynced += 1;
+      upserted += result.upserted;
+    } catch (err) {
+      console.warn(`Roster sync failed for team ${team.teamId}:`, err);
+    }
+  }
+
+  return { teamsSynced, upserted };
+}
+
 /** Refresh roster when a team leader opens team settings (best-effort). */
 export async function trySyncServiceTeamRosterForLeader(params: {
   organizationId: string;

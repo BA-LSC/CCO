@@ -38,7 +38,6 @@ export default function TeamChatPage() {
   const [detailLoading, setDetailLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
-  const [syncingRoster, setSyncingRoster] = useState(false);
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
   const {
@@ -84,20 +83,6 @@ export default function TeamChatPage() {
       ...detail,
       conversation: { ...detail.conversation, muted },
     });
-  }
-
-  async function syncRoster() {
-    setSyncingRoster(true);
-    setError(null);
-    try {
-      await apiFetch(`/api/v1/services/teams/${teamId}/roster/sync`, { method: "POST" });
-      await reloadDetail({ sync: true });
-      dispatchSidebarReload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Roster sync failed");
-    } finally {
-      setSyncingRoster(false);
-    }
   }
 
   async function removeFromTeam(userId: string, displayName: string) {
@@ -213,18 +198,6 @@ export default function TeamChatPage() {
             removingMemberId={removingMemberId}
             onInvite={isLeader ? inviteMember : undefined}
             onRemove={isLeader ? removeFromTeam : undefined}
-            headerAction={
-              isLeader ? (
-                <button
-                  type="button"
-                  className="link-btn"
-                  disabled={syncingRoster}
-                  onClick={() => void syncRoster()}
-                >
-                  {syncingRoster ? "Refreshing…" : "Refresh from Planning Center"}
-                </button>
-              ) : undefined
-            }
           />
         </ChannelSettingsPanel>
       )}
