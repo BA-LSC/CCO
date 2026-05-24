@@ -4,14 +4,36 @@ import { useEffect, useState, type ReactNode } from "react";
 
 const EXIT_MS = 320;
 
+export type ChatHomeBannerVariant = "success" | "error" | "neutral";
+export type ChatHomeBannerPlacement = "default" | "fixed" | "panel";
+
 type Props = {
-  variant: "success" | "error";
+  variant: ChatHomeBannerVariant;
   children: ReactNode;
   /** Auto-dismiss after this many ms; omit to keep visible */
   autoDismissMs?: number;
+  actions?: ReactNode;
+  placement?: ChatHomeBannerPlacement;
 };
 
-export function ChatHomeBanner({ variant, children, autoDismissMs }: Props) {
+function wrapClassName(placement: ChatHomeBannerPlacement): string {
+  switch (placement) {
+    case "fixed":
+      return "chat-home-banner-wrap chat-home-banner-wrap--fixed";
+    case "panel":
+      return "chat-home-banner-wrap chat-home-banner-wrap--panel";
+    case "default":
+      return "chat-home-banner-wrap";
+  }
+}
+
+export function ChatHomeBanner({
+  variant,
+  children,
+  autoDismissMs,
+  actions,
+  placement = "default",
+}: Props) {
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
 
@@ -30,19 +52,23 @@ export function ChatHomeBanner({ variant, children, autoDismissMs }: Props) {
 
   if (!visible) return null;
 
+  const role = variant === "error" || actions ? "alert" : "status";
+
   return (
-    <div className="chat-home-banner-wrap">
+    <div className={wrapClassName(placement)}>
       <div
         className={[
           "chat-home-banner",
           variant,
+          actions ? "chat-home-banner--with-actions" : "",
           exiting ? "chat-home-banner--exit" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        role={variant === "error" ? "alert" : "status"}
+        role={role}
       >
-        {children}
+        <div className="chat-home-banner-body">{children}</div>
+        {actions ? <div className="chat-home-banner-actions">{actions}</div> : null}
       </div>
     </div>
   );

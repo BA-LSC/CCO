@@ -8,6 +8,7 @@ import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
 import { CallOverlay } from "@/components/calls/CallOverlay";
+import { ChatHomeBanner } from "@/components/ChatHomeBanner";
 
 type Props = {
   conversationId: string;
@@ -113,9 +114,9 @@ export function ConversationCallKit({ conversationId }: Props) {
       ) : null}
 
       {error ? (
-        <div className="alert alert-error call-error" role="alert">
+        <ChatHomeBanner variant="error" placement="panel">
           {error}
-        </div>
+        </ChatHomeBanner>
       ) : null}
 
       {inCall && authToken ? <CallOverlay authToken={authToken} onLeave={handleLeave} /> : null}

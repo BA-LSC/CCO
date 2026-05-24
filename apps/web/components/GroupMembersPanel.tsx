@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChatHomeBanner } from "@/components/ChatHomeBanner";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { usePresenceWatch } from "@/components/PresenceProvider";
@@ -71,9 +72,9 @@ export function GroupMembersPanel({ groupId }: Props) {
       </div>
 
       {error && (
-        <div className="alert alert-error" role="alert">
+        <ChatHomeBanner variant="error" placement="panel">
           {error}
-        </div>
+        </ChatHomeBanner>
       )}
 
       <ul className="group-members-list">

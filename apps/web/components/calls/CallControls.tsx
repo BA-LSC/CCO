@@ -1,6 +1,7 @@
 "use client";
 
 import type { CallSummaryDto } from "@cco/shared/calls";
+import { ChatHomeBanner } from "@/components/ChatHomeBanner";
 import { PanelHeaderPhoneIcon } from "@/components/PanelHeaderIcons";
 
 type CallIconState = "idle" | "waiting" | "joinable" | "in-call";
@@ -64,16 +65,29 @@ export function IncomingCallToast({
   onDismiss: () => void;
 }) {
   return (
-    <div className="incoming-call-toast" role="alert">
-      <p>{hostName} started a call</p>
-      <div className="incoming-call-toast-actions">
-        <button type="button" className="btn btn-primary btn-sm" onClick={onJoin}>
-          Join
-        </button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onDismiss}>
-          Dismiss
-        </button>
-      </div>
-    </div>
+    <ChatHomeBanner
+      variant="neutral"
+      placement="fixed"
+      actions={
+        <>
+          <button
+            type="button"
+            className="chat-home-banner-btn chat-home-banner-btn--answer"
+            onClick={onJoin}
+          >
+            Answer
+          </button>
+          <button
+            type="button"
+            className="chat-home-banner-btn chat-home-banner-btn--decline"
+            onClick={onDismiss}
+          >
+            Decline
+          </button>
+        </>
+      }
+    >
+      {hostName} started a call
+    </ChatHomeBanner>
   );
 }
