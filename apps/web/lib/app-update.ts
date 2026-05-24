@@ -1,4 +1,4 @@
-import { APP_BUILD_VERSION, getClientBuildVersion } from "@/lib/build-version";
+import { APP_BUILD_VERSION, getClientBuildVersion, syncMetaBuildVersion } from "@/lib/build-version";
 import { waitForSendIdle } from "@/lib/app-update-composer";
 import { hideAppUpdateOverlay, showAppUpdateOverlay } from "@/lib/app-update-overlay";
 
@@ -275,6 +275,7 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
   }
 
   if (serverVersion && serverVersion === clientVersion) {
+    syncMetaBuildVersion(serverVersion);
     clearReloadLoopGuard();
     if (isDeployPending()) clearDeployWait();
     return false;

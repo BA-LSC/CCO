@@ -1,62 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
+  APP_UPDATE_EVENT,
   checkAppVersion,
   isAppUpdateInProgress,
   resumeAppUpdateUi,
 } from "@/lib/app-update";
-import { showAppUpdateOverlay, hideAppUpdateOverlay } from "@/lib/app-update-overlay";
+import { hideAppUpdateOverlay } from "@/lib/app-update-overlay";
 import { listenForAppUpdates } from "@/lib/service-worker-client";
 
+function syncUpdateUi() {
+  void checkAppVersion().finally(() => {
+    if (isAppUpdateInProgress()) {
+      resumeAppUpdateUi();
+    } else {
+      hideAppUpdateOverlay();
+    }
+  });
+}
+
 export function ServiceWorkerUpdater() {
-  const [updating, setUpdating] = useState(() => isAppUpdateInProgress());
+  const pathname = usePathname();
 
   useEffect(
     () =>
       listenForAppUpdates(async () => {
-        flushSync(() => setUpdating(true));
+        resumeAppUpdateUi();
       }),
     [],
   );
 
   useEffect(() => {
-    if (!updating && !isAppUpdateInProgress()) return;
-    showAppUpdateOverlay();
-  }, [updating]);
-
-  useEffect(() => {
-    const resume = () => {
-      if (document.visibilityState === "hidden") return;
-      void checkAppVersion().finally(() => {
-        if (isAppUpdateInProgress()) {
-          resumeAppUpdateUi();
-        } else {
-          hideAppUpdateOverlay();
-        }
-      });
-    };
+    syncUpdateUi();
 
     const onFocus = () => {
-      void checkAppVersion().finally(() => {
-        if (isAppUpdateInProgress()) {
-          resumeAppUpdateUi();
-        } else {
-          hideAppUpdateOverlay();
-        }
-      });
+      if (document.visibilityState === "hidden") return;
+      syncUpdateUi();
     };
 
-    document.addEventListener("visibilitychange", resume);
-    window.addEventListener("pageshow", onFocus);
-    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("pageshow", syncUpdateUi);
+    window.addEventListener("focus", syncUpdateUi);
+    window.addEventListener(APP_UPDATE_EVENT, syncUpdateUi);
     return () => {
-      document.removeEventListener("visibilitychange", resume);
-      window.removeEventListener("pageshow", onFocus);
-      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("pageshow", syncUpdateUi);
+      window.removeEventListener("focus", syncUpdateUi);
+      window.removeEventListener(APP_UPDATE_EVENT, syncUpdateUi);
     };
-  }, []);
+  }, [pathname]);
 
   return null;
 }

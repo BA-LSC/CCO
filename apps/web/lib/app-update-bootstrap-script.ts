@@ -13,6 +13,7 @@ export function appUpdateBootstrapScript(clientVersion: string): string {
 
   return `(function(){try{
 var CLIENT=${versionLiteral};
+window.__ccoAppVersion=CLIENT;
 var STYLE=${styleLiteral};
 var INNER=${innerHtmlLiteral};
 var applying=false;
@@ -30,11 +31,21 @@ var SEND_WAIT_MS=8000;
 var DEPLOY_SEND_WAIT_MS=500;
 function getClientVersion(){
   try{
+    var runtime=window.__ccoAppVersion;
+    if(runtime&&String(runtime).trim())return String(runtime).trim();
     var meta=document.querySelector('meta[name="cco-app-version"]');
     var content=meta&&meta.getAttribute("content");
     if(content&&content.trim())return content.trim();
   }catch(e){}
   return CLIENT;
+}
+function syncMetaVersion(version){
+  try{
+    if(!version)return;
+    window.__ccoAppVersion=version;
+    var meta=document.querySelector('meta[name="cco-app-version"]');
+    if(meta)meta.setAttribute("content",version);
+  }catch(e){}
 }
 function ensureStyle(){
   if(document.getElementById(STYLE_ID))return;
@@ -158,11 +169,15 @@ function handleVersionPayload(d){
     }else if(deployPending){
       clearDeployPending();
       applying=false;
+      syncMetaVersion(d.version);
+    }else{
+      syncMetaVersion(d.version);
     }
     return;
   }
   if(deployPending){
     if(!needsReload){
+      syncMetaVersion(d.version);
       clearDeployPending();
       applying=false;
       return;
@@ -174,6 +189,7 @@ function handleVersionPayload(d){
     applyUpdate(false);
     return;
   }
+  syncMetaVersion(d.version);
   clearDeployPending();
   applying=false;
 }
