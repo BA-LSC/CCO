@@ -1,4 +1,5 @@
 import app from "./app";
+import { ensureExtendedOrganizationSchema } from "./services/org-schema-capabilities";
 import {
   handleWebSocketClose,
   handleWebSocketOpen,
@@ -38,6 +39,10 @@ const server = Bun.serve({
       handleWebSocketClose(ws);
     },
   },
+});
+
+void ensureExtendedOrganizationSchema().catch((err) => {
+  console.error("Extended organization schema ensure failed:", err);
 });
 
 console.log(`CCO API listening on http://localhost:${port}`);

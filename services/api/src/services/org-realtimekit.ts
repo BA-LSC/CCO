@@ -11,19 +11,8 @@ import {
   provisionRealtimeKitFromApiToken,
   resolveCloudflareAccountId,
 } from "./cloudflare-realtimekit-provision";
-import {
-  isMissingOrgMigrationColumnsError,
-  ORG_MIGRATIONS_0021_0023_MESSAGE,
-} from "./org-db-migrations";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
-import { hasExtendedOrganizationColumns } from "./org-schema-capabilities";
-
-function rethrowCloudflareSaveError(err: unknown): never {
-  if (isMissingOrgMigrationColumnsError(err)) {
-    throw new Error(ORG_MIGRATIONS_0021_0023_MESSAGE);
-  }
-  throw err;
-}
+import { ensureExtendedOrganizationSchema } from "./org-schema-capabilities";
 
 export type RealtimeKitConfig = {
   accountId: string;
@@ -106,21 +95,15 @@ export async function saveOrganizationCloudflareApiToken(params: {
   const accounts = await listCloudflareAccounts(apiToken);
   const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
 
-  if (!(await hasExtendedOrganizationColumns())) {
-    throw new Error(ORG_MIGRATIONS_0021_0023_MESSAGE);
-  }
+  await ensureExtendedOrganizationSchema();
 
-  try {
-    await db
-      .update(organizations)
-      .set({
-        cloudflareApiTokenEnc: encryptSecret(apiToken),
-        cloudflareAccountId: accountId,
-      })
-      .where(eq(organizations.id, params.organizationId));
-  } catch (err) {
-    rethrowCloudflareSaveError(err);
-  }
+  await db
+    .update(organizations)
+    .set({
+      cloudflareApiTokenEnc: encryptSecret(apiToken),
+      cloudflareAccountId: accountId,
+    })
+    .where(eq(organizations.id, params.organizationId));
 
   return { accountId };
 }
@@ -146,21 +129,18 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
     autoCreateApp: params.autoCreateApp ?? true,
   });
 
-  try {
-    await db
-      .update(organizations)
-      .set({
-        cloudflareAccountId: provisioned.accountId,
-        realtimeKitAppId: provisioned.appId,
-        cloudflareApiTokenEnc: encryptSecret(apiToken),
-        realtimeKitPresetHost: provisioned.presets?.host ?? null,
-        realtimeKitPresetMember: provisioned.presets?.member ?? null,
-        realtimeKitPresetGuest: provisioned.presets?.guest ?? null,
-      })
-      .where(eq(organizations.id, params.organizationId));
-  } catch (err) {
-    rethrowCloudflareSaveError(err);
-  }
+  await ensureExtendedOrganizationSchema();
+  await db
+    .update(organizations)
+    .set({
+      cloudflareAccountId: provisioned.accountId,
+      realtimeKitAppId: provisioned.appId,
+      cloudflareApiTokenEnc: encryptSecret(apiToken),
+      realtimeKitPresetHost: provisioned.presets?.host ?? null,
+      realtimeKitPresetMember: provisioned.presets?.member ?? null,
+      realtimeKitPresetGuest: provisioned.presets?.guest ?? null,
+    })
+    .where(eq(organizations.id, params.organizationId));
 
   return {
     createdApp: provisioned.createdApp,
@@ -173,6 +153,7 @@ export { provisionRealtimeKitFromApiToken } from "./cloudflare-realtimekit-provi
 
 /** Disable RealtimeKit calls while keeping the Cloudflare API token for other features. */
 export async function disableOrganizationRealtimeKitCalls(organizationId: string): Promise<void> {
+  await ensureExtendedOrganizationSchema();
   await db
     .update(organizations)
     .set({
