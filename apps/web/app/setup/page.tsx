@@ -312,7 +312,6 @@ export default function SetupPage() {
                     value={webhookSecret}
                     onChange={setWebhookSecret}
                     configured={webhookSecretCount > 0}
-                    configuredCount={webhookSecretCount}
                     placeholder={
                       webhookSecretCount > 0
                         ? `${webhookSecretCount} secret(s) saved — paste new lines to replace all`
