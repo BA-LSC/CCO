@@ -79,6 +79,7 @@ export async function sendWebPushNotifications(
     body: string;
     url: string;
     conversationId: string;
+    icon?: string | null;
     image?: string | null;
   },
 ): Promise<void> {
@@ -92,6 +93,7 @@ export async function sendWebPushNotifications(
     body: payload.body,
     url: payload.url,
     conversationId: payload.conversationId,
+    ...(payload.icon ? { icon: payload.icon } : {}),
     ...(payload.image ? { image: payload.image } : {}),
   });
 

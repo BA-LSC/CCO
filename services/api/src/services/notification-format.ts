@@ -2,6 +2,7 @@ import { fetchPersonAvatarUrl, PlanningCenterClient } from "@cco/pco-client";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
+import { renderMentionBody } from "../lib/mentions";
 import type { MessageDto } from "./messages";
 import { getOrgPcoAccessToken } from "./org-config";
 import { getConfiguredOrganization } from "./org-oauth";
@@ -61,6 +62,14 @@ export function resolveNotificationImageUrl(url: string | null | undefined): str
   const trimmed = url.trim();
   if (trimmed.startsWith("https://")) return trimmed;
   if (trimmed.startsWith("http://")) return trimmed;
+  if (trimmed.startsWith("/")) {
+    const base = process.env.WEB_URL ?? "http://localhost:3000";
+    try {
+      return new URL(trimmed, base).href;
+    } catch {
+      return null;
+    }
+  }
   return null;
 }
 
@@ -103,17 +112,18 @@ export async function resolveAuthorAvatarForNotification(authorId: string): Prom
 }
 
 function messagePreview(message: MessageDto): string {
+  const body = renderMentionBody(message.body.trim());
   if (message.attachmentUrl) {
-    return message.body.trim() || "Sent an image";
+    return body || "Sent an image";
   }
-  return message.body.trim();
+  return body;
 }
 
 export async function buildMessageNotificationContent(params: {
   message: MessageDto;
   meta: ConversationNotificationMeta;
   mention?: boolean;
-}): Promise<{ title: string; body: string; image: string | null }> {
+}): Promise<{ title: string; body: string; icon: string | null; image: string | null }> {
   const preview = messagePreview(params.message);
   const title =
     params.meta.kind === "dm" ? params.message.authorName.trim() || "Message" : params.meta.title;
@@ -129,13 +139,19 @@ export async function buildMessageNotificationContent(params: {
       : `${params.message.authorName} sent a message`;
   }
 
-  const image =
+  const authorIcon =
     resolveNotificationImageUrl(params.message.authorAvatarUrl) ??
     (await resolveAuthorAvatarForNotification(params.message.authorId));
+
+  const attachmentImage =
+    params.message.attachmentUrl && params.message.messageType === "image"
+      ? resolveNotificationImageUrl(params.message.attachmentUrl)
+      : null;
 
   return {
     title,
     body: formatNotificationBody(bodyText),
-    image,
+    icon: authorIcon,
+    image: attachmentImage,
   };
 }

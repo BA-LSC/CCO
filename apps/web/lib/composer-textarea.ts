@@ -1,6 +1,8 @@
+type ComposerFieldElement = HTMLTextAreaElement | HTMLElement;
+
 /** Grow/shrink the chat composer to fit content, capped at max lines (then scroll). */
 export function syncComposerTextareaHeight(
-  textarea: HTMLTextAreaElement | null,
+  textarea: ComposerFieldElement | null,
   maxLines = 3,
 ): void {
   if (!textarea) return;

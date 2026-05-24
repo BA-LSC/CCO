@@ -3953,7 +3953,8 @@ html[data-theme="6"] .user-menu-dropdown {
   min-width: 0;
 }
 
-.chat-thread .composer textarea {
+.chat-thread .composer textarea,
+.chat-thread .composer .composer-mention-input {
   flex: 1;
   min-width: 0;
   min-height: var(--composer-control-height);
@@ -3979,6 +3980,22 @@ html[data-theme="6"] .user-menu-dropdown {
     background 0.15s,
     border-color 0.15s,
     color 0.15s;
+}
+
+.chat-thread .composer .composer-mention-input {
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+
+.chat-thread .composer .composer-mention-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.chat-thread .composer .composer-mention-input .composer-mention-chip {
+  display: inline;
 }
 
 .chat-thread .composer-attach {
@@ -4225,7 +4242,8 @@ html[data-theme="6"] .user-menu-dropdown {
   cursor: not-allowed;
 }
 
-.chat-thread .composer.composer--readonly textarea {
+.chat-thread .composer.composer--readonly textarea,
+.chat-thread .composer.composer--readonly .composer-mention-input {
   background: var(--color-surface-2);
   color: var(--color-muted);
   cursor: not-allowed;
@@ -5375,7 +5393,8 @@ html.standalone-display .chat-thread-panel {
   cursor: not-allowed;
 }
 
-.chat-thread-panel .composer.composer--readonly textarea {
+.chat-thread-panel .composer.composer--readonly textarea,
+.chat-thread-panel .composer.composer--readonly .composer-mention-input {
   background: var(--color-surface-2);
   color: var(--color-muted);
   cursor: not-allowed;

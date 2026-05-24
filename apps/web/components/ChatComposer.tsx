@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { syncComposerTextareaHeight } from "@/lib/composer-textarea";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ComposerAttachMenu } from "@/components/ComposerAttachMenu";
 import { ComposerGiphyPicker } from "@/components/ComposerGiphyPicker";
 import { ComposerPendingMedia } from "@/components/ComposerPendingMedia";
-import { formatMention, fetchGiphyEnabled } from "@/lib/api";
+import {
+  ComposerMentionInput,
+  type ComposerMentionInputHandle,
+} from "@/components/ComposerMentionInput";
+import { fetchGiphyEnabled } from "@/lib/api";
 import { isAppUpdateInProgress } from "@/lib/app-update";
 import {
   clearComposerDraft,
@@ -23,18 +26,6 @@ import {
 } from "@/lib/composer-media";
 
 type Member = { id?: string; displayName: string; onCco?: boolean };
-
-function getActiveMentionQuery(value: string): string | null {
-  for (let i = value.length - 1; i >= 0; i -= 1) {
-    if (value[i] !== "@") continue;
-    const segment = value.slice(i);
-    if (segment.includes(" ")) return null;
-    const query = segment.slice(1);
-    if (query.startsWith("[")) return null;
-    return query.toLowerCase();
-  }
-  return null;
-}
 
 function memberCanMention(member: Member): boolean {
   return Boolean(member.id && member.onCco !== false);
@@ -85,7 +76,7 @@ export function ChatComposer({
   const sendInFlightRef = useRef(false);
   const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const composerRef = useRef<ComposerMentionInputHandle>(null);
 
   const composerReadOnly = !canPost;
   const composerInputLocked = composerLocked || composerReadOnly;
@@ -121,11 +112,6 @@ export function ChatComposer({
     composerRef.current?.blur();
   }, [canPost]);
 
-  useLayoutEffect(() => {
-    syncComposerTextareaHeight(composerRef.current);
-    onComposerLayout?.();
-  }, [body, composerLocked, conversationId, onComposerLayout]);
-
   const resetComposerDragState = useCallback(() => {
     composerDragDepthRef.current = 0;
     setComposerDragOver(false);
@@ -133,9 +119,7 @@ export function ChatComposer({
 
   const focusComposer = useCallback(() => {
     requestAnimationFrame(() => {
-      const el = composerRef.current;
-      el?.focus();
-      syncComposerTextareaHeight(el);
+      composerRef.current?.focus();
     });
   }, []);
 
@@ -177,20 +161,11 @@ export function ChatComposer({
     onMountStageMedia?.(stageComposerMedia);
   }, [onMountStageMedia, stageComposerMedia]);
 
-  const insertMention = useCallback(
-    (member: Member) => {
-      if (!memberCanMention(member) || !member.id) return;
-      const token = formatMention(member.displayName, member.id);
-      setBody((prev) => {
-        const at = prev.lastIndexOf("@");
-        if (at >= 0) return `${prev.slice(0, at)}${token} `;
-        return `${prev}${token} `;
-      });
-      setMentionQuery(null);
-      composerRef.current?.focus();
-    },
-    [],
-  );
+  const insertMention = useCallback((member: Member) => {
+    if (!memberCanMention(member) || !member.id) return;
+    composerRef.current?.insertMention(member.displayName, member.id);
+    setMentionQuery(null);
+  }, []);
 
   const handleSend = useCallback(
     async (e?: React.FormEvent) => {
@@ -249,7 +224,6 @@ export function ChatComposer({
     (value: string) => {
       if (!canPost) return;
       setBody(value);
-      setMentionQuery(getActiveMentionQuery(value));
     },
     [canPost],
   );
@@ -264,7 +238,7 @@ export function ChatComposer({
         );
 
   const handleComposerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Escape") {
         if (mentionQuery !== null) {
           e.preventDefault();
@@ -378,21 +352,21 @@ export function ChatComposer({
           onPickMedia={() => fileRef.current?.click()}
           onPickGiphy={() => setGiphyOpen(true)}
         />
-        <textarea
+        <ComposerMentionInput
           ref={composerRef}
           value={body}
-          onChange={(e) => handleBodyChange(e.target.value)}
+          onChange={handleBodyChange}
+          onMentionQueryChange={setMentionQuery}
           onKeyDown={handleComposerKeyDown}
           placeholder={
             composerReadOnly
               ? (readOnlyReason ?? "You cannot post in this conversation.")
               : composerPlaceholder
           }
-          enterKeyHint="send"
           disabled={composerInputLocked}
           readOnly={composerReadOnly}
-          rows={1}
           aria-label="Message"
+          onLayout={onComposerLayout}
         />
         <button
           type="submit"

@@ -33,6 +33,7 @@ function readPushPayload(event) {
     body: "New message",
     url: "/",
     conversationId: "",
+    icon: "",
     image: "",
   };
   if (!event.data) return defaults;
@@ -54,14 +55,16 @@ function readPushPayload(event) {
 self.addEventListener("push", (event) => {
   const payload = readPushPayload(event);
   const appIcon = new URL("/icons/icon-192.png", self.location.origin).href;
+  const iconUrl = resolveNotificationAssetUrl(payload.icon) || appIcon;
   const imageUrl = resolveNotificationAssetUrl(payload.image);
 
   const notificationOptions = {
     body: payload.body,
-    icon: appIcon,
+    icon: iconUrl,
     badge: appIcon,
     tag: payload.conversationId ? "cco-" + payload.conversationId : "cco-message",
     renotify: true,
+    timestamp: Date.now(),
     data: { url: payload.url, conversationId: payload.conversationId },
   };
   if (imageUrl) {

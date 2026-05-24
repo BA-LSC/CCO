@@ -123,6 +123,7 @@ async function notifyUsersOfMessage(params: {
   url: string;
   title: string;
   body: string;
+  icon?: string | null;
   image?: string | null;
 }): Promise<void> {
   if (params.userIds.length === 0) return;
@@ -137,6 +138,7 @@ async function notifyUsersOfMessage(params: {
     body: params.body,
     url: appendNotificationAnchorToUrl(params.url),
     conversationId: params.conversationId,
+    icon: params.icon ?? null,
     image: params.image ?? null,
   };
 
