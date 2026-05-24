@@ -2125,6 +2125,11 @@ html[data-theme="6"] .user-menu-dropdown {
   color: var(--color-text);
 }
 
+.chat-sidebar-toggle .panel-header-icon {
+  width: 32px;
+  height: 32px;
+}
+
 .chat-panel {
   flex: 1;
   min-height: 0;
