@@ -3,7 +3,14 @@ import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../auth/token-crypto";
 import { getConfiguredOrganization } from "./org-oauth";
-import { provisionRealtimeKitFromApiToken } from "./cloudflare-realtimekit-provision";
+import {
+  listCloudflareAccounts,
+  verifyCloudflareApiToken,
+} from "./cloudflare-api";
+import {
+  provisionRealtimeKitFromApiToken,
+  resolveCloudflareAccountId,
+} from "./cloudflare-realtimekit-provision";
 
 export type RealtimeKitConfig = {
   accountId: string;
@@ -44,6 +51,57 @@ export function getPresetNames(org?: typeof organizations.$inferSelect | null) {
       process.env.REALTIMEKIT_PRESET_GUEST?.trim() ||
       "guest",
   };
+}
+
+/** Shared Cloudflare API token for RealtimeKit and future Cloudflare integrations. */
+export async function resolveCloudflareApiToken(): Promise<{
+  apiToken: string;
+  accountId: string;
+} | null> {
+  const org = await getConfiguredOrganization();
+  if (org?.cloudflareApiTokenEnc) {
+    return {
+      apiToken: decryptSecret(org.cloudflareApiTokenEnc),
+      accountId: org.cloudflareAccountId ?? "",
+    };
+  }
+
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (!apiToken) return null;
+
+  return {
+    apiToken,
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? "",
+  };
+}
+
+export async function saveOrganizationCloudflareApiToken(params: {
+  organizationId: string;
+  apiToken: string;
+  existingAccountId?: string;
+}): Promise<{ accountId: string }> {
+  const apiToken = params.apiToken.trim();
+  if (!apiToken) {
+    throw new Error("Cloudflare API token is required");
+  }
+
+  const verified = await verifyCloudflareApiToken(apiToken);
+  if (verified.status !== "active") {
+    throw new Error("Cloudflare API token is not active");
+  }
+
+  const accounts = await listCloudflareAccounts(apiToken);
+  const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
+
+  await db
+    .update(organizations)
+    .set({
+      cloudflareApiTokenEnc: encryptSecret(apiToken),
+      cloudflareAccountId: accountId,
+    })
+    .where(eq(organizations.id, params.organizationId));
+
+  return { accountId };
 }
 
 export async function updateOrganizationRealtimeKitFromToken(params: {
@@ -88,13 +146,12 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
 /** Re-export for future first-time setup flow. */
 export { provisionRealtimeKitFromApiToken } from "./cloudflare-realtimekit-provision";
 
-export async function clearOrganizationRealtimeKitConfig(organizationId: string): Promise<void> {
+/** Disable RealtimeKit calls while keeping the Cloudflare API token for other features. */
+export async function disableOrganizationRealtimeKitCalls(organizationId: string): Promise<void> {
   await db
     .update(organizations)
     .set({
-      cloudflareAccountId: null,
       realtimeKitAppId: null,
-      cloudflareApiTokenEnc: null,
       realtimeKitPresetHost: null,
       realtimeKitPresetMember: null,
       realtimeKitPresetGuest: null,
@@ -143,25 +200,27 @@ export async function enableOrganizationRealtimeKit(params: {
     return { ...result, reconfigured: true };
   }
 
-  throw new Error("Cloudflare API token is required to enable calls");
+  throw new Error("Save a Cloudflare API token before enabling calls");
 }
 
 export function getOrganizationRealtimeKitStatus(org: typeof organizations.$inferSelect) {
   const presets = getPresetNames(org);
-  const fromDb = Boolean(
-    org.cloudflareAccountId && org.realtimeKitAppId && org.cloudflareApiTokenEnc,
-  );
+  const tokenFromDb = Boolean(org.cloudflareApiTokenEnc);
+  const callsFromDb = Boolean(org.realtimeKitAppId && org.cloudflareApiTokenEnc);
   const fromEnv = Boolean(
     process.env.CLOUDFLARE_ACCOUNT_ID?.trim() &&
       process.env.REALTIMEKIT_APP_ID?.trim() &&
       process.env.CLOUDFLARE_API_TOKEN?.trim(),
   );
+  const tokenFromEnv = Boolean(process.env.CLOUDFLARE_API_TOKEN?.trim());
   return {
-    realtimeKitConfigured: fromDb || fromEnv,
-    realtimeKitFromEnv: fromEnv && !fromDb,
+    realtimeKitConfigured: callsFromDb || fromEnv,
+    realtimeKitFromEnv: fromEnv && !callsFromDb,
     realtimeKitAccountId: org.cloudflareAccountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
     realtimeKitAppId: org.realtimeKitAppId ?? process.env.REALTIMEKIT_APP_ID ?? "",
-    realtimeKitTokenConfigured: fromDb || Boolean(process.env.CLOUDFLARE_API_TOKEN?.trim()),
+    cloudflareApiTokenConfigured: tokenFromDb || tokenFromEnv,
+    /** @deprecated Use cloudflareApiTokenConfigured */
+    realtimeKitTokenConfigured: tokenFromDb || tokenFromEnv,
     realtimeKitPresetsConfigured: Boolean(
       org.realtimeKitPresetHost && org.realtimeKitPresetMember && org.realtimeKitPresetGuest,
     ),

@@ -24,9 +24,10 @@ import {
   updateOrganizationGiphyApiKey,
 } from "../services/org-giphy";
 import {
-  clearOrganizationRealtimeKitConfig,
+  disableOrganizationRealtimeKitCalls,
   enableOrganizationRealtimeKit,
   getOrganizationRealtimeKitStatus,
+  saveOrganizationCloudflareApiToken,
 } from "../services/org-realtimekit";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -47,7 +48,10 @@ const IntegrationsPatchSchema = z.object({
 
 const RealtimeKitSetupSchema = z.object({
   enabled: z.boolean(),
-  cloudflareApiToken: z.string().min(1).optional(),
+});
+
+const CloudflareTokenSchema = z.object({
+  cloudflareApiToken: z.string().min(1),
 });
 
 export const settingsRouter = new Hono<Env>();
@@ -215,7 +219,7 @@ settingsRouter.post("/integrations/realtimekit", requireAuth, async (c) => {
     return c.json({ error: parsed.error.flatten() }, 400);
   }
 
-  const { enabled, cloudflareApiToken } = parsed.data;
+  const { enabled } = parsed.data;
   const current = getOrganizationRealtimeKitStatus(org);
 
   try {
@@ -223,7 +227,6 @@ settingsRouter.post("/integrations/realtimekit", requireAuth, async (c) => {
       await enableOrganizationRealtimeKit({
         organizationId: org.id,
         organizationName: org.name,
-        cloudflareApiToken,
       });
     } else {
       if (current.realtimeKitFromEnv) {
@@ -232,10 +235,54 @@ settingsRouter.post("/integrations/realtimekit", requireAuth, async (c) => {
           400,
         );
       }
-      await clearOrganizationRealtimeKitConfig(org.id);
+      await disableOrganizationRealtimeKitCalls(org.id);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "RealtimeKit setup failed";
+    return c.json({ error: message }, 400);
+  }
+
+  const updated = await getConfiguredOrganization();
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
+  return c.json({
+    ok: true,
+    ...realtimeKitStatus,
+  });
+});
+
+settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  const org = await getConfiguredOrganization();
+  if (!org) return c.json({ error: "Organization not found" }, 404);
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = CloudflareTokenSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  const current = getOrganizationRealtimeKitStatus(org);
+
+  try {
+    await saveOrganizationCloudflareApiToken({
+      organizationId: org.id,
+      apiToken: parsed.data.cloudflareApiToken,
+      existingAccountId: current.realtimeKitAccountId || undefined,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Invalid Cloudflare API token";
     return c.json({ error: message }, 400);
   }
 

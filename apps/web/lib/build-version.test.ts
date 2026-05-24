@@ -62,7 +62,7 @@ describe("resolveAppBuildVersion", () => {
     });
   });
 
-  test("prefers baked BUILD_ID file over env", () => {
+  test("prefers env deploy id over baked BUILD_ID file", () => {
     const dir = mkdtempSync(join(tmpdir(), "cco-build-"));
     Bun.write(join(dir, "BUILD_ID"), "file-sha\n");
     const prev = process.cwd();
@@ -73,6 +73,25 @@ describe("resolveAppBuildVersion", () => {
         resolveAppBuildVersion({
           CCO_BUILD_ID: "env-sha",
           NODE_ENV: "production",
+        }),
+      ).toBe("env-sha");
+    } finally {
+      process.chdir(prev);
+      clearBuildVersionCacheForTests();
+    }
+  });
+
+  test("falls back to baked BUILD_ID when env is dev", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cco-build-"));
+    Bun.write(join(dir, "BUILD_ID"), "file-sha\n");
+    const prev = process.cwd();
+    clearBuildVersionCacheForTests();
+    process.chdir(dir);
+    try {
+      expect(
+        resolveAppBuildVersion({
+          CCO_BUILD_ID: "dev",
+          NODE_ENV: "development",
         }),
       ).toBe("file-sha");
     } finally {

@@ -281,8 +281,12 @@ export async function isAppVersionCurrent(): Promise<boolean> {
   return Boolean(serverVersion && serverVersion === clientVersion);
 }
 
+export function shouldRunAppUpdateChecks(): boolean {
+  return APP_BUILD_VERSION !== "dev";
+}
+
 export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise<boolean> {
-  if (APP_BUILD_VERSION === "dev" && getClientBuildVersion() === "dev") return false;
+  if (!shouldRunAppUpdateChecks()) return false;
   if (isAppUpdateInProgress() && !isDeployPending() && !isPostDeployGracePeriod()) return false;
 
   const clientVersion = getClientBuildVersion();

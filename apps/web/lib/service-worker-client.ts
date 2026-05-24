@@ -3,6 +3,7 @@ import {
   checkAppVersion,
   completeAppUpdateReload,
   DEPLOY_POLL_MS,
+  forceClearStaleUpdateState,
   getUpdateCheckIntervalMs,
   isAppUpdateInProgress,
   isAppVersionCurrent,
@@ -10,6 +11,7 @@ import {
   isPostDeployGracePeriod,
   prepareAppUpdate,
   probeServerAppVersion,
+  shouldRunAppUpdateChecks,
   shouldSuppressServiceWorkerUpdateAfterDeploy,
 } from "@/lib/app-update";
 import { getClientBuildVersion } from "@/lib/build-version";
@@ -50,6 +52,17 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     return () => {};
   }
 
+  if (!shouldRunAppUpdateChecks()) {
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          void registration.unregister();
+        }
+      });
+    }
+    return () => {};
+  }
+
   let registration: ServiceWorkerRegistration | null = null;
   let applying = false;
   let reloaded = false;
@@ -79,8 +92,18 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     if (isAppUpdateInProgress()) return;
     applying = true;
 
-    await prepareAppUpdate(onUpdating);
-    reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+    try {
+      await prepareAppUpdate(onUpdating);
+      if (await isAppVersionCurrent()) {
+        forceClearStaleUpdateState();
+        return;
+      }
+      reg.waiting.postMessage(SKIP_WAITING_MESSAGE);
+    } catch {
+      forceClearStaleUpdateState();
+    } finally {
+      applying = false;
+    }
   };
 
   const onControllerChange = () => {
@@ -88,10 +111,12 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
       if (reloaded) return;
       if (shouldSuppressServiceWorkerUpdateAfterDeploy()) {
         reloaded = true;
+        forceClearStaleUpdateState();
         return;
       }
       if (await isAppVersionCurrent()) {
         reloaded = true;
+        forceClearStaleUpdateState();
         return;
       }
       reloaded = true;

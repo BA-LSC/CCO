@@ -34,9 +34,13 @@ export function clearBuildVersionCacheForTests(): void {
   cachedBakedBuildId = undefined;
 }
 
-/** Resolve the deploy id for server routes (prefers baked BUILD_ID file). */
+/** Resolve the deploy id for server routes (must match client APP_BUILD_VERSION). */
 export function resolveAppBuildVersion(env: NodeJS.ProcessEnv = process.env): string {
+  const fromEnv = resolveAppBuildVersionFromEnv(env);
+  if (fromEnv !== "dev") return fromEnv;
+
   const fromFile = readBakedBuildId();
   if (fromFile) return fromFile;
-  return resolveAppBuildVersionFromEnv(env);
+
+  return "dev";
 }

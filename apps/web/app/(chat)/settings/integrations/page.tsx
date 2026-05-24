@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LoadingState } from "@/components/PageStates";
@@ -23,6 +23,7 @@ type IntegrationsSettings = {
   giphyApiKeyConfigured: boolean;
   realtimeKitConfigured?: boolean;
   realtimeKitFromEnv?: boolean;
+  cloudflareApiTokenConfigured?: boolean;
   realtimeKitAccountId?: string;
   realtimeKitAppId?: string;
   realtimeKitTokenConfigured?: boolean;
@@ -157,10 +158,11 @@ function Feedback({ error, success }: { error?: string | null; success?: string 
   );
 }
 
-function CloudflareCallsSection({
+function CloudflareSection({
   name,
   configured,
   fromEnv,
+  tokenConfigured,
   accountId,
   appId,
   presetsConfigured,
@@ -169,6 +171,7 @@ function CloudflareCallsSection({
   name: string;
   configured: boolean;
   fromEnv: boolean;
+  tokenConfigured: boolean;
   accountId: string;
   appId: string;
   presetsConfigured: boolean;
@@ -176,6 +179,7 @@ function CloudflareCallsSection({
     IntegrationsSettings,
     | "realtimeKitConfigured"
     | "realtimeKitFromEnv"
+    | "cloudflareApiTokenConfigured"
     | "realtimeKitAccountId"
     | "realtimeKitAppId"
     | "realtimeKitTokenConfigured"
@@ -183,91 +187,89 @@ function CloudflareCallsSection({
   >) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [tokenBusy, setTokenBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [awaitingToken, setAwaitingToken] = useState(false);
   const [cloudflareApiToken, setCloudflareApiToken] = useState("");
-  const provisionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function applyCallsSetting(enabled: boolean, token?: string) {
+  type CloudflareStatus = Pick<
+    IntegrationsSettings,
+    | "realtimeKitConfigured"
+    | "realtimeKitFromEnv"
+    | "cloudflareApiTokenConfigured"
+    | "realtimeKitAccountId"
+    | "realtimeKitAppId"
+    | "realtimeKitTokenConfigured"
+    | "realtimeKitPresetsConfigured"
+  >;
+
+  async function saveApiToken() {
+    const token = cloudflareApiToken.trim();
+    if (!token) {
+      setError("Paste a Cloudflare API token to save.");
+      return;
+    }
+
+    setTokenBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const updated = await apiFetch<CloudflareStatus & { ok: boolean }>(
+        "/api/v1/settings/integrations/cloudflare",
+        {
+          method: "POST",
+          body: JSON.stringify({ cloudflareApiToken: token }),
+        },
+      );
+      onStatusChange(updated);
+      setCloudflareApiToken("");
+      setSuccess("Cloudflare API token saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save Cloudflare token");
+    } finally {
+      setTokenBusy(false);
+    }
+  }
+
+  async function handleCallsToggle(enabled: boolean) {
+    if (busy) return;
+
+    if (enabled && !tokenConfigured && !fromEnv) {
+      setError("Save a Cloudflare API token before enabling calls.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const updated = await apiFetch<
-        Pick<
-          IntegrationsSettings,
-          | "realtimeKitConfigured"
-          | "realtimeKitFromEnv"
-          | "realtimeKitAccountId"
-          | "realtimeKitAppId"
-          | "realtimeKitTokenConfigured"
-          | "realtimeKitPresetsConfigured"
-        > & { ok: boolean }
-      >("/api/v1/settings/integrations/realtimekit", {
-        method: "POST",
-        body: JSON.stringify({
-          enabled,
-          ...(token?.trim() ? { cloudflareApiToken: token.trim() } : {}),
-        }),
-      });
+      const updated = await apiFetch<CloudflareStatus & { ok: boolean }>(
+        "/api/v1/settings/integrations/realtimekit",
+        {
+          method: "POST",
+          body: JSON.stringify({ enabled }),
+        },
+      );
       onStatusChange(updated);
-      setCloudflareApiToken("");
-      setAwaitingToken(false);
       setSuccess(
         enabled
           ? updated.realtimeKitPresetsConfigured
             ? "Audio & video calls enabled."
             : "Calls enabled. Create host, group_call_participant, and guest presets in RealtimeKit if needed."
-          : "Audio & video calls disabled.",
+          : "Audio & video calls disabled. API token kept for other Cloudflare features.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cloudflare setup failed");
-      throw err;
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleToggle(enabled: boolean) {
-    if (busy) return;
-
-    if (!enabled) {
-      await applyCallsSetting(false);
-      return;
-    }
-
-    if (configured || fromEnv) {
-      await applyCallsSetting(true);
-      return;
-    }
-
-    setAwaitingToken(true);
-    setError(null);
-    setSuccess(null);
-  }
-
-  useEffect(() => {
-    if (!awaitingToken || busy) return;
-    const token = cloudflareApiToken.trim();
-    if (token.length < 20) return;
-
-    if (provisionTimerRef.current) clearTimeout(provisionTimerRef.current);
-    provisionTimerRef.current = setTimeout(() => {
-      void applyCallsSetting(true, token).catch(() => {
-        /* error state handled in applyCallsSetting */
-      });
-    }, 600);
-
-    return () => {
-      if (provisionTimerRef.current) clearTimeout(provisionTimerRef.current);
-    };
-  }, [awaitingToken, busy, cloudflareApiToken]);
-
   const toggleChecked = configured || fromEnv;
   const toggleDisabled = busy || fromEnv;
-  const showTokenSetup = awaitingToken && !configured && !fromEnv;
+  const sectionBusy = busy || tokenBusy;
 
   return (
     <section className="integrations-section" aria-labelledby="cloudflare-heading">
@@ -275,8 +277,8 @@ function CloudflareCallsSection({
         <div className="integrations-section-head">
           <h2 id="cloudflare-heading">Cloudflare</h2>
           <p>
-            RealtimeKit powers group calls without opening ports. Media runs on Cloudflare&apos;s
-            edge. Free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
+            Store an API token for Cloudflare integrations. RealtimeKit powers group calls without
+            opening ports — free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
             <a
               href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
               target="_blank"
@@ -290,8 +292,45 @@ function CloudflareCallsSection({
           <div className="integrations-section-badges">
             <span className="integrations-badge integrations-badge--success">Calls enabled</span>
           </div>
+        ) : tokenConfigured ? (
+          <div className="integrations-section-badges">
+            <span className="integrations-badge integrations-badge--success">Token saved</span>
+          </div>
         ) : null}
       </div>
+
+      {!fromEnv ? (
+        <div className="integrations-fields">
+          <SecretInput
+            label="Cloudflare API token"
+            configured={tokenConfigured}
+            value={cloudflareApiToken}
+            onChange={setCloudflareApiToken}
+            placeholder="Paste API token"
+          />
+          <button
+            type="button"
+            className="btn btn-secondary integrations-action-btn"
+            disabled={sectionBusy || !cloudflareApiToken.trim()}
+            onClick={() => void saveApiToken()}
+          >
+            {tokenBusy ? "Saving…" : "Save token"}
+          </button>
+          {tokenConfigured && accountId ? (
+            <p className="integrations-field-hint">
+              Account <code>{accountId}</code>
+            </p>
+          ) : (
+            <p className="integrations-field-hint">
+              Saved encrypted. Use for RealtimeKit calls and future Cloudflare features.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="integrations-field-hint">
+          Configured via server environment. Token and call settings are managed outside this page.
+        </p>
+      )}
 
       <label className="integrations-toggle channel-settings-toggle">
         <span className="integrations-toggle-label">Audio &amp; video calls</span>
@@ -301,65 +340,32 @@ function CloudflareCallsSection({
           checked={toggleChecked}
           disabled={toggleDisabled}
           aria-label="Enable audio and video calls"
-          onChange={(e) => void handleToggle(e.target.checked)}
+          onChange={(e) => void handleCallsToggle(e.target.checked)}
         />
         <span className="toggle-switch" aria-hidden="true" />
       </label>
 
-      {fromEnv ? (
-        <p className="integrations-field-hint">
-          Configured via server environment. Toggle is locked while env credentials are present.
-        </p>
-      ) : null}
-
-      {showTokenSetup ? (
-        <div className="integrations-fields">
-          <SecretInput
-            label="Cloudflare API token (Realtime Admin)"
-            configured={false}
-            value={cloudflareApiToken}
-            onChange={setCloudflareApiToken}
-            placeholder="Paste token to connect automatically"
-          />
-          <p className="integrations-field-hint">
-            {busy
-              ? "Connecting to Cloudflare and setting up RealtimeKit…"
-              : `CCO will verify the token, connect to Cloudflare, and create a RealtimeKit app for ${name || "your church"} if needed.`}
-          </p>
-          {!busy ? (
-            <button
-              type="button"
-              className="btn btn-secondary integrations-action-btn"
-              onClick={() => setAwaitingToken(false)}
-            >
-              Cancel
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {configured && !showTokenSetup ? (
+      {configured ? (
         <div className="integrations-field-hint">
-          {accountId ? (
+          {appId ? (
             <p>
-              Account <code>{accountId}</code>
-              {appId ? (
-                <>
-                  {" · "}
-                  App <code>{appId}</code>
-                </>
-              ) : null}
+              RealtimeKit app <code>{appId}</code>
             </p>
           ) : null}
           {presetsConfigured ? (
             <p>Preset roles detected from your RealtimeKit app.</p>
           ) : (
             <p>
-              Presets not auto-detected. Create <code>host</code>, <code>group_call_participant</code>
-              , and <code>guest</code> in the RealtimeKit dashboard, or override via env vars.
+              Presets not auto-detected for {name || "your church"}. Create <code>host</code>,{" "}
+              <code>group_call_participant</code>, and <code>guest</code> in the RealtimeKit
+              dashboard, or override via env vars.
             </p>
           )}
         </div>
+      ) : tokenConfigured && !fromEnv ? (
+        <p className="integrations-field-hint">
+          Token is ready. Turn on calls to provision RealtimeKit automatically.
+        </p>
       ) : null}
 
       <Feedback error={error} success={success} />
@@ -390,6 +396,7 @@ export default function IntegrationsSettingsPage() {
   const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
   const [realtimeKitConfigured, setRealtimeKitConfigured] = useState(false);
   const [realtimeKitFromEnv, setRealtimeKitFromEnv] = useState(false);
+  const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
   const [realtimeKitAccountId, setRealtimeKitAccountId] = useState("");
   const [realtimeKitAppId, setRealtimeKitAppId] = useState("");
   const [realtimeKitPresetsConfigured, setRealtimeKitPresetsConfigured] = useState(false);
@@ -420,6 +427,9 @@ export default function IntegrationsSettingsPage() {
         setRealtimeKitAppId(settings.realtimeKitAppId ?? "");
         setRealtimeKitConfigured(settings.realtimeKitConfigured ?? false);
         setRealtimeKitFromEnv(settings.realtimeKitFromEnv ?? false);
+        setCloudflareApiTokenConfigured(
+          settings.cloudflareApiTokenConfigured ?? settings.realtimeKitTokenConfigured ?? false,
+        );
         setRealtimeKitPresetsConfigured(settings.realtimeKitPresetsConfigured ?? false);
         setUris(redirectUris);
       } catch (err) {
@@ -543,16 +553,20 @@ export default function IntegrationsSettingsPage() {
         </button>
       </section>
 
-      <CloudflareCallsSection
+      <CloudflareSection
         name={name}
         configured={realtimeKitConfigured}
         fromEnv={realtimeKitFromEnv}
+        tokenConfigured={cloudflareApiTokenConfigured}
         accountId={realtimeKitAccountId}
         appId={realtimeKitAppId}
         presetsConfigured={realtimeKitPresetsConfigured}
         onStatusChange={(status) => {
           setRealtimeKitConfigured(status.realtimeKitConfigured ?? false);
           setRealtimeKitFromEnv(status.realtimeKitFromEnv ?? false);
+          setCloudflareApiTokenConfigured(
+            status.cloudflareApiTokenConfigured ?? status.realtimeKitTokenConfigured ?? false,
+          );
           setRealtimeKitPresetsConfigured(status.realtimeKitPresetsConfigured ?? false);
           if (status.realtimeKitAccountId) setRealtimeKitAccountId(status.realtimeKitAccountId);
           if (status.realtimeKitAppId) setRealtimeKitAppId(status.realtimeKitAppId);
