@@ -152,9 +152,12 @@ function handleVersionPayload(d){
   var clientVersion=getClientVersion();
   var needsReload=d.version!==clientVersion;
   if(d.updating){
-    markDeployPending();
     if(needsReload){
+      markDeployPending();
       applyUpdate(true);
+    }else if(deployPending){
+      clearDeployPending();
+      applying=false;
     }
     return;
   }

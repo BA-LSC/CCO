@@ -100,6 +100,12 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
   navigator.serviceWorker?.addEventListener("controllerchange", onControllerChange);
 
   const runUpdateChecks = async () => {
+    if (isPostDeployGracePeriod()) {
+      if (await isAppVersionCurrent()) {
+        syncDeployPoll();
+        return;
+      }
+    }
     if (isAppUpdateInProgress() && !isDeployWaitActive() && !isPostDeployGracePeriod()) return;
     if (await checkAppVersion(onUpdating)) return;
     if (!(await isAppVersionCurrent())) {

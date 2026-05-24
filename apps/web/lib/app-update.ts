@@ -262,13 +262,15 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  // Deploy draining — show the overlay even while the old version is still live.
+  // Deploy draining — only block clients that still need the new bundle.
   if (updating) {
     if (!unavailable && serverVersion && serverVersion !== clientVersion) {
       await applyAppUpdate(onUpdating);
       return true;
     }
-    markDeployWait(onUpdating);
+    if (serverVersion && serverVersion === clientVersion) {
+      clearDeployWait();
+    }
     return false;
   }
 
