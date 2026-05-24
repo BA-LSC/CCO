@@ -9,6 +9,7 @@ import {
   getCachedConfiguredOrganization,
   invalidateOrgContextCache,
 } from "./org-context-cache";
+import { configuredOrganizationColumns } from "./org-select";
 
 export type OrgOAuthCredentials = {
   clientId: string;
@@ -47,7 +48,7 @@ export async function getOrganizationWithOAuthCredentials() {
   }
 
   const rows = await db
-    .select()
+    .select(configuredOrganizationColumns)
     .from(organizations)
     .where(
       and(isNotNull(organizations.pcoClientId), isNotNull(organizations.pcoClientSecretEnc)),
@@ -58,7 +59,7 @@ export async function getOrganizationWithOAuthCredentials() {
 
 export async function getPendingSetupOrganization() {
   const rows = await db
-    .select()
+    .select(configuredOrganizationColumns)
     .from(organizations)
     .where(isNull(organizations.setupCompletedAt))
     .limit(1);

@@ -2,12 +2,14 @@ import { isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
+import {
+  configuredOrganizationColumns,
+  type ConfiguredOrganizationRow,
+} from "./org-select";
 
 const ORG_CACHE_TTL_MS = 60_000;
 
-type OrgRow = typeof organizations.$inferSelect;
-
-let cachedOrg: OrgRow | null | undefined;
+let cachedOrg: ConfiguredOrganizationRow | null | undefined;
 let cachedOrgAt = 0;
 let cachedWebhooksEnabled: boolean | null = null;
 let cachedWebhooksAt = 0;
@@ -19,14 +21,14 @@ export function invalidateOrgContextCache(): void {
   cachedWebhooksAt = 0;
 }
 
-export async function getCachedConfiguredOrganization(): Promise<OrgRow | null> {
+export async function getCachedConfiguredOrganization(): Promise<ConfiguredOrganizationRow | null> {
   const now = Date.now();
   if (cachedOrg !== undefined && now - cachedOrgAt < ORG_CACHE_TTL_MS) {
     return cachedOrg;
   }
 
   const rows = await db
-    .select()
+    .select(configuredOrganizationColumns)
     .from(organizations)
     .where(isNotNull(organizations.setupCompletedAt))
     .limit(1);
@@ -38,8 +40,13 @@ export async function getCachedConfiguredOrganization(): Promise<OrgRow | null> 
 }
 
 export async function getCachedOrgWebhookSecrets(): Promise<string[]> {
-  const org = await getCachedConfiguredOrganization();
-  return decryptWebhookSecrets(org?.pcoWebhookSecretEnc);
+  const rows = await db
+    .select({ pcoWebhookSecretEnc: organizations.pcoWebhookSecretEnc })
+    .from(organizations)
+    .where(isNotNull(organizations.setupCompletedAt))
+    .limit(1);
+
+  return decryptWebhookSecrets(rows[0]?.pcoWebhookSecretEnc);
 }
 
 export async function areOrgWebhooksEnabledCached(): Promise<boolean> {
