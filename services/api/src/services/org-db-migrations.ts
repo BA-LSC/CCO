@@ -32,13 +32,26 @@ function mentionsExtendedOrgColumn(message: string): boolean {
   return EXTENDED_ORG_COLUMN_MARKERS.some((marker) => message.includes(marker));
 }
 
+const SCHEMA_MISSING_PATTERNS = [
+  /does not exist/i,
+  /undefined column/i,
+] as const;
+
+const CALL_SCHEMA_MARKERS = [
+  "call_participants",
+  "call_sessions",
+  "call_invite_tokens",
+] as const;
+
+function mentionsCallSchema(message: string): boolean {
+  return CALL_SCHEMA_MARKERS.some((marker) => message.includes(marker));
+}
+
 export function isMissingOrgMigrationColumnsError(err: unknown): boolean {
   const message = collectErrorText(err);
-  if (!mentionsExtendedOrgColumn(message)) return false;
+  if (!SCHEMA_MISSING_PATTERNS.some((pattern) => pattern.test(message))) {
+    return false;
+  }
 
-  return (
-    message.includes("does not exist") ||
-    message.includes("Failed query") ||
-    message.includes("undefined column")
-  );
+  return mentionsExtendedOrgColumn(message) || mentionsCallSchema(message);
 }

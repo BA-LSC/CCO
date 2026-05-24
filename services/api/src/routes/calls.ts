@@ -17,6 +17,10 @@ import {
   isMissingOrgMigrationColumnsError,
   ORG_MIGRATIONS_0021_0023_MESSAGE,
 } from "../services/org-db-migrations";
+import {
+  callParticipantsTableExists,
+  ensureCallSessionSchema,
+} from "../services/org-schema-capabilities";
 
 type Env = { Variables: AuthVariables };
 
@@ -140,7 +144,16 @@ export function mountConversationCallRoutes(conversationsRouter: Hono<Env>): voi
       if (isMissingOrgMigrationColumnsError(err)) {
         return c.json({ error: ORG_MIGRATIONS_0021_0023_MESSAGE }, 503);
       }
-      const message = err instanceof Error ? err.message : "Failed to start call";
+      await ensureCallSessionSchema();
+      if (!(await callParticipantsTableExists())) {
+        return c.json({ error: ORG_MIGRATIONS_0021_0023_MESSAGE }, 503);
+      }
+      const message =
+        err instanceof Error
+          ? [err.message, err.cause instanceof Error ? err.cause.message : null]
+              .filter(Boolean)
+              .join(": ")
+          : "Failed to start call";
       return c.json({ error: message }, 503);
     }
   });

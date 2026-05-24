@@ -84,7 +84,7 @@ async function runEnsureCloudflareOrganizationColumns(): Promise<void> {
   orgColumnsReady = true;
 }
 
-async function callParticipantsTableExists(): Promise<boolean> {
+export async function callParticipantsTableExists(): Promise<boolean> {
   const result = await db.execute(sql`
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public'
@@ -102,6 +102,7 @@ async function runEnsureCallSessionSchema(): Promise<void> {
   if (await callParticipantsTableExists()) {
     callSchemaReady = true;
   } else {
+    callSchemaPromise = null;
     console.warn(
       "[schema ensure] call_participants table missing — run migrations 0021–0023 (./deploy/compose.sh run --rm migrate)",
     );
