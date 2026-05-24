@@ -15,6 +15,8 @@ import {
   isMissingOrgMigrationColumnsError,
   ORG_MIGRATIONS_0021_0023_MESSAGE,
 } from "./org-db-migrations";
+import { selectConfiguredOrganizationRow } from "./configured-org-query";
+import { hasExtendedOrganizationColumns } from "./org-schema-capabilities";
 
 function rethrowCloudflareSaveError(err: unknown): never {
   if (isMissingOrgMigrationColumnsError(err)) {
@@ -104,6 +106,10 @@ export async function saveOrganizationCloudflareApiToken(params: {
   const accounts = await listCloudflareAccounts(apiToken);
   const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
 
+  if (!(await hasExtendedOrganizationColumns())) {
+    throw new Error(ORG_MIGRATIONS_0021_0023_MESSAGE);
+  }
+
   try {
     await db
       .update(organizations)
@@ -183,12 +189,7 @@ export async function enableOrganizationRealtimeKit(params: {
   organizationName?: string;
   cloudflareApiToken?: string;
 }): Promise<{ createdApp: boolean; presetsResolved: boolean; reconfigured: boolean }> {
-  const org = await db
-    .select()
-    .from(organizations)
-    .where(eq(organizations.id, params.organizationId))
-    .limit(1);
-  const row = org[0];
+  const row = await selectConfiguredOrganizationRow(eq(organizations.id, params.organizationId));
   if (!row) throw new Error("Organization not found");
 
   const status = getOrganizationRealtimeKitStatus(row);
