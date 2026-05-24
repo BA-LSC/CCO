@@ -1,13 +1,27 @@
 import {
+  applyAppUpdate,
   checkAppVersion,
   clearDeployWait,
+  DEPLOY_POLL_MS,
+  isDeployPending,
   markDeployWait,
+  probeServerAppVersion,
   shouldRunAppUpdateChecks,
 } from "@/lib/app-update";
 
 const RECONNECT_MS = 5_000;
 
-/** Push deploy overlay updates via SSE instead of waiting for poll intervals. */
+/** Finish a deploy: reload while deploy-pending flags are still set, then clear overlay. */
+async function finishDeployUpdate(): Promise<void> {
+  if (isDeployPending()) {
+    await applyAppUpdate();
+    return;
+  }
+  clearDeployWait();
+  await checkAppVersion();
+}
+
+/** Push deploy overlay updates via SSE with fast polling as a fallback. */
 export function listenForDeployEvents(): () => void {
   if (typeof window === "undefined" || !shouldRunAppUpdateChecks()) {
     return () => {};
@@ -15,15 +29,37 @@ export function listenForDeployEvents(): () => void {
 
   let source: EventSource | null = null;
   let reconnectTimer: number | null = null;
+  let pollTimer: number | null = null;
   let stopped = false;
+  let finishing = false;
 
   const handleSignal = (updating: boolean) => {
     if (updating) {
       markDeployWait();
       return;
     }
-    clearDeployWait();
-    void checkAppVersion();
+    void finishDeployUpdateSafely();
+  };
+
+  const finishDeployUpdateSafely = async () => {
+    if (finishing) return;
+    finishing = true;
+    try {
+      await finishDeployUpdate();
+    } finally {
+      finishing = false;
+    }
+  };
+
+  const pollDeployState = async () => {
+    const { updating } = await probeServerAppVersion();
+    if (updating) {
+      markDeployWait();
+      return;
+    }
+    if (isDeployPending()) {
+      await finishDeployUpdateSafely();
+    }
   };
 
   const connect = () => {
@@ -49,11 +85,14 @@ export function listenForDeployEvents(): () => void {
   };
 
   connect();
+  void pollDeployState();
+  pollTimer = window.setInterval(() => void pollDeployState(), DEPLOY_POLL_MS);
 
   return () => {
     stopped = true;
     source?.close();
     source = null;
     if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
+    if (pollTimer !== null) window.clearInterval(pollTimer);
   };
 }

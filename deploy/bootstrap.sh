@@ -127,8 +127,8 @@ mark_deploy_draining() {
 }
 
 clear_deploy_draining() {
-  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" PUBLISH cco:deploy:signal ready >/dev/null 2>&1 || true
   "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" DEL cco:deploy:draining >/dev/null 2>&1 || true
+  "${COMPOSE[@]}" exec -T redis redis-cli -a "${REDIS_PASSWORD}" PUBLISH cco:deploy:signal ready >/dev/null 2>&1 || true
 }
 
 trap 'clear_deploy_draining || true' EXIT
