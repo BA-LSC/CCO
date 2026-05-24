@@ -2,7 +2,7 @@
 #   source deploy/lib/build.sh
 
 # Resolve which compose services to build.
-# Prints space-separated service names (e.g. "migrate api" or "web").
+# Prints one service name per line (migrate, api, web).
 cco_resolve_build_services() {
   local mode="auto"
   local since_ref=""
@@ -34,15 +34,15 @@ cco_resolve_build_services() {
 
   case "$mode" in
     all)
-      printf '%s\n' "migrate api web"
+      printf '%s\n' migrate api web
       return 0
       ;;
     api)
-      printf '%s\n' "migrate api"
+      printf '%s\n' migrate api
       return 0
       ;;
     web)
-      printf '%s\n' "web"
+      printf '%s\n' web
       return 0
       ;;
   esac
@@ -52,7 +52,7 @@ cco_resolve_build_services() {
   local compare_ref="${since_ref:-HEAD~1}"
 
   if ! git rev-parse "$compare_ref" >/dev/null 2>&1; then
-    printf '%s\n' "migrate api web"
+    printf '%s\n' migrate api web
     return 0
   fi
 
@@ -83,11 +83,10 @@ cco_resolve_build_services() {
   fi
 
   if (( build_api )); then
-    printf 'migrate api'
-    (( build_web )) && printf ' web'
-    printf '\n'
+    printf '%s\n' migrate api
+    (( build_web )) && printf '%s\n' web
   elif (( build_web )); then
-    printf '%s\n' "web"
+    printf '%s\n' web
   fi
 }
 
