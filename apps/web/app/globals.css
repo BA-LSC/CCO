@@ -5461,11 +5461,13 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-bubble-stack--has-reactions {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .chat-thread .message-content:has(.message-bubble-stack--has-reactions) {
-  width: 100%;
+  width: fit-content;
+  max-width: 70%;
 }
 
 @media (min-width: 769px) {
@@ -5488,13 +5490,14 @@ button.sidebar-group-header:focus-visible {
 
 .chat-thread .message-reaction-row {
   --message-reaction-control-height: 26px;
+  --message-reaction-control-min-width: 36px;
   --message-reaction-radius: 6px;
+  align-self: stretch;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 0 4px;
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -5527,8 +5530,9 @@ button.sidebar-group-header:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
+  min-width: var(--message-reaction-control-min-width, 36px);
   height: var(--message-reaction-control-height, 26px);
+  min-height: var(--message-reaction-control-height, 26px);
   padding: 0 8px;
   box-sizing: border-box;
   border: 1px dashed var(--color-border);
@@ -5555,6 +5559,7 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 3px;
+  min-width: var(--message-reaction-control-min-width, 36px);
   height: var(--message-reaction-control-height, 26px);
   min-height: var(--message-reaction-control-height, 26px);
   padding: 0 8px;
