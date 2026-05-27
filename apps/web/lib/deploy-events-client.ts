@@ -11,9 +11,19 @@ import {
 
 const RECONNECT_MS = 5_000;
 
-/** Finish a deploy: reload while deploy-pending flags are still set, then clear overlay. */
+function isUpdateOverlayVisible(): boolean {
+  return (
+    typeof document !== "undefined" &&
+    Boolean(document.getElementById("cco-app-update-overlay"))
+  );
+}
+
+/** Finish a deploy: full reload when the update screen was shown, otherwise version-check only. */
 async function finishDeployUpdate(): Promise<void> {
-  if (isDeployPending()) {
+  if (isDeployPending() || isUpdateOverlayVisible()) {
+    if (!isDeployPending()) {
+      markDeployWait();
+    }
     await applyAppUpdate();
     return;
   }
