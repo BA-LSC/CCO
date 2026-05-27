@@ -435,9 +435,14 @@ export async function startCloudflareReleaseUpdate(options?: {
   job: CloudflareReleaseUpdateJob;
   targetVersion: string;
 }> {
-  const job = await prepareCloudflareReleaseUpdate(options);
   await setDeployDraining(true);
-  return { job, targetVersion: job.targetVersion };
+  try {
+    const job = await prepareCloudflareReleaseUpdate(options);
+    return { job, targetVersion: job.targetVersion };
+  } catch (err) {
+    await setDeployDraining(false);
+    throw err;
+  }
 }
 
 export async function applyCloudflareReleaseUpdate(options?: {
@@ -446,8 +451,14 @@ export async function applyCloudflareReleaseUpdate(options?: {
   appliedVersion: string;
   deployedWorkers: string[];
 }> {
-  const job = await prepareCloudflareReleaseUpdate(options);
-  return executeCloudflareReleaseUpdate(job);
+  await setDeployDraining(true);
+  try {
+    const job = await prepareCloudflareReleaseUpdate(options);
+    return await executeCloudflareReleaseUpdate(job);
+  } catch (err) {
+    await setDeployDraining(false);
+    throw err;
+  }
 }
 
 export async function setGitRepoUrl(gitRepoUrl: string): Promise<void> {
