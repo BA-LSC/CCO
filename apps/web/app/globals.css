@@ -1016,6 +1016,10 @@ html[data-theme="6"] .user-menu-dropdown {
   color: var(--color-muted);
 }
 
+.sidebar-team-service-block .sidebar-list {
+  margin-left: var(--sidebar-nest);
+}
+
 .sidebar-section-teams .sidebar-team-item {
   gap: 8px;
   align-items: flex-start;
@@ -1354,6 +1358,11 @@ html[data-theme="6"] .user-menu-dropdown {
 .sidebar-skeleton-label-team {
   width: 96px;
   height: 0.9rem;
+}
+
+.sidebar-skeleton-label-team-heading {
+  width: 80px;
+  height: 0.6875rem;
 }
 
 .sidebar-skeleton-nested-row,

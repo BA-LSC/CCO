@@ -62,16 +62,23 @@ export function SidebarSkeleton() {
 
       <section className="sidebar-section sidebar-section-teams" aria-hidden>
         <SidebarSectionHeader title="Teams" />
-        <ul className="sidebar-list">
-          {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
-            <li key={teamIndex}>
-              <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
-                <span className="sidebar-team-leader-slot" />
-                <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="sidebar-team-groups">
+          <div className="sidebar-team-service-block">
+            <h3 className="sidebar-team-service-heading">
+              <span className="sidebar-skeleton-label sidebar-skeleton-label-team-heading" />
+            </h3>
+            <ul className="sidebar-list">
+              {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
+                <li key={teamIndex}>
+                  <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
+                    <span className="sidebar-team-leader-slot" />
+                    <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </section>
     </div>
   );
