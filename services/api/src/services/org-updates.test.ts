@@ -129,4 +129,14 @@ describe("prepareCloudflareReleaseUpdate", () => {
     );
     expect(fnBody).toMatch(/try \{\s*\n\s*await setDeployLastError\(null\)/);
   });
+
+  test("migrates org secrets when store id exists but D1 enc columns remain", () => {
+    const source = readFileSync(ORG_UPDATES_PATH, "utf8");
+    const fnBody = source.slice(
+      source.indexOf("export async function prepareCloudflareReleaseUpdate"),
+      source.indexOf("export async function executeCloudflareReleaseUpdate"),
+    );
+    expect(fnBody).toContain("organizationHasPendingSecretsStoreMigration(org)");
+    expect(fnBody).toContain("!secretsStoreId || organizationHasPendingSecretsStoreMigration(org)");
+  });
 });

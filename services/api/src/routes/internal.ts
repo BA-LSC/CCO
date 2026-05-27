@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { verifyCloudflareUpdateApplyPermissions } from "@cco/cloudflare-provision";
 import { reconcileStaleMemberships } from "../jobs/reconcile";
-import { runScheduledUpdateCheck } from "../services/org-updates";
+import { getConfiguredOrganization } from "../services/org-oauth";
+import {
+  migrateOrganizationSecretsToStore,
+  organizationHasPendingSecretsStoreMigration,
+} from "../services/org-secrets";
+import { resolveOrgHostnames, runScheduledUpdateCheck } from "../services/org-updates";
 import { recordWebhookDelivery } from "../webhooks/delivery";
 import {
   handleMembershipDestroyed,
@@ -15,6 +21,7 @@ import {
   sendWebPushDirect,
 } from "../services/push-delivery";
 import { verifyCfInternalAuth } from "../runtime/internal-auth";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 const internalRouter = new Hono();
 
@@ -115,6 +122,76 @@ internalRouter.post("/jobs/check-updates", async (c) => {
   if (!verifyInternalAuth(c)) return c.json({ error: "Unauthorized" }, 401);
   const result = await runScheduledUpdateCheck();
   return c.json(result);
+});
+
+function requireProvisionSecretsForRecovery(): {
+  SESSION_SECRET: string;
+  TOKEN_ENCRYPTION_KEY: string;
+  CF_INTERNAL_SECRET: string;
+} {
+  const SESSION_SECRET = process.env.SESSION_SECRET?.trim();
+  const TOKEN_ENCRYPTION_KEY = process.env.TOKEN_ENCRYPTION_KEY?.trim();
+  const CF_INTERNAL_SECRET = process.env.CF_INTERNAL_SECRET?.trim();
+  if (!SESSION_SECRET || !TOKEN_ENCRYPTION_KEY || !CF_INTERNAL_SECRET) {
+    throw new Error("Worker platform secrets are not configured");
+  }
+  return { SESSION_SECRET, TOKEN_ENCRYPTION_KEY, CF_INTERNAL_SECRET };
+}
+
+/** Recovery when bootstrap set Secrets Store id but D1 still holds *_enc org secrets. */
+internalRouter.post("/migrate-org-secrets-to-store", async (c) => {
+  if (!isCloudflareRuntime()) {
+    return c.json({ error: "Cloudflare runtime only" }, 400);
+  }
+
+  const org = await getConfiguredOrganization();
+  if (!org?.cloudflareAccountId) {
+    return c.json({ error: "Organization not configured" }, 404);
+  }
+  if (!organizationHasPendingSecretsStoreMigration(org)) {
+    return c.json({ ok: true, migrated: false, reason: "nothing_pending" });
+  }
+
+  const hostnames = resolveOrgHostnames(org);
+  if (!hostnames) {
+    return c.json({ error: "Could not resolve chat/API hostnames" }, 400);
+  }
+
+  const bearer = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!bearer) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await verifyCloudflareUpdateApplyPermissions({
+      accountId: org.cloudflareAccountId,
+      apiToken: bearer,
+      chatHostname: hostnames.chatHostname,
+      apiHostname: hostnames.apiHostname,
+    });
+  } catch {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let platformSecrets;
+  try {
+    platformSecrets = requireProvisionSecretsForRecovery();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Platform secrets unavailable";
+    return c.json({ error: message }, 500);
+  }
+
+  try {
+    const secretsStoreId = await migrateOrganizationSecretsToStore({
+      organizationId: org.id,
+      accountId: org.cloudflareAccountId,
+      apiToken: bearer,
+      platformSecrets,
+    });
+    return c.json({ ok: true, migrated: true, secretsStoreId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Migration failed";
+    console.error("migrate-org-secrets-to-store:", message);
+    return c.json({ error: message }, 500);
+  }
 });
 
 export { internalRouter };

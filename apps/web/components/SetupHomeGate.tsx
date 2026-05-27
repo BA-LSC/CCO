@@ -23,7 +23,7 @@ export function SetupHomeGate({ hasSession }: Props) {
         if (cancelled) return;
         if (status.configured) {
           setConfigured(true);
-          router.replace(hasSession ? "/groups" : "/auth/sign-in");
+          router.replace(hasSession ? "/groups" : "/auth/sign-in?next=%2Fgroups");
           return;
         }
         setReady(true);

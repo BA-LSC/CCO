@@ -18,7 +18,7 @@ import { isCloudflareRuntime } from "../runtime/worker-context";
 import { readDeployLastError, setDeployDraining, setDeployLastError } from "../lib/deploy-status";
 import { fetchGitReleaseIndex, resolveOrgGitRepoUrl } from "./git-release-index";
 import { getConfiguredOrganization } from "./org-oauth";
-import { migrateOrganizationSecretsToStore, isCloudflareApiTokenConfigured } from "./org-secrets";
+import { migrateOrganizationSecretsToStore, isCloudflareApiTokenConfigured, organizationHasPendingSecretsStoreMigration } from "./org-secrets";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import { invalidateOrgContextCache } from "./org-context-cache";
 
@@ -315,7 +315,7 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
 
   const accountId = org.cloudflareAccountId;
 
-  if (!secretsStoreId) {
+  if (!secretsStoreId || organizationHasPendingSecretsStoreMigration(org)) {
     secretsStoreId = await migrateOrganizationSecretsToStore({
       organizationId: org.id,
       accountId,

@@ -3,6 +3,7 @@ import {
   ensureSecretsStore,
   seedPlatformStoreSecrets,
   upsertStoreSecret,
+  type CcoStoreSecretName,
   type ProvisionSecrets,
 } from "@cco/cloudflare-provision";
 import { eq } from "drizzle-orm";
@@ -54,6 +55,133 @@ export function isCloudflareApiTokenConfigured(
   org: Pick<ConfiguredOrganizationRow, "cloudflareApiTokenConfigured" | "cloudflareApiTokenEnc">,
 ): boolean {
   return Boolean(org.cloudflareApiTokenConfigured || org.cloudflareApiTokenEnc);
+}
+
+type OrganizationEncryptedSecretFields = Pick<
+  ConfiguredOrganizationRow,
+  | "cloudflareSecretsStoreId"
+  | "pcoClientSecretEnc"
+  | "pcoWebhookSecretEnc"
+  | "giphyApiKeyEnc"
+  | "vapidPrivateKeyEnc"
+  | "cloudflareApiTokenEnc"
+  | "cloudflareR2AccessKeyIdEnc"
+  | "cloudflareR2SecretAccessKeyEnc"
+>;
+
+/** True when Secrets Store is configured but org secrets still live in D1 *_enc columns. */
+export function organizationHasPendingSecretsStoreMigration(
+  org: OrganizationEncryptedSecretFields,
+): boolean {
+  if (!org.cloudflareSecretsStoreId?.trim()) return false;
+  return Boolean(
+    org.pcoClientSecretEnc ||
+      org.pcoWebhookSecretEnc ||
+      org.giphyApiKeyEnc ||
+      org.vapidPrivateKeyEnc ||
+      org.cloudflareApiTokenEnc ||
+      org.cloudflareR2AccessKeyIdEnc ||
+      org.cloudflareR2SecretAccessKeyEnc,
+  );
+}
+
+export type OrganizationSecretStoreUpsert = {
+  secretName: CcoStoreSecretName;
+  value: string;
+};
+
+/** Decrypt D1 *_enc columns into Secrets Store upserts (requires TOKEN_ENCRYPTION_KEY). */
+export function collectOrganizationSecretsForStoreMigration(
+  org: OrganizationEncryptedSecretFields,
+): OrganizationSecretStoreUpsert[] {
+  const upserts: OrganizationSecretStoreUpsert[] = [];
+
+  if (org.pcoClientSecretEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+      value: decryptSecret(org.pcoClientSecretEnc),
+    });
+  }
+
+  if (org.pcoWebhookSecretEnc) {
+    const webhookSecrets = decryptWebhookSecrets(org.pcoWebhookSecretEnc);
+    if (webhookSecrets.length > 0) {
+      upserts.push({
+        secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
+        value: webhookSecrets.join("\n"),
+      });
+    }
+  }
+
+  if (org.giphyApiKeyEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.GIPHY_API_KEY,
+      value: decryptSecret(org.giphyApiKeyEnc),
+    });
+  }
+
+  if (org.vapidPrivateKeyEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.VAPID_PRIVATE_KEY,
+      value: decryptSecret(org.vapidPrivateKeyEnc),
+    });
+  }
+
+  if (org.cloudflareApiTokenEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
+      value: decryptSecret(org.cloudflareApiTokenEnc),
+    });
+  }
+
+  if (org.cloudflareR2AccessKeyIdEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.R2_ACCESS_KEY_ID,
+      value: decryptSecret(org.cloudflareR2AccessKeyIdEnc),
+    });
+  }
+
+  if (org.cloudflareR2SecretAccessKeyEnc) {
+    upserts.push({
+      secretName: CCO_STORE_SECRET.R2_SECRET_ACCESS_KEY,
+      value: decryptSecret(org.cloudflareR2SecretAccessKeyEnc),
+    });
+  }
+
+  return upserts;
+}
+
+export function organizationSecretsStoreMigrationDbPatch(
+  org: OrganizationEncryptedSecretFields & Pick<ConfiguredOrganizationRow, "pcoClientSecretConfigured" | "pcoWebhookSecretsConfigured" | "giphyApiKeyConfigured" | "vapidPrivateKeyConfigured" | "cloudflareApiTokenConfigured" | "cloudflareR2AccessKeyConfigured" | "cloudflareR2SecretAccessKeyConfigured">,
+  storeId: string,
+): Record<string, unknown> {
+  return {
+    cloudflareSecretsStoreId: storeId,
+    pcoClientSecretConfigured: Boolean(org.pcoClientSecretEnc || org.pcoClientSecretConfigured),
+    pcoWebhookSecretsConfigured: Boolean(
+      org.pcoWebhookSecretEnc || org.pcoWebhookSecretsConfigured,
+    ),
+    giphyApiKeyConfigured: Boolean(org.giphyApiKeyEnc || org.giphyApiKeyConfigured),
+    vapidPrivateKeyConfigured: Boolean(
+      org.vapidPrivateKeyEnc || org.vapidPrivateKeyConfigured,
+    ),
+    cloudflareApiTokenConfigured: Boolean(
+      org.cloudflareApiTokenEnc || org.cloudflareApiTokenConfigured,
+    ),
+    cloudflareR2AccessKeyConfigured: Boolean(
+      org.cloudflareR2AccessKeyIdEnc || org.cloudflareR2AccessKeyConfigured,
+    ),
+    cloudflareR2SecretAccessKeyConfigured: Boolean(
+      org.cloudflareR2SecretAccessKeyEnc || org.cloudflareR2SecretAccessKeyConfigured,
+    ),
+    pcoClientSecretEnc: null,
+    pcoWebhookSecretEnc: null,
+    giphyApiKeyEnc: null,
+    vapidPrivateKeyEnc: null,
+    cloudflareApiTokenEnc: null,
+    cloudflareR2AccessKeyIdEnc: null,
+    cloudflareR2SecretAccessKeyEnc: null,
+  };
 }
 
 export type OrgSecretsStoreContext = {
@@ -144,7 +272,7 @@ export async function migrateOrganizationSecretsToStore(params: {
   organizationId: string;
   accountId: string;
   apiToken: string;
-  platformSecrets: ProvisionSecrets;
+  platformSecrets?: ProvisionSecrets;
 }): Promise<string> {
   const rows = await db
     .select()
@@ -158,115 +286,28 @@ export async function migrateOrganizationSecretsToStore(params: {
     org.cloudflareSecretsStoreId?.trim() ||
     (await ensureSecretsStore(params.accountId, params.apiToken)).id;
 
-  await seedPlatformStoreSecrets(
-    params.accountId,
-    params.apiToken,
-    storeId,
-    params.platformSecrets,
-  );
-
-  if (org.pcoClientSecretEnc) {
-    await upsertStoreSecret(
+  if (params.platformSecrets) {
+    await seedPlatformStoreSecrets(
       params.accountId,
       params.apiToken,
       storeId,
-      CCO_STORE_SECRET.PCO_CLIENT_SECRET,
-      decryptSecret(org.pcoClientSecretEnc),
+      params.platformSecrets,
     );
   }
 
-  if (org.pcoWebhookSecretEnc) {
-    const webhookSecrets = decryptWebhookSecrets(org.pcoWebhookSecretEnc);
-    if (webhookSecrets.length > 0) {
-      await upsertStoreSecret(
-        params.accountId,
-        params.apiToken,
-        storeId,
-        CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
-        webhookSecrets.join("\n"),
-      );
-    }
-  }
-
-  if (org.giphyApiKeyEnc) {
+  for (const upsert of collectOrganizationSecretsForStoreMigration(org)) {
     await upsertStoreSecret(
       params.accountId,
       params.apiToken,
       storeId,
-      CCO_STORE_SECRET.GIPHY_API_KEY,
-      decryptSecret(org.giphyApiKeyEnc),
-    );
-  }
-
-  if (org.vapidPrivateKeyEnc) {
-    await upsertStoreSecret(
-      params.accountId,
-      params.apiToken,
-      storeId,
-      CCO_STORE_SECRET.VAPID_PRIVATE_KEY,
-      decryptSecret(org.vapidPrivateKeyEnc),
-    );
-  }
-
-  if (org.cloudflareApiTokenEnc) {
-    await upsertStoreSecret(
-      params.accountId,
-      params.apiToken,
-      storeId,
-      CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
-      decryptSecret(org.cloudflareApiTokenEnc),
-    );
-  }
-
-  if (org.cloudflareR2AccessKeyIdEnc) {
-    await upsertStoreSecret(
-      params.accountId,
-      params.apiToken,
-      storeId,
-      CCO_STORE_SECRET.R2_ACCESS_KEY_ID,
-      decryptSecret(org.cloudflareR2AccessKeyIdEnc),
-    );
-  }
-
-  if (org.cloudflareR2SecretAccessKeyEnc) {
-    await upsertStoreSecret(
-      params.accountId,
-      params.apiToken,
-      storeId,
-      CCO_STORE_SECRET.R2_SECRET_ACCESS_KEY,
-      decryptSecret(org.cloudflareR2SecretAccessKeyEnc),
+      upsert.secretName,
+      upsert.value,
     );
   }
 
   await db
     .update(organizations)
-    .set({
-      cloudflareSecretsStoreId: storeId,
-      pcoClientSecretConfigured: Boolean(org.pcoClientSecretEnc || org.pcoClientSecretConfigured),
-      pcoWebhookSecretsConfigured: Boolean(
-        org.pcoWebhookSecretEnc || org.pcoWebhookSecretsConfigured,
-      ),
-      giphyApiKeyConfigured: Boolean(org.giphyApiKeyEnc || org.giphyApiKeyConfigured),
-      vapidPrivateKeyConfigured: Boolean(
-        org.vapidPrivateKeyEnc || org.vapidPrivateKeyConfigured,
-      ),
-      cloudflareApiTokenConfigured: Boolean(
-        org.cloudflareApiTokenEnc || org.cloudflareApiTokenConfigured,
-      ),
-      cloudflareR2AccessKeyConfigured: Boolean(
-        org.cloudflareR2AccessKeyIdEnc || org.cloudflareR2AccessKeyConfigured,
-      ),
-      cloudflareR2SecretAccessKeyConfigured: Boolean(
-        org.cloudflareR2SecretAccessKeyEnc || org.cloudflareR2SecretAccessKeyConfigured,
-      ),
-      pcoClientSecretEnc: null,
-      pcoWebhookSecretEnc: null,
-      giphyApiKeyEnc: null,
-      vapidPrivateKeyEnc: null,
-      cloudflareApiTokenEnc: null,
-      cloudflareR2AccessKeyIdEnc: null,
-      cloudflareR2SecretAccessKeyEnc: null,
-    })
+    .set(organizationSecretsStoreMigrationDbPatch(org, storeId))
     .where(eq(organizations.id, params.organizationId));
 
   invalidateOrgContextCache();

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -63,6 +63,7 @@ const ChatLayoutContext = createContext<ChatLayoutContextValue | null>(null);
 
 export function ChatLayoutProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsToken, setWsToken] = useState<string | null>(null);
   const [session, setSession] = useState<ChatSessionInfo | null>(() => readCachedSession());
@@ -108,6 +109,12 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setSessionLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (sessionLoading || session) return;
+    const next = encodeURIComponent(`${pathname}${window.location.search}`);
+    router.replace(`/auth/sign-in?next=${next}`);
+  }, [session, sessionLoading, pathname, router]);
 
   return (
     <ChatLayoutContext.Provider
