@@ -897,21 +897,48 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-section-header {
+  position: relative;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+.sidebar-section-header-has-action {
+  padding-right: 36px;
+}
+
+.sidebar-section-header-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 4px 8px;
-  margin-bottom: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sidebar-section-header-line {
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--color-border);
 }
 
 .sidebar-section-title {
+  flex-shrink: 0;
   margin: 0;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.6875rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   color: var(--color-muted);
+  text-align: center;
+}
+
+.sidebar-section-header-action {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
 }
 
 .sidebar-action-btn {
@@ -940,44 +967,25 @@ html[data-theme="6"] .user-menu-dropdown {
   padding: 0;
 }
 
-.sidebar-list-indented {
-  padding: 0 8px 0 16px;
-}
-
-.sidebar-section-indented .sidebar-empty {
-  padding: 4px 8px 4px 16px;
-}
-
-.sidebar-section-indented .sidebar-list-indented {
-  padding: 0 8px 0 16px;
-  overflow: visible;
-}
-
-.sidebar-section-indented .sidebar-new-dm {
-  padding: 0 8px 8px 16px;
-}
-
-.sidebar-section-messages .sidebar-empty,
+.sidebar-section-indented .sidebar-list,
+.sidebar-section-messages .sidebar-list,
 .sidebar-section-messages .sidebar-new-dm,
-.sidebar-section-messages .sidebar-list {
-  padding-left: 8px;
+.sidebar-section-teams .sidebar-list,
+.sidebar-section-teams .sidebar-team-groups {
+  padding-left: 12px;
   padding-right: 8px;
 }
 
-.sidebar-section-messages .sidebar-empty {
-  text-align: center;
+.sidebar-section-indented .sidebar-empty,
+.sidebar-section-messages .sidebar-empty,
+.sidebar-section-teams .sidebar-empty {
+  padding: 4px 8px 4px 12px;
+  text-align: left;
 }
 
 .sidebar-section-messages .sidebar-dm-item {
   padding-left: 0;
   padding-right: 0;
-}
-
-.sidebar-section-teams .sidebar-empty,
-.sidebar-section-teams .sidebar-list,
-.sidebar-section-teams .sidebar-team-groups {
-  padding-left: 8px;
-  padding-right: 8px;
 }
 
 .sidebar-team-groups {
@@ -992,7 +1000,7 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-team-service-heading {
   margin: 0;
-  padding: 2px 8px 4px;
+  padding: 2px 8px 4px 12px;
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -1000,14 +1008,7 @@ html[data-theme="6"] .user-menu-dropdown {
   color: var(--color-muted);
 }
 
-.sidebar-section-teams .sidebar-team-service-block .sidebar-list {
-  padding-left: 0;
-  padding-right: 0;
-}
-
 .sidebar-section-teams .sidebar-team-item {
-  padding-left: 0;
-  padding-right: 0;
   gap: 8px;
   align-items: flex-start;
 }

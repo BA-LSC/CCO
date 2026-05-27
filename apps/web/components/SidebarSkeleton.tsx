@@ -1,3 +1,5 @@
+import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
+
 const GROUP_ROWS = 2;
 const CHANNEL_ROWS = 2;
 const DM_ROWS = 3;
@@ -9,9 +11,7 @@ export function SidebarSkeleton() {
       <span className="visually-hidden">Loading sidebar</span>
 
       <section className="sidebar-section sidebar-section-indented" aria-hidden>
-        <div className="sidebar-section-header">
-          <h2 className="sidebar-section-title">Groups</h2>
-        </div>
+        <SidebarSectionHeader title="Groups" />
         <ul className="sidebar-list">
           {Array.from({ length: GROUP_ROWS }, (_, groupIndex) => (
             <li key={groupIndex} className="sidebar-group">
@@ -39,10 +39,10 @@ export function SidebarSkeleton() {
       </section>
 
       <section className="sidebar-section sidebar-section-messages" aria-hidden>
-        <div className="sidebar-section-header">
-          <h2 className="sidebar-section-title">Messages</h2>
-          <span className="sidebar-add-channel-icon sidebar-skeleton-icon" aria-hidden />
-        </div>
+        <SidebarSectionHeader
+          title="Messages"
+          action={<span className="sidebar-add-channel-icon sidebar-skeleton-icon" aria-hidden />}
+        />
         <ul className="sidebar-list">
           {Array.from({ length: DM_ROWS }, (_, dmIndex) => (
             <li key={dmIndex}>
@@ -58,9 +58,7 @@ export function SidebarSkeleton() {
       </section>
 
       <section className="sidebar-section sidebar-section-teams" aria-hidden>
-        <div className="sidebar-section-header">
-          <h2 className="sidebar-section-title">Teams</h2>
-        </div>
+        <SidebarSectionHeader title="Teams" />
         <ul className="sidebar-list">
           {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
             <li key={teamIndex}>

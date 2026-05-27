@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SidebarCloseIcon, SidebarLockIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import {
   apiFetch,
   slugify,
@@ -148,9 +149,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
 
   return (
     <section className="sidebar-section sidebar-section-indented" aria-label="Groups">
-      <div className="sidebar-section-header">
-        <h2 className="sidebar-section-title">Groups</h2>
-      </div>
+      <SidebarSectionHeader title="Groups" />
 
       {createError && <p className="sidebar-alert">{createError}</p>}
 

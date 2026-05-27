@@ -11,6 +11,7 @@ import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { UserStatusMessage } from "@/components/UserStatusMessage";
 import { usePresenceWatch } from "@/components/PresenceProvider";
 import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import { UserMenu } from "@/components/UserMenu";
 import {
   apiFetch,
@@ -259,23 +260,25 @@ export function ChatSidebar() {
             <GroupSidebarSection groups={groups} onGroupsReload={loadSidebar} />
 
             <section className="sidebar-section sidebar-section-messages" aria-label="Messages">
-              <div className="sidebar-section-header">
-                <h2 className="sidebar-section-title">Messages</h2>
-                <button
-                  type="button"
-                  className={`sidebar-add-channel-icon ${showNewDm ? "sidebar-add-channel-icon-active" : ""}`}
-                  aria-label={showNewDm ? "Cancel new message" : "New message"}
-                  aria-expanded={showNewDm}
-                  title={showNewDm ? "Cancel" : "New message"}
-                  onClick={() => {
-                    setShowNewDm((v) => !v);
-                    setDmSearch("");
-                    setDmPeople([]);
-                  }}
-                >
-                  {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
-                </button>
-              </div>
+              <SidebarSectionHeader
+                title="Messages"
+                action={
+                  <button
+                    type="button"
+                    className={`sidebar-add-channel-icon ${showNewDm ? "sidebar-add-channel-icon-active" : ""}`}
+                    aria-label={showNewDm ? "Cancel new message" : "New message"}
+                    aria-expanded={showNewDm}
+                    title={showNewDm ? "Cancel" : "New message"}
+                    onClick={() => {
+                      setShowNewDm((v) => !v);
+                      setDmSearch("");
+                      setDmPeople([]);
+                    }}
+                  >
+                    {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
+                  </button>
+                }
+              />
 
               {showNewDm && (
                 <div className="sidebar-new-dm">
@@ -374,9 +377,7 @@ export function ChatSidebar() {
             </section>
 
             <section className="sidebar-section sidebar-section-teams" aria-label="Teams">
-              <div className="sidebar-section-header">
-                <h2 className="sidebar-section-title">Teams</h2>
-              </div>
+              <SidebarSectionHeader title="Teams" />
 
               {teams.length === 0 ? (
                 <p className="sidebar-empty">No teams yet.</p>
