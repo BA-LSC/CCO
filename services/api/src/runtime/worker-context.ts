@@ -23,10 +23,16 @@ export type WorkerEnvVars = {
   UPLOAD_STORAGE?: string;
 };
 
+/** Cloudflare ExecutionContext surface used for background deploy jobs. */
+export type WorkerExecutionContext = {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
 export type WorkerRuntimeContext = {
   bindings: WorkerBindings;
   vars: WorkerEnvVars;
   d1: CcoD1Database;
+  executionCtx?: WorkerExecutionContext;
 };
 
 const storage = new AsyncLocalStorage<WorkerRuntimeContext>();
@@ -41,6 +47,10 @@ export function getWorkerBindings(): WorkerBindings | undefined {
 
 export function getWorkerD1(): CcoD1Database | undefined {
   return storage.getStore()?.d1;
+}
+
+export function getExecutionContext(): WorkerExecutionContext | undefined {
+  return storage.getStore()?.executionCtx;
 }
 
 export function isCloudflareRuntime(): boolean {
@@ -78,9 +88,10 @@ export async function runWithWorkerContext<T>(
   bindings: WorkerBindings,
   vars: WorkerEnvVars,
   fn: () => T | Promise<T>,
+  executionCtx?: WorkerExecutionContext,
 ): Promise<T> {
   const d1 = createD1Client(bindings.DB);
-  const ctx: WorkerRuntimeContext = { bindings, vars, d1 };
+  const ctx: WorkerRuntimeContext = { bindings, vars, d1, executionCtx };
   mirrorEnvVars(vars);
   return storage.run(ctx, fn);
 }

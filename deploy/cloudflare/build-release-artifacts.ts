@@ -64,6 +64,10 @@ cpSync(
   join(ROOT, "packages/db/drizzle/d1/0000_d1_baseline.sql"),
   join(RELEASES, "0000_d1_baseline.sql"),
 );
+cpSync(
+  join(ROOT, "packages/db/drizzle/d1/0001_org_release_updates.sql"),
+  join(RELEASES, "0001_org_release_updates.sql"),
+);
 
 const manifest = walkAssets(ASSETS_OUT);
 writeFileSync(join(RELEASES, "cco-web-manifest.json"), JSON.stringify(manifest, null, 2));
@@ -90,6 +94,7 @@ Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE
 - Web manifest: \`cco-web-manifest.json\`
 - Release catalog: \`release-index.json\` (version + git ref for Admin Updates)
 - D1 baseline: \`0000_d1_baseline.sql\`
+- D1 incremental migrations: \`0001_org_release_updates.sql\` (Admin Updates day-two schema)
 `;
 writeFileSync(join(RELEASES, "README.md"), releaseReadme);
 

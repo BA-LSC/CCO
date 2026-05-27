@@ -5,7 +5,11 @@ import {
   ensureCloudflareOrganizationColumns,
   ensureCallSessionSchema,
 } from "./queries/org-schema.d1.js";
-import { getD1MigrationSqlFiles, readD1BaselineSql } from "./client.js";
+import {
+  getD1IncrementalMigrationFilenames,
+  getD1MigrationSqlFiles,
+  readD1BaselineSql,
+} from "./client.js";
 
 describe("D1 client helpers", () => {
   test("readD1BaselineSql returns non-empty SQL", async () => {
@@ -19,6 +23,11 @@ describe("D1 client helpers", () => {
     const fromDisk = readFileSync(getD1MigrationSqlFiles()[0]!, "utf8");
     const fromHelper = await readD1BaselineSql();
     expect(fromHelper).toBe(fromDisk);
+  });
+
+  test("getD1IncrementalMigrationFilenames lists shipped day-two migrations", () => {
+    const files = getD1IncrementalMigrationFilenames();
+    expect(files).toEqual(["0001_org_release_updates.sql"]);
   });
 });
 

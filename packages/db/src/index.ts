@@ -3,6 +3,7 @@ export {
   createDb,
   getD1MigrationsFolder,
   getD1MigrationSqlFiles,
+  getD1IncrementalMigrationFilenames,
   readD1BaselineSql,
   runMigrations,
   applyBaselineMigration,

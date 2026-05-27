@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoadingState } from "@/components/PageStates";
 import { apiFetch } from "@/lib/api";
+import { clearDeployWait, markDeployWait } from "@/lib/app-update";
 
 type UpdatesStatus = {
   platform: "cloudflare" | "vps" | "unknown";
@@ -90,15 +91,25 @@ export default function UpdatesSettingsPage() {
     setBusy("apply");
     setError(null);
     setSuccess(null);
+    markDeployWait();
     try {
       const result = await apiFetch<{
         ok: boolean;
+        accepted?: boolean;
         appliedVersion: string;
         status: UpdatesStatus;
       }>("/api/v1/settings/updates/apply", { method: "POST" });
       setStatus(result.status);
-      setSuccess(`Update applied (${shortenSha(result.appliedVersion)}). Workers are redeploying.`);
+      const version = shortenSha(result.appliedVersion);
+      const refreshNote =
+        " This page will refresh automatically when the deploy finishes.";
+      setSuccess(
+        result.accepted
+          ? `Update started (${version}). Workers are redeploying.${refreshNote}`
+          : `Update applied (${version}). Workers are redeploying.${refreshNote}`,
+      );
     } catch (err) {
+      clearDeployWait();
       setError(err instanceof Error ? err.message : "Apply failed");
     } finally {
       setBusy(null);

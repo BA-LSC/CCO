@@ -40,9 +40,12 @@ import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
 import {
   applyCloudflareReleaseUpdate,
+  executeCloudflareReleaseUpdate,
   getUpdatesStatus,
   setAutoUpdateEnabled,
+  startCloudflareReleaseUpdate,
 } from "../services/org-updates";
+import { getExecutionContext, isCloudflareRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
 
@@ -391,6 +394,21 @@ settingsRouter.post("/updates/apply", requireAuth, async (c) => {
   }
 
   try {
+    const executionCtx = getExecutionContext();
+    if (isCloudflareRuntime() && executionCtx) {
+      const { job, targetVersion } = await startCloudflareReleaseUpdate();
+      executionCtx.waitUntil(
+        executeCloudflareReleaseUpdate(job).catch((err) => {
+          console.error("[org-updates] Background apply failed:", err);
+        }),
+      );
+      const status = await getUpdatesStatus();
+      return c.json(
+        { ok: true, accepted: true, appliedVersion: targetVersion, status },
+        202,
+      );
+    }
+
     const result = await applyCloudflareReleaseUpdate();
     const status = await getUpdatesStatus();
     return c.json({ ok: true, ...result, status });

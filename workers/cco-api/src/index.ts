@@ -6,7 +6,7 @@ const app = createApp();
 
 export default {
   async fetch(request: Request, env: CcoApiEnv, _ctx: ExecutionContext): Promise<Response> {
-    return runWithWorkerContext(workerBindings(env), workerEnvVars(env), () => app.fetch(request));
+    return runWithWorkerContext(workerBindings(env), workerEnvVars(env), () => app.fetch(request), _ctx);
   },
 };
 

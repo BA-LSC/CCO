@@ -28,6 +28,11 @@ export function getD1MigrationSqlFiles(): string[] {
   return [join(getD1MigrationsFolder(), "0000_d1_baseline.sql")];
 }
 
+/** Incremental D1 migration filenames shipped in release artifacts (apply order). */
+export function getD1IncrementalMigrationFilenames(): string[] {
+  return ["0001_org_release_updates.sql"];
+}
+
 /** Read baseline migration SQL (for Workers without filesystem or provision API batch). */
 export async function readD1BaselineSql(): Promise<string> {
   const bun = (globalThis as { Bun?: { file: (p: string) => { text: () => Promise<string> } } }).Bun;
