@@ -93,7 +93,7 @@ export function ChatSidebar() {
   const [dmSearching, setDmSearching] = useState(false);
   const [dmPeopleError, setDmPeopleError] = useState<string | null>(null);
   const [creatingDm, setCreatingDm] = useState<string | null>(null);
-  const [churchName, setChurchName] = useState<string | null>(null);
+  const [setupChurchName, setSetupChurchName] = useState<string | null>(null);
 
   const loadSidebar = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -124,9 +124,11 @@ export function ChatSidebar() {
 
   useEffect(() => {
     void fetchSetupStatus().then((status) => {
-      if (status.churchName) setChurchName(status.churchName);
+      if (status.churchName) setSetupChurchName(status.churchName);
     });
   }, []);
+
+  const churchName = session?.organizationName?.trim() || setupChurchName;
 
   useEffect(() => {
     if (!pcoSync) return;

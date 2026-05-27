@@ -10,15 +10,17 @@ type Props = {
 };
 
 export function EmptyChatPane({ banner }: Props) {
-  const { openSidebar } = useChatLayout();
-  const [churchName, setChurchName] = useState<string | null>(null);
+  const { openSidebar, session } = useChatLayout();
+  const [setupChurchName, setSetupChurchName] = useState<string | null>(null);
   const [menuPulse, setMenuPulse] = useState(true);
 
   useEffect(() => {
     void fetchSetupStatus().then((status) => {
-      if (status.churchName) setChurchName(status.churchName);
+      if (status.churchName) setSetupChurchName(status.churchName);
     });
   }, []);
+
+  const churchName = session?.organizationName?.trim() || setupChurchName;
 
   return (
     <div className="empty-chat-pane">

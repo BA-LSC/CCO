@@ -48,7 +48,7 @@ async function setupStatusUrlAsync(): Promise<string> {
 export async function fetchSetupStatus(): Promise<SetupStatus> {
   try {
     if (typeof window !== "undefined") {
-      const res = await fetch("/api/v1/setup/status", { cache: "no-store" });
+      const res = await fetch("/api/v1/setup/status", { cache: "no-store", credentials: "include" });
       if (!res.ok) return { configured: false, signInAvailable: false };
       return (await res.json()) as SetupStatus;
     }

@@ -37,6 +37,7 @@ import {
   InstallHandoffSchema,
 } from "../services/install-setup";
 import { isInstallHandoffAuthorized } from "../services/setup-session";
+import { resolveChurchDisplayName } from "../services/org-display";
 
 type Env = { Variables: AuthVariables };
 
@@ -77,8 +78,10 @@ setupRouter.get("/status", async (c) => {
   const orgWithOAuth = await getOrganizationWithOAuthCredentials();
   const credentials = await getActiveOrgOAuthCredentials();
   const org = configured ? await getConfiguredOrganization() : orgWithOAuth;
-  const churchName =
-    org?.name && org.name !== "Pending setup" ? org.name.trim() : null;
+  let churchName = resolveChurchDisplayName(org?.name);
+  if (!churchName && orgWithOAuth && orgWithOAuth.id !== org?.id) {
+    churchName = resolveChurchDisplayName(orgWithOAuth.name);
+  }
   const webhookSecrets = org ? decryptWebhookSecrets(org.pcoWebhookSecretEnc) : [];
   return c.json({
     configured,

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { USER_STATUS_PICKER_PRESETS, parseUserStatusPreset } from "@cco/shared";
 import { db } from "../db";
-import { users } from "../db/schema";
+import { organizations, users } from "../db/schema";
 import { signWsToken } from "../auth/session";
 import { parseUserTheme } from "../lib/theme";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -13,6 +13,8 @@ import {
   refreshUserDisplayNameFromPco,
 } from "../services/user-profile";
 import { updateUserStatus } from "../services/user-status";
+import { resolveChurchDisplayName } from "../services/org-display";
+import { getConfiguredOrganization } from "../services/org-oauth";
 
 type Env = { Variables: AuthVariables };
 
@@ -51,6 +53,18 @@ sessionRouter.get("/me", requireAuth, async (c) => {
     displayName = (await refreshUserDisplayNameFromPco(session.userId)) ?? displayName;
   }
 
+  const orgRow = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, session.organizationId))
+    .limit(1);
+
+  let organizationName = resolveChurchDisplayName(orgRow[0]?.name);
+  if (!organizationName) {
+    const configured = await getConfiguredOrganization();
+    organizationName = resolveChurchDisplayName(configured?.name);
+  }
+
   return c.json({
     userId: row[0].id,
     displayName,
@@ -59,6 +73,7 @@ sessionRouter.get("/me", requireAuth, async (c) => {
     siteAdministrator: row[0].siteAdministrator,
     statusPreset: parseUserStatusPreset(row[0].statusPreset),
     statusMessage: row[0].statusMessage,
+    organizationName,
   });
 });
 

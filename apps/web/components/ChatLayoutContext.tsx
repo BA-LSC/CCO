@@ -20,6 +20,7 @@ export type ChatSessionInfo = {
   userId: string;
   displayName?: string;
   avatarUrl?: string | null;
+  organizationName?: string | null;
 };
 
 const SESSION_CACHE_KEY = "cco:session";
