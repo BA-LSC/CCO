@@ -30,6 +30,8 @@ type IntegrationsSettings = {
   realtimeKitConfigured?: boolean;
   realtimeKitFromEnv?: boolean;
   cloudflareApiTokenConfigured?: boolean;
+  cloudflareApiTokenValid?: boolean | null;
+  cloudflareApiTokenError?: string | null;
   realtimeKitAccountId?: string;
   realtimeKitAppId?: string;
   realtimeKitTokenConfigured?: boolean;
@@ -208,6 +210,8 @@ function CloudflareSection({
   configured,
   fromEnv,
   tokenConfigured,
+  tokenValid,
+  tokenError,
   accountId,
   apiToken,
   onApiTokenChange,
@@ -216,6 +220,8 @@ function CloudflareSection({
   configured: boolean;
   fromEnv: boolean;
   tokenConfigured: boolean;
+  tokenValid: boolean | null;
+  tokenError: string | null;
   accountId: string;
   apiToken: string;
   onApiTokenChange: (value: string) => void;
@@ -224,22 +230,39 @@ function CloudflareSection({
     platformProvisioned || configured || fromEnv || tokenConfigured;
   if (!hasCloudflare) return null;
 
-  const connected = platformProvisioned || tokenConfigured || fromEnv;
-  const canEditToken = !fromEnv && (platformProvisioned || tokenConfigured);
+  const tokenNeedsRefresh = tokenConfigured && tokenValid === false;
+  const connected = (platformProvisioned || tokenConfigured || fromEnv) && !tokenNeedsRefresh;
+  const canEditToken = !fromEnv && (platformProvisioned || tokenConfigured || tokenNeedsRefresh);
 
-  const description = platformProvisioned
-    ? "Connected during install. Paste a new API token here after rotating credentials or adding permissions (including Secrets Store → Write)."
-    : fromEnv
-      ? "Configured via server environment. Token and call settings are managed outside this page."
-      : "Cloudflare API token is stored encrypted.";
+  const description = tokenNeedsRefresh
+    ? (tokenError ??
+      "The stored Cloudflare API token is invalid or expired. Paste a new token below and save, then retry Apply update.")
+    : platformProvisioned
+      ? "Connected during install. Paste a new API token here after rotating credentials or adding permissions (including Secrets Store → Write)."
+      : fromEnv
+        ? "Configured via server environment. Token and call settings are managed outside this page."
+        : "Cloudflare API token is stored encrypted.";
 
   return (
     <IntegrationsSection
       id="cloudflare-heading"
       heading="Cloudflare"
       description={description}
-      badge={connected ? "Connected" : undefined}
+      badge={
+        tokenNeedsRefresh
+          ? "Token expired"
+          : connected
+            ? "Connected"
+            : undefined
+      }
+      badgeVariant={tokenNeedsRefresh ? "muted" : "success"}
     >
+      {tokenNeedsRefresh ? (
+        <p className="integrations-feedback integrations-feedback--error" role="alert">
+          {tokenError ??
+            "Cloudflare API token failed verification. Paste a new token and save."}
+        </p>
+      ) : null}
       {accountId ? (
         <p className="integrations-field-hint">
           Account <code>{accountId}</code>
@@ -285,6 +308,8 @@ export default function IntegrationsSettingsPage() {
   const [realtimeKitConfigured, setRealtimeKitConfigured] = useState(false);
   const [realtimeKitFromEnv, setRealtimeKitFromEnv] = useState(false);
   const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
+  const [cloudflareApiTokenValid, setCloudflareApiTokenValid] = useState<boolean | null>(null);
+  const [cloudflareApiTokenError, setCloudflareApiTokenError] = useState<string | null>(null);
   const [realtimeKitAccountId, setRealtimeKitAccountId] = useState("");
   const [cloudflarePlatformProvisioned, setCloudflarePlatformProvisioned] = useState(false);
   const [pcoSyncing, setPcoSyncing] = useState(false);
@@ -323,6 +348,8 @@ export default function IntegrationsSettingsPage() {
         setCloudflareApiTokenConfigured(
           settings.cloudflareApiTokenConfigured ?? settings.realtimeKitTokenConfigured ?? false,
         );
+        setCloudflareApiTokenValid(settings.cloudflareApiTokenValid ?? null);
+        setCloudflareApiTokenError(settings.cloudflareApiTokenError ?? null);
         setCloudflarePlatformProvisioned(
           Boolean(settings.cloudflarePlatformProvisionedAt) ||
             Boolean(settings.cloudflarePlatformConfigured),
@@ -389,6 +416,8 @@ export default function IntegrationsSettingsPage() {
             Boolean(cloudflareUpdated.cloudflarePlatformConfigured) ||
             cloudflarePlatformProvisioned,
         );
+        setCloudflareApiTokenValid(cloudflareUpdated.cloudflareApiTokenValid ?? true);
+        setCloudflareApiTokenError(cloudflareUpdated.cloudflareApiTokenError ?? null);
       }
 
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
@@ -494,7 +523,7 @@ export default function IntegrationsSettingsPage() {
         <p>Integrations, Cloudflare, release updates, and org configuration. Saved secrets stay encrypted.</p>
       </header>
 
-      <AdminUpdatesSection />
+      <AdminUpdatesSection applyCloudflareApiToken={cloudflareApiToken.trim() || undefined} />
 
       <IntegrationsSection
         id="pco-sync-heading"
@@ -536,6 +565,8 @@ export default function IntegrationsSettingsPage() {
           configured={realtimeKitConfigured}
           fromEnv={realtimeKitFromEnv}
           tokenConfigured={cloudflareApiTokenConfigured}
+          tokenValid={cloudflareApiTokenValid}
+          tokenError={cloudflareApiTokenError}
           accountId={realtimeKitAccountId}
           apiToken={cloudflareApiToken}
           onApiTokenChange={setCloudflareApiToken}

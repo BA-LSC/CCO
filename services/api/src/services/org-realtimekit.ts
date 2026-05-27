@@ -178,12 +178,26 @@ export async function updateOrganizationRealtimeKitFromToken(params: {
   });
 
   await ensureCloudflareOrganizationColumns();
+
+  const orgRows = await db
+    .select({ cloudflareSecretsStoreId: organizations.cloudflareSecretsStoreId })
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const org = orgRows[0];
+  const usesStore = org ? orgUsesSecretsStore(org) : false;
+
   await db
     .update(organizations)
     .set({
       cloudflareAccountId: provisioned.accountId,
       realtimeKitAppId: provisioned.appId,
-      cloudflareApiTokenEnc: encryptSecret(apiToken),
+      ...(usesStore
+        ? {
+            cloudflareApiTokenConfigured: true,
+            cloudflareApiTokenEnc: null,
+          }
+        : { cloudflareApiTokenEnc: encryptSecret(apiToken) }),
       realtimeKitPresetHost: provisioned.presets?.host ?? null,
       realtimeKitPresetMember: provisioned.presets?.member ?? null,
       realtimeKitPresetGuest: provisioned.presets?.guest ?? null,

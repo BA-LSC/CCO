@@ -14,8 +14,14 @@ const SECRETS_STORE_HINT =
   "Add Account → Secrets Store → Write to the Cloudflare API token.";
 
 function enrichCloudflareAuthMessage(err: CloudflareApiError): string {
-  if (/authentication error/i.test(err.message) || err.status === 403) {
-    return `${err.message}. ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT} ${SECRETS_STORE_HINT}`;
+  if (
+    /authentication (?:failed|error)/i.test(err.message) ||
+    err.status === 403
+  ) {
+    const base = err.message.includes("Secrets Store")
+      ? err.message
+      : `${err.message} Paste a new Cloudflare API token in Admin Settings → Cloudflare (recovery tokens expire).`;
+    return `${base} ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT} ${SECRETS_STORE_HINT}`;
   }
   return err.message;
 }

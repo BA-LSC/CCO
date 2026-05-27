@@ -41,6 +41,7 @@ import { selectConfiguredOrganizationRow } from "../services/configured-org-quer
 import { invalidateOrgContextCache } from "../services/org-context-cache";
 import {
   isPcoClientSecretConfigured,
+  isCloudflareApiTokenConfigured,
   isPcoWebhookSecretsConfigured,
 } from "../services/org-secrets";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
@@ -49,6 +50,7 @@ import { syncPcoDataForUser } from "../services/pco-data-sync";
 import { verifyCloudflareUpdateApplyPermissions } from "@cco/cloudflare-provision";
 import {
   applyCloudflareReleaseUpdate,
+  checkCloudflareApplyTokenHealth,
   executeCloudflareReleaseUpdate,
   getUpdatesStatus,
   resolveOrgHostnames,
@@ -145,6 +147,10 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(refreshed);
   const platformStatus = getOrganizationCloudflarePlatformStatus(refreshed);
   const webhookConfigured = isPcoWebhookSecretsConfigured(refreshed);
+  const tokenHealth =
+    refreshed.cloudflareAccountId && isCloudflareApiTokenConfigured(refreshed)
+      ? await checkCloudflareApplyTokenHealth(refreshed)
+      : { valid: null, error: null };
 
   return c.json({
     configured: true,
@@ -160,6 +166,8 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     ...giphyStatus,
     ...realtimeKitStatus,
     ...platformStatus,
+    cloudflareApiTokenValid: tokenHealth.valid,
+    cloudflareApiTokenError: tokenHealth.error,
     gitRepoUrl: resolveOrgGitRepoUrl(refreshed.gitRepoUrl),
     defaultGitRepoUrl: CCO_DEFAULT_GIT_REPO_URL,
   });
@@ -392,10 +400,13 @@ settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
     (await selectConfiguredOrganizationRow(eq(organizations.id, org.id))) ?? org;
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated);
   const platformStatus = getOrganizationCloudflarePlatformStatus(updated);
+  const tokenHealth = await checkCloudflareApplyTokenHealth(updated);
   return c.json({
     ok: true,
     ...realtimeKitStatus,
     ...platformStatus,
+    cloudflareApiTokenValid: tokenHealth.valid,
+    cloudflareApiTokenError: tokenHealth.error,
   });
 });
 

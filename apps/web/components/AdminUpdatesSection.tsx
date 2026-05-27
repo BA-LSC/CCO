@@ -22,6 +22,8 @@ type UpdatesStatus = {
   lastApplyError: string | null;
   canApply: boolean;
   applyBlockedReason: string | null;
+  cloudflareApiTokenValid?: boolean | null;
+  cloudflareApiTokenError?: string | null;
 };
 
 function shortenSha(value: string | null): string {
@@ -58,7 +60,12 @@ function formatStatusLine(status: UpdatesStatus): string {
   return `Version ${installed} · Last checked ${checked}`;
 }
 
-export function AdminUpdatesSection() {
+export function AdminUpdatesSection({
+  applyCloudflareApiToken,
+}: {
+  /** When set, Apply update uses this token instead of the Secrets Store binding. */
+  applyCloudflareApiToken?: string;
+} = {}) {
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
   const [busy, setBusy] = useState<"check" | "apply" | "toggle" | null>(null);
   const [deploying, setDeploying] = useState(false);
@@ -178,12 +185,20 @@ export function AdminUpdatesSection() {
     markDeployWait({ showOverlay: false });
     setDeploying(true);
     try {
+      const applyBody = applyCloudflareApiToken
+        ? JSON.stringify({ cloudflareApiToken: applyCloudflareApiToken })
+        : undefined;
       const result = await apiFetch<{
         ok: boolean;
         accepted?: boolean;
         appliedVersion: string;
         status: UpdatesStatus;
-      }>("/api/v1/settings/updates/apply", { method: "POST" });
+      }>("/api/v1/settings/updates/apply", {
+        method: "POST",
+        ...(applyBody
+          ? { headers: { "Content-Type": "application/json" }, body: applyBody }
+          : {}),
+      });
       setStatus(result.status);
       const version = shortenSha(result.appliedVersion);
       const refreshNote =
@@ -254,6 +269,12 @@ export function AdminUpdatesSection() {
       </div>
 
       <p className="integrations-inline-status integrations-field-hint">{formatStatusLine(status)}</p>
+
+      {status.cloudflareApiTokenValid === false && status.cloudflareApiTokenError && (
+        <p className="integrations-feedback integrations-feedback--error" role="alert">
+          Cloudflare token invalid: {status.cloudflareApiTokenError}
+        </p>
+      )}
 
       {status.lastApplyError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">

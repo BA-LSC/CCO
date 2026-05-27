@@ -67,7 +67,59 @@ export type UpdatesStatus = {
   lastApplyError: string | null;
   canApply: boolean;
   applyBlockedReason: string | null;
+  /** False when the apply token (Secrets Store binding) fails Cloudflare preflight. */
+  cloudflareApiTokenValid: boolean | null;
+  cloudflareApiTokenError: string | null;
 };
+
+export type CloudflareApplyTokenHealth = {
+  valid: boolean;
+  error: string | null;
+};
+
+/** Preflight the token Apply update will use (binding, override, or legacy D1 enc). */
+export async function checkCloudflareApplyTokenHealth(
+  org: NonNullable<Awaited<ReturnType<typeof getConfiguredOrganization>>>,
+  apiTokenOverride?: string,
+): Promise<CloudflareApplyTokenHealth> {
+  if (!isCloudflareApiTokenConfigured(org)) {
+    return { valid: false, error: "Cloudflare API token is not configured." };
+  }
+  if (!org.cloudflareAccountId?.trim()) {
+    return { valid: false, error: "Cloudflare account is not linked to this organization." };
+  }
+
+  const hostnames = resolveOrgHostnames(org);
+  if (!hostnames) {
+    return {
+      valid: false,
+      error: "Could not resolve chat/API hostnames from organization URLs.",
+    };
+  }
+
+  const apiToken = resolveApplyCloudflareApiToken(org, apiTokenOverride);
+  if (!apiToken) {
+    return {
+      valid: false,
+      error:
+        "Cloudflare API token is missing. Paste a new token under Cloudflare in Admin Settings.",
+    };
+  }
+
+  try {
+    await verifyCloudflareUpdateApplyPermissions({
+      accountId: org.cloudflareAccountId,
+      apiToken,
+      chatHostname: hostnames.chatHostname,
+      apiHostname: hostnames.apiHostname,
+    });
+    return { valid: true, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Cloudflare API token verification failed";
+    return { valid: false, error: message };
+  }
+}
 
 export type CloudflareReleaseUpdateJob = {
   orgId: string;
@@ -219,6 +271,20 @@ export async function getUpdatesStatus(options?: {
     applyBlockedReason = "Already on the latest release.";
   }
 
+  let cloudflareApiTokenValid: boolean | null = null;
+  let cloudflareApiTokenError: string | null = null;
+  if (platform === "cloudflare" && isCloudflareApiTokenConfigured(org)) {
+    const tokenHealth = await checkCloudflareApplyTokenHealth(org);
+    cloudflareApiTokenValid = tokenHealth.valid;
+    cloudflareApiTokenError = tokenHealth.error;
+    if (!tokenHealth.valid) {
+      canApply = false;
+      applyBlockedReason =
+        tokenHealth.error ??
+        "Cloudflare API token is invalid. Paste a new token under Cloudflare.";
+    }
+  }
+
   return {
     platform,
     currentVersion,
@@ -232,6 +298,8 @@ export async function getUpdatesStatus(options?: {
     lastApplyError,
     canApply,
     applyBlockedReason,
+    cloudflareApiTokenValid,
+    cloudflareApiTokenError,
   };
 }
 

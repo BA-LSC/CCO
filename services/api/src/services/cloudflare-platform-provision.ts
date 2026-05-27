@@ -2,6 +2,7 @@ import { encryptSecret } from "../auth/token-crypto";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { eq } from "drizzle-orm";
+import { orgUsesSecretsStore } from "./org-secrets";
 import { resolveCloudflareAccountId } from "./cloudflare-realtimekit-provision";
 import {
   ensureHyperdriveConfig,
@@ -97,11 +98,25 @@ export async function provisionCloudflarePlatform(params: {
   }
 
   await ensureCloudflarePlatformColumns();
+
+  const orgRows = await db
+    .select({ cloudflareSecretsStoreId: organizations.cloudflareSecretsStoreId })
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const org = orgRows[0];
+  const usesStore = org ? orgUsesSecretsStore(org) : false;
+
   await db
     .update(organizations)
     .set({
       cloudflareAccountId: accountId,
-      cloudflareApiTokenEnc: encryptSecret(apiToken),
+      ...(usesStore
+        ? {
+            cloudflareApiTokenConfigured: true,
+            cloudflareApiTokenEnc: null,
+          }
+        : { cloudflareApiTokenEnc: encryptSecret(apiToken) }),
       cloudflareR2BucketName: r2BucketName,
       cloudflareKvPresenceNamespaceId: presenceKv.id,
       cloudflareKvDeployNamespaceId: deployKv.id,
