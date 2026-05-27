@@ -324,18 +324,20 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                             activeConversationId === conv.id ? "sidebar-item-active" : ""
                           }`}
                         >
-                          <SidebarChannelPrefix conv={conv} />
-                          <span className="sidebar-item-label">{conv.title}</span>
-                          <span className="sidebar-nested-trailing">
-                            {conv.muted && (
-                              <span className="sidebar-badge" title="Muted">
-                                🔕
-                              </span>
-                            )}
-                            {conv.hasUnread && activeConversationId !== conv.id && (
-                              <span className="sidebar-unread-dot" aria-label="Unread messages" />
-                            )}
-                          </span>
+                          <div className="sidebar-channel-row">
+                            <SidebarChannelPrefix conv={conv} />
+                            <span className="sidebar-item-label">{conv.title}</span>
+                            <span className="sidebar-nested-trailing">
+                              {conv.muted && (
+                                <span className="sidebar-badge" title="Muted">
+                                  🔕
+                                </span>
+                              )}
+                              {conv.hasUnread && activeConversationId !== conv.id && (
+                                <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                              )}
+                            </span>
+                          </div>
                         </Link>
                       </li>
                     ))
