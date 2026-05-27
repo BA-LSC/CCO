@@ -30,6 +30,18 @@ function formatWhen(iso: string | null): string {
   return new Date(iso).toLocaleString();
 }
 
+function formatStatusLine(status: UpdatesStatus): string {
+  const installed = shortenSha(status.currentVersion);
+  const checked = formatWhen(status.lastUpdateCheckAt);
+
+  if (status.updateAvailable) {
+    const latest = shortenSha(status.latestVersion);
+    return `Installed ${installed} · Latest ${latest} · Last checked ${checked}`;
+  }
+
+  return `Version ${installed} · Last checked ${checked}`;
+}
+
 type AdminUpdatesSectionProps = {
   initialGitRepoUrl?: string;
   onFeedback?: (message: { error?: string; success?: string }) => void;
@@ -161,78 +173,25 @@ export function AdminUpdatesSection({
     );
   }
 
+  const statusBadge = status.updateAvailable
+    ? { label: "Update available", variant: "muted" as const }
+    : { label: "Up to date", variant: "success" as const };
+
   return (
     <section className="integrations-section" aria-labelledby="updates-status-heading">
-      <div className="integrations-section-head">
-        <h2 id="updates-status-heading">Updates</h2>
-        <p>
-          Compare your installed build with the latest commit on your configured GitHub repository.
-          Release artifacts for the default repo are published to setup-c.co; custom forks need{" "}
-          <code>CCO_RELEASES_BASE_URL</code> on the worker.
-        </p>
-      </div>
-
-      <form className="integrations-fields" onSubmit={(e) => void handleSaveGitRepo(e)}>
-        <label className="integrations-field">
-          <span className="integrations-field-label">Git repository URL</span>
-          <input
-            className="integrations-input"
-            type="url"
-            value={gitRepoUrl}
-            onChange={(e) => setGitRepoUrl(e.target.value)}
-            placeholder={CCO_DEFAULT_GIT_REPO_URL}
-            required
-          />
-        </label>
-        <button
-          type="submit"
-          className="btn btn-secondary integrations-action-btn"
-          disabled={busy !== null}
-        >
-          {busy === "saveRepo" ? "Saving…" : "Save repository"}
-        </button>
-      </form>
-
-      <dl className="integrations-fields">
-        <div className="integrations-field">
-          <span className="integrations-field-label">Platform</span>
-          <span>
-            {status.platform === "cloudflare"
-              ? "BYO Cloudflare"
-              : status.platform === "vps"
-                ? "VPS"
-                : "Unknown"}
+      <div className="integrations-section-top">
+        <div className="integrations-section-head">
+          <h2 id="updates-status-heading">Updates</h2>
+          <p>Install the latest release from your connected repository.</p>
+        </div>
+        <div className="integrations-section-badges">
+          <span className={`integrations-badge integrations-badge--${statusBadge.variant}`}>
+            {statusBadge.label}
           </span>
         </div>
-        <div className="integrations-field">
-          <span className="integrations-field-label">Installed version</span>
-          <span>{shortenSha(status.currentVersion)}</span>
-        </div>
-        <div className="integrations-field">
-          <span className="integrations-field-label">Latest on main</span>
-          <span>{shortenSha(status.latestVersion)}</span>
-        </div>
-        <div className="integrations-field">
-          <span className="integrations-field-label">Last checked</span>
-          <span>{formatWhen(status.lastUpdateCheckAt)}</span>
-        </div>
-        {status.latestPublishedAt && (
-          <div className="integrations-field">
-            <span className="integrations-field-label">Latest published</span>
-            <span>{formatWhen(status.latestPublishedAt)}</span>
-          </div>
-        )}
-        {status.releasesBaseUrl && (
-          <div className="integrations-field">
-            <span className="integrations-field-label">Artifacts base</span>
-            <span>
-              <a href={status.releasesBaseUrl} target="_blank" rel="noreferrer">
-                {status.releasesBaseUrl}
-              </a>
-            </span>
-          </div>
-        )}
-      </dl>
+      </div>
+
+      <p className="integrations-inline-status integrations-field-hint">{formatStatusLine(status)}</p>
 
       {status.lastApplyError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
@@ -240,7 +199,7 @@ export function AdminUpdatesSection({
         </p>
       )}
 
-      <div className="integrations-section-top">
+      <div className="integrations-actions">
         <button
           type="button"
           className="btn btn-secondary integrations-action-btn"
@@ -264,24 +223,69 @@ export function AdminUpdatesSection({
       )}
 
       {status.platform === "cloudflare" && (
-        <label className="integrations-toggle">
-          <input
-            type="checkbox"
-            checked={status.autoUpdateEnabled}
-            disabled={busy !== null}
-            onChange={(event) => void handleToggleAutoUpdate(event.target.checked)}
-          />
-          <span className="integrations-toggle-label">
-            Automatically install new releases (checked every 6 hours). Default is off.
-          </span>
-        </label>
+        <>
+          <label className="integrations-toggle">
+            <span className="integrations-toggle-label">Auto-install updates</span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={status.autoUpdateEnabled}
+              disabled={busy !== null}
+              onChange={(event) => void handleToggleAutoUpdate(event.target.checked)}
+              aria-label="Auto-install updates"
+            />
+            <span className="toggle-switch" aria-hidden="true" />
+          </label>
+          <p className="integrations-field-hint">
+            Checked every 6 hours. Off by default until you enable it.
+          </p>
+        </>
       )}
 
-      {status.platform === "vps" && (
-        <p className="integrations-field-hint">
-          VPS production updates use <code>cd ~/cco && ./deploy/update.sh</code> on the server.
-        </p>
-      )}
+      <details className="integrations-details">
+        <summary>Advanced</summary>
+        <div className="integrations-details-body">
+          <form className="integrations-fields" onSubmit={(e) => void handleSaveGitRepo(e)}>
+            <label className="integrations-field">
+              <span className="integrations-field-label">Git repository URL</span>
+              <input
+                className="integrations-input"
+                type="url"
+                value={gitRepoUrl}
+                onChange={(e) => setGitRepoUrl(e.target.value)}
+                placeholder={CCO_DEFAULT_GIT_REPO_URL}
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              className="btn btn-secondary integrations-action-btn"
+              disabled={busy !== null}
+            >
+              {busy === "saveRepo" ? "Saving…" : "Save repository"}
+            </button>
+          </form>
+
+          <dl className="integrations-fields">
+            <div className="integrations-field">
+              <span className="integrations-field-label">Platform</span>
+              <span>
+                {status.platform === "cloudflare"
+                  ? "BYO Cloudflare"
+                  : status.platform === "vps"
+                    ? "VPS"
+                    : "Unknown"}
+              </span>
+            </div>
+            {status.latestPublishedAt && (
+              <div className="integrations-field">
+                <span className="integrations-field-label">Latest published</span>
+                <span>{formatWhen(status.latestPublishedAt)}</span>
+              </div>
+            )}
+          </dl>
+        </div>
+      </details>
     </section>
   );
 }

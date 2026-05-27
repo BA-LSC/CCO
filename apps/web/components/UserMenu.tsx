@@ -352,17 +352,14 @@ export function UserMenu({ variant = "default" }: Props) {
             </div>
           )}
           {user.siteAdministrator && (
-            <div className="user-menu-admin" role="group" aria-label="Admin">
-              <span className="user-menu-dropdown-label">Admin</span>
-              <a
-                href="/settings/admin"
-                className="user-menu-item"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-              >
-                Admin Settings
-              </a>
-            </div>
+            <a
+              href="/settings/admin"
+              className="user-menu-item"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+            >
+              Admin Settings
+            </a>
           )}
           <a
             href="/auth/sign-out?next=/"

@@ -2267,7 +2267,8 @@ button.sidebar-group-header:focus-visible {
 }
 
 .channel-settings-toggle input,
-.channel-options-toggle input {
+.channel-options-toggle input,
+.integrations-toggle input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2305,17 +2306,20 @@ button.sidebar-group-header:focus-visible {
 }
 
 .channel-settings-toggle input:checked + .toggle-switch,
-.channel-options-toggle input:checked + .toggle-switch {
+.channel-options-toggle input:checked + .toggle-switch,
+.integrations-toggle input:checked + .toggle-switch {
   background: var(--color-primary);
 }
 
 .channel-settings-toggle input:checked + .toggle-switch::after,
-.channel-options-toggle input:checked + .toggle-switch::after {
+.channel-options-toggle input:checked + .toggle-switch::after,
+.integrations-toggle input:checked + .toggle-switch::after {
   transform: translateX(18px);
 }
 
 .channel-settings-toggle input:focus-visible + .toggle-switch,
-.channel-options-toggle input:focus-visible + .toggle-switch {
+.channel-options-toggle input:focus-visible + .toggle-switch,
+.integrations-toggle input:focus-visible + .toggle-switch {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
@@ -3490,6 +3494,12 @@ button.sidebar-group-header:focus-visible {
   background: var(--color-surface);
 }
 
+@media (min-width: 769px) {
+  .integrations-section {
+    padding-inline: 14px;
+  }
+}
+
 .integrations-section-top {
   display: flex;
   align-items: flex-start;
@@ -3712,12 +3722,21 @@ button.sidebar-group-header:focus-visible {
   align-self: flex-start;
 }
 
+.integrations-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .integrations-toggle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   padding: 4px 0;
+  margin: 0;
   cursor: pointer;
 }
 
@@ -3725,13 +3744,7 @@ button.sidebar-group-header:focus-visible {
   font-size: 0.9375rem;
   font-weight: 500;
   color: var(--color-text);
-}
-
-.integrations-toggle input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
+  line-height: 1.3;
 }
 
 .integrations-form-footer {

@@ -492,16 +492,20 @@ export default function IntegrationsSettingsPage() {
         </button>
         <p className="integrations-field-hint">{pcoNightlySyncSchedule}</p>
         <label className="integrations-toggle">
+          <span className="integrations-toggle-label">Nightly sync</span>
           <input
             type="checkbox"
+            role="switch"
             checked={pcoNightlySyncEnabled}
             disabled={pcoSyncBusy !== null}
             onChange={(event) => void handleTogglePcoNightlySync(event.target.checked)}
+            aria-label="Nightly sync"
           />
-          <span className="integrations-toggle-label">
-            Run automatic nightly sync for all linked Planning Center accounts.
-          </span>
+          <span className="toggle-switch" aria-hidden="true" />
         </label>
+        <p className="integrations-field-hint">
+          Run automatic nightly sync for all linked Planning Center accounts.
+        </p>
       </IntegrationsSection>
 
       <CloudflareSection
