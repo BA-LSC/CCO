@@ -37,6 +37,21 @@ export function PanelHeaderSettingsIcon({ className = "panel-header-icon" }: Ico
   );
 }
 
+export function SidebarChevronIcon({ className = "sidebar-add-channel-icon-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M6 9l6 6 6-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SidebarPlusIcon({ className = "sidebar-add-channel-icon-glyph" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>

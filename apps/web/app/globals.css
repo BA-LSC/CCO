@@ -796,6 +796,9 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .chat-sidebar {
+  --sidebar-gutter: 10px;
+  /* Nest under a row label: item pad + avatar + gap (matches group/DM name column) */
+  --sidebar-nest: 32px;
   width: var(--sidebar-width);
   flex-shrink: 0;
   display: flex;
@@ -814,9 +817,8 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-brand {
   flex-shrink: 0;
-  padding: 0 8px 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 0 8px 8px;
+  margin-bottom: 0;
   text-align: center;
 }
 
@@ -967,19 +969,24 @@ html[data-theme="6"] .user-menu-dropdown {
   padding: 0;
 }
 
+.sidebar-section > :not(.sidebar-section-header) {
+  padding-left: var(--sidebar-gutter);
+  padding-right: var(--sidebar-gutter);
+}
+
 .sidebar-section-indented .sidebar-list,
 .sidebar-section-messages .sidebar-list,
 .sidebar-section-messages .sidebar-new-dm,
 .sidebar-section-teams .sidebar-list,
 .sidebar-section-teams .sidebar-team-groups {
-  padding-left: 12px;
-  padding-right: 8px;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .sidebar-section-indented .sidebar-empty,
 .sidebar-section-messages .sidebar-empty,
 .sidebar-section-teams .sidebar-empty {
-  padding: 4px 8px 4px 12px;
+  padding: 4px 0;
   text-align: left;
 }
 
@@ -1000,7 +1007,7 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-team-service-heading {
   margin: 0;
-  padding: 2px 8px 4px 12px;
+  padding: 4px 10px;
   font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -1230,7 +1237,7 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-nested {
   list-style: none;
-  margin: 0;
+  margin: 0 0 0 var(--sidebar-nest);
   padding: 0;
 }
 
@@ -1238,9 +1245,8 @@ html[data-theme="6"] .user-menu-dropdown {
   font-size: 0.85rem;
   font-weight: 400;
   gap: 2px;
-  /* Align # with group name: header pad (10) + avatar (24) + gap (8) */
-  padding-left: 42px;
-  padding-right: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .sidebar-nested-trailing {
@@ -1275,7 +1281,7 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-nested .sidebar-nested-loading,
 .sidebar-nested .sidebar-nested-empty {
-  padding-left: 42px;
+  padding-left: 10px;
 }
 
 .sidebar-nested-loading,
@@ -1381,11 +1387,64 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-group-actions {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
   padding-right: 8px;
+}
+
+.sidebar-group-menu {
+  position: relative;
+}
+
+.sidebar-group-menu-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-group-menu-chevron .sidebar-add-channel-icon-glyph {
+  transition: transform 0.15s ease;
+}
+
+.sidebar-group-menu-chevron-open .sidebar-add-channel-icon-glyph {
+  transform: rotate(180deg);
+}
+
+.sidebar-group-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 148px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
+.sidebar-group-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-group-menu-item:hover,
+.sidebar-group-menu-item:focus {
+  background: var(--color-primary-soft);
+  outline: none;
 }
 
 .sidebar-group-header {

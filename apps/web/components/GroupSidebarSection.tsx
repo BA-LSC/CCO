@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SidebarCloseIcon, SidebarLockIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarChevronIcon, SidebarLockIcon } from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import {
   apiFetch,
@@ -28,6 +28,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
   const router = useRouter();
   const [groups, setGroups] = useState(initialGroups);
   const [creatingForGroup, setCreatingForGroup] = useState<string | null>(null);
+  const [menuOpenForGroup, setMenuOpenForGroup] = useState<string | null>(null);
   const [newChannelName, setNewChannelName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -106,6 +107,28 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
     void loadGroupDetailForChannel(creatingForGroup);
   }, [creatingForGroup, loadGroupDetailForChannel]);
 
+  useEffect(() => {
+    if (!menuOpenForGroup) return;
+
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(".sidebar-group-menu")) return;
+      setMenuOpenForGroup(null);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpenForGroup(null);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpenForGroup]);
+
   async function createChannel(e: React.FormEvent, groupId: string) {
     e.preventDefault();
     const title = newChannelName.trim();
@@ -178,26 +201,45 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                     </div>
                     {leader && (
                       <div className="sidebar-group-actions">
-                        <button
-                          type="button"
-                          className={`sidebar-add-channel-icon ${creatingForGroup === group.id ? "sidebar-add-channel-icon-active" : ""}`}
-                          title="Add channel"
-                          aria-label="Add channel"
-                          aria-expanded={creatingForGroup === group.id}
-                          onClick={() => {
-                            if (creatingForGroup === group.id) {
-                              setCreatingForGroup(null);
-                              setNewChannelName("");
-                              setCreateError(null);
-                            } else {
-                              setCreatingForGroup(group.id);
-                              setNewChannelName("");
-                              setCreateError(null);
-                            }
-                          }}
-                        >
-                          {creatingForGroup === group.id ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
-                        </button>
+                        <div className="sidebar-group-menu">
+                          <button
+                            type="button"
+                            className={`sidebar-add-channel-icon ${menuOpenForGroup === group.id ? "sidebar-add-channel-icon-active" : ""}`}
+                            title="Group options"
+                            aria-label="Group options"
+                            aria-haspopup="menu"
+                            aria-expanded={menuOpenForGroup === group.id}
+                            onClick={() => {
+                              setMenuOpenForGroup((current) =>
+                                current === group.id ? null : group.id,
+                              );
+                            }}
+                          >
+                            <span
+                              className={`sidebar-group-menu-chevron${menuOpenForGroup === group.id ? " sidebar-group-menu-chevron-open" : ""}`}
+                              aria-hidden
+                            >
+                              <SidebarChevronIcon />
+                            </span>
+                          </button>
+                          {menuOpenForGroup === group.id ? (
+                            <div className="sidebar-group-menu-dropdown" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="sidebar-group-menu-item"
+                                onClick={() => {
+                                  setMenuOpenForGroup(null);
+                                  setCreatingForGroup(group.id);
+                                  setNewChannelName("");
+                                  setCreateError(null);
+                                }}
+                              >
+                                Add channel
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     )}
                   </div>
