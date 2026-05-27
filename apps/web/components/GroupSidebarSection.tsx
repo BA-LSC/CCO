@@ -211,57 +211,67 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
             return (
               <li key={group.id} className="sidebar-group">
                 <div className="sidebar-group-block">
-                  <div
-                    className={`sidebar-group-header ${
-                      activeGroupId === group.id ? "sidebar-group-header-active" : ""
-                    }`}
-                  >
-                    <UserAvatar
-                      displayName={group.name}
-                      avatarUrl={group.imageUrl}
-                      className="sidebar-group-avatar"
-                    />
-                    <span className="sidebar-item-label">{group.name}</span>
-                    {leader ? (
-                      <div className="sidebar-group-menu">
-                        <button
-                          type="button"
-                          className={`sidebar-group-menu-trigger${
-                            menuOpenForGroup === group.id ? " sidebar-group-menu-trigger-open" : ""
-                          }`}
-                          title="Group options"
-                          aria-label="Group options"
-                          aria-haspopup="menu"
-                          aria-expanded={menuOpenForGroup === group.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMenuOpenForGroup((current) =>
-                              current === group.id ? null : group.id,
-                            );
-                          }}
-                        >
+                  {leader ? (
+                    <div className="sidebar-group-menu">
+                      <button
+                        type="button"
+                        className={`sidebar-group-header${
+                          activeGroupId === group.id ? " sidebar-group-header-active" : ""
+                        }${
+                          menuOpenForGroup === group.id ? " sidebar-group-header-menu-open" : ""
+                        }`}
+                        title="Group options"
+                        aria-label={`Group options, ${group.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={menuOpenForGroup === group.id}
+                        onClick={() => {
+                          setMenuOpenForGroup((current) =>
+                            current === group.id ? null : group.id,
+                          );
+                        }}
+                      >
+                        <UserAvatar
+                          displayName={group.name}
+                          avatarUrl={group.imageUrl}
+                          className="sidebar-group-avatar"
+                        />
+                        <span className="sidebar-item-label">{group.name}</span>
+                        <span className="sidebar-group-menu-trigger" aria-hidden>
                           <SidebarChevronRightIcon />
-                        </button>
-                        {menuOpenForGroup === group.id ? (
-                          <div className="sidebar-group-menu-dropdown" role="menu">
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className="sidebar-group-menu-item"
-                              onClick={() => {
-                                setMenuOpenForGroup(null);
-                                setCreatingForGroup(group.id);
-                                setNewChannelName("");
-                                setCreateError(null);
-                              }}
-                            >
-                              Add channel
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
+                        </span>
+                      </button>
+                      {menuOpenForGroup === group.id ? (
+                        <div className="sidebar-group-menu-dropdown" role="menu">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="sidebar-group-menu-item"
+                            onClick={() => {
+                              setMenuOpenForGroup(null);
+                              setCreatingForGroup(group.id);
+                              setNewChannelName("");
+                              setCreateError(null);
+                            }}
+                          >
+                            Add channel
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div
+                      className={`sidebar-group-header ${
+                        activeGroupId === group.id ? "sidebar-group-header-active" : ""
+                      }`}
+                    >
+                      <UserAvatar
+                        displayName={group.name}
+                        avatarUrl={group.imageUrl}
+                        className="sidebar-group-avatar"
+                      />
+                      <span className="sidebar-item-label">{group.name}</span>
+                    </div>
+                  )}
 
                   {creatingForGroup === group.id && (
                     <form
