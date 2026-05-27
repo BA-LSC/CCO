@@ -3,6 +3,7 @@ import { encryptSecret } from "../auth/token-crypto";
 import {
   collectOrganizationSecretsForStoreMigration,
   organizationHasPendingSecretsStoreMigration,
+  resolveApplyCloudflareApiToken,
   resolveOrgSecretsStoreContext,
 } from "./org-secrets";
 
@@ -94,6 +95,46 @@ describe("resolveOrgSecretsStoreContext", () => {
       if (previous === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
       else process.env.CLOUDFLARE_API_TOKEN = previous;
     }
+  });
+});
+
+describe("resolveApplyCloudflareApiToken", () => {
+  const previousKey = process.env.TOKEN_ENCRYPTION_KEY;
+  const previousEnvToken = process.env.CLOUDFLARE_API_TOKEN;
+
+  beforeEach(() => {
+    process.env.TOKEN_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef";
+  });
+
+  afterEach(() => {
+    if (previousKey === undefined) delete process.env.TOKEN_ENCRYPTION_KEY;
+    else process.env.TOKEN_ENCRYPTION_KEY = previousKey;
+    if (previousEnvToken === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+    else process.env.CLOUDFLARE_API_TOKEN = previousEnvToken;
+  });
+
+  test("prefers explicit override", () => {
+    process.env.CLOUDFLARE_API_TOKEN = "binding-token";
+    expect(
+      resolveApplyCloudflareApiToken(
+        { cloudflareApiTokenEnc: encryptSecret("d1-token") },
+        "override-token",
+      ),
+    ).toBe("override-token");
+  });
+
+  test("uses D1 encrypted token when present even if Secrets Store id exists elsewhere", () => {
+    process.env.CLOUDFLARE_API_TOKEN = "binding-token";
+    expect(
+      resolveApplyCloudflareApiToken({
+        cloudflareApiTokenEnc: encryptSecret("d1-token"),
+      }),
+    ).toBe("d1-token");
+  });
+
+  test("falls back to worker binding when D1 enc is cleared", () => {
+    process.env.CLOUDFLARE_API_TOKEN = "binding-token";
+    expect(resolveApplyCloudflareApiToken({ cloudflareApiTokenEnc: null })).toBe("binding-token");
   });
 });
 

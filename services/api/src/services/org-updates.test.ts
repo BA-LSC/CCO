@@ -138,5 +138,6 @@ describe("prepareCloudflareReleaseUpdate", () => {
     );
     expect(fnBody).toContain("organizationHasPendingSecretsStoreMigration(org)");
     expect(fnBody).toContain("!secretsStoreId || organizationHasPendingSecretsStoreMigration(org)");
+    expect(fnBody).toContain("resolveApplyCloudflareApiToken(org");
   });
 });

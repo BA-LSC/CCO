@@ -57,6 +57,25 @@ export function isCloudflareApiTokenConfigured(
   return Boolean(org.cloudflareApiTokenConfigured || org.cloudflareApiTokenEnc);
 }
 
+/** Token for Admin Apply update: explicit override, then D1 enc, then worker store binding. */
+export function resolveApplyCloudflareApiToken(
+  org: Pick<ConfiguredOrganizationRow, "cloudflareApiTokenEnc">,
+  overrideToken?: string,
+): string {
+  const trimmedOverride = overrideToken?.trim();
+  if (trimmedOverride) return trimmedOverride;
+
+  if (org.cloudflareApiTokenEnc) {
+    try {
+      return decryptSecret(org.cloudflareApiTokenEnc);
+    } catch {
+      // TOKEN_ENCRYPTION_KEY rotation: fall back to Secrets Store worker binding.
+    }
+  }
+
+  return process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "";
+}
+
 type OrganizationEncryptedSecretFields = Pick<
   ConfiguredOrganizationRow,
   | "cloudflareSecretsStoreId"

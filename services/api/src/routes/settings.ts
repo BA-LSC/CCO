@@ -84,6 +84,10 @@ const CloudflareTokenSchema = z.object({
   cloudflareApiToken: z.string().min(1),
 });
 
+const UpdatesApplySchema = z.object({
+  cloudflareApiToken: z.string().min(1).optional(),
+});
+
 const UpdatesPatchSchema = z
   .object({
     autoUpdateEnabled: z.boolean().optional(),
@@ -463,9 +467,25 @@ settingsRouter.post("/updates/apply", requireAuth, async (c) => {
   }
 
   try {
+    let apiTokenOverride: string | undefined;
+    const rawBody = await c.req.text();
+    if (rawBody.trim()) {
+      let body: unknown;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        return c.json({ error: "Invalid JSON body" }, 400);
+      }
+      const parsed = UpdatesApplySchema.safeParse(body);
+      if (!parsed.success) {
+        return c.json({ error: parsed.error.flatten() }, 400);
+      }
+      apiTokenOverride = parsed.data.cloudflareApiToken?.trim();
+    }
+
     const executionCtx = getExecutionContext();
     if (isCloudflareRuntime() && executionCtx) {
-      const { job, targetVersion } = await startCloudflareReleaseUpdate();
+      const { job, targetVersion } = await startCloudflareReleaseUpdate({ apiTokenOverride });
       executionCtx.waitUntil(
         executeCloudflareReleaseUpdate(job).catch((err) => {
           console.error("[org-updates] Background apply failed:", err);
@@ -478,7 +498,7 @@ settingsRouter.post("/updates/apply", requireAuth, async (c) => {
       );
     }
 
-    const result = await applyCloudflareReleaseUpdate();
+    const result = await applyCloudflareReleaseUpdate({ apiTokenOverride });
     const status = await getUpdatesStatus();
     return c.json({ ok: true, ...result, status });
   } catch (err) {

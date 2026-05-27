@@ -11,14 +11,18 @@ import {
 } from "@cco/cloudflare-provision";
 import { getD1IncrementalMigrationFilenames } from "@cco/db";
 import { eq, sql } from "drizzle-orm";
-import { decryptSecret } from "../auth/token-crypto";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { isCloudflareRuntime } from "../runtime/worker-context";
 import { readDeployLastError, setDeployDraining, setDeployLastError } from "../lib/deploy-status";
 import { fetchGitReleaseIndex, resolveOrgGitRepoUrl } from "./git-release-index";
 import { getConfiguredOrganization } from "./org-oauth";
-import { migrateOrganizationSecretsToStore, isCloudflareApiTokenConfigured, organizationHasPendingSecretsStoreMigration } from "./org-secrets";
+import {
+  migrateOrganizationSecretsToStore,
+  isCloudflareApiTokenConfigured,
+  organizationHasPendingSecretsStoreMigration,
+  resolveApplyCloudflareApiToken,
+} from "./org-secrets";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import { invalidateOrgContextCache } from "./org-context-cache";
 
@@ -275,7 +279,9 @@ async function applyIncrementalD1Migrations(job: CloudflareReleaseUpdateJob): Pr
   }
 }
 
-export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleaseUpdateJob> {
+export async function prepareCloudflareReleaseUpdate(options?: {
+  apiTokenOverride?: string;
+}): Promise<CloudflareReleaseUpdateJob> {
   await ensureOrgUpdateSettingsColumns();
   const org = await getConfiguredOrganization();
   if (!org) throw new Error("Organization not found");
@@ -304,10 +310,7 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
   const platformSecrets = requireProvisionSecrets();
   let secretsStoreId = org.cloudflareSecretsStoreId?.trim() ?? "";
 
-  const apiToken =
-    org.cloudflareApiTokenEnc && !secretsStoreId
-      ? decryptSecret(org.cloudflareApiTokenEnc)
-      : process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "";
+  const apiToken = resolveApplyCloudflareApiToken(org, options?.apiTokenOverride);
 
   if (!apiToken) {
     throw new Error("Cloudflare API token is not available for apply update");
@@ -426,20 +429,24 @@ export async function executeCloudflareReleaseUpdate(
   }
 }
 
-export async function startCloudflareReleaseUpdate(): Promise<{
+export async function startCloudflareReleaseUpdate(options?: {
+  apiTokenOverride?: string;
+}): Promise<{
   job: CloudflareReleaseUpdateJob;
   targetVersion: string;
 }> {
-  const job = await prepareCloudflareReleaseUpdate();
+  const job = await prepareCloudflareReleaseUpdate(options);
   await setDeployDraining(true);
   return { job, targetVersion: job.targetVersion };
 }
 
-export async function applyCloudflareReleaseUpdate(): Promise<{
+export async function applyCloudflareReleaseUpdate(options?: {
+  apiTokenOverride?: string;
+}): Promise<{
   appliedVersion: string;
   deployedWorkers: string[];
 }> {
-  const job = await prepareCloudflareReleaseUpdate();
+  const job = await prepareCloudflareReleaseUpdate(options);
   return executeCloudflareReleaseUpdate(job);
 }
 
