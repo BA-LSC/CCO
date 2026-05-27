@@ -1593,6 +1593,10 @@ button.sidebar-group-header:focus-visible {
   outline-offset: -2px;
 }
 
+.sidebar-group-header .sidebar-item-label {
+  font-weight: 600;
+}
+
 .sidebar-group-header-active .sidebar-item-label {
   color: var(--color-primary);
 }
