@@ -1861,7 +1861,7 @@ button.sidebar-group-header:focus-visible {
   top: 12px;
   left: 12px;
   right: 12px;
-  z-index: 6;
+  z-index: 30;
   overflow: hidden;
   pointer-events: none;
 }
@@ -1873,8 +1873,8 @@ button.sidebar-group-header:focus-visible {
 
 .empty-chat-pane-banner-slot .chat-home-banner {
   margin: 0;
-  padding: 10px 12px 10px 13px;
-  background: var(--color-surface);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--color-bg) 22%, var(--color-surface));
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
   color: var(--color-text);
@@ -1882,14 +1882,14 @@ button.sidebar-group-header:focus-visible {
 
 .empty-chat-pane-banner-slot .chat-home-banner.error {
   color: var(--color-danger);
-  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
-  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
 }
 
 .empty-chat-pane-banner-slot .chat-home-banner.success {
   color: var(--color-success);
-  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
-  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-success);
+  background: color-mix(in srgb, var(--color-success-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border));
 }
 
 .empty-chat-pane-banner-slot .chat-home-banner.neutral {
@@ -2458,10 +2458,11 @@ button.sidebar-group-header:focus-visible {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 5;
+  z-index: 30;
   padding: 8px var(--chat-inset-x, 20px) 0;
   overflow: hidden;
   pointer-events: none;
+  isolation: isolate;
 }
 
 .chat-panel-banner-slot > * {
@@ -2979,6 +2980,31 @@ button.sidebar-group-header:focus-visible {
 
 .chat-home-banner-wrap--fixed .chat-home-banner--exit {
   transform: translateY(110%);
+}
+
+.chat-home-banner--auto-dismiss {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.chat-home-banner-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.chat-home-banner-progress-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: currentColor;
+  opacity: 0.65;
+  will-change: transform;
 }
 
 .chat-home-banner.success {
@@ -4225,28 +4251,34 @@ button.sidebar-group-header:focus-visible {
 .chat-panel-banner-slot .send-error,
 .chat-panel-banner-slot .chat-home-banner {
   margin: 0;
-  padding: 10px 12px 10px 13px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   line-height: 1.4;
   font-weight: 500;
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-bg) 22%, var(--color-surface));
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
   color: var(--color-text);
 }
 
+.chat-panel-banner-slot .chat-home-banner--auto-dismiss {
+  padding-bottom: 14px;
+}
+
 .chat-panel-banner-slot .send-error,
 .chat-panel-banner-slot .chat-home-banner.error {
   color: var(--color-danger);
-  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
-  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+  box-shadow: var(--shadow-md);
 }
 
 .chat-panel-banner-slot .chat-home-banner.success {
   color: var(--color-success);
-  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
-  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-success);
+  background: color-mix(in srgb, var(--color-success-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border));
+  box-shadow: var(--shadow-md);
 }
 
 .chat-panel-banner-slot .chat-home-banner.neutral {

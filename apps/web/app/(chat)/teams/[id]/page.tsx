@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Suspense } from "react";
-import { ChatHomeBanner } from "@/components/ChatHomeBanner";
+import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
@@ -217,7 +217,12 @@ export default function TeamChatPage() {
       <div className="chat-panel-content">
         {displayError ? (
           <div className="chat-panel-banner-slot">
-            <ChatHomeBanner variant="error" placement="panel">
+            <ChatHomeBanner
+              key={displayError}
+              variant="error"
+              placement="panel"
+              autoDismissMs={CHAT_PANEL_BANNER_AUTO_DISMISS_MS}
+            >
               {displayError}
             </ChatHomeBanner>
           </div>

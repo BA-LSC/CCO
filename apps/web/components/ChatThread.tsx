@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChatComposer, useComposerDragHandlers, type PendingComposerMedia } from "@/components/ChatComposer";
+import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatMessageList } from "@/components/ChatMessageList";
 import {
   apiFetch,
@@ -931,9 +932,15 @@ export function ChatThread({
         <div className="chat-panel-messages-wrap">
           {sendError ? (
             <div className="chat-panel-banner-slot">
-              <p className="send-error" role="alert">
+              <ChatHomeBanner
+                key={sendError}
+                variant="error"
+                placement="panel"
+                autoDismissMs={CHAT_PANEL_BANNER_AUTO_DISMISS_MS}
+                onDismiss={() => setSendError(null)}
+              >
                 {sendError}
-              </p>
+              </ChatHomeBanner>
             </div>
           ) : null}
           <div
