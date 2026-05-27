@@ -48,7 +48,15 @@ export function ChatPanelHeader({ title, subtitle, avatarUrl, loading = false, c
               title
             )}
           </h1>
-          {subtitle && <p className="chat-panel-subtitle">{subtitle}</p>}
+          {(loading || subtitle) && (
+            <p className="chat-panel-subtitle">
+              {loading ? (
+                <span className="chat-panel-subtitle-skeleton" aria-hidden />
+              ) : (
+                subtitle
+              )}
+            </p>
+          )}
         </div>
       </div>
       {children && (
