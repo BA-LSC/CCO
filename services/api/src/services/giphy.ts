@@ -4,6 +4,9 @@ import {
   getUploadDir,
   safeUploadPath,
 } from "../lib/uploads";
+import { getConfiguredOrganization } from "./org-oauth";
+import { isGiphyApiKeyConfigured, orgUsesSecretsStore } from "./org-secrets";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 import { resolveGiphyApiKey } from "./org-giphy";
 
 const GIPHY_API = "https://api.giphy.com/v1/gifs";
@@ -55,7 +58,16 @@ function mapGiphyResult(gif: GiphyApiGif): GiphyGifResult | null {
 }
 
 export async function isGiphyConfigured(): Promise<boolean> {
-  return Boolean(await resolveGiphyApiKey());
+  if (await resolveGiphyApiKey()) return true;
+
+  // BYO Cloudflare stores the key in Secrets Store with only a D1 configured flag.
+  // Treat that flag as enabled so the composer matches Admin Settings after save.
+  const org = await getConfiguredOrganization();
+  if (org && orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    return isGiphyApiKeyConfigured(org);
+  }
+
+  return false;
 }
 
 async function fetchGiphy(path: string, params: Record<string, string>): Promise<GiphyApiGif[]> {
