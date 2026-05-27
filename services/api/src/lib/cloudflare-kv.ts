@@ -74,6 +74,10 @@ export async function kvDelete(config: CloudflareKvConfig, key: string): Promise
   await deleteKvValue(config.accountId, config.apiToken, config.namespaceId, key);
 }
 
+export async function kvDeleteBinding(namespace: KVNamespace, key: string): Promise<void> {
+  await namespace.delete(key);
+}
+
 export async function kvMget(config: CloudflareKvConfig, keys: string[]): Promise<Array<string | null>> {
   return bulkGetKvValues(config.accountId, config.apiToken, config.namespaceId, keys);
 }

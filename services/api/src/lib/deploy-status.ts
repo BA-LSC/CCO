@@ -1,5 +1,13 @@
 import Redis from "ioredis";
-import { kvGet, kvGetBinding, kvPut, kvPutBinding, resolveDeployKvConfig } from "../lib/cloudflare-kv";
+import {
+  kvDelete,
+  kvDeleteBinding,
+  kvGet,
+  kvGetBinding,
+  kvPut,
+  kvPutBinding,
+  resolveDeployKvConfig,
+} from "../lib/cloudflare-kv";
 import { getWorkerBindings } from "../runtime/worker-context";
 
 export const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
@@ -169,7 +177,7 @@ export async function setDeployLastError(message: string | null): Promise<void> 
     if (message) {
       await kvPutBinding(binding, DEPLOY_LAST_ERROR_KEY, message, 86_400);
     } else {
-      await kvPutBinding(binding, DEPLOY_LAST_ERROR_KEY, "", 1);
+      await kvDeleteBinding(binding, DEPLOY_LAST_ERROR_KEY);
     }
     return;
   }
@@ -178,7 +186,7 @@ export async function setDeployLastError(message: string | null): Promise<void> 
   if (message) {
     await kvPut(kv, DEPLOY_LAST_ERROR_KEY, message, 86_400);
   } else {
-    await kvPut(kv, DEPLOY_LAST_ERROR_KEY, "", 1);
+    await kvDelete(kv, DEPLOY_LAST_ERROR_KEY);
   }
 }
 
