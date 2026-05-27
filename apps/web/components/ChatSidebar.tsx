@@ -10,7 +10,7 @@ import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { DmSidebarSubtitle } from "@/components/DmSidebarSubtitle";
 import { usePresenceWatch } from "@/components/PresenceProvider";
-import { SidebarCloseIcon, SidebarLeaderIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarCloseIcon, SidebarCrownIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import { UserMenu } from "@/components/UserMenu";
 import {
@@ -229,9 +229,12 @@ export function ChatSidebar() {
   function renderTeamPrefix(team: ServiceTeamSummary) {
     if (team.role === "leader") {
       return (
-        <span className="sidebar-channel-prefix" title="Team leader">
-          <SidebarLeaderIcon />
-        </span>
+        <>
+          <span className="sidebar-channel-prefix" title="Team leader">
+            <SidebarCrownIcon />
+          </span>
+          <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
+        </>
       );
     }
 

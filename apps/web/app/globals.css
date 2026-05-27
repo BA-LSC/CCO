@@ -800,10 +800,9 @@ html[data-theme="6"] .user-menu-dropdown {
   --sidebar-row-pad: 10px;
   --sidebar-avatar-size: 24px;
   --sidebar-avatar-gap: 8px;
-  /* Nest channels under group title text (row pad + avatar + gap) */
-  --sidebar-nest: calc(
-    var(--sidebar-row-pad) + var(--sidebar-avatar-size) + var(--sidebar-avatar-gap)
-  );
+  /* Nested rows: modest indent under parent (was full title-text alignment at 42px) */
+  --sidebar-nest: 28px;
+  --sidebar-team-nest: 20px;
   width: var(--sidebar-width);
   flex-shrink: 0;
   display: flex;
@@ -1028,7 +1027,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-team-service-block .sidebar-list {
-  margin-left: var(--sidebar-nest);
+  margin-left: var(--sidebar-team-nest);
 }
 
 .sidebar-team-label {

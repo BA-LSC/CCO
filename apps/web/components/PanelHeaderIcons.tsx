@@ -150,3 +150,18 @@ export function SidebarLeaderIcon({ className = "sidebar-channel-prefix-glyph" }
     </svg>
   );
 }
+
+export function SidebarCrownIcon({ className = "sidebar-channel-prefix-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M5 17h14M6 17l1.2-7.2 3.8 3.2L12 7l1 5.8 3.8-3.2L18 17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
