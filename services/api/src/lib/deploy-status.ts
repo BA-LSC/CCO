@@ -177,7 +177,14 @@ export async function setDeployLastError(message: string | null): Promise<void> 
     if (message) {
       await kvPutBinding(binding, DEPLOY_LAST_ERROR_KEY, message, 86_400);
     } else {
-      await kvDeleteBinding(binding, DEPLOY_LAST_ERROR_KEY);
+      try {
+        await kvDeleteBinding(binding, DEPLOY_LAST_ERROR_KEY);
+      } catch (err) {
+        console.warn(
+          "[deploy-status] Failed to clear deploy last error from KV:",
+          err instanceof Error ? err.message : err,
+        );
+      }
     }
     return;
   }
@@ -186,7 +193,14 @@ export async function setDeployLastError(message: string | null): Promise<void> 
   if (message) {
     await kvPut(kv, DEPLOY_LAST_ERROR_KEY, message, 86_400);
   } else {
-    await kvDelete(kv, DEPLOY_LAST_ERROR_KEY);
+    try {
+      await kvDelete(kv, DEPLOY_LAST_ERROR_KEY);
+    } catch (err) {
+      console.warn(
+        "[deploy-status] Failed to clear deploy last error from KV:",
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 }
 

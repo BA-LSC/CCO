@@ -102,7 +102,15 @@ export function AdminUpdatesSection({
   }
 
   async function handleApply() {
-    if (!status?.canApply) return;
+    if (!status) return;
+    if (!status.canApply) {
+      setFeedback({
+        error:
+          status.applyBlockedReason ??
+          "Apply update is not available right now. Check for updates or fix the issue above, then try again.",
+      });
+      return;
+    }
     setBusy("apply");
     setFeedback({});
     markDeployWait();
@@ -207,6 +215,9 @@ export function AdminUpdatesSection({
       {status.lastApplyError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
           Last apply failed: {status.lastApplyError}
+          {status.canApply
+            ? " Apply update will redeploy the current release to recover."
+            : null}
         </p>
       )}
 
@@ -224,10 +235,15 @@ export function AdminUpdatesSection({
         <button
           type="button"
           className="btn btn-primary integrations-action-btn"
-          disabled={busy !== null || !status.canApply}
+          disabled={busy !== null}
+          aria-disabled={!status.canApply}
           onClick={() => void handleApply()}
         >
-          {busy === "apply" ? "Applying…" : "Apply update"}
+          {busy === "apply"
+            ? "Applying…"
+            : status.lastApplyError && status.canApply
+              ? "Retry apply"
+              : "Apply update"}
         </button>
       </div>
 

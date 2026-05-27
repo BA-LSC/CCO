@@ -206,7 +206,7 @@ export async function getUpdatesStatus(options?: {
   } else if (checkError) {
     canApply = false;
     applyBlockedReason = checkError;
-  } else if (!updateAvailable) {
+  } else if (!updateAvailable && !lastApplyError) {
     canApply = false;
     applyBlockedReason = "Already on the latest release.";
   }
@@ -296,7 +296,8 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
   const currentVersion =
     org.installedReleaseVersion?.trim() || resolveRunningBuildVersion();
-  if (!isUpdateAvailable(currentVersion, releaseIndex.version)) {
+  const lastApplyError = await readDeployLastError();
+  if (!isUpdateAvailable(currentVersion, releaseIndex.version) && !lastApplyError) {
     throw new Error("Already on the latest release");
   }
 
@@ -331,7 +332,11 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
   });
 
   const readBundle = createRemoteBundleLoader(releasesBase);
-  await setDeployLastError(null);
+  try {
+    await setDeployLastError(null);
+  } catch {
+    // Old workers may fail KV clear (e.g. expiration_ttl=1); apply must still proceed.
+  }
 
   const d1 = await ensureD1Database(accountId, apiToken, "cco");
   const resources = {
@@ -405,7 +410,11 @@ export async function executeCloudflareReleaseUpdate(
       })
       .where(eq(organizations.id, job.orgId));
     invalidateOrgContextCache();
-    await setDeployLastError(null);
+    try {
+      await setDeployLastError(null);
+    } catch {
+      // Non-blocking: successful deploy should not fail on stale KV clear behavior.
+    }
 
     return { appliedVersion: job.targetVersion, deployedWorkers };
   } catch (err) {

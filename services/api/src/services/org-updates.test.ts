@@ -103,3 +103,30 @@ describe("resolveUpdatePlatform", () => {
     ).toBe("vps");
   });
 });
+
+describe("getUpdatesStatus apply gating", () => {
+  test("allows canApply when last apply failed but version matches latest", () => {
+    const source = readFileSync(ORG_UPDATES_PATH, "utf8");
+    const fnBody = source.slice(
+      source.indexOf("export async function getUpdatesStatus"),
+      source.indexOf("function requireProvisionSecrets"),
+    );
+    expect(fnBody).toContain("!updateAvailable && !lastApplyError");
+    expect(fnBody).not.toMatch(/else if \(!updateAvailable\) \{\s*\n\s*canApply = false/);
+  });
+});
+
+describe("prepareCloudflareReleaseUpdate", () => {
+  test("allows redeploy when lastApplyError is set even if versions match", () => {
+    const source = readFileSync(ORG_UPDATES_PATH, "utf8");
+    const fnBody = source.slice(
+      source.indexOf("export async function prepareCloudflareReleaseUpdate"),
+      source.indexOf("export async function executeCloudflareReleaseUpdate"),
+    );
+    expect(fnBody).toContain("const lastApplyError = await readDeployLastError()");
+    expect(fnBody).toContain(
+      "!isUpdateAvailable(currentVersion, releaseIndex.version) && !lastApplyError",
+    );
+    expect(fnBody).toMatch(/try \{\s*\n\s*await setDeployLastError\(null\)/);
+  });
+});
