@@ -21,6 +21,8 @@ function applyBaselineSqlite(db: Database): void {
   db.exec(readFileSync(path, "utf8"));
   const gitRepoMigration = `${getD1MigrationsFolder()}/0003_org_git_repo_url.sql`;
   db.exec(readFileSync(gitRepoMigration, "utf8"));
+  const secretsStoreMigration = `${getD1MigrationsFolder()}/0004_secrets_store.sql`;
+  db.exec(readFileSync(secretsStoreMigration, "utf8"));
 }
 
 describe("D1 schema", () => {

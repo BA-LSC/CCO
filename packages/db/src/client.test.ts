@@ -31,6 +31,7 @@ describe("D1 client helpers", () => {
       "0001_org_release_updates.sql",
       "0002_pco_nightly_sync_enabled.sql",
       "0003_org_git_repo_url.sql",
+      "0004_secrets_store.sql",
     ]);
   });
 });

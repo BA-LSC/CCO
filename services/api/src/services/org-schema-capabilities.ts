@@ -24,6 +24,14 @@ const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "auto_update_enabled" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "last_update_check_at" timestamp`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "git_repo_url" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_secrets_store_id" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_client_secret_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_webhook_secrets_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "giphy_api_key_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "vapid_private_key_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_api_token_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_access_key_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_secret_access_key_configured" boolean`,
 ] as const;
 
 /** Call tables from 0021 — optional; must not block Cloudflare token save. */
