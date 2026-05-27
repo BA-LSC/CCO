@@ -10,7 +10,11 @@ import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { DmSidebarSubtitle } from "@/components/DmSidebarSubtitle";
 import { usePresenceWatch } from "@/components/PresenceProvider";
-import { SidebarCloseIcon, SidebarCrownIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import {
+  SidebarCloseIcon,
+  SidebarComposeIcon,
+  SidebarCrownIcon,
+} from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import { UserMenu } from "@/components/UserMenu";
 import {
@@ -462,9 +466,13 @@ export function ChatSidebar() {
               >
                 <div className="sidebar-dm-row">
                   <span className="sidebar-new-message-icon" aria-hidden>
-                    {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
+                    {showNewDm ? <SidebarCloseIcon /> : <SidebarComposeIcon />}
                   </span>
-                  <span className="sidebar-item-label">
+                  <span
+                    className={`sidebar-item-label sidebar-new-message-label${
+                      showNewDm ? " sidebar-new-message-label-cancel" : ""
+                    }`}
+                  >
                     {showNewDm ? "Cancel" : "New message"}
                   </span>
                 </div>

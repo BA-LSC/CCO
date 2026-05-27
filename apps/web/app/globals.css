@@ -1169,7 +1169,8 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-dm-row > .avatar-with-presence,
-.sidebar-dm-row > .sidebar-dm-avatar {
+.sidebar-dm-row > .sidebar-dm-avatar,
+.sidebar-dm-row > .sidebar-new-message-icon {
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: center;
@@ -1755,15 +1756,27 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 2px;
 }
 
+.sidebar-new-message-btn:hover {
+  background: color-mix(in srgb, var(--color-surface-2) 75%, transparent);
+}
+
+.sidebar-new-message-btn.sidebar-item-active {
+  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface-2));
+}
+
 .sidebar-new-message-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--sidebar-avatar-size);
   height: var(--sidebar-avatar-size);
+  min-width: var(--sidebar-avatar-size);
+  max-width: var(--sidebar-avatar-size);
+  flex-shrink: 0;
+  box-sizing: border-box;
   border-radius: 50%;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 1.5px dashed color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
   color: var(--color-muted);
 }
 
@@ -1775,8 +1788,31 @@ html[data-theme="6"] .user-menu-dropdown {
 .sidebar-new-message-btn:hover .sidebar-new-message-icon,
 .sidebar-item-active.sidebar-new-message-btn .sidebar-new-message-icon {
   color: var(--color-primary);
-  background: var(--color-primary-soft);
-  border-color: transparent;
+  background: color-mix(in srgb, var(--color-primary-soft) 50%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 65%, var(--color-border));
+  border-style: dashed;
+}
+
+.sidebar-new-message-label {
+  font-style: italic;
+  font-weight: 450;
+  color: var(--color-muted);
+}
+
+.sidebar-new-message-label-cancel {
+  font-style: normal;
+  font-weight: 500;
+}
+
+.sidebar-new-message-btn:hover .sidebar-new-message-label,
+.sidebar-item-active.sidebar-new-message-btn .sidebar-new-message-label {
+  color: var(--color-primary);
+}
+
+.sidebar-skeleton-compose-avatar {
+  border-style: dashed;
+  background: transparent;
+  animation: none;
 }
 
 .sidebar-new-dm {
