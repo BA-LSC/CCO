@@ -11,8 +11,6 @@ import {
   markDeployWait,
   probeServerAppVersion,
 } from "@/lib/app-update";
-import { CCO_DEFAULT_GIT_REPO_URL } from "@cco/shared";
-
 type UpdatesStatus = {
   platform: "cloudflare" | "vps" | "unknown";
   currentVersion: string | null;
@@ -20,9 +18,7 @@ type UpdatesStatus = {
   updateAvailable: boolean;
   autoUpdateEnabled: boolean;
   lastUpdateCheckAt: string | null;
-  latestPublishedAt: string | null;
   releasesBaseUrl: string | null;
-  gitRepoUrl: string;
   lastApplyError: string | null;
   canApply: boolean;
   applyBlockedReason: string | null;
@@ -62,16 +58,9 @@ function formatStatusLine(status: UpdatesStatus): string {
   return `Version ${installed} · Last checked ${checked}`;
 }
 
-type AdminUpdatesSectionProps = {
-  initialGitRepoUrl?: string;
-};
-
-export function AdminUpdatesSection({
-  initialGitRepoUrl = CCO_DEFAULT_GIT_REPO_URL,
-}: AdminUpdatesSectionProps) {
+export function AdminUpdatesSection() {
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
-  const [gitRepoUrl, setGitRepoUrl] = useState(initialGitRepoUrl);
-  const [busy, setBusy] = useState<"check" | "apply" | "toggle" | "saveRepo" | null>(null);
+  const [busy, setBusy] = useState<"check" | "apply" | "toggle" | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
   const deployPollRef = useRef<number | null>(null);
@@ -79,7 +68,6 @@ export function AdminUpdatesSection({
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
     setStatus(next);
-    setGitRepoUrl(next.gitRepoUrl);
     return next;
   }, []);
 
@@ -208,30 +196,6 @@ export function AdminUpdatesSection({
     }
   }
 
-  async function handleSaveGitRepo(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy("saveRepo");
-    setFeedback({});
-    try {
-      await apiFetch("/api/v1/settings/integrations", {
-        method: "PATCH",
-        body: JSON.stringify({ gitRepoUrl }),
-      });
-      const next = await loadStatus();
-      setFeedback({
-        success: next.updateAvailable
-          ? "Git repository saved. A new release is available."
-          : "Git repository saved.",
-      });
-    } catch (err) {
-      setFeedback({
-        error: err instanceof Error ? err.message : "Failed to save git repository",
-      });
-    } finally {
-      setBusy(null);
-    }
-  }
-
   if (!status) {
     return (
       <section className="integrations-section" aria-labelledby="updates-status-heading">
@@ -324,55 +288,10 @@ export function AdminUpdatesSection({
             <span className="toggle-switch" aria-hidden="true" />
           </label>
           <p className="integrations-field-hint">
-            Checked every 6 hours. Off by default until you enable it.
+            Checked every 6 hours.
           </p>
         </>
       )}
-
-      <details className="integrations-details">
-        <summary>Advanced</summary>
-        <div className="integrations-details-body">
-          <form className="integrations-fields" onSubmit={(e) => void handleSaveGitRepo(e)}>
-            <label className="integrations-field">
-              <span className="integrations-field-label">Git repository URL</span>
-              <input
-                className="integrations-input"
-                type="url"
-                value={gitRepoUrl}
-                onChange={(e) => setGitRepoUrl(e.target.value)}
-                placeholder={CCO_DEFAULT_GIT_REPO_URL}
-                required
-              />
-            </label>
-            <button
-              type="submit"
-              className="btn btn-secondary integrations-action-btn"
-              disabled={controlsDisabled}
-            >
-              {busy === "saveRepo" ? "Saving…" : "Save repository"}
-            </button>
-          </form>
-
-          <dl className="integrations-fields">
-            <div className="integrations-field">
-              <span className="integrations-field-label">Platform</span>
-              <span>
-                {status.platform === "cloudflare"
-                  ? "BYO Cloudflare"
-                  : status.platform === "vps"
-                    ? "VPS"
-                    : "Unknown"}
-              </span>
-            </div>
-            {status.latestPublishedAt && (
-              <div className="integrations-field">
-                <span className="integrations-field-label">Latest published</span>
-                <span>{formatWhen(status.latestPublishedAt)}</span>
-              </div>
-            )}
-          </dl>
-        </div>
-      </details>
     </section>
   );
 }

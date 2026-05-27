@@ -39,8 +39,6 @@ type IntegrationsSettings = {
   realtimeKitPresetGuest?: string;
   cloudflarePlatformProvisionedAt?: string | null;
   cloudflarePlatformConfigured?: boolean;
-  gitRepoUrl?: string;
-  defaultGitRepoUrl?: string;
 };
 
 type PcoSyncResult = {
@@ -211,57 +209,29 @@ function CloudflareSection({
   fromEnv,
   tokenConfigured,
   accountId,
-  onTokenSaved,
+  apiToken,
+  onApiTokenChange,
 }: {
   platformProvisioned: boolean;
   configured: boolean;
   fromEnv: boolean;
   tokenConfigured: boolean;
   accountId: string;
-  onTokenSaved: () => void;
+  apiToken: string;
+  onApiTokenChange: (value: string) => void;
 }) {
-  const [apiToken, setApiToken] = useState("");
-  const [savingToken, setSavingToken] = useState(false);
-  const [tokenError, setTokenError] = useState<string | null>(null);
-  const [tokenSuccess, setTokenSuccess] = useState<string | null>(null);
-
   const hasCloudflare =
     platformProvisioned || configured || fromEnv || tokenConfigured;
   if (!hasCloudflare) return null;
 
   const connected = platformProvisioned || tokenConfigured || fromEnv;
-  const callsEnabled = configured || fromEnv;
   const canEditToken = !fromEnv && (platformProvisioned || tokenConfigured);
 
   const description = platformProvisioned
     ? "Connected during install. Paste a new API token here after rotating credentials or adding permissions (including Secrets Store → Write)."
     : fromEnv
       ? "Configured via server environment. Token and call settings are managed outside this page."
-      : "Cloudflare API token is stored encrypted for updates and RealtimeKit calls.";
-
-  async function handleSaveToken() {
-    const trimmed = apiToken.trim();
-    if (!trimmed) {
-      setTokenError("Paste a Cloudflare API token to save.");
-      return;
-    }
-    setSavingToken(true);
-    setTokenError(null);
-    setTokenSuccess(null);
-    try {
-      await apiFetch("/api/v1/settings/integrations/cloudflare", {
-        method: "POST",
-        body: JSON.stringify({ cloudflareApiToken: trimmed }),
-      });
-      setApiToken("");
-      setTokenSuccess("Cloudflare API token saved.");
-      onTokenSaved();
-    } catch (err) {
-      setTokenError(err instanceof Error ? err.message : "Failed to save Cloudflare token");
-    } finally {
-      setSavingToken(false);
-    }
-  }
+      : "Cloudflare API token is stored encrypted.";
 
   return (
     <IntegrationsSection
@@ -275,30 +245,15 @@ function CloudflareSection({
           Account <code>{accountId}</code>
         </p>
       ) : null}
-      {callsEnabled ? (
-        <p className="integrations-field-hint">Audio &amp; video calls are enabled.</p>
-      ) : null}
       {canEditToken ? (
         <div className="integrations-fields">
           <SecretInput
             label="Cloudflare API token"
             configured={tokenConfigured}
             value={apiToken}
-            onChange={setApiToken}
+            onChange={onApiTokenChange}
             placeholder="Paste new token (Secrets Store → Write required for updates)"
           />
-          <Feedback error={tokenError} success={tokenSuccess} />
-          <button
-            type="button"
-            className="btn btn-secondary integrations-action-btn"
-            disabled={savingToken}
-            onClick={() => void handleSaveToken()}
-          >
-            {savingToken ? "Saving…" : "Save Cloudflare token"}
-          </button>
-          <p className="integrations-field-hint">
-            Required for Admin Updates apply. Do not enable IP filtering on this token.
-          </p>
         </div>
       ) : null}
     </IntegrationsSection>
@@ -326,6 +281,7 @@ export default function IntegrationsSettingsPage() {
   const [webPushConfigured, setWebPushConfigured] = useState(false);
   const [giphyApiKey, setGiphyApiKey] = useState("");
   const [giphyApiKeyConfigured, setGiphyApiKeyConfigured] = useState(false);
+  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [realtimeKitConfigured, setRealtimeKitConfigured] = useState(false);
   const [realtimeKitFromEnv, setRealtimeKitFromEnv] = useState(false);
   const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
@@ -338,7 +294,6 @@ export default function IntegrationsSettingsPage() {
   const [pcoLastSyncedAt, setPcoLastSyncedAt] = useState<string | null>(null);
   const [pcoNightlySyncEnabled, setPcoNightlySyncEnabled] = useState(true);
   const [pcoNightlySyncSchedule, setPcoNightlySyncSchedule] = useState("Nightly at 3:00 AM UTC");
-  const [gitRepoUrl, setGitRepoUrl] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -372,7 +327,6 @@ export default function IntegrationsSettingsPage() {
           Boolean(settings.cloudflarePlatformProvisionedAt) ||
             Boolean(settings.cloudflarePlatformConfigured),
         );
-        setGitRepoUrl(settings.gitRepoUrl ?? settings.defaultGitRepoUrl ?? "");
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -399,6 +353,8 @@ export default function IntegrationsSettingsPage() {
     setError(null);
     setSaved(false);
 
+    const trimmedCloudflareToken = cloudflareApiToken.trim();
+
     const payload: Record<string, string> = {
       name,
       clientId,
@@ -411,6 +367,30 @@ export default function IntegrationsSettingsPage() {
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
 
     try {
+      if (trimmedCloudflareToken) {
+        const cloudflareUpdated = await apiFetch<
+          IntegrationsSettings & { ok: boolean }
+        >("/api/v1/settings/integrations/cloudflare", {
+          method: "POST",
+          body: JSON.stringify({ cloudflareApiToken: trimmedCloudflareToken }),
+        });
+        setCloudflareApiToken("");
+        setCloudflareApiTokenConfigured(
+          cloudflareUpdated.cloudflareApiTokenConfigured ??
+            cloudflareUpdated.realtimeKitTokenConfigured ??
+            true,
+        );
+        if (cloudflareUpdated.realtimeKitAccountId) {
+          setRealtimeKitAccountId(cloudflareUpdated.realtimeKitAccountId);
+        }
+        setRealtimeKitConfigured(cloudflareUpdated.realtimeKitConfigured ?? realtimeKitConfigured);
+        setCloudflarePlatformProvisioned(
+          Boolean(cloudflareUpdated.cloudflarePlatformProvisionedAt) ||
+            Boolean(cloudflareUpdated.cloudflarePlatformConfigured) ||
+            cloudflarePlatformProvisioned,
+        );
+      }
+
       const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
         "/api/v1/settings/integrations",
         {
@@ -514,7 +494,7 @@ export default function IntegrationsSettingsPage() {
         <p>Integrations, Cloudflare, release updates, and org configuration. Saved secrets stay encrypted.</p>
       </header>
 
-      <AdminUpdatesSection initialGitRepoUrl={gitRepoUrl} />
+      <AdminUpdatesSection />
 
       <IntegrationsSection
         id="pco-sync-heading"
@@ -550,16 +530,17 @@ export default function IntegrationsSettingsPage() {
         </p>
       </IntegrationsSection>
 
-      <CloudflareSection
-        platformProvisioned={cloudflarePlatformProvisioned}
-        configured={realtimeKitConfigured}
-        fromEnv={realtimeKitFromEnv}
-        tokenConfigured={cloudflareApiTokenConfigured}
-        accountId={realtimeKitAccountId}
-        onTokenSaved={() => setCloudflareApiTokenConfigured(true)}
-      />
-
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
+        <CloudflareSection
+          platformProvisioned={cloudflarePlatformProvisioned}
+          configured={realtimeKitConfigured}
+          fromEnv={realtimeKitFromEnv}
+          tokenConfigured={cloudflareApiTokenConfigured}
+          accountId={realtimeKitAccountId}
+          apiToken={cloudflareApiToken}
+          onApiTokenChange={setCloudflareApiToken}
+        />
+
         <IntegrationsSection
           id="pco-oauth-heading"
           heading="Planning Center OAuth"
