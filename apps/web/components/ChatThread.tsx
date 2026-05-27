@@ -857,7 +857,7 @@ export function ChatThread({
 
   const messageScrollContent = (
     <>
-      {sendError && (
+      {layout !== "panel" && sendError && (
         <p className="send-error" role="alert">
           {sendError}
         </p>
@@ -928,15 +928,24 @@ export function ChatThread({
         .join(" ")}
     >
       {layout === "panel" ? (
-        <div
-          ref={panelBodyRef}
-          className={[
-            "chat-panel-body",
-            scrollReady ? "chat-panel-body--scroll-ready" : "chat-panel-body--scroll-init",
-          ].join(" ")}
-          onScroll={handleScrollContainer}
-        >
-          <div className="chat-panel-messages-inner">{messageScrollContent}</div>
+        <div className="chat-panel-messages-wrap">
+          {sendError ? (
+            <div className="chat-panel-banner-slot">
+              <p className="send-error" role="alert">
+                {sendError}
+              </p>
+            </div>
+          ) : null}
+          <div
+            ref={panelBodyRef}
+            className={[
+              "chat-panel-body",
+              scrollReady ? "chat-panel-body--scroll-ready" : "chat-panel-body--scroll-init",
+            ].join(" ")}
+            onScroll={handleScrollContainer}
+          >
+            <div className="chat-panel-messages-inner">{messageScrollContent}</div>
+          </div>
         </div>
       ) : (
         <div>{messageScrollContent}</div>
@@ -1001,6 +1010,7 @@ export function ChatThread({
           members={members}
           resolvedUserId={resolvedUserId}
           sendError={sendError}
+          hideSendErrorBanner={layout === "panel"}
           onSendError={setSendError}
           onSend={handleComposerSend}
           onSendGiphy={handleComposerGiphy}

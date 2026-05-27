@@ -139,13 +139,14 @@ export default function DmChatPage() {
         </ChannelSettingsPanel>
       )}
 
-      {displayError && (
-        <ChatHomeBanner variant="error" placement="panel">
-          {displayError}
-        </ChatHomeBanner>
-      )}
-
       <div className="chat-panel-content">
+        {displayError ? (
+          <div className="chat-panel-banner-slot">
+            <ChatHomeBanner variant="error" placement="panel">
+              {displayError}
+            </ChatHomeBanner>
+          </div>
+        ) : null}
         <ChatThread
           key={conversationId}
           conversationId={conversationId}

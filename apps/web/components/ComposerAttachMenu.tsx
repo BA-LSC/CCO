@@ -80,7 +80,7 @@ export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPick
                 onPickGiphy?.();
               }}
             >
-              Giphy search
+              Giphy
             </button>
           ) : null}
         </div>

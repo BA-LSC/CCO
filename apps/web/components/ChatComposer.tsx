@@ -42,6 +42,8 @@ type Props = {
   members: Member[];
   resolvedUserId?: string;
   sendError: string | null;
+  /** Panel layout shows send errors in a floating banner above messages. */
+  hideSendErrorBanner?: boolean;
   onSendError: (error: string | null) => void;
   onSend: (payload: { text: string; media: PendingComposerMedia | null }) => Promise<void>;
   onSendGiphy: (importUrl: string) => Promise<void>;
@@ -60,6 +62,7 @@ export function ChatComposer({
   members,
   resolvedUserId,
   sendError,
+  hideSendErrorBanner = false,
   onSendError,
   onSend,
   onSendGiphy,
@@ -299,7 +302,7 @@ export function ChatComposer({
         />
       ) : null}
 
-      {sendError ? (
+      {sendError && !hideSendErrorBanner ? (
         <p className="composer-send-error" role="alert">
           {sendError}
         </p>

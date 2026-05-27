@@ -194,12 +194,6 @@ export default function TeamChatPage() {
         />
       </ChatPanelHeader>
 
-      {displayError && (
-        <ChatHomeBanner variant="error" placement="panel">
-          {displayError}
-        </ChatHomeBanner>
-      )}
-
       {showSettings && detail?.conversation && (
         <ChannelSettingsPanel>
           <ConversationMuteSetting
@@ -221,6 +215,13 @@ export default function TeamChatPage() {
       )}
 
       <div className="chat-panel-content">
+        {displayError ? (
+          <div className="chat-panel-banner-slot">
+            <ChatHomeBanner variant="error" placement="panel">
+              {displayError}
+            </ChatHomeBanner>
+          </div>
+        ) : null}
         <ChatThread
           key={conversationId ?? "team"}
           conversationId={detail?.conversation?.id ?? null}

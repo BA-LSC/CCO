@@ -391,12 +391,6 @@ export default function GroupConversationPage() {
         />
       </ChatPanelHeader>
 
-      {displayError && (
-        <ChatHomeBanner variant="error" placement="panel">
-          {displayError}
-        </ChatHomeBanner>
-      )}
-
       {showChannelSettings && activeConversation && detail && (
         <ChannelSettingsPanel>
           <ConversationMuteSetting
@@ -482,6 +476,13 @@ export default function GroupConversationPage() {
       )}
 
       <div className="chat-panel-content">
+        {displayError ? (
+          <div className="chat-panel-banner-slot">
+            <ChatHomeBanner variant="error" placement="panel">
+              {displayError}
+            </ChatHomeBanner>
+          </div>
+        ) : null}
         <ChatThread
           key={conversationId}
           conversationId={conversationId}
