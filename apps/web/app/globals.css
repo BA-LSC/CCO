@@ -1238,10 +1238,30 @@ html[data-theme="6"] .user-menu-dropdown {
   background: color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
+.sidebar-channel-prefix,
 .sidebar-hash {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
   color: var(--color-muted);
   font-size: 0.85rem;
+}
+
+.sidebar-channel-prefix-hash {
+  justify-content: flex-start;
+}
+
+.sidebar-channel-prefix-glyph {
+  display: block;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.sidebar-item-active .sidebar-channel-prefix {
+  color: var(--color-primary);
 }
 
 .sidebar-nested {

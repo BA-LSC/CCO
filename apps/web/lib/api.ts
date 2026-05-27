@@ -140,6 +140,7 @@ export type GroupSidebarConversation = {
   slug: string;
   title: string;
   leaderOnly: boolean;
+  hasRestrictedAccess: boolean;
   muted: boolean;
   hasUnread: boolean;
 };

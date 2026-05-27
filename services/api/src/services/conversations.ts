@@ -283,6 +283,22 @@ export async function listGroupsForSidebar(userId: string) {
   const unreadByConv =
     convIds.length > 0 ? await unreadFlagsForConversations(convIds, userId) : new Map();
 
+  const groupMemberCountByGroup = new Map<string, number>();
+  const convMemberCountByConv = new Map<string, number>();
+
+  const groupMemberCounts = await db
+    .select({
+      groupId: groupMemberships.groupId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(groupMemberships)
+    .where(inArray(groupMemberships.groupId, groupIds))
+    .groupBy(groupMemberships.groupId);
+
+  for (const row of groupMemberCounts) {
+    groupMemberCountByGroup.set(row.groupId, row.count);
+  }
+
   if (convIds.length > 0) {
     const mutedRows = await db
       .select({
@@ -300,6 +316,19 @@ export async function listGroupsForSidebar(userId: string) {
     for (const row of mutedRows) {
       mutedByConv.set(row.conversationId, row.muted);
     }
+
+    const convMemberCounts = await db
+      .select({
+        conversationId: conversationMembers.conversationId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(conversationMembers)
+      .where(inArray(conversationMembers.conversationId, convIds))
+      .groupBy(conversationMembers.conversationId);
+
+    for (const row of convMemberCounts) {
+      convMemberCountByConv.set(row.conversationId, row.count);
+    }
   }
 
   const convsByGroup = new Map<string, typeof convRows>();
@@ -316,14 +345,25 @@ export async function listGroupsForSidebar(userId: string) {
     pcoGroupId: group.pcoGroupId,
     imageUrl: group.imageUrl,
     membershipRole: group.membershipRole,
-    conversations: (convsByGroup.get(group.id) ?? []).map((conv) => ({
-      id: conv.id,
-      slug: conv.slug,
-      title: conv.title,
-      leaderOnly: conv.leaderOnly,
-      muted: mutedByConv.get(conv.id) ?? false,
-      hasUnread: unreadByConv.get(conv.id) ?? false,
-    })),
+    conversations: (convsByGroup.get(group.id) ?? []).map((conv) => {
+      const groupMemberCount = groupMemberCountByGroup.get(group.id) ?? 0;
+      const convMemberCount = convMemberCountByConv.get(conv.id) ?? 0;
+      const hasRestrictedAccess =
+        conv.slug !== "general" &&
+        groupMemberCount > 0 &&
+        convMemberCount > 0 &&
+        convMemberCount < groupMemberCount;
+
+      return {
+        id: conv.id,
+        slug: conv.slug,
+        title: conv.title,
+        leaderOnly: conv.leaderOnly,
+        hasRestrictedAccess,
+        muted: mutedByConv.get(conv.id) ?? false,
+        hasUnread: unreadByConv.get(conv.id) ?? false,
+      };
+    }),
   }));
 }
 

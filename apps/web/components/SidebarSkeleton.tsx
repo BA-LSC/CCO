@@ -27,7 +27,7 @@ export function SidebarSkeleton() {
                 {Array.from({ length: CHANNEL_ROWS }, (_, channelIndex) => (
                   <li key={channelIndex}>
                     <div className="sidebar-item sidebar-nested-item sidebar-skeleton-nested-row">
-                      <span className="sidebar-hash">#</span>
+                      <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
                       <span className="sidebar-skeleton-label sidebar-skeleton-label-channel" />
                     </div>
                   </li>

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SidebarChevronIcon, SidebarLockIcon } from "@/components/PanelHeaderIcons";
+import { SidebarAnnouncementIcon, SidebarChevronIcon, SidebarLockIcon } from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import {
   apiFetch,
   slugify,
   type GroupDetail,
   type GroupSidebarItem,
+  type GroupSidebarConversation,
 } from "@/lib/api";
 import { subscribeConversationUpdated, subscribeUnreadChanged } from "@/lib/sidebar-events";
 
@@ -21,6 +22,26 @@ type Props = {
 
 function isLeaderRole(role: string | undefined): boolean {
   return role === "leader" || role === "admin";
+}
+
+function SidebarChannelPrefix({ conv }: { conv: GroupSidebarConversation }) {
+  if (conv.hasRestrictedAccess) {
+    return (
+      <span className="sidebar-channel-prefix" title="Restricted access">
+        <SidebarLockIcon />
+      </span>
+    );
+  }
+
+  if (conv.leaderOnly) {
+    return (
+      <span className="sidebar-channel-prefix" title="Leaders only can post">
+        <SidebarAnnouncementIcon />
+      </span>
+    );
+  }
+
+  return <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>;
 }
 
 export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: Props) {
@@ -303,14 +324,9 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                             activeConversationId === conv.id ? "sidebar-item-active" : ""
                           }`}
                         >
-                          <span className="sidebar-hash">#</span>
+                          <SidebarChannelPrefix conv={conv} />
                           <span className="sidebar-item-label">{conv.title}</span>
                           <span className="sidebar-nested-trailing">
-                            {conv.leaderOnly && (
-                              <span className="sidebar-channel-lock" title="Leaders only">
-                                <SidebarLockIcon />
-                              </span>
-                            )}
                             {conv.muted && (
                               <span className="sidebar-badge" title="Muted">
                                 🔕

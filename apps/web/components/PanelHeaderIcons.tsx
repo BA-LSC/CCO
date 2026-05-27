@@ -95,7 +95,7 @@ export function PanelHeaderPhoneIcon({ className = "panel-header-icon" }: IconPr
   );
 }
 
-export function SidebarLockIcon({ className = "sidebar-channel-lock-glyph" }: IconProps) {
+export function SidebarLockIcon({ className = "sidebar-channel-prefix-glyph" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
       <path
@@ -115,6 +115,23 @@ export function SidebarLockIcon({ className = "sidebar-channel-lock-glyph" }: Ic
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
+export function SidebarAnnouncementIcon({
+  className = "sidebar-channel-prefix-glyph",
+}: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M4 10v4M7 8.5 17 4v16L7 15.5H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
