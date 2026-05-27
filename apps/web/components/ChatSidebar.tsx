@@ -226,36 +226,28 @@ export function ChatSidebar() {
     [teamGroups],
   );
 
-  function renderTeamPrefix(team: ServiceTeamSummary) {
-    if (team.role === "leader") {
-      return (
-        <>
-          <span className="sidebar-channel-prefix" title="Team leader">
-            <SidebarCrownIcon />
-          </span>
-          <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
-        </>
-      );
-    }
-
-    return <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>;
-  }
-
   function renderTeamItem(team: ServiceTeamSummary) {
     return (
       <Link
         href={`/teams/${team.id}`}
-        className={`sidebar-item sidebar-team-item sidebar-nested-item ${
+        className={`sidebar-item sidebar-team-item ${
           activeTeamId === team.id ? "sidebar-item-active" : ""
         }`}
       >
-        {renderTeamPrefix(team)}
-        <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
-        <span className="sidebar-nested-trailing">
-          {team.hasUnread && activeTeamId !== team.id && (
-            <span className="sidebar-unread-dot" aria-label="Unread messages" />
-          )}
-        </span>
+        <div className="sidebar-team-row">
+          <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
+          <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
+          <span className="sidebar-nested-trailing">
+            {team.role === "leader" && (
+              <span className="sidebar-team-leader" title="Team leader">
+                <SidebarCrownIcon className="sidebar-team-crown-glyph" />
+              </span>
+            )}
+            {team.hasUnread && activeTeamId !== team.id && (
+              <span className="sidebar-unread-dot" aria-label="Unread messages" />
+            )}
+          </span>
+        </div>
       </Link>
     );
   }

@@ -70,16 +70,16 @@ export function SidebarSkeleton() {
             <ul className="sidebar-list">
               {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
                 <li key={teamIndex}>
-                  <div className="sidebar-item sidebar-team-item sidebar-nested-item sidebar-skeleton-team-row">
-                    {teamIndex === 0 ? (
-                      <>
-                        <span className="sidebar-channel-prefix sidebar-skeleton-icon" aria-hidden />
-                        <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
-                      </>
-                    ) : (
+                  <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
+                    <div className="sidebar-team-row">
                       <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
-                    )}
-                    <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
+                      <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
+                      {teamIndex === 0 ? (
+                        <span className="sidebar-nested-trailing">
+                          <span className="sidebar-team-leader sidebar-skeleton-icon" aria-hidden />
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </li>
               ))}
