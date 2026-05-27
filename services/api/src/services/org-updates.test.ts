@@ -83,6 +83,7 @@ describe("resolveUpdatePlatform", () => {
       resolveUpdatePlatform({
         cloudflarePlatformProvisionedAt: new Date(),
         cloudflareApiTokenEnc: "enc",
+        cloudflareApiTokenConfigured: false,
         cloudflareAccountId: "acct",
       }),
     ).toBe("cloudflare");
@@ -96,6 +97,7 @@ describe("resolveUpdatePlatform", () => {
       resolveUpdatePlatform({
         cloudflarePlatformProvisionedAt: null,
         cloudflareApiTokenEnc: null,
+        cloudflareApiTokenConfigured: false,
         cloudflareAccountId: null,
       }),
     ).toBe("vps");

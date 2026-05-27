@@ -1,4 +1,5 @@
 import { DEFAULT_PCO_OAUTH_SCOPE } from "@cco/pco-client";
+import { CCO_STORE_SECRET } from "@cco/cloudflare-provision";
 import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { db } from "../db";
@@ -9,7 +10,14 @@ import {
   getCachedConfiguredOrganization,
   invalidateOrgContextCache,
 } from "./org-context-cache";
+import {
+  isPcoClientSecretConfigured,
+  isPcoWebhookSecretsConfigured,
+  orgUsesSecretsStore,
+  upsertOrgSecretForOrganization,
+} from "./org-secrets";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 export type OrgOAuthCredentials = {
   clientId: string;
@@ -29,7 +37,19 @@ function envBootstrapCredentials(): OrgOAuthCredentials | null {
 }
 
 function credentialsFromOrg(org: typeof organizations.$inferSelect): OrgOAuthCredentials | null {
-  if (!org.pcoClientId || !org.pcoClientSecretEnc) return null;
+  if (!org.pcoClientId) return null;
+
+  if (isCloudflareRuntime() && orgUsesSecretsStore(org)) {
+    const clientSecret = process.env.PCO_CLIENT_SECRET?.trim();
+    if (!clientSecret) return null;
+    return {
+      clientId: org.pcoClientId,
+      clientSecret,
+      scope: org.pcoOauthScope ?? DEFAULT_PCO_OAUTH_SCOPE,
+    };
+  }
+
+  if (!org.pcoClientSecretEnc) return null;
   return {
     clientId: org.pcoClientId,
     clientSecret: decryptSecret(org.pcoClientSecretEnc),
@@ -43,14 +63,17 @@ export async function getConfiguredOrganization() {
 
 export async function getOrganizationWithOAuthCredentials() {
   const completed = await getConfiguredOrganization();
-  if (completed?.pcoClientId && completed.pcoClientSecretEnc) {
+  if (completed?.pcoClientId && isPcoClientSecretConfigured(completed)) {
     return completed;
   }
 
   const rows = await selectConfiguredOrganizationRow(
-    and(isNotNull(organizations.pcoClientId), isNotNull(organizations.pcoClientSecretEnc)),
+    and(isNotNull(organizations.pcoClientId)),
   );
-  return rows;
+  if (rows && isPcoClientSecretConfigured(rows)) {
+    return rows;
+  }
+  return rows?.pcoClientSecretEnc ? rows : null;
 }
 
 export async function getPendingSetupOrganization() {
@@ -58,12 +81,16 @@ export async function getPendingSetupOrganization() {
 }
 
 export function draftHasSensitiveData(org: typeof organizations.$inferSelect): boolean {
-  return Boolean(org.pcoClientId || org.pcoClientSecretEnc);
+  return Boolean(
+    org.pcoClientId || org.pcoClientSecretEnc || org.pcoClientSecretConfigured,
+  );
 }
 
 export async function isSetupComplete(): Promise<boolean> {
   const org = await getConfiguredOrganization();
-  return Boolean(org?.setupCompletedAt && org.pcoClientId && org.pcoClientSecretEnc);
+  return Boolean(
+    org?.setupCompletedAt && org.pcoClientId && isPcoClientSecretConfigured(org),
+  );
 }
 
 export async function getActiveOrgOAuthCredentials(): Promise<OrgOAuthCredentials | null> {
@@ -86,8 +113,6 @@ export async function saveSetupDraft(params: {
 }): Promise<void> {
   const scope = DEFAULT_PCO_OAUTH_SCOPE;
   const clientId = params.clientId.trim();
-  const clientSecretEnc = encryptSecret(params.clientSecret.trim());
-  const webhookEnc = encryptWebhookSecretsInput(params.webhookSecret);
   const signInRedirectUri = params.signInRedirectUri.trim();
   const webhookUrl = params.webhookUrl.trim();
 
@@ -96,6 +121,56 @@ export async function saveSetupDraft(params: {
     .from(organizations)
     .where(isNull(organizations.setupCompletedAt))
     .limit(1);
+
+  const orgId = pending[0]?.id;
+  if (orgId && isCloudflareRuntime()) {
+    const orgRows = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+      .limit(1);
+    if (orgRows[0] && orgUsesSecretsStore(orgRows[0])) {
+      await db
+        .update(organizations)
+        .set({
+          name: params.name.trim(),
+          pcoClientId: clientId,
+          pcoOauthScope: scope,
+          pcoWebRedirectUri: signInRedirectUri,
+          pcoWebhookUrl: webhookUrl,
+          pcoClientSecretConfigured: true,
+          pcoClientSecretEnc: null,
+          ...(params.webhookSecret !== undefined
+            ? {
+                pcoWebhookSecretsConfigured: Boolean(params.webhookSecret?.trim()),
+                pcoWebhookSecretEnc: null,
+              }
+            : {}),
+        })
+        .where(eq(organizations.id, orgId));
+
+      await upsertOrgSecretForOrganization({
+        organizationId: orgId,
+        secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+        value: params.clientSecret.trim(),
+        configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
+      });
+
+      if (params.webhookSecret?.trim()) {
+        await upsertOrgSecretForOrganization({
+          organizationId: orgId,
+          secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
+          value: params.webhookSecret.trim(),
+          configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
+        });
+      }
+      invalidateOrgContextCache();
+      return;
+    }
+  }
+
+  const clientSecretEnc = encryptSecret(params.clientSecret.trim());
+  const webhookEnc = encryptWebhookSecretsInput(params.webhookSecret);
 
   if (pending[0]) {
     await db
@@ -172,14 +247,65 @@ export async function saveOrganizationOAuthSetup(params: {
   churchCenterSubdomain?: string | null;
   webhookSecret?: string | null;
 }): Promise<void> {
+  const orgRows = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const org = orgRows[0];
+  if (!org) throw new Error("Organization not found");
+
+  const clientSecret = params.clientSecret?.trim();
+  if (orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    if (!clientSecret && !isPcoClientSecretConfigured(org)) {
+      throw new Error("OAuth client secret is required");
+    }
+    await db
+      .update(organizations)
+      .set({
+        name: params.name,
+        pcoClientId: params.clientId.trim(),
+        pcoOauthScope: params.scope?.trim() || DEFAULT_PCO_OAUTH_SCOPE,
+        churchCenterSubdomain: params.churchCenterSubdomain?.trim() || null,
+        setupCompletedAt: new Date(),
+        setupByUserId: params.userId,
+        pcoClientSecretConfigured: true,
+        pcoClientSecretEnc: null,
+        pcoWebhookSecretsConfigured: Boolean(params.webhookSecret?.trim()),
+        pcoWebhookSecretEnc: null,
+      })
+      .where(eq(organizations.id, params.organizationId));
+
+    if (clientSecret) {
+      await upsertOrgSecretForOrganization({
+        organizationId: params.organizationId,
+        secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+        value: clientSecret,
+        configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
+      });
+    }
+    if (params.webhookSecret?.trim()) {
+      await upsertOrgSecretForOrganization({
+        organizationId: params.organizationId,
+        secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
+        value: params.webhookSecret.trim(),
+        configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
+      });
+    }
+    invalidateOrgContextCache();
+    const { ensureVapidKeys } = await import("./org-vapid");
+    await ensureVapidKeys(params.organizationId);
+    return;
+  }
+
   const existing = await db
     .select({ pcoClientSecretEnc: organizations.pcoClientSecretEnc })
     .from(organizations)
     .where(eq(organizations.id, params.organizationId))
     .limit(1);
 
-  const secretEnc = params.clientSecret?.trim()
-    ? encryptSecret(params.clientSecret.trim())
+  const secretEnc = clientSecret
+    ? encryptSecret(clientSecret)
     : existing[0]?.pcoClientSecretEnc;
   if (!secretEnc) {
     throw new Error("OAuth client secret is required");
@@ -213,6 +339,64 @@ export async function updateOrganizationOAuthSettings(params: {
   signInRedirectUri?: string;
   webhookUrl?: string;
 }): Promise<void> {
+  const orgRows = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const org = orgRows[0];
+
+  if (org && orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    const updates: Record<string, unknown> = {};
+    if (params.name !== undefined) updates.name = params.name.trim();
+    if (params.clientId !== undefined) updates.pcoClientId = params.clientId.trim();
+    if (params.signInRedirectUri !== undefined) {
+      updates.pcoWebRedirectUri = params.signInRedirectUri.trim();
+    }
+    if (params.webhookUrl !== undefined) updates.pcoWebhookUrl = params.webhookUrl.trim();
+
+    if (params.clientSecret !== undefined) {
+      await upsertOrgSecretForOrganization({
+        organizationId: params.organizationId,
+        secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+        value: params.clientSecret.trim(),
+        configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
+      });
+    }
+    if (params.webhookSecret !== undefined) {
+      const trimmed = params.webhookSecret.trim();
+      if (trimmed) {
+        await upsertOrgSecretForOrganization({
+          organizationId: params.organizationId,
+          secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
+          value: trimmed,
+          configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
+        });
+      } else {
+        updates.pcoWebhookSecretsConfigured = false;
+        updates.pcoWebhookSecretEnc = null;
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db
+        .update(organizations)
+        .set(updates)
+        .where(eq(organizations.id, params.organizationId));
+    }
+    if (
+      params.name !== undefined ||
+      params.clientId !== undefined ||
+      params.clientSecret !== undefined ||
+      params.webhookSecret !== undefined ||
+      params.signInRedirectUri !== undefined ||
+      params.webhookUrl !== undefined
+    ) {
+      invalidateOrgContextCache();
+    }
+    return;
+  }
+
   const updates: {
     name?: string;
     pcoClientId?: string;

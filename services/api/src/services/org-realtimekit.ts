@@ -1,8 +1,15 @@
+import { CCO_STORE_SECRET } from "@cco/cloudflare-provision";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../auth/token-crypto";
 import { getConfiguredOrganization } from "./org-oauth";
+import {
+  isCloudflareApiTokenConfigured,
+  orgUsesSecretsStore,
+  upsertOrgSecretForOrganization,
+} from "./org-secrets";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 import {
   listCloudflareAccounts,
   verifyCloudflareApiToken,
@@ -22,12 +29,20 @@ export type RealtimeKitConfig = {
 
 export async function resolveRealtimeKitConfig(): Promise<RealtimeKitConfig | null> {
   const org = await getConfiguredOrganization();
-  if (org?.cloudflareAccountId && org.realtimeKitAppId && org.cloudflareApiTokenEnc) {
-    return {
-      accountId: org.cloudflareAccountId,
-      appId: org.realtimeKitAppId,
-      apiToken: decryptSecret(org.cloudflareApiTokenEnc),
-    };
+  if (org?.cloudflareAccountId && org.realtimeKitAppId) {
+    const apiToken =
+      orgUsesSecretsStore(org) && isCloudflareRuntime()
+        ? process.env.CLOUDFLARE_API_TOKEN?.trim()
+        : org.cloudflareApiTokenEnc
+          ? decryptSecret(org.cloudflareApiTokenEnc)
+          : undefined;
+    if (apiToken) {
+      return {
+        accountId: org.cloudflareAccountId,
+        appId: org.realtimeKitAppId,
+        apiToken,
+      };
+    }
   }
 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
@@ -61,11 +76,19 @@ export async function resolveCloudflareApiToken(): Promise<{
   accountId: string;
 } | null> {
   const org = await getConfiguredOrganization();
-  if (org?.cloudflareApiTokenEnc) {
-    return {
-      apiToken: decryptSecret(org.cloudflareApiTokenEnc),
-      accountId: org.cloudflareAccountId ?? "",
-    };
+  if (org && isCloudflareApiTokenConfigured(org)) {
+    const apiToken =
+      orgUsesSecretsStore(org) && isCloudflareRuntime()
+        ? process.env.CLOUDFLARE_API_TOKEN?.trim()
+        : org.cloudflareApiTokenEnc
+          ? decryptSecret(org.cloudflareApiTokenEnc)
+          : undefined;
+    if (apiToken) {
+      return {
+        apiToken,
+        accountId: org.cloudflareAccountId ?? "",
+      };
+    }
   }
 
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
@@ -96,6 +119,28 @@ export async function saveOrganizationCloudflareApiToken(params: {
   const accountId = resolveCloudflareAccountId(accounts, params.existingAccountId?.trim());
 
   await ensureCloudflareOrganizationColumns();
+
+  const orgRows = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, params.organizationId))
+    .limit(1);
+  const org = orgRows[0];
+
+  if (org && orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    await upsertOrgSecretForOrganization({
+      organizationId: params.organizationId,
+      secretName: CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
+      value: apiToken,
+      configuredPatch: {
+        cloudflareApiTokenConfigured: true,
+        cloudflareApiTokenEnc: null,
+        cloudflareAccountId: accountId,
+      },
+    });
+    invalidateOrgContextCache();
+    return { accountId };
+  }
 
   await db
     .update(organizations)
@@ -246,6 +291,7 @@ export function getOrganizationRealtimeKitStatus(
     typeof organizations.$inferSelect,
     | "cloudflareAccountId"
     | "cloudflareApiTokenEnc"
+    | "cloudflareApiTokenConfigured"
     | "realtimeKitAppId"
     | "realtimeKitPresetHost"
     | "realtimeKitPresetMember"
@@ -253,8 +299,8 @@ export function getOrganizationRealtimeKitStatus(
   >,
 ) {
   const presets = getPresetNames(org);
-  const tokenFromDb = Boolean(org.cloudflareApiTokenEnc);
-  const callsFromDb = Boolean(org.realtimeKitAppId && org.cloudflareApiTokenEnc);
+  const tokenConfigured = isCloudflareApiTokenConfigured(org);
+  const callsFromDb = Boolean(org.realtimeKitAppId && tokenConfigured);
   const fromEnv = Boolean(
     process.env.CLOUDFLARE_ACCOUNT_ID?.trim() &&
       process.env.REALTIMEKIT_APP_ID?.trim() &&
@@ -266,9 +312,9 @@ export function getOrganizationRealtimeKitStatus(
     realtimeKitFromEnv: fromEnv && !callsFromDb,
     realtimeKitAccountId: org.cloudflareAccountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
     realtimeKitAppId: org.realtimeKitAppId ?? process.env.REALTIMEKIT_APP_ID ?? "",
-    cloudflareApiTokenConfigured: tokenFromDb || tokenFromEnv,
+    cloudflareApiTokenConfigured: tokenConfigured || tokenFromEnv,
     /** @deprecated Use cloudflareApiTokenConfigured */
-    realtimeKitTokenConfigured: tokenFromDb || tokenFromEnv,
+    realtimeKitTokenConfigured: tokenConfigured || tokenFromEnv,
     realtimeKitPresetsConfigured: Boolean(
       org.realtimeKitPresetHost && org.realtimeKitPresetMember && org.realtimeKitPresetGuest,
     ),

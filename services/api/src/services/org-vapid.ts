@@ -1,9 +1,16 @@
 import webpush from "web-push";
+import { CCO_STORE_SECRET } from "@cco/cloudflare-provision";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { decryptSecret, encryptSecret } from "../auth/token-crypto";
 import { getConfiguredOrganization } from "./org-oauth";
+import {
+  isVapidPrivateKeyConfigured,
+  orgUsesSecretsStore,
+  upsertOrgSecretForOrganization,
+} from "./org-secrets";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 export type VapidConfig = {
   publicKey: string;
@@ -37,14 +44,39 @@ export async function ensureVapidKeys(organizationId: string): Promise<void> {
     .select({
       vapidPublicKey: organizations.vapidPublicKey,
       vapidPrivateKeyEnc: organizations.vapidPrivateKeyEnc,
+      vapidPrivateKeyConfigured: organizations.vapidPrivateKeyConfigured,
+      cloudflareSecretsStoreId: organizations.cloudflareSecretsStoreId,
+      cloudflarePlatformProvisionedAt: organizations.cloudflarePlatformProvisionedAt,
     })
     .from(organizations)
     .where(eq(organizations.id, organizationId))
     .limit(1);
 
-  if (rows[0]?.vapidPublicKey && rows[0]?.vapidPrivateKeyEnc) return;
+  const org = rows[0];
+  if (!org) return;
+  if (isVapidPrivateKeyConfigured(org)) return;
 
   const keys = webpush.generateVAPIDKeys();
+
+  if (orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    await db
+      .update(organizations)
+      .set({
+        vapidPublicKey: keys.publicKey,
+        vapidPrivateKeyConfigured: true,
+        vapidPrivateKeyEnc: null,
+      })
+      .where(eq(organizations.id, organizationId));
+
+    await upsertOrgSecretForOrganization({
+      organizationId,
+      secretName: CCO_STORE_SECRET.VAPID_PRIVATE_KEY,
+      value: keys.privateKey,
+      configuredPatch: { vapidPrivateKeyConfigured: true, vapidPrivateKeyEnc: null },
+    });
+    return;
+  }
+
   await db
     .update(organizations)
     .set({
@@ -80,7 +112,19 @@ function envVapidConfig(): VapidConfig | null {
 }
 
 function orgVapidConfig(org: typeof organizations.$inferSelect): VapidConfig | null {
-  if (!org.vapidPublicKey || !org.vapidPrivateKeyEnc || !org.vapidSubject) return null;
+  if (!org.vapidPublicKey || !org.vapidSubject) return null;
+
+  if (orgUsesSecretsStore(org) && isCloudflareRuntime()) {
+    const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+    if (!privateKey) return null;
+    return {
+      publicKey: org.vapidPublicKey,
+      privateKey,
+      subject: org.vapidSubject,
+    };
+  }
+
+  if (!org.vapidPrivateKeyEnc) return null;
 
   return {
     publicKey: org.vapidPublicKey,
@@ -100,7 +144,7 @@ export async function resolveVapidConfig(): Promise<VapidConfig | null> {
 }
 
 export async function getOrganizationVapidStatus(org: typeof organizations.$inferSelect) {
-  const keysConfigured = Boolean(org.vapidPublicKey && org.vapidPrivateKeyEnc);
+  const keysConfigured = isVapidPrivateKeyConfigured(org) && Boolean(org.vapidPublicKey);
   const subjectEmail = parseVapidSubjectEmail(org.vapidSubject);
   return {
     vapidKeysConfigured: keysConfigured,

@@ -4,6 +4,11 @@ import { organizations } from "../db/schema";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
 import type { ConfiguredOrganizationRow } from "./org-select";
+import {
+  isPcoWebhookSecretsConfigured,
+  orgUsesSecretsStore,
+} from "./org-secrets";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 const ORG_CACHE_TTL_MS = 60_000;
 
@@ -32,6 +37,13 @@ export async function getCachedConfiguredOrganization(): Promise<ConfiguredOrgan
 }
 
 export async function getCachedOrgWebhookSecrets(): Promise<string[]> {
+  if (isCloudflareRuntime()) {
+    const raw = process.env.WEBHOOK_SECRETS?.trim();
+    if (raw) {
+      return raw.split("\n").map((line) => line.trim()).filter(Boolean);
+    }
+  }
+
   const rows = await db
     .select({ pcoWebhookSecretEnc: organizations.pcoWebhookSecretEnc })
     .from(organizations)

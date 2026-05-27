@@ -18,6 +18,7 @@ import { isCloudflareRuntime } from "../runtime/worker-context";
 import { readDeployLastError, setDeployDraining, setDeployLastError } from "../lib/deploy-status";
 import { fetchGitReleaseIndex, resolveOrgGitRepoUrl } from "./git-release-index";
 import { getConfiguredOrganization } from "./org-oauth";
+import { migrateOrganizationSecretsToStore, isCloudflareApiTokenConfigured } from "./org-secrets";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import { invalidateOrgContextCache } from "./org-context-cache";
 
@@ -68,7 +69,7 @@ export type CloudflareReleaseUpdateJob = {
   orgId: string;
   accountId: string;
   apiToken: string;
-  secrets: ProvisionSecrets;
+  secretsStoreId: string;
   resources: {
     accountId: string;
     d1DatabaseId: string;
@@ -120,11 +121,12 @@ export function resolveOrgHostnames(org: {
 export function resolveUpdatePlatform(org: {
   cloudflarePlatformProvisionedAt: Date | null;
   cloudflareApiTokenEnc: string | null;
+  cloudflareApiTokenConfigured: boolean | null;
   cloudflareAccountId: string | null;
 }): UpdatePlatform {
   if (
     org.cloudflarePlatformProvisionedAt &&
-    org.cloudflareApiTokenEnc &&
+    isCloudflareApiTokenConfigured(org) &&
     org.cloudflareAccountId
   ) {
     return "cloudflare";
@@ -195,7 +197,7 @@ export async function getUpdatesStatus(options?: {
   } else if (platform !== "cloudflare") {
     canApply = false;
     applyBlockedReason = "Update apply is only supported for BYO Cloudflare installs.";
-  } else if (!org.cloudflareApiTokenEnc) {
+  } else if (!isCloudflareApiTokenConfigured(org)) {
     canApply = false;
     applyBlockedReason = "Cloudflare API token is not configured.";
   } else if (!resolveOrgHostnames(org)) {
@@ -280,7 +282,7 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
   if (resolveUpdatePlatform(org) !== "cloudflare") {
     throw new Error("Apply update is only supported for BYO Cloudflare installs");
   }
-  if (!org.cloudflareApiTokenEnc || !org.cloudflareAccountId) {
+  if (!isCloudflareApiTokenConfigured(org) || !org.cloudflareAccountId) {
     throw new Error("Cloudflare credentials are not configured");
   }
 
@@ -298,8 +300,29 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
     throw new Error("Already on the latest release");
   }
 
-  const apiToken = decryptSecret(org.cloudflareApiTokenEnc);
+  const platformSecrets = requireProvisionSecrets();
+  let secretsStoreId = org.cloudflareSecretsStoreId?.trim() ?? "";
+
+  const apiToken =
+    org.cloudflareApiTokenEnc && !secretsStoreId
+      ? decryptSecret(org.cloudflareApiTokenEnc)
+      : process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "";
+
+  if (!apiToken) {
+    throw new Error("Cloudflare API token is not available for apply update");
+  }
+
   const accountId = org.cloudflareAccountId;
+
+  if (!secretsStoreId) {
+    secretsStoreId = await migrateOrganizationSecretsToStore({
+      organizationId: org.id,
+      accountId,
+      apiToken,
+      platformSecrets,
+    });
+  }
+
   await verifyCloudflareUpdateApplyPermissions({
     accountId,
     apiToken,
@@ -307,7 +330,6 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
     apiHostname: hostnames.apiHostname,
   });
 
-  const secrets = requireProvisionSecrets();
   const readBundle = createRemoteBundleLoader(releasesBase);
   await setDeployLastError(null);
 
@@ -337,7 +359,7 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
     orgId: org.id,
     accountId,
     apiToken,
-    secrets,
+    secretsStoreId,
     resources,
     releasesBase,
     targetVersion: releaseIndex.version,
@@ -356,7 +378,7 @@ export async function executeCloudflareReleaseUpdate(
       accountId: job.accountId,
       apiToken: job.apiToken,
       resources: job.resources,
-      secrets: job.secrets,
+      secretsStoreId: job.secretsStoreId,
       apiHostname: job.resources.apiHostname,
       readBundle: job.readBundle,
     });
@@ -369,7 +391,7 @@ export async function executeCloudflareReleaseUpdate(
       apiToken: job.apiToken,
       chatHostname: job.resources.chatHostname,
       apiHostname: job.resources.apiHostname,
-      secrets: job.secrets,
+      secretsStoreId: job.secretsStoreId,
       workerModuleUrl: `${job.releasesBase}/cco-web.mjs`,
       assetsBaseUrl: `${job.releasesBase}/assets/`,
       assetsManifest,

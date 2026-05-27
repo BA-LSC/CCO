@@ -58,6 +58,12 @@ export const configuredOrganizationColumns = {
   cloudflareKvPresenceNamespaceId: organizations.cloudflareKvPresenceNamespaceId,
   cloudflareKvDeployNamespaceId: organizations.cloudflareKvDeployNamespaceId,
   cloudflarePushQueueId: organizations.cloudflarePushQueueId,
+  cloudflareSecretsStoreId: organizations.cloudflareSecretsStoreId,
+  pcoClientSecretConfigured: organizations.pcoClientSecretConfigured,
+  pcoWebhookSecretsConfigured: organizations.pcoWebhookSecretsConfigured,
+  giphyApiKeyConfigured: organizations.giphyApiKeyConfigured,
+  vapidPrivateKeyConfigured: organizations.vapidPrivateKeyConfigured,
+  cloudflareApiTokenConfigured: organizations.cloudflareApiTokenConfigured,
   cloudflarePlatformProvisionedAt: organizations.cloudflarePlatformProvisionedAt,
   installedReleaseVersion: organizations.installedReleaseVersion,
   autoUpdateEnabled: organizations.autoUpdateEnabled,
@@ -82,6 +88,12 @@ export function extendConfiguredOrganizationRow(
     cloudflareKvPresenceNamespaceId: null,
     cloudflareKvDeployNamespaceId: null,
     cloudflarePushQueueId: null,
+    cloudflareSecretsStoreId: null,
+    pcoClientSecretConfigured: false,
+    pcoWebhookSecretsConfigured: false,
+    giphyApiKeyConfigured: false,
+    vapidPrivateKeyConfigured: false,
+    cloudflareApiTokenConfigured: false,
     cloudflarePlatformProvisionedAt: null,
     installedReleaseVersion: null,
     autoUpdateEnabled: false,
@@ -120,6 +132,12 @@ export type ConfiguredOrganizationRow = {
   cloudflareKvPresenceNamespaceId: string | null;
   cloudflareKvDeployNamespaceId: string | null;
   cloudflarePushQueueId: string | null;
+  cloudflareSecretsStoreId: string | null;
+  pcoClientSecretConfigured: boolean;
+  pcoWebhookSecretsConfigured: boolean;
+  giphyApiKeyConfigured: boolean;
+  vapidPrivateKeyConfigured: boolean;
+  cloudflareApiTokenConfigured: boolean;
   cloudflarePlatformProvisionedAt: Date | null;
   installedReleaseVersion: string | null;
   autoUpdateEnabled: boolean;

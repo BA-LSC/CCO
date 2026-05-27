@@ -1,6 +1,11 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createD1Client, type CcoD1Database } from "@cco/db";
 
+/** Cloudflare Secrets Store binding (Workers runtime). */
+export type SecretsStoreSecretBinding = {
+  get(): Promise<string>;
+};
+
 /** Cloudflare Worker bindings available to the API runtime. */
 export type WorkerBindings = {
   DB: D1Database;
@@ -21,6 +26,14 @@ export type WorkerEnvVars = {
   MOBILE_ORIGIN?: string;
   PUBLIC_UPLOAD_URL?: string;
   UPLOAD_STORAGE?: string;
+  PCO_CLIENT_SECRET?: string;
+  WEBHOOK_SECRETS?: string;
+  GIPHY_API_KEY?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  VAPID_PRIVATE_KEY?: string;
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
+  SETUP_BOOTSTRAP_SECRET?: string;
 };
 
 /** Cloudflare ExecutionContext surface used for background deploy jobs. */
@@ -66,7 +79,54 @@ const ENV_KEYS: Array<keyof WorkerEnvVars> = [
   "MOBILE_ORIGIN",
   "PUBLIC_UPLOAD_URL",
   "UPLOAD_STORAGE",
+  "PCO_CLIENT_SECRET",
+  "WEBHOOK_SECRETS",
+  "GIPHY_API_KEY",
+  "CLOUDFLARE_API_TOKEN",
+  "VAPID_PRIVATE_KEY",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "SETUP_BOOTSTRAP_SECRET",
 ];
+
+async function resolveBindingValue(
+  value: SecretsStoreSecretBinding | string | undefined,
+): Promise<string | undefined> {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  const resolved = (await value.get())?.trim();
+  return resolved || undefined;
+}
+
+/** Resolve classic env strings and Secrets Store bindings into WorkerEnvVars. */
+export async function preloadWorkerEnvVars(
+  env: Record<string, SecretsStoreSecretBinding | string | undefined>,
+): Promise<WorkerEnvVars> {
+  const entries = await Promise.all(
+    ENV_KEYS.map(async (key) => [key, await resolveBindingValue(env[key])] as const),
+  );
+
+  const vars: WorkerEnvVars = {
+    SESSION_SECRET: "",
+    TOKEN_ENCRYPTION_KEY: "",
+    CF_INTERNAL_SECRET: "",
+  };
+
+  for (const [key, value] of entries) {
+    if (value != null && value !== "") {
+      vars[key] = value;
+    }
+  }
+
+  if (!vars.SETUP_BOOTSTRAP_SECRET && vars.CF_INTERNAL_SECRET) {
+    vars.SETUP_BOOTSTRAP_SECRET = vars.CF_INTERNAL_SECRET;
+  }
+
+  return vars;
+}
 
 function mirrorEnvVars(vars: WorkerEnvVars): void {
   process.env.CCO_RUNTIME = "cloudflare";

@@ -2,7 +2,6 @@ import { DEFAULT_PCO_OAUTH_SCOPE } from "@cco/pco-client";
 import { eq, isNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { encryptSecret } from "../auth/token-crypto";
 import {
   buildInstallSetupUrls,
   resolvePcoWebhookUrl,
@@ -20,10 +19,11 @@ export const InstallHandoffSchema = z.object({
   chatHostname: z.string().min(1),
   apiHostname: z.string().min(1),
   cloudflareAccountId: z.string().min(1).optional(),
-  cloudflareApiToken: z.string().min(1).optional(),
+  cloudflareSecretsStoreId: z.string().min(1).optional(),
+  cloudflareApiTokenConfigured: z.boolean().optional(),
+  cloudflareR2AccessKeyConfigured: z.boolean().optional(),
+  cloudflareR2SecretAccessKeyConfigured: z.boolean().optional(),
   cloudflareR2BucketName: z.string().min(1).optional(),
-  cloudflareR2AccessKeyId: z.string().min(1).optional(),
-  cloudflareR2SecretAccessKey: z.string().min(1).optional(),
   cloudflareKvPresenceNamespaceId: z.string().min(1).optional(),
   cloudflareKvDeployNamespaceId: z.string().min(1).optional(),
   cloudflarePushQueueId: z.string().min(1).optional(),
@@ -62,16 +62,11 @@ export async function applyInstallHandoff(payload: InstallHandoffPayload): Promi
     pcoWebRedirectUri: urls.signInRedirectUri,
     pcoWebhookUrl: urls.webhookUrl,
     cloudflareAccountId: payload.cloudflareAccountId ?? null,
-    cloudflareApiTokenEnc: payload.cloudflareApiToken
-      ? encryptSecret(payload.cloudflareApiToken)
-      : null,
+    cloudflareSecretsStoreId: payload.cloudflareSecretsStoreId ?? null,
+    cloudflareApiTokenConfigured: payload.cloudflareApiTokenConfigured ?? false,
     cloudflareR2BucketName: payload.cloudflareR2BucketName ?? null,
-    cloudflareR2AccessKeyIdEnc: payload.cloudflareR2AccessKeyId
-      ? encryptSecret(payload.cloudflareR2AccessKeyId)
-      : null,
-    cloudflareR2SecretAccessKeyEnc: payload.cloudflareR2SecretAccessKey
-      ? encryptSecret(payload.cloudflareR2SecretAccessKey)
-      : null,
+    cloudflareR2AccessKeyConfigured: payload.cloudflareR2AccessKeyConfigured ?? false,
+    cloudflareR2SecretAccessKeyConfigured: payload.cloudflareR2SecretAccessKeyConfigured ?? false,
     cloudflareKvPresenceNamespaceId: payload.cloudflareKvPresenceNamespaceId ?? null,
     cloudflareKvDeployNamespaceId: payload.cloudflareKvDeployNamespaceId ?? null,
     cloudflarePushQueueId: payload.cloudflarePushQueueId ?? null,

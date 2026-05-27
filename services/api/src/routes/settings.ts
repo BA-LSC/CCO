@@ -39,6 +39,10 @@ import {
 } from "../services/cloudflare-platform-provision";
 import { selectConfiguredOrganizationRow } from "../services/configured-org-query";
 import { invalidateOrgContextCache } from "../services/org-context-cache";
+import {
+  isPcoClientSecretConfigured,
+  isPcoWebhookSecretsConfigured,
+} from "../services/org-secrets";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
@@ -133,15 +137,15 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   const giphyStatus = getOrganizationGiphyStatus(refreshed);
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(refreshed);
   const platformStatus = getOrganizationCloudflarePlatformStatus(refreshed);
-  const webhookSecrets = decryptWebhookSecrets(refreshed.pcoWebhookSecretEnc);
+  const webhookConfigured = isPcoWebhookSecretsConfigured(refreshed);
 
   return c.json({
     configured: true,
     name: refreshed.name,
     clientId: refreshed.pcoClientId ?? "",
-    clientSecretConfigured: Boolean(refreshed.pcoClientSecretEnc),
-    webhookConfigured: webhookSecrets.length > 0,
-    webhookSecretCount: webhookSecrets.length,
+    clientSecretConfigured: isPcoClientSecretConfigured(refreshed),
+    webhookConfigured,
+    webhookSecretCount: webhookConfigured ? 1 : 0,
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
     ...pcoSyncSettingsFields(refreshed),
@@ -234,21 +238,17 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
   }
 
   const updated = await getConfiguredOrganization();
-  const webhookSecrets = decryptWebhookSecrets(
-    updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
-  );
-  const vapidStatus = await getOrganizationVapidStatus(updated ?? org);
-  const giphyStatus = getOrganizationGiphyStatus(updated ?? org);
-  const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated ?? org);
+  const statusOrg = updated ?? org;
+  const vapidStatus = await getOrganizationVapidStatus(statusOrg);
+  const giphyStatus = getOrganizationGiphyStatus(statusOrg);
+  const realtimeKitStatus = getOrganizationRealtimeKitStatus(statusOrg);
   return c.json({
     ok: true,
-    name: updated?.name ?? org.name,
-    clientId: updated?.pcoClientId ?? org.pcoClientId ?? "",
-    clientSecretConfigured: Boolean(
-      updated?.pcoClientSecretEnc ?? org.pcoClientSecretEnc,
-    ),
-    webhookConfigured: webhookSecrets.length > 0,
-    webhookSecretCount: webhookSecrets.length,
+    name: statusOrg.name,
+    clientId: statusOrg.pcoClientId ?? "",
+    clientSecretConfigured: isPcoClientSecretConfigured(statusOrg),
+    webhookConfigured: isPcoWebhookSecretsConfigured(statusOrg),
+    webhookSecretCount: isPcoWebhookSecretsConfigured(statusOrg) ? 1 : 0,
     signInRedirectUri:
       updated?.pcoWebRedirectUri ??
       org.pcoWebRedirectUri ??
