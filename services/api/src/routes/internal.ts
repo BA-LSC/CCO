@@ -6,8 +6,10 @@ import { getConfiguredOrganization } from "../services/org-oauth";
 import {
   migrateOrganizationSecretsToStore,
   organizationHasPendingSecretsStoreMigration,
+  upsertOrgSecretForOrganization,
 } from "../services/org-secrets";
 import { resolveOrgHostnames, runScheduledUpdateCheck } from "../services/org-updates";
+import { CCO_STORE_SECRET } from "@cco/cloudflare-provision";
 import { recordWebhookDelivery } from "../webhooks/delivery";
 import {
   handleMembershipDestroyed,
@@ -190,6 +192,67 @@ internalRouter.post("/migrate-org-secrets-to-store", async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Migration failed";
     console.error("migrate-org-secrets-to-store:", message);
+    return c.json({ error: message }, 500);
+  }
+});
+
+const RecoverPcoClientSecretSchema = z.object({
+  pcoClientSecret: z.string().min(1),
+});
+
+/** When D1 decrypt fails (TOKEN_ENCRYPTION_KEY rotation), write PCO secret directly to store. */
+internalRouter.post("/recover-pco-client-secret", async (c) => {
+  if (!isCloudflareRuntime()) {
+    return c.json({ error: "Cloudflare runtime only" }, 400);
+  }
+
+  const org = await getConfiguredOrganization();
+  if (!org?.cloudflareAccountId || !org.cloudflareSecretsStoreId) {
+    return c.json({ error: "Organization Secrets Store not configured" }, 404);
+  }
+
+  const hostnames = resolveOrgHostnames(org);
+  if (!hostnames) {
+    return c.json({ error: "Could not resolve chat/API hostnames" }, 400);
+  }
+
+  const bearer = c.req.header("Authorization")?.replace(/^Bearer\s+/i, "").trim();
+  if (!bearer) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await verifyCloudflareUpdateApplyPermissions({
+      accountId: org.cloudflareAccountId,
+      apiToken: bearer,
+      chatHostname: hostnames.chatHostname,
+      apiHostname: hostnames.apiHostname,
+    });
+  } catch {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = RecoverPcoClientSecretSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  try {
+    await upsertOrgSecretForOrganization({
+      organizationId: org.id,
+      secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+      value: parsed.data.pcoClientSecret.trim(),
+      configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
+    });
+    return c.json({ ok: true, recovered: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Recovery failed";
+    console.error("recover-pco-client-secret:", message);
     return c.json({ error: message }, 500);
   }
 });

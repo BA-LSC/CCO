@@ -286,7 +286,13 @@ export async function migrateOrganizationSecretsToStore(params: {
     org.cloudflareSecretsStoreId?.trim() ||
     (await ensureSecretsStore(params.accountId, params.apiToken)).id;
 
-  if (params.platformSecrets) {
+  // Do not re-seed platform secrets when the store already exists and org *_enc columns
+  // are pending migration — bootstrap may have rotated TOKEN_ENCRYPTION_KEY before decrypt.
+  const shouldSeedPlatformSecrets =
+    params.platformSecrets &&
+    !(org.cloudflareSecretsStoreId?.trim() && organizationHasPendingSecretsStoreMigration(org));
+
+  if (shouldSeedPlatformSecrets) {
     await seedPlatformStoreSecrets(
       params.accountId,
       params.apiToken,

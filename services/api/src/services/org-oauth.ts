@@ -13,6 +13,7 @@ import {
 import {
   isPcoClientSecretConfigured,
   isPcoWebhookSecretsConfigured,
+  organizationHasPendingSecretsStoreMigration,
   orgUsesSecretsStore,
   upsertOrgSecretForOrganization,
 } from "./org-secrets";
@@ -40,6 +41,17 @@ function credentialsFromOrg(org: typeof organizations.$inferSelect): OrgOAuthCre
   if (!org.pcoClientId) return null;
 
   if (isCloudflareRuntime() && orgUsesSecretsStore(org)) {
+    if (org.pcoClientSecretEnc && organizationHasPendingSecretsStoreMigration(org)) {
+      try {
+        return {
+          clientId: org.pcoClientId,
+          clientSecret: decryptSecret(org.pcoClientSecretEnc),
+          scope: org.pcoOauthScope ?? DEFAULT_PCO_OAUTH_SCOPE,
+        };
+      } catch {
+        // Fall through to Secrets Store binding when D1 decrypt fails (e.g. key rotation).
+      }
+    }
     const clientSecret = process.env.PCO_CLIENT_SECRET?.trim();
     if (!clientSecret) return null;
     return {

@@ -121,7 +121,10 @@ async function loadOrganizationRow(
       cloudflare_api_token_configured, cloudflare_r2_access_key_configured,
       cloudflare_r2_secret_access_key_configured,
       pco_web_redirect_uri, pco_webhook_url
-     FROM organizations LIMIT 1`,
+     FROM organizations
+     WHERE setup_completed_at IS NOT NULL
+     ORDER BY setup_completed_at DESC
+     LIMIT 1`,
   );
   const row = batches[0]?.results?.[0] as OrgRow | undefined;
   if (!row?.id) {
