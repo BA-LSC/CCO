@@ -10,7 +10,6 @@ import {
 } from "@cco/shared/user-status";
 import { useTheme } from "@/components/ThemeProvider";
 import { useChatLayout } from "@/components/ChatLayoutContext";
-import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserPresenceDot } from "@/components/UserPresenceDot";
 import { resolvePresenceDotState, usePresence } from "@/components/PresenceProvider";
@@ -58,7 +57,6 @@ export function UserMenu({ variant = "default" }: Props) {
   const { session: layoutSession } = useChatLayout();
   const { myStatus, setMyStatus, markUserActive, isUserOnline } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
-  const pcoSync = usePlanningCenterSync();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -327,30 +325,6 @@ export function UserMenu({ variant = "default" }: Props) {
             </label>
           </div>
 
-          {pcoSync && pcoSync.webhooksEnabled === false && (
-            <div className="user-menu-sync" role="group" aria-label="Planning Center sync">
-              <span className="user-menu-dropdown-label">Planning Center</span>
-              <button
-                type="button"
-                className="user-menu-item"
-                role="menuitem"
-                disabled={pcoSync.groupsSyncing || pcoSync.teamsSyncing}
-                onClick={() => void pcoSync.syncPco().then(() => setOpen(false))}
-              >
-                {pcoSync.groupsSyncing || pcoSync.teamsSyncing ? "Syncing PCO…" : "Sync PCO"}
-              </button>
-              {pcoSync.needsReconnect && (
-                <a
-                  href="/auth/reconnect"
-                  className="user-menu-item"
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                >
-                  Reconnect Planning Center
-                </a>
-              )}
-            </div>
-          )}
           {user.siteAdministrator && (
             <a
               href="/settings/admin"

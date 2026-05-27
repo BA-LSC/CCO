@@ -565,31 +565,6 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   color: var(--color-danger);
 }
 
-.user-menu-sync {
-  padding: 8px 0 4px;
-  border-bottom: 1px solid var(--color-border);
-  margin-bottom: 4px;
-}
-
-.user-menu-sync .user-menu-dropdown-label {
-  display: block;
-  padding: 0 12px 6px;
-}
-
-.user-menu-sync .user-menu-item {
-  width: 100%;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-}
-
-.user-menu-sync .user-menu-item:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .user-menu-theme {
   padding: 10px 12px 8px;
   border-bottom: 1px solid var(--color-border);
