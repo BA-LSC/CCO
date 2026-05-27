@@ -436,6 +436,7 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
       authorId: last.authorId,
       createdAt: last.createdAt.toISOString(),
     });
+    const participant = participantByConv.get(conversationId);
     previewByConv.set(
       conversationId,
       formatSidebarMessagePreview({
@@ -443,6 +444,8 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
         attachmentUrl: last.attachmentUrl,
         messageType: last.messageType,
         authorIsSelf: last.authorId === userId,
+        authorDisplayName:
+          last.authorId === userId ? undefined : participant?.displayName,
       }),
     );
   }

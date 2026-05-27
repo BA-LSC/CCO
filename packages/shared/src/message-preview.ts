@@ -11,6 +11,8 @@ export type SidebarMessagePreviewInput = {
   messageType?: string | null;
   /** When true, prefixes preview with "You: " (Discord-style for own messages). */
   authorIsSelf?: boolean;
+  /** When set and not authorIsSelf, prefixes preview with "{name}: ". */
+  authorDisplayName?: string;
   maxLength?: number;
 };
 
@@ -47,6 +49,9 @@ export function formatSidebarMessagePreview(input: SidebarMessagePreviewInput): 
 
   if (input.authorIsSelf) {
     text = `You: ${text}`;
+  } else {
+    const name = input.authorDisplayName?.trim();
+    if (name) text = `${name}: ${text}`;
   }
 
   return truncatePreview(text, maxLength);

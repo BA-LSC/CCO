@@ -35,11 +35,13 @@ function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
 }
 
 function previewFromMessage(message: Message, currentUserId: string | undefined): string | null {
+  const authorIsSelf = message.authorId === currentUserId;
   return formatSidebarMessagePreview({
     body: message.body,
     attachmentUrl: message.attachmentUrl,
     messageType: message.messageType,
-    authorIsSelf: message.authorId === currentUserId,
+    authorIsSelf,
+    authorDisplayName: authorIsSelf ? undefined : message.authorName,
   });
 }
 
