@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { formatSidebarMessagePreview } from "./message-preview";
+import { firstNameFromDisplayName, formatSidebarMessagePreview } from "./message-preview";
+
+describe("firstNameFromDisplayName", () => {
+  test("returns first token of a full name", () => {
+    expect(firstNameFromDisplayName("Gabreil Bodensteiner")).toBe("Gabreil");
+  });
+
+  test("returns single names unchanged", () => {
+    expect(firstNameFromDisplayName("Madonna")).toBe("Madonna");
+  });
+});
 
 describe("formatSidebarMessagePreview", () => {
   test("returns null for empty text messages", () => {
@@ -33,11 +43,11 @@ describe("formatSidebarMessagePreview", () => {
     ).toBe("You: On my way");
   });
 
-  test("prefixes other participant messages with display name", () => {
+  test("prefixes other participant messages with first name only", () => {
     expect(
       formatSidebarMessagePreview({
         body: "whats up",
-        authorDisplayName: "Gabreil",
+        authorDisplayName: "Gabreil Bodensteiner",
       }),
     ).toBe("Gabreil: whats up");
   });
@@ -55,7 +65,7 @@ describe("formatSidebarMessagePreview", () => {
   test("truncates long previews with sender prefix", () => {
     const preview = formatSidebarMessagePreview({
       body: "This is a very long message that should be truncated for the sidebar preview row display",
-      authorDisplayName: "Gabreil",
+      authorDisplayName: "Gabreil Bodensteiner",
       maxLength: 30,
     });
     expect(preview).toBeTruthy();

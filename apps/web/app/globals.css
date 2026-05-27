@@ -1157,6 +1157,11 @@ html[data-theme="6"] .user-menu-dropdown {
   line-height: 1.15;
 }
 
+.sidebar-dm-preview-prefix {
+  font-weight: 600;
+  color: inherit;
+}
+
 .sidebar-dm-avatar {
   width: 24px;
   height: 24px;

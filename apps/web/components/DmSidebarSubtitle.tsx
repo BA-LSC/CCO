@@ -8,6 +8,21 @@ type Props = {
   className?: string;
 };
 
+/** Discord-style "You:" / "Name:" prefix before the message snippet. */
+function renderMessagePreview(text: string, className: string) {
+  const match = text.match(/^(You|[^:]+):\s([\s\S]+)$/);
+  if (!match) {
+    return <span className={className}>{text}</span>;
+  }
+
+  return (
+    <span className={className}>
+      <span className="sidebar-dm-preview-prefix">{match[1]}: </span>
+      {match[2]}
+    </span>
+  );
+}
+
 export function DmSidebarSubtitle({ userId, preview, className = "sidebar-dm-status" }: Props) {
   const { getUserStatus } = usePresence();
   const statusMessage = getUserStatus(userId)?.message?.trim();
@@ -17,5 +32,5 @@ export function DmSidebarSubtitle({ userId, preview, className = "sidebar-dm-sta
 
   const text = preview?.trim();
   if (!text) return null;
-  return <span className={className}>{text}</span>;
+  return renderMessagePreview(text, className);
 }

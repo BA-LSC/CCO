@@ -26,6 +26,13 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/** First token of a display name for Discord-style DM sidebar prefixes. */
+export function firstNameFromDisplayName(displayName: string): string {
+  const trimmed = displayName.trim();
+  if (!trimmed) return "";
+  return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
 function truncatePreview(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   const slice = text.slice(0, maxLength);
@@ -50,8 +57,8 @@ export function formatSidebarMessagePreview(input: SidebarMessagePreviewInput): 
   if (input.authorIsSelf) {
     text = `You: ${text}`;
   } else {
-    const name = input.authorDisplayName?.trim();
-    if (name) text = `${name}: ${text}`;
+    const first = firstNameFromDisplayName(input.authorDisplayName ?? "");
+    if (first) text = `${first}: ${text}`;
   }
 
   return truncatePreview(text, maxLength);

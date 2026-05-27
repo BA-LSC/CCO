@@ -34,14 +34,20 @@ function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
   return [...dms].sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
 }
 
-function previewFromMessage(message: Message, currentUserId: string | undefined): string | null {
+function previewFromMessage(
+  message: Message,
+  currentUserId: string | undefined,
+  otherParticipantDisplayName?: string,
+): string | null {
   const authorIsSelf = message.authorId === currentUserId;
   return formatSidebarMessagePreview({
     body: message.body,
     attachmentUrl: message.attachmentUrl,
     messageType: message.messageType,
     authorIsSelf,
-    authorDisplayName: authorIsSelf ? undefined : message.authorName,
+    authorDisplayName: authorIsSelf
+      ? undefined
+      : (otherParticipantDisplayName ?? message.authorName),
   });
 }
 
@@ -156,23 +162,38 @@ export function ChatSidebar() {
       if (!activeConversationId) return;
 
       if (event.type === "message.created" && event.message) {
-        const preview = previewFromMessage(event.message, session?.userId);
-        setDms((prev) =>
-          applyDmMessagePreview(
+        setDms((prev) => {
+          const dm = prev.find((row) => row.id === activeConversationId);
+          const preview = previewFromMessage(
+            event.message,
+            session?.userId,
+            dm?.participant.displayName,
+          );
+          return applyDmMessagePreview(
             prev,
             activeConversationId,
             preview,
             event.message.createdAt,
-          ),
-        );
+          );
+        });
         return;
       }
 
       if (event.type === "message.updated" && event.message) {
-        const preview = previewFromMessage(event.message, session?.userId);
-        setDms((prev) =>
-          applyDmMessagePreview(prev, activeConversationId, preview, event.message.createdAt),
-        );
+        setDms((prev) => {
+          const dm = prev.find((row) => row.id === activeConversationId);
+          const preview = previewFromMessage(
+            event.message,
+            session?.userId,
+            dm?.participant.displayName,
+          );
+          return applyDmMessagePreview(
+            prev,
+            activeConversationId,
+            preview,
+            event.message.createdAt,
+          );
+        });
         return;
       }
 
