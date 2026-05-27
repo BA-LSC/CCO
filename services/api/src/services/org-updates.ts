@@ -167,6 +167,7 @@ export async function getUpdatesStatus(options?: {
 
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   const lastApplyError = await readDeployLastError();
+  let lastUpdateCheckAt = org.lastUpdateCheckAt;
 
   if (options?.forceCheck || !org.lastUpdateCheckAt) {
     try {
@@ -174,10 +175,13 @@ export async function getUpdatesStatus(options?: {
     } catch (err) {
       checkError = err instanceof Error ? err.message : "Release check failed";
     }
+    const checkedAt = new Date();
     await db
       .update(organizations)
-      .set({ lastUpdateCheckAt: new Date() })
+      .set({ lastUpdateCheckAt: checkedAt })
       .where(eq(organizations.id, org.id));
+    lastUpdateCheckAt = checkedAt;
+    invalidateOrgContextCache();
   } else {
     try {
       latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
@@ -221,7 +225,7 @@ export async function getUpdatesStatus(options?: {
     latestVersion,
     updateAvailable,
     autoUpdateEnabled: org.autoUpdateEnabled ?? false,
-    lastUpdateCheckAt: org.lastUpdateCheckAt?.toISOString() ?? null,
+    lastUpdateCheckAt: lastUpdateCheckAt?.toISOString() ?? null,
     latestPublishedAt: latestIndex?.publishedAt ?? null,
     releasesBaseUrl: latestIndex ? resolveReleasesBaseUrl(latestIndex) : null,
     gitRepoUrl,

@@ -114,6 +114,18 @@ describe("getUpdatesStatus apply gating", () => {
     expect(fnBody).toContain("!updateAvailable && !lastApplyError");
     expect(fnBody).not.toMatch(/else if \(!updateAvailable\) \{\s*\n\s*canApply = false/);
   });
+
+  test("returns lastUpdateCheckAt from force check, not stale org row", () => {
+    const source = readFileSync(ORG_UPDATES_PATH, "utf8");
+    const fnBody = source.slice(
+      source.indexOf("export async function getUpdatesStatus"),
+      source.indexOf("function requireProvisionSecrets"),
+    );
+    expect(fnBody).toContain("let lastUpdateCheckAt = org.lastUpdateCheckAt");
+    expect(fnBody).toContain("lastUpdateCheckAt = checkedAt");
+    expect(fnBody).toContain("lastUpdateCheckAt: lastUpdateCheckAt?.toISOString()");
+    expect(fnBody).not.toContain("lastUpdateCheckAt: org.lastUpdateCheckAt?.toISOString()");
+  });
 });
 
 describe("prepareCloudflareReleaseUpdate", () => {
