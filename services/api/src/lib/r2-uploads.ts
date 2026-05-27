@@ -3,6 +3,7 @@ import { createR2AccessKey } from "@cco/cloudflare-provision";
 import { decryptSecret } from "../auth/token-crypto";
 import { getWorkerBindings } from "../runtime/worker-context";
 import { getConfiguredOrganization } from "../services/org-oauth";
+import { resolveApplyCloudflareApiToken } from "../services/org-secrets";
 
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -11,8 +12,21 @@ export type R2Config = {
   bucketName: string;
   accessKeyId: string;
   secretAccessKey: string;
+  /** Present for temporary credentials minted via the R2 temp-access API. */
+  sessionToken?: string;
   publicBaseUrl: string;
 };
+
+function readR2CredentialsFromEnv(): Pick<R2Config, "accessKeyId" | "secretAccessKey"> | null {
+  const accessKeyId =
+    process.env.R2_ACCESS_KEY_ID?.trim() || process.env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim() || "";
+  const secretAccessKey =
+    process.env.R2_SECRET_ACCESS_KEY?.trim() ||
+    process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim() ||
+    "";
+  if (!accessKeyId || !secretAccessKey) return null;
+  return { accessKeyId, secretAccessKey };
+}
 
 function r2Endpoint(accountId: string): string {
   return `https://${accountId}.r2.cloudflarestorage.com`;
@@ -38,25 +52,25 @@ export async function resolveR2Config(): Promise<R2Config | null> {
         publicBaseUrl,
       };
     }
+    const envCredentials = readR2CredentialsFromEnv();
     return {
       accountId: org.cloudflareAccountId,
       bucketName: org.cloudflareR2BucketName,
-      accessKeyId: "",
-      secretAccessKey: "",
+      accessKeyId: envCredentials?.accessKeyId ?? "",
+      secretAccessKey: envCredentials?.secretAccessKey ?? "",
       publicBaseUrl,
     };
   }
 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   const bucketName = process.env.CLOUDFLARE_R2_BUCKET?.trim();
-  const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim();
-  if (accountId && bucketName && accessKeyId && secretAccessKey) {
+  const envCredentials = readR2CredentialsFromEnv();
+  if (accountId && bucketName && envCredentials) {
     return {
       accountId,
       bucketName,
-      accessKeyId,
-      secretAccessKey,
+      accessKeyId: envCredentials.accessKeyId,
+      secretAccessKey: envCredentials.secretAccessKey,
       publicBaseUrl:
         process.env.CLOUDFLARE_R2_PUBLIC_URL?.trim() ||
         process.env.PUBLIC_UPLOAD_URL?.trim() ||
@@ -68,8 +82,8 @@ export async function resolveR2Config(): Promise<R2Config | null> {
     return {
       accountId: org?.cloudflareAccountId ?? accountId ?? "binding",
       bucketName: org?.cloudflareR2BucketName ?? bucketName ?? "cco-uploads",
-      accessKeyId: "",
-      secretAccessKey: "",
+      accessKeyId: envCredentials?.accessKeyId ?? "",
+      secretAccessKey: envCredentials?.secretAccessKey ?? "",
       publicBaseUrl:
         org?.cloudflareR2PublicUrl?.trim() ||
         process.env.PUBLIC_UPLOAD_URL?.trim() ||
@@ -90,6 +104,7 @@ function r2Client(config: R2Config): AwsClient {
   return new AwsClient({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
+    sessionToken: config.sessionToken,
     service: "s3",
     region: "auto",
   });
@@ -100,22 +115,22 @@ async function withR2S3Credentials(config: R2Config): Promise<R2Config> {
   if (config.accessKeyId && config.secretAccessKey) return config;
 
   const org = await getConfiguredOrganization();
-  const apiToken = org?.cloudflareApiTokenEnc
-    ? decryptSecret(org.cloudflareApiTokenEnc)
-    : process.env.CLOUDFLARE_API_TOKEN?.trim();
+  const apiToken = org ? resolveApplyCloudflareApiToken(org) : process.env.CLOUDFLARE_API_TOKEN?.trim();
   const accountId = org?.cloudflareAccountId ?? config.accountId;
-  if (!apiToken || !accountId) return config;
+  const parentAccessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+  if (!apiToken || !accountId || !parentAccessKeyId) return config;
 
   const creds = await createR2AccessKey(
     accountId,
     apiToken,
     config.bucketName,
-    `cco-uploads-${config.bucketName}`,
+    parentAccessKeyId,
   );
   return {
     ...config,
     accessKeyId: creds.access_key_id,
     secretAccessKey: creds.secret_access_key,
+    sessionToken: creds.session_token,
   };
 }
 

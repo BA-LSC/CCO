@@ -44,26 +44,49 @@ export async function ensureR2Bucket(
   return { name, created: true };
 }
 
+type R2AccessKeyResponse = {
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+};
+
 export type R2AccessKey = {
   access_key_id: string;
   secret_access_key: string;
+  session_token?: string;
 };
 
 export async function createR2AccessKey(
   accountId: string,
   apiToken: string,
   bucketName: string,
-  tokenName: string,
+  parentAccessKeyId: string,
 ): Promise<R2AccessKey> {
-  return cfRequest<R2AccessKey>(apiToken, `/accounts/${accountId}/r2/temp-access-credentials`, {
-    method: "POST",
-    body: JSON.stringify({
-      bucket: bucketName,
-      parentAccessKeyId: tokenName,
-      permission: "object-read-write",
-      ttlSeconds: 604800,
-    }),
-  });
+  const result = await cfRequest<R2AccessKeyResponse>(
+    apiToken,
+    `/accounts/${accountId}/r2/temp-access-credentials`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        bucket: bucketName,
+        parentAccessKeyId,
+        permission: "object-read-write",
+        ttlSeconds: 604800,
+      }),
+    },
+  );
+
+  const accessKeyId = result.accessKeyId?.trim();
+  const secretAccessKey = result.secretAccessKey?.trim();
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error("R2 temp access credentials response missing access keys");
+  }
+
+  return {
+    access_key_id: accessKeyId,
+    secret_access_key: secretAccessKey,
+    session_token: result.sessionToken?.trim() || undefined,
+  };
 }
 
 export type KvNamespace = {

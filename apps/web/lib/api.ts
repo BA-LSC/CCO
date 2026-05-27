@@ -131,7 +131,10 @@ async function uploadMediaViaPresign(file: File, contentType: string): Promise<s
     body: file,
   });
   if (!putRes.ok) {
-    throw new Error("Upload to storage failed. Please try again.");
+    const detail = (await putRes.text()).trim();
+    throw new Error(
+      detail && detail.length <= 240 ? detail : "Upload to storage failed. Please try again.",
+    );
   }
   return presign.url;
 }
