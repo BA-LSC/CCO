@@ -119,7 +119,7 @@ export default function DmChatPage() {
         loading={detailLoading}
       >
         <Suspense fallback={null}>
-          <ConversationCallKit conversationId={conversationId} />
+          <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
         </Suspense>
         <PanelSettingsButton
           expanded={showOptions}

@@ -382,7 +382,7 @@ export default function GroupConversationPage() {
         loading={detailLoading}
       >
         <Suspense fallback={null}>
-          <ConversationCallKit conversationId={conversationId} />
+          <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
         </Suspense>
         <PanelSettingsButton
           expanded={showChannelSettings}

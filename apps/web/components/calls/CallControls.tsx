@@ -10,6 +10,7 @@ type Props = {
   activeCall: CallSummaryDto | null;
   inCall: boolean;
   loading: boolean;
+  disabled?: boolean;
   onStart: () => void;
   onJoin: () => void;
 };
@@ -36,15 +37,24 @@ function getCallLabel(state: CallIconState, activeCall: CallSummaryDto | null): 
   }
 }
 
-export function CallActionButton({ activeCall, inCall, loading, onStart, onJoin }: Props) {
+export function CallActionButton({
+  activeCall,
+  inCall,
+  loading,
+  disabled = false,
+  onStart,
+  onJoin,
+}: Props) {
   const state = getCallIconState(activeCall, inCall);
   const label = getCallLabel(state, activeCall);
+  const isDisabled = loading || inCall || disabled;
 
   return (
     <button
       type="button"
       className={`panel-header-icon-btn call-header-btn call-header-btn--${state}`}
-      disabled={loading || inCall}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
       onClick={() => (activeCall && !inCall ? onJoin() : onStart())}
       aria-label={label}
       title={label}

@@ -180,7 +180,10 @@ export default function TeamChatPage() {
       >
         <Suspense fallback={null}>
           {detail?.conversation?.id ? (
-            <ConversationCallKit conversationId={detail.conversation.id} />
+            <ConversationCallKit
+              conversationId={detail.conversation.id}
+              disabled={detailLoading}
+            />
           ) : null}
         </Suspense>
         <PanelSettingsButton

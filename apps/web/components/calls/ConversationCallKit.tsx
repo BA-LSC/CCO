@@ -12,9 +12,10 @@ import { ChatHomeBanner } from "@/components/ChatHomeBanner";
 
 type Props = {
   conversationId: string;
+  disabled?: boolean;
 };
 
-export function ConversationCallKit({ conversationId }: Props) {
+export function ConversationCallKit({ conversationId, disabled = false }: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -144,6 +145,7 @@ export function ConversationCallKit({ conversationId }: Props) {
         activeCall={activeCall}
         inCall={inCall}
         loading={loading}
+        disabled={disabled}
         onStart={() => void join()}
         onJoin={() => void join()}
       />

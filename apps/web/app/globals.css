@@ -6518,6 +6518,22 @@ html.standalone-display .chat-thread-panel {
   color: var(--color-primary);
 }
 
+.panel-header-icon-btn.call-header-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  animation: none;
+  color: var(--color-muted);
+}
+
+.panel-header-icon-btn.call-header-btn:disabled:hover {
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.panel-header-icon-btn.call-header-btn:disabled:focus-visible {
+  outline: none;
+}
+
 @keyframes call-header-pulse {
   0%,
   100% {
