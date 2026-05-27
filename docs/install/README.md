@@ -54,6 +54,7 @@ Cloudflare does not offer third-party OAuth for “deploy into your account.” 
 | Workers KV Storage | Edit |
 | Workers R2 Storage | Edit |
 | Queues | Edit |
+| Secrets Store | Write |
 | Realtime | Edit or Admin |
 | Account Settings | Read |
 
@@ -71,7 +72,9 @@ Cloudflare does not offer third-party OAuth for “deploy into your account.” 
 |------------|-------|
 | User Details | Read |
 
-The wizard links to the token page from step 2. Paste the token once; it is encrypted for the install session and used only to provision resources in **your** account.
+The wizard links to the token page from step 2. Paste the token once; it is stored in your account **Secrets Store** (not in the app database) and used to provision and update Workers in **your** account. Admin integration secret changes write to the same store and take effect without redeploying Workers.
+
+**Existing BYO churches:** after upgrading, run **Admin → Updates → Apply** once so legacy encrypted D1 secrets are copied into Secrets Store and worker bindings are refreshed.
 
 ### What gets provisioned
 
