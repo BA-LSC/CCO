@@ -797,8 +797,13 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .chat-sidebar {
   --sidebar-gutter: 10px;
-  /* Nest under a row label: item pad + avatar + gap (matches group/DM name column) */
-  --sidebar-nest: 32px;
+  --sidebar-row-pad: 10px;
+  --sidebar-avatar-size: 24px;
+  --sidebar-avatar-gap: 8px;
+  /* Nest channels under group title text (row pad + avatar + gap) */
+  --sidebar-nest: calc(
+    var(--sidebar-row-pad) + var(--sidebar-avatar-size) + var(--sidebar-avatar-gap)
+  );
   width: var(--sidebar-width);
   flex-shrink: 0;
   display: flex;
@@ -1245,8 +1250,8 @@ html[data-theme="6"] .user-menu-dropdown {
   font-size: 0.85rem;
   font-weight: 400;
   gap: 2px;
-  padding-left: 10px;
-  padding-right: 10px;
+  padding-left: 0;
+  padding-right: var(--sidebar-row-pad);
 }
 
 .sidebar-nested-trailing {
@@ -1281,7 +1286,7 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-nested .sidebar-nested-loading,
 .sidebar-nested .sidebar-nested-empty {
-  padding-left: 10px;
+  padding-left: 0;
 }
 
 .sidebar-nested-loading,
