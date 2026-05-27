@@ -16,6 +16,8 @@ import {
   fetchWebReleaseManifest,
   listCloudflareAccounts,
   provisionRealtimeKitFromApiToken,
+  upsertStoreSecret,
+  CCO_STORE_SECRET,
   apiInternalUrl,
   type CcoWorkerScriptName,
   type ProvisionPipelineContext,
@@ -168,6 +170,11 @@ export async function createInstallProvisionHandlers(
     }
 
     const accountId = resolveAccountId(state, context);
+    const secretsStoreId = state.resources.secretsStoreId;
+    if (!secretsStoreId) {
+      throw new Error("Secrets Store must exist before deploy_pages");
+    }
+
     const releasesBase = resolveReleasesBaseUrl(options);
     const assetsManifest = options.fetchWebManifest
       ? await options.fetchWebManifest()
@@ -178,7 +185,7 @@ export async function createInstallProvisionHandlers(
       apiToken: context.apiToken,
       chatHostname,
       apiHostname,
-      secrets,
+      secretsStoreId,
       workerModuleUrl: `${releasesBase}/cco-web.mjs`,
       assetsBaseUrl: `${releasesBase}/assets`,
       assetsManifest,
@@ -268,8 +275,34 @@ export async function createInstallProvisionHandlers(
     const apiHostname = state.resources.apiHostname;
     const chatHostname = state.resources.chatHostname;
     const secrets = state.secrets;
-    if (!apiHostname || !chatHostname || !secrets) {
-      throw new Error("Hostnames and secrets are required before finalize_org");
+    const secretsStoreId = state.resources.secretsStoreId;
+    if (!apiHostname || !chatHostname || !secrets || !secretsStoreId) {
+      throw new Error("Hostnames, secrets, and Secrets Store are required before finalize_org");
+    }
+
+    const accountId = resolveAccountId(state, context);
+    await upsertStoreSecret(
+      accountId,
+      context.apiToken,
+      secretsStoreId,
+      CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
+      context.apiToken,
+    );
+    if (state.resources.r2AccessKeyId && state.resources.r2SecretAccessKey) {
+      await upsertStoreSecret(
+        accountId,
+        context.apiToken,
+        secretsStoreId,
+        CCO_STORE_SECRET.R2_ACCESS_KEY_ID,
+        state.resources.r2AccessKeyId,
+      );
+      await upsertStoreSecret(
+        accountId,
+        context.apiToken,
+        secretsStoreId,
+        CCO_STORE_SECRET.R2_SECRET_ACCESS_KEY,
+        state.resources.r2SecretAccessKey,
+      );
     }
 
     const handoffUrl = apiInternalUrl(apiHostname, "/v1/setup/install-handoff");
@@ -284,10 +317,13 @@ export async function createInstallProvisionHandlers(
         chatHostname,
         apiHostname,
         cloudflareAccountId: state.resources.accountId,
-        cloudflareApiToken: context.apiToken,
+        cloudflareSecretsStoreId: secretsStoreId,
+        cloudflareApiTokenConfigured: true,
         cloudflareR2BucketName: state.resources.r2BucketName,
         cloudflareR2AccessKeyId: state.resources.r2AccessKeyId,
         cloudflareR2SecretAccessKey: state.resources.r2SecretAccessKey,
+        cloudflareR2AccessKeyConfigured: Boolean(state.resources.r2AccessKeyId),
+        cloudflareR2SecretAccessKeyConfigured: Boolean(state.resources.r2SecretAccessKey),
         cloudflareKvPresenceNamespaceId: state.resources.kvPresenceNamespaceId,
         cloudflareKvDeployNamespaceId: state.resources.kvDeployNamespaceId,
         cloudflarePushQueueId: state.resources.pushQueueId,

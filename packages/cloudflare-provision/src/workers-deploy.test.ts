@@ -4,9 +4,7 @@ import {
   deployWorkerScript,
   ensureCcoApiWorkerRoutes,
   ensureQueueConsumer,
-  putWorkerSecret,
 } from "./workers-deploy";
-import { generateProvisionSecrets } from "./provision-pipeline";
 
 const originalFetch = globalThis.fetch;
 
@@ -57,28 +55,6 @@ describe("deployWorkerScript", () => {
   });
 });
 
-describe("putWorkerSecret", () => {
-  test("uploads secret via workers secrets API", async () => {
-    let capturedBody = "";
-    mockFetch((url, init) => {
-      if (url.endsWith("/secrets")) {
-        capturedBody = String(init?.body ?? "");
-        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
-      }
-      return new Response(JSON.stringify({ success: false, errors: [{ message: "unexpected" }] }), {
-        status: 404,
-      });
-    });
-
-    await putWorkerSecret("acct", "token", "cco-api", "SESSION_SECRET", "secret-value");
-    expect(JSON.parse(capturedBody)).toEqual({
-      name: "SESSION_SECRET",
-      text: "secret-value",
-      type: "secret_text",
-    });
-  });
-});
-
 describe("ensureQueueConsumer", () => {
   test("binds worker consumer with max_retries 3", async () => {
     let capturedBody = "";
@@ -106,17 +82,23 @@ describe("ensureQueueConsumer", () => {
 });
 
 describe("deployAllProvisionWorkers", () => {
-  test("deploys all scripts, secrets, cron, and queue consumer", async () => {
+  test("deploys all scripts with store bindings, cron, and queue consumer (no secret PUTs)", async () => {
     const uploadedScripts: string[] = [];
+    let secretPutCount = 0;
     let cronConfigured = false;
     let queueConsumerConfigured = false;
 
     mockFetch((url, init) => {
-      if (url.includes("/workers/scripts/") && !url.endsWith("/secrets") && !url.endsWith("/schedules")) {
-        uploadedScripts.push(url.split("/workers/scripts/")[1] ?? "");
+      if (url.includes("/workers/scripts/") && url.endsWith("/secrets")) {
+        secretPutCount += 1;
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
       }
-      if (url.endsWith("/secrets")) {
+      if (
+        url.includes("/workers/scripts/") &&
+        !url.endsWith("/secrets") &&
+        !url.endsWith("/schedules")
+      ) {
+        uploadedScripts.push(url.split("/workers/scripts/")[1] ?? "");
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
       }
       if (url.endsWith("/schedules")) {
@@ -132,12 +114,11 @@ describe("deployAllProvisionWorkers", () => {
       });
     });
 
-    const secrets = generateProvisionSecrets();
     const deployed = await deployAllProvisionWorkers({
       accountId: "acct-1",
       apiToken: "cf-token",
       apiHostname: "api.example.com",
-      secrets,
+      secretsStoreId: "store-1",
       resources: {
         d1DatabaseId: "d1-id",
         r2BucketName: "cco-uploads-test",
@@ -152,6 +133,7 @@ describe("deployAllProvisionWorkers", () => {
     expect(uploadedScripts).toContain("cco-reconcile-cron");
     expect(cronConfigured).toBe(true);
     expect(queueConsumerConfigured).toBe(true);
+    expect(secretPutCount).toBe(0);
   });
 });
 

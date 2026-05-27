@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildWorkerBindings,
-  buildWorkerSecrets,
   CCO_API_WORKER_ROUTES,
   CCO_RECONCILE_CRON,
   resolveApiRoutePattern,
 } from "./worker-definitions";
-import { generateProvisionSecrets } from "./provision-pipeline";
+import { buildWorkerSecretsStoreBindings } from "./secrets-store";
 
 const resources = {
   d1DatabaseId: "d1-id",
@@ -26,10 +25,8 @@ describe("worker definitions", () => {
   });
 
   test("builds cco-api bindings from provision resources", () => {
-    const secrets = generateProvisionSecrets();
     const bindings = buildWorkerBindings("cco-api", {
       resources: { ...resources, chatHostname: "chat.example.com" },
-      secrets,
       apiHostname: "api.example.com",
       chatHostname: "chat.example.com",
     });
@@ -41,18 +38,20 @@ describe("worker definitions", () => {
         { type: "plain_text", name: "API_DOMAIN", text: "api.example.com" },
       ]),
     );
-    expect(buildWorkerSecrets("cco-api", secrets)).toEqual(
+    expect(buildWorkerSecretsStoreBindings("cco-api", "store-1")).toEqual(
       expect.arrayContaining([
-        { name: "SETUP_BOOTSTRAP_SECRET", value: secrets.CF_INTERNAL_SECRET },
+        expect.objectContaining({
+          type: "secrets_store_secret",
+          name: "TOKEN_ENCRYPTION_KEY",
+          store_id: "store-1",
+        }),
       ]),
     );
   });
 
   test("wires reconcile cron worker internal URL", () => {
-    const secrets = generateProvisionSecrets();
     const bindings = buildWorkerBindings("cco-reconcile-cron", {
       resources,
-      secrets,
       apiHostname: "api.example.com",
     });
     expect(bindings).toEqual([
@@ -62,16 +61,18 @@ describe("worker definitions", () => {
         text: "https://api.example.com/internal/jobs/reconcile",
       },
     ]);
-    expect(buildWorkerSecrets("cco-reconcile-cron", secrets)).toEqual([
-      { name: "RECONCILE_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET },
+    expect(buildWorkerSecretsStoreBindings("cco-reconcile-cron", "store-1")).toEqual([
+      expect.objectContaining({
+        type: "secrets_store_secret",
+        name: "RECONCILE_INTERNAL_SECRET",
+        store_id: "store-1",
+      }),
     ]);
   });
 
   test("wires push consumer internal URL and queue producer on cco-api", () => {
-    const secrets = generateProvisionSecrets();
     const apiBindings = buildWorkerBindings("cco-api", {
       resources,
-      secrets,
       apiHostname: "api.example.com",
     });
     expect(apiBindings).toEqual(
@@ -82,7 +83,6 @@ describe("worker definitions", () => {
 
     const consumerBindings = buildWorkerBindings("cco-push-consumer", {
       resources,
-      secrets,
       apiHostname: "api.example.com",
     });
     expect(consumerBindings).toEqual([
@@ -92,8 +92,8 @@ describe("worker definitions", () => {
         text: "https://api.example.com/internal/push/deliver",
       },
     ]);
-    expect(buildWorkerSecrets("cco-push-consumer", secrets)).toEqual([
-      { name: "PUSH_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET },
+    expect(buildWorkerSecretsStoreBindings("cco-push-consumer", "store-1")).toEqual([
+      expect.objectContaining({ name: "PUSH_INTERNAL_SECRET" }),
     ]);
   });
 

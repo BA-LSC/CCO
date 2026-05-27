@@ -11,8 +11,10 @@ import {
   ensureKvNamespace,
   ensureQueue,
   ensureR2Bucket,
+  ensureSecretsStore,
   generateProvisionSecrets,
   listCloudflareAccounts,
+  seedPlatformStoreSecrets,
   type CcoWorkerScriptName,
 } from "@cco/cloudflare-provision";
 import { resolveCloudflareAccountId } from "../../services/api/src/services/cloudflare-realtimekit-provision";
@@ -57,6 +59,9 @@ const secrets = {
   CF_INTERNAL_SECRET: internalSecret,
 };
 
+const store = await ensureSecretsStore(accountId, apiToken);
+await seedPlatformStoreSecrets(accountId, apiToken, store.id, secrets);
+
 const resources = {
   accountId,
   d1DatabaseId: d1.uuid,
@@ -65,6 +70,7 @@ const resources = {
   kvDeployNamespaceId: deployKv.id,
   pushQueueId: pushQueue.queue_id,
   apiHostname: apiDomain,
+  secretsStoreId: store.id,
 };
 
 const readBundle = async (scriptName: CcoWorkerScriptName) => {
@@ -81,7 +87,7 @@ const deployed = await deployAllProvisionWorkers({
   accountId,
   apiToken,
   resources,
-  secrets,
+  secretsStoreId: store.id,
   apiHostname: apiDomain,
   readBundle,
 });

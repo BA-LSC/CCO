@@ -1,9 +1,9 @@
 import { CloudflareApiError } from "./cloudflare-api";
 import { ensureWorkerRoute } from "./cloudflare-api-resources";
-import type { ProvisionResources, ProvisionSecrets } from "./provision-pipeline";
+import type { ProvisionResources } from "./provision-pipeline";
+import { buildWorkerSecretsStoreBindings } from "./secrets-store";
 import {
   buildWorkerBindings,
-  buildWorkerSecrets,
   CCO_API_WORKER_ROUTES,
   CCO_RECONCILE_WORKER_CRONS,
   CCO_WORKER_BUILD_SPECS,
@@ -27,6 +27,12 @@ export type WorkerBinding =
       name: string;
       class_name: string;
       script_name?: string;
+    }
+  | {
+      type: "secrets_store_secret";
+      name: string;
+      store_id: string;
+      secret_name: string;
     };
 
 type WorkerScriptMetadata = {
@@ -213,7 +219,7 @@ export type DeployAllProvisionWorkersParams = {
   accountId: string;
   apiToken: string;
   resources: ProvisionResources;
-  secrets: ProvisionSecrets;
+  secretsStoreId: string;
   apiHostname: string;
   readBundle: (scriptName: CcoWorkerScriptName) => Promise<ArrayBuffer>;
 };
@@ -285,15 +291,17 @@ function resolveWorkerDeployOptions(
 export async function deployAllProvisionWorkers(
   params: DeployAllProvisionWorkersParams,
 ): Promise<string[]> {
-  const { accountId, apiToken, resources, secrets, apiHostname, readBundle } = params;
+  const { accountId, apiToken, resources, secretsStoreId, apiHostname, readBundle } = params;
 
   if (!apiHostname.trim()) {
     throw new Error("apiHostname is required to deploy workers");
   }
+  if (!secretsStoreId.trim()) {
+    throw new Error("secretsStoreId is required to deploy BYO workers");
+  }
 
   const bindingParams = {
     resources,
-    secrets,
     apiHostname,
     chatHostname: resources.chatHostname,
   };
@@ -302,7 +310,10 @@ export async function deployAllProvisionWorkers(
 
   for (const spec of CCO_WORKER_BUILD_SPECS) {
     const moduleBytes = await readBundle(spec.scriptName);
-    const bindings = buildWorkerBindings(spec.scriptName, bindingParams);
+    const bindings = [
+      ...buildWorkerBindings(spec.scriptName, bindingParams),
+      ...buildWorkerSecretsStoreBindings(spec.scriptName, secretsStoreId),
+    ];
 
     await deployWorkerScript(
       accountId,
@@ -312,10 +323,6 @@ export async function deployAllProvisionWorkers(
       bindings,
       resolveWorkerDeployOptions(spec.scriptName, migrationTags.get(spec.scriptName)),
     );
-
-    for (const secret of buildWorkerSecrets(spec.scriptName, secrets)) {
-      await putWorkerSecret(accountId, apiToken, spec.scriptName, secret.name, secret.value);
-    }
 
     if (spec.scriptName === "cco-reconcile-cron") {
       await deployWorkerCronSchedule(

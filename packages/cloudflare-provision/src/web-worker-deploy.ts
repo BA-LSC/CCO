@@ -1,6 +1,6 @@
 import { CloudflareApiError } from "./cloudflare-api";
-import { deployWorkerScript, putWorkerSecret, type WorkerBinding } from "./workers-deploy";
-import type { ProvisionSecrets } from "./provision-pipeline";
+import { buildWebWorkerSecretsStoreBindings } from "./secrets-store";
+import { deployWorkerScript, type WorkerBinding } from "./workers-deploy";
 import { normalizeWebAssetManifestPath } from "./web-asset-path";
 
 const CF_API = "https://api.cloudflare.com/client/v4";
@@ -19,7 +19,7 @@ export type DeployCcoWebWorkerParams = {
   apiToken: string;
   chatHostname: string;
   apiHostname: string;
-  secrets: ProvisionSecrets;
+  secretsStoreId: string;
   workerModuleUrl: string;
   assetsBaseUrl: string;
   assetsManifest: WebAssetManifest;
@@ -159,7 +159,11 @@ function normalizeHostname(value: string): string {
   return value.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
-function buildCcoWebBindings(chatHostname: string, apiHostname: string): WorkerBinding[] {
+function buildCcoWebBindings(
+  chatHostname: string,
+  apiHostname: string,
+  secretsStoreId: string,
+): WorkerBinding[] {
   const chatHost = normalizeHostname(chatHostname);
   const apiHost = normalizeHostname(apiHostname);
   return [
@@ -183,6 +187,7 @@ function buildCcoWebBindings(chatHostname: string, apiHostname: string): WorkerB
       name: "PCO_WEB_REDIRECT_URI",
       text: `https://${chatHost}/api/auth/pco/callback`,
     },
+    ...buildWebWorkerSecretsStoreBindings(secretsStoreId),
   ];
 }
 
@@ -210,7 +215,7 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
     compatibility_date: "2025-05-26",
     compatibility_flags: ["nodejs_compat"],
     assets: { jwt: assetsJwt },
-    bindings: buildCcoWebBindings(params.chatHostname, params.apiHostname),
+    bindings: buildCcoWebBindings(params.chatHostname, params.apiHostname, params.secretsStoreId),
   };
 
   const form = new FormData();
@@ -237,14 +242,6 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
       res.status,
     );
   }
-
-  await putWorkerSecret(
-    params.accountId,
-    params.apiToken,
-    CCO_WEB_SCRIPT_NAME,
-    "TOKEN_ENCRYPTION_KEY",
-    params.secrets.TOKEN_ENCRYPTION_KEY,
-  );
 }
 
 export async function fetchWebReleaseManifest(manifestUrl: string): Promise<WebAssetManifest> {

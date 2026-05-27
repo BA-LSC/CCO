@@ -1,5 +1,6 @@
 import type { ProvisionPipelineContext, ProvisionSessionState } from "./provision-pipeline";
 import type { ProvisionStepHandler, ProvisionStepHandlers } from "./provision-pipeline";
+import { ensureSecretsStore, seedPlatformStoreSecrets } from "./secrets-store";
 import { deployAllProvisionWorkers, ensureCcoApiWorkerRoutes } from "./workers-deploy";
 import type { CcoWorkerScriptName } from "./worker-definitions";
 
@@ -46,14 +47,20 @@ export async function createProvisionWorkerHandlers(
       state.resources.pushQueueId,
     ];
     if (required.some((value) => !value)) {
-      throw new Error("D1, R2, KV, and queue resources must exist before deploy_workers");
+      throw new Error(
+        "D1, R2, KV, queue, and Secrets Store must exist before deploy_workers",
+      );
     }
+
+    const store = await ensureSecretsStore(accountId, context.apiToken);
+    await seedPlatformStoreSecrets(accountId, context.apiToken, store.id, secrets);
+    state.resources.secretsStoreId = store.id;
 
     const deployed = await deployAllProvisionWorkers({
       accountId,
       apiToken: context.apiToken,
       resources: state.resources,
-      secrets,
+      secretsStoreId: state.resources.secretsStoreId!,
       apiHostname,
       readBundle,
     });

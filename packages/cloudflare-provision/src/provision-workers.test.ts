@@ -9,6 +9,25 @@ describe("createProvisionWorkerHandlers", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
+      if (url.includes("/secrets_store/stores") && init?.method !== "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ success: true, result: [{ id: "store-1", name: "cco" }] }), {
+            status: 200,
+          }),
+        );
+      }
+      if (url.includes("/secrets_store/stores") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ success: true, result: { id: "store-1", name: "cco" } }), {
+            status: 200,
+          }),
+        );
+      }
+      if (url.includes("/secrets_store/stores/") && url.endsWith("/secrets")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ success: true, result: [] }), { status: 200 }),
+        );
+      }
       if (/\/workers\/scripts\/[^/]+$/.test(url) && init?.method === "PUT") {
         uploads.push(url.split("/workers/scripts/")[1] ?? "");
         return Promise.resolve(
@@ -67,6 +86,7 @@ describe("createProvisionWorkerHandlers", () => {
         "cco-api",
       ]);
       expect(state.resources.workerScriptNames).toEqual(uploads);
+      expect(state.resources.secretsStoreId).toBe("store-1");
     } finally {
       globalThis.fetch = originalFetch;
     }

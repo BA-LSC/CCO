@@ -5,7 +5,9 @@ import { join, relative } from "node:path";
 import { $ } from "bun";
 import {
   deployCcoWebWorker,
+  ensureSecretsStore,
   generateProvisionSecrets,
+  seedPlatformStoreSecrets,
 } from "@cco/cloudflare-provision";
 import { hashWebAssetFile } from "../../packages/cloudflare-provision/src/web-asset-hash.ts";
 
@@ -52,12 +54,15 @@ await Bun.write(workerPath, readFileSync(join(tmp, "worker.js")));
 const secrets = generateProvisionSecrets();
 secrets.TOKEN_ENCRYPTION_KEY = tokenKey;
 
+const store = await ensureSecretsStore(accountId, apiToken);
+await seedPlatformStoreSecrets(accountId, apiToken, store.id, secrets);
+
 await deployCcoWebWorker({
   accountId,
   apiToken,
   chatHostname,
   apiHostname,
-  secrets,
+  secretsStoreId: store.id,
   workerModuleUrl: `file://${workerPath}`,
   assetsBaseUrl: `file://${assetsDir}/`,
   assetsManifest: walkAssets(assetsDir),

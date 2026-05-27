@@ -44,6 +44,7 @@ export type ProvisionSecrets = {
 export type ProvisionResources = {
   accountId?: string;
   zoneId?: string;
+  secretsStoreId?: string;
   d1DatabaseId?: string;
   r2BucketName?: string;
   r2AccessKeyId?: string;

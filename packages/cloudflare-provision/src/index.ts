@@ -4,6 +4,27 @@ export {
 } from "./update-token-verify";
 
 export {
+  CCO_SECRETS_STORE_NAME,
+  CCO_STORE_SECRET,
+  CCO_ORG_STORE_SECRETS,
+  CCO_PLATFORM_STORE_SECRETS,
+  CCO_STORE_BINDING_MAP,
+  buildStoreSecretBinding,
+  buildWorkerSecretsStoreBindings,
+  buildWebWorkerSecretsStoreBindings,
+  createSecretsStore,
+  ensureSecretsStore,
+  hasStoreSecret,
+  listSecretsStores,
+  listStoreSecrets,
+  seedPlatformStoreSecrets,
+  upsertStoreSecret,
+  type CcoStoreBindingName,
+  type CcoStoreSecretName,
+  type SecretsStoreBinding,
+} from "./secrets-store";
+
+export {
   cfRequest,
   cfRealtimeKitRequest,
   CloudflareApiError,
@@ -81,13 +102,11 @@ export {
   CCO_UPDATE_CHECK_CRON,
   CCO_RECONCILE_WORKER_CRONS,
   buildWorkerBindings,
-  buildWorkerSecrets,
   defaultWorkerBundleDir,
   resolveApiRoutePattern,
   apiInternalUrl,
   type CcoWorkerScriptName,
   type WorkerBindingsParams,
-  type WorkerSecretEntry,
 } from "./worker-definitions";
 
 export {

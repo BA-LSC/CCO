@@ -10,11 +10,21 @@ const WORKERS_SCRIPTS_HINT =
 const WORKERS_ROUTES_HINT =
   "Add Zone → Workers Routes → Edit for your chat and API hostnames on the Cloudflare API token.";
 
+const SECRETS_STORE_HINT =
+  "Add Account → Secrets Store → Edit to the Cloudflare API token.";
+
 function enrichCloudflareAuthMessage(err: CloudflareApiError): string {
   if (/authentication error/i.test(err.message) || err.status === 403) {
-    return `${err.message}. ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT}`;
+    return `${err.message}. ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT} ${SECRETS_STORE_HINT}`;
   }
   return err.message;
+}
+
+async function assertSecretsStoreAccess(accountId: string, apiToken: string): Promise<void> {
+  await cfRequest<Array<{ id: string }>>(
+    apiToken,
+    `/accounts/${accountId}/secrets_store/stores`,
+  );
 }
 
 async function assertWorkerScriptsAccess(accountId: string, apiToken: string): Promise<void> {
@@ -65,6 +75,7 @@ export async function verifyCloudflareUpdateApplyPermissions(
     }
 
     await assertWorkerScriptsAccess(params.accountId, apiToken);
+    await assertSecretsStoreAccess(params.accountId, apiToken);
     await assertWorkerRoutesAccess(apiToken, params.apiHostname, "API");
     if (params.chatHostname !== params.apiHostname) {
       await assertWorkerRoutesAccess(apiToken, params.chatHostname, "chat");

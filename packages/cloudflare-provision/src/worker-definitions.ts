@@ -1,4 +1,4 @@
-import type { ProvisionResources, ProvisionSecrets } from "./provision-pipeline";
+import type { ProvisionResources } from "./provision-pipeline";
 import type { WorkerBinding } from "./workers-deploy";
 
 export const CCO_WORKER_BUILD_SPECS = [
@@ -43,7 +43,6 @@ export function apiInternalUrl(apiHostname: string, path: string): string {
 
 export type WorkerBindingsParams = {
   resources: ProvisionResources;
-  secrets: ProvisionSecrets;
   apiHostname: string;
   chatHostname?: string;
 };
@@ -63,7 +62,7 @@ export function buildWorkerBindings(
   scriptName: CcoWorkerScriptName,
   params: WorkerBindingsParams,
 ): WorkerBinding[] {
-  const { resources, secrets, apiHostname } = params;
+  const { resources, apiHostname } = params;
   const chatHostname = params.chatHostname ?? resources.chatHostname;
   const apiHost = normalizeBindingHostname(apiHostname);
   const d1Id = requireResource(resources.d1DatabaseId, "d1DatabaseId");
@@ -140,44 +139,4 @@ export function buildWorkerBindings(
 
 export function defaultWorkerBundleDir(): string {
   return "deploy/cloudflare/bundles";
-}
-
-export type WorkerSecretEntry = { name: string; value: string };
-
-export function buildWorkerSecrets(
-  scriptName: CcoWorkerScriptName,
-  secrets: ProvisionSecrets,
-): WorkerSecretEntry[] {
-  switch (scriptName) {
-    case "cco-api":
-      return [
-        { name: "SESSION_SECRET", value: secrets.SESSION_SECRET },
-        { name: "TOKEN_ENCRYPTION_KEY", value: secrets.TOKEN_ENCRYPTION_KEY },
-        { name: "CF_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET },
-        { name: "SETUP_BOOTSTRAP_SECRET", value: secrets.CF_INTERNAL_SECRET },
-      ];
-    case "cco-realtime-fanout":
-      return [
-        { name: "SESSION_SECRET", value: secrets.SESSION_SECRET },
-        { name: "CF_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET },
-      ];
-    case "cco-pco-webhook":
-      return [
-        { name: "INTERNAL_FORWARD_SECRET", value: secrets.CF_INTERNAL_SECRET },
-        { name: "WEBHOOK_SECRETS", value: "" },
-      ];
-    case "cco-giphy-proxy":
-      return [
-        { name: "GIPHY_API_KEY", value: "" },
-        { name: "INTERNAL_AUTH_SECRET", value: secrets.CF_INTERNAL_SECRET },
-      ];
-    case "cco-push-consumer":
-      return [{ name: "PUSH_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET }];
-    case "cco-reconcile-cron":
-      return [{ name: "RECONCILE_INTERNAL_SECRET", value: secrets.CF_INTERNAL_SECRET }];
-    default: {
-      const exhaustive: never = scriptName;
-      throw new Error(`Unknown worker script: ${exhaustive}`);
-    }
-  }
 }
