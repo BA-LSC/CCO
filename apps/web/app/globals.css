@@ -1764,6 +1764,13 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-top: 2px;
 }
 
+.sidebar-new-message-btn .sidebar-dm-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sidebar-avatar-gap);
+}
+
 .sidebar-new-message-btn:hover {
   background: color-mix(in srgb, var(--color-surface-2) 75%, transparent);
 }
