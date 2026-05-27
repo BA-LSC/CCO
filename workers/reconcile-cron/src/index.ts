@@ -1,6 +1,15 @@
+type SecretsStoreSecretBinding = { get(): Promise<string> };
+
 export interface Env {
   RECONCILE_INTERNAL_URL: string;
-  RECONCILE_INTERNAL_SECRET: string;
+  RECONCILE_INTERNAL_SECRET: SecretsStoreSecretBinding | string;
+}
+
+async function resolveSecret(
+  binding: SecretsStoreSecretBinding | string,
+): Promise<string> {
+  if (typeof binding === "string") return binding;
+  return (await binding.get()) ?? "";
 }
 
 async function postInternal(url: string, secret: string): Promise<Response> {
@@ -21,7 +30,7 @@ function updateCheckUrl(reconcileUrl: string): string {
 
 export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    const auth = env.RECONCILE_INTERNAL_SECRET;
+    const auth = await resolveSecret(env.RECONCILE_INTERNAL_SECRET);
 
     if (controller.cron === "0 */6 * * *") {
       const url = updateCheckUrl(env.RECONCILE_INTERNAL_URL);

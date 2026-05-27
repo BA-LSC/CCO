@@ -1,21 +1,30 @@
 import { verifyWsConversationAccess } from "./access";
 import { extractBearerToken, verifyWsToken } from "./auth";
 
+type SecretsStoreSecretBinding = { get(): Promise<string> };
+
 export interface Env {
   CONVERSATION_ROOM: DurableObjectNamespace;
   DB: D1Database;
-  SESSION_SECRET: string;
-  CF_INTERNAL_SECRET: string;
+  SESSION_SECRET: SecretsStoreSecretBinding | string;
+  CF_INTERNAL_SECRET: SecretsStoreSecretBinding | string;
 }
 
-function readInternalSecret(env: Env): string {
-  return env.CF_INTERNAL_SECRET.trim();
+async function resolveSecret(
+  binding: SecretsStoreSecretBinding | string,
+): Promise<string> {
+  if (typeof binding === "string") return binding.trim();
+  return ((await binding.get()) ?? "").trim();
 }
 
-function authorizeInternal(request: Request, env: Env): boolean {
+async function readInternalSecret(env: Env): Promise<string> {
+  return resolveSecret(env.CF_INTERNAL_SECRET);
+}
+
+function authorizeInternal(request: Request, internalSecret: string): boolean {
   const token = extractBearerToken(request, new URL(request.url));
   if (!token) return false;
-  return token === readInternalSecret(env);
+  return token === internalSecret;
 }
 
 function conversationRoomStub(env: Env, conversationId: string): DurableObjectStub {
@@ -27,7 +36,8 @@ async function handleWsUpgrade(request: Request, env: Env, url: URL): Promise<Re
   const token = extractBearerToken(request, url);
   if (!token) return new Response("Unauthorized", { status: 401 });
 
-  const wsSession = await verifyWsToken(token, env.SESSION_SECRET);
+  const sessionSecret = await resolveSecret(env.SESSION_SECRET);
+  const wsSession = await verifyWsToken(token, sessionSecret);
   if (!wsSession) return new Response("Unauthorized", { status: 401 });
 
   const conversationId = url.searchParams.get("conversationId");
@@ -41,7 +51,8 @@ async function handleWsUpgrade(request: Request, env: Env, url: URL): Promise<Re
 }
 
 async function handleInternalPublish(request: Request, env: Env): Promise<Response> {
-  if (!authorizeInternal(request, env)) {
+  const internalSecret = await readInternalSecret(env);
+  if (!authorizeInternal(request, internalSecret)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

@@ -5,10 +5,19 @@ import {
   verifyWebhookAuth,
 } from "@cco/shared/webhook-auth";
 
+type SecretsStoreSecretBinding = { get(): Promise<string> };
+
 export interface Env {
-  WEBHOOK_SECRETS: string;
+  WEBHOOK_SECRETS: SecretsStoreSecretBinding | string;
   INTERNAL_FORWARD_URL: string;
-  INTERNAL_FORWARD_SECRET: string;
+  INTERNAL_FORWARD_SECRET: SecretsStoreSecretBinding | string;
+}
+
+async function resolveSecret(
+  binding: SecretsStoreSecretBinding | string,
+): Promise<string> {
+  if (typeof binding === "string") return binding;
+  return (await binding.get()) ?? "";
 }
 
 export default {
@@ -18,7 +27,8 @@ export default {
     }
 
     const rawBody = await request.text();
-    const secrets = env.WEBHOOK_SECRETS.split("\n").map((s) => s.trim()).filter(Boolean);
+    const webhookSecretsRaw = await resolveSecret(env.WEBHOOK_SECRETS);
+    const secrets = webhookSecretsRaw.split("\n").map((s) => s.trim()).filter(Boolean);
     const auth = await verifyWebhookAuth({
       secrets,
       rawBody,
@@ -54,12 +64,13 @@ export default {
     }
 
     const { deliveryId, body: payload } = normalizeWebhookPayload(rawPayload);
+    const forwardSecret = await resolveSecret(env.INTERNAL_FORWARD_SECRET);
 
     const forward = await fetch(env.INTERNAL_FORWARD_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${env.INTERNAL_FORWARD_SECRET}`,
+        Authorization: `Bearer ${forwardSecret}`,
         "X-PCO-Webhooks-Name": eventType,
       },
       body: JSON.stringify({ handlerKind, payload, deliveryId, eventType }),
