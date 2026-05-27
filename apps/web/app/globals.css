@@ -3299,19 +3299,19 @@ button.sidebar-group-header:focus-visible {
 }
 
 .app-update-overlay .loading-screen-content {
-  gap: 18px;
+  gap: 24px;
 }
 
 .app-update-overlay .loading-screen-label {
-  font-size: 1.125rem;
+  font-size: 1.5rem;
   font-weight: 600;
 }
 
 .app-update-overlay .spinner {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   margin: 0;
-  border-width: 4px;
+  border-width: 5px;
   animation-name: cco-app-update-spin;
 }
 
