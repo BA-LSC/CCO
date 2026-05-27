@@ -9,6 +9,7 @@ import {
   type UserStatusPickerPreset,
 } from "@cco/shared/user-status";
 import { useTheme } from "@/components/ThemeProvider";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserPresenceDot } from "@/components/UserPresenceDot";
@@ -35,7 +36,26 @@ type Props = {
   variant?: "default" | "sidebar";
 };
 
+function isPlaceholderDisplayName(name: string | null | undefined): boolean {
+  const normalized = name
+    ?.trim()
+    .toLowerCase()
+    .replace(/[''.`-]/g, "")
+    .replace(/\s+/g, " ");
+  return !normalized || normalized === "member" || normalized === "user";
+}
+
+function resolveDisplayName(...candidates: (string | null | undefined)[]): string {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (!trimmed || isPlaceholderDisplayName(trimmed)) continue;
+    return trimmed;
+  }
+  return "Signed in";
+}
+
 export function UserMenu({ variant = "default" }: Props) {
+  const { session: layoutSession } = useChatLayout();
   const { myStatus, setMyStatus, markUserActive, isUserOnline } = usePresence();
   const { theme, setTheme, chaosUnlocked, unlockChaos } = useTheme();
   const pcoSync = usePlanningCenterSync();
@@ -109,7 +129,7 @@ export function UserMenu({ variant = "default" }: Props) {
     return <PcoSignInButton>Sign in</PcoSignInButton>;
   }
 
-  const displayName = user.displayName?.trim() || "Signed in";
+  const displayName = resolveDisplayName(user?.displayName, layoutSession?.displayName);
 
   async function handleThemePick(next: UserTheme) {
     if (next === "1") {

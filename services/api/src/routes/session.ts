@@ -7,7 +7,11 @@ import { users } from "../db/schema";
 import { signWsToken } from "../auth/session";
 import { parseUserTheme } from "../lib/theme";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
-import { refreshUserAvatarFromPco } from "../services/user-profile";
+import {
+  isPlaceholderDisplayName,
+  refreshUserAvatarFromPco,
+  refreshUserDisplayNameFromPco,
+} from "../services/user-profile";
 import { updateUserStatus } from "../services/user-status";
 
 type Env = { Variables: AuthVariables };
@@ -42,9 +46,14 @@ sessionRouter.get("/me", requireAuth, async (c) => {
     avatarUrl = await refreshUserAvatarFromPco(session.userId);
   }
 
+  let displayName = row[0].displayName;
+  if (isPlaceholderDisplayName(displayName)) {
+    displayName = (await refreshUserDisplayNameFromPco(session.userId)) ?? displayName;
+  }
+
   return c.json({
     userId: row[0].id,
-    displayName: row[0].displayName,
+    displayName,
     theme: row[0].theme,
     avatarUrl: avatarUrl ?? null,
     siteAdministrator: row[0].siteAdministrator,

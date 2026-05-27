@@ -848,6 +848,13 @@ html[data-theme="6"] .user-menu-dropdown {
   width: 100%;
   justify-content: flex-start;
   padding: 8px 10px;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+.user-menu-sidebar .user-menu-avatar-wrap,
+.user-menu-sidebar .user-menu-chevron {
+  align-self: center;
 }
 
 .user-menu-sidebar .user-menu-name {
@@ -855,6 +862,7 @@ html[data-theme="6"] .user-menu-dropdown {
   min-width: 0;
   max-width: none;
   text-align: left;
+  line-height: 1.2;
 }
 
 .user-menu-identity {
@@ -862,17 +870,19 @@ html[data-theme="6"] .user-menu-dropdown {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 1px;
   text-align: left;
 }
 
 .user-menu-status-preview {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 400;
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.15;
 }
 
 .user-menu-sidebar .user-menu-dropdown {
