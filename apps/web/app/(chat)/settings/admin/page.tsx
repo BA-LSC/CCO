@@ -459,20 +459,7 @@ export default function IntegrationsSettingsPage() {
         <p>Integrations, Cloudflare, release updates, and org configuration. Saved secrets stay encrypted.</p>
       </header>
 
-      <AdminUpdatesSection
-        initialGitRepoUrl={gitRepoUrl}
-        onFeedback={({ error: updateError, success: updateSuccess }) => {
-          if (updateError) {
-            setError(updateError);
-            setSaved(false);
-          }
-          if (updateSuccess) {
-            setError(null);
-            setSaved(false);
-            setPcoSyncResult(updateSuccess);
-          }
-        }}
-      />
+      <AdminUpdatesSection initialGitRepoUrl={gitRepoUrl} />
 
       <IntegrationsSection
         id="pco-sync-heading"

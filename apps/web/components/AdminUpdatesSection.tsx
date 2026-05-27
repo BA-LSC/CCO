@@ -30,6 +30,18 @@ function formatWhen(iso: string | null): string {
   return new Date(iso).toLocaleString();
 }
 
+function UpdatesFeedback({ error, success }: { error?: string | null; success?: string | null }) {
+  if (!error && !success) return null;
+  return (
+    <p
+      className={`integrations-feedback${error ? " integrations-feedback--error" : " integrations-feedback--success"}`}
+      role={error ? "alert" : "status"}
+    >
+      {error ?? success}
+    </p>
+  );
+}
+
 function formatStatusLine(status: UpdatesStatus): string {
   const installed = shortenSha(status.currentVersion);
   const checked = formatWhen(status.lastUpdateCheckAt);
@@ -44,16 +56,15 @@ function formatStatusLine(status: UpdatesStatus): string {
 
 type AdminUpdatesSectionProps = {
   initialGitRepoUrl?: string;
-  onFeedback?: (message: { error?: string; success?: string }) => void;
 };
 
 export function AdminUpdatesSection({
   initialGitRepoUrl = CCO_DEFAULT_GIT_REPO_URL,
-  onFeedback,
 }: AdminUpdatesSectionProps) {
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
   const [gitRepoUrl, setGitRepoUrl] = useState(initialGitRepoUrl);
   const [busy, setBusy] = useState<"check" | "apply" | "toggle" | "saveRepo" | null>(null);
+  const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
@@ -64,27 +75,27 @@ export function AdminUpdatesSection({
 
   useEffect(() => {
     void loadStatus().catch((err) => {
-      onFeedback?.({
+      setFeedback({
         error: err instanceof Error ? err.message : "Failed to load updates",
       });
     });
-  }, [loadStatus, onFeedback]);
+  }, [loadStatus]);
 
   async function handleCheck() {
     setBusy("check");
-    onFeedback?.({});
+    setFeedback({});
     try {
       const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates/check", {
         method: "POST",
       });
       setStatus(next);
-      onFeedback?.({
+      setFeedback({
         success: next.updateAvailable
           ? "A new release is available."
           : "You're on the latest release.",
       });
     } catch (err) {
-      onFeedback?.({ error: err instanceof Error ? err.message : "Check failed" });
+      setFeedback({ error: err instanceof Error ? err.message : "Check failed" });
     } finally {
       setBusy(null);
     }
@@ -93,7 +104,7 @@ export function AdminUpdatesSection({
   async function handleApply() {
     if (!status?.canApply) return;
     setBusy("apply");
-    onFeedback?.({});
+    setFeedback({});
     markDeployWait();
     try {
       const result = await apiFetch<{
@@ -106,14 +117,14 @@ export function AdminUpdatesSection({
       const version = shortenSha(result.appliedVersion);
       const refreshNote =
         " This page will refresh automatically when the deploy finishes.";
-      onFeedback?.({
+      setFeedback({
         success: result.accepted
           ? `Update started (${version}). Workers are redeploying.${refreshNote}`
           : `Update applied (${version}). Workers are redeploying.${refreshNote}`,
       });
     } catch (err) {
       clearDeployWait();
-      onFeedback?.({ error: err instanceof Error ? err.message : "Apply failed" });
+      setFeedback({ error: err instanceof Error ? err.message : "Apply failed" });
       await loadStatus();
     } finally {
       setBusy(null);
@@ -122,18 +133,18 @@ export function AdminUpdatesSection({
 
   async function handleToggleAutoUpdate(enabled: boolean) {
     setBusy("toggle");
-    onFeedback?.({});
+    setFeedback({});
     try {
       const next = await apiFetch<UpdatesStatus & { ok: boolean }>("/api/v1/settings/updates", {
         method: "PATCH",
         body: JSON.stringify({ autoUpdateEnabled: enabled }),
       });
       setStatus(next);
-      onFeedback?.({
+      setFeedback({
         success: enabled ? "Automatic updates enabled." : "Automatic updates disabled.",
       });
     } catch (err) {
-      onFeedback?.({
+      setFeedback({
         error: err instanceof Error ? err.message : "Failed to save setting",
       });
     } finally {
@@ -144,20 +155,20 @@ export function AdminUpdatesSection({
   async function handleSaveGitRepo(e: React.FormEvent) {
     e.preventDefault();
     setBusy("saveRepo");
-    onFeedback?.({});
+    setFeedback({});
     try {
       await apiFetch("/api/v1/settings/integrations", {
         method: "PATCH",
         body: JSON.stringify({ gitRepoUrl }),
       });
       const next = await loadStatus();
-      onFeedback?.({
+      setFeedback({
         success: next.updateAvailable
           ? "Git repository saved. A new release is available."
           : "Git repository saved.",
       });
     } catch (err) {
-      onFeedback?.({
+      setFeedback({
         error: err instanceof Error ? err.message : "Failed to save git repository",
       });
     } finally {
@@ -198,6 +209,8 @@ export function AdminUpdatesSection({
           Last apply failed: {status.lastApplyError}
         </p>
       )}
+
+      <UpdatesFeedback error={feedback.error} success={feedback.success} />
 
       <div className="integrations-actions">
         <button

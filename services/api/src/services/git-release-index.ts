@@ -10,6 +10,7 @@ import {
 } from "@cco/shared";
 
 const GITHUB_API = "https://api.github.com";
+const GITHUB_USER_AGENT = "cco-org-updates";
 
 type GithubCommitResponse = {
   sha: string;
@@ -21,6 +22,35 @@ type GithubReleaseResponse = {
   published_at: string;
   assets?: Array<{ name: string; browser_download_url: string }>;
 };
+
+function resolveGithubToken(): string | null {
+  const token =
+    process.env.GITHUB_TOKEN?.trim() ||
+    process.env.CCO_GITHUB_TOKEN?.trim() ||
+    null;
+  return token || null;
+}
+
+function resolveGithubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": GITHUB_USER_AGENT,
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const token = resolveGithubToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function fetchGithubJson<T>(url: string): Promise<{ ok: true; json: T } | { ok: false; status: number }> {
+  const res = await fetch(url, { headers: resolveGithubHeaders() });
+  if (!res.ok) {
+    return { ok: false, status: res.status };
+  }
+  return { ok: true, json: (await res.json()) as T };
+}
 
 function resolveArtifactReleasesBaseUrl(repoUrl: string): string {
   const explicit = process.env.CCO_RELEASES_BASE_URL?.trim()?.replace(/\/+$/, "");
@@ -38,16 +68,13 @@ async function fetchGithubMainCommitSha(owner: string, repo: string): Promise<{
   publishedAt: string;
 }> {
   const ref = process.env.CCO_GIT_REF?.trim() || CCO_DEFAULT_GIT_REF;
-  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "cco-org-updates",
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub commit lookup failed (HTTP ${res.status})`);
+  const result = await fetchGithubJson<GithubCommitResponse>(
+    `${GITHUB_API}/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`,
+  );
+  if (!result.ok) {
+    throw new Error(`GitHub commit lookup failed (HTTP ${result.status})`);
   }
-  const json = (await res.json()) as GithubCommitResponse;
+  const json = result.json;
   if (!json.sha?.trim()) {
     throw new Error("GitHub commit response missing sha");
   }
@@ -57,7 +84,12 @@ async function fetchGithubMainCommitSha(owner: string, repo: string): Promise<{
 
 async function fetchSetupCReleaseIndex(): Promise<ReleaseIndex> {
   const url = process.env.CCO_RELEASE_INDEX_URL?.trim() || CCO_RELEASE_INDEX_URL;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": GITHUB_USER_AGENT,
+    },
+  });
   if (!res.ok) {
     throw new Error(`Release index unavailable (HTTP ${res.status})`);
   }
@@ -68,29 +100,95 @@ async function fetchSetupCReleaseIndex(): Promise<ReleaseIndex> {
   return json;
 }
 
-async function fetchGithubLatestReleaseBase(
+async function fetchGithubLatestReleaseAsset(
   owner: string,
   repo: string,
-): Promise<string | null> {
-  const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/releases/latest`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "cco-org-updates",
-    },
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) return null;
-  const json = (await res.json()) as GithubReleaseResponse;
-  const asset = json.assets?.find((entry) => entry.name === "release-index.json");
+  assetName: string,
+): Promise<{ baseUrl: string; downloadUrl: string } | null> {
+  const result = await fetchGithubJson<GithubReleaseResponse>(
+    `${GITHUB_API}/repos/${owner}/${repo}/releases/latest`,
+  );
+  if (!result.ok) return null;
+  const asset = result.json.assets?.find((entry) => entry.name === assetName);
   if (!asset?.browser_download_url) return null;
   const url = new URL(asset.browser_download_url);
-  return url.href.slice(0, url.href.lastIndexOf("/"));
+  return {
+    downloadUrl: asset.browser_download_url,
+    baseUrl: url.href.slice(0, url.href.lastIndexOf("/")),
+  };
+}
+
+async function fetchGithubLatestReleaseIndex(owner: string, repo: string): Promise<ReleaseIndex | null> {
+  const asset = await fetchGithubLatestReleaseAsset(owner, repo, "release-index.json");
+  if (!asset) return null;
+  const res = await fetch(asset.downloadUrl, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": GITHUB_USER_AGENT,
+    },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as ReleaseIndex;
+  if (!json.version?.trim()) return null;
+  return {
+    ...json,
+    version: json.version.trim(),
+    releasesBaseUrl: json.releasesBaseUrl?.trim() || asset.baseUrl,
+  };
+}
+
+async function fetchDefaultGitReleaseIndex(repoUrl: string): Promise<ReleaseIndex> {
+  let setupError: string | null = null;
+  try {
+    return await fetchSetupCReleaseIndex();
+  } catch (err) {
+    setupError = err instanceof Error ? err.message : "Release index unavailable";
+  }
+
+  const parsed = parseGitHubRepoUrl(repoUrl);
+  if (!parsed) {
+    throw new Error(setupError ?? "Release index unavailable");
+  }
+
+  try {
+    const { sha, publishedAt } = await fetchGithubMainCommitSha(parsed.owner, parsed.repo);
+    return {
+      version: sha,
+      gitRef: CCO_DEFAULT_GIT_REF,
+      publishedAt,
+      releasesBaseUrl: resolveArtifactReleasesBaseUrl(repoUrl),
+    };
+  } catch (githubErr) {
+    const githubMessage =
+      githubErr instanceof Error ? githubErr.message : "GitHub commit lookup failed";
+    throw new Error(setupError ?? githubMessage);
+  }
+}
+
+async function fetchCustomGitReleaseIndex(
+  repoUrl: string,
+  owner: string,
+  repo: string,
+): Promise<ReleaseIndex> {
+  const releaseIndex = await fetchGithubLatestReleaseIndex(owner, repo);
+  if (releaseIndex) {
+    return releaseIndex;
+  }
+
+  const releaseAsset = await fetchGithubLatestReleaseAsset(owner, repo, "release-index.json");
+  const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
+  return {
+    version: sha,
+    gitRef: CCO_DEFAULT_GIT_REF,
+    publishedAt,
+    releasesBaseUrl: releaseAsset?.baseUrl ?? resolveArtifactReleasesBaseUrl(repoUrl),
+  };
 }
 
 /**
  * Resolve the release catalog for Admin Updates from a git repository URL.
- * Version checks use GitHub main (or CCO_GIT_REF); artifacts load from setup-c.co for the default repo
- * or CCO_RELEASES_BASE_URL / GitHub release assets for forks.
+ * Default BA-LSC/CCO installs read setup-c.co/release-index.json first (no GitHub auth required).
+ * Custom forks use GitHub release assets, then main commit SHA with optional GITHUB_TOKEN.
  */
 export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
   const repoUrl = normalizeGitRepoUrl(gitRepoUrl);
@@ -99,32 +197,11 @@ export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined
     throw new Error("Git repository URL must be a GitHub repository");
   }
 
-  const { sha, publishedAt } = await fetchGithubMainCommitSha(parsed.owner, parsed.repo);
-
   if (isDefaultGitRepo(repoUrl)) {
-    try {
-      const catalog = await fetchSetupCReleaseIndex();
-      if (catalog.version === sha) {
-        return catalog;
-      }
-    } catch {
-      // setup-c.co catalog may lag main; fall through to git-derived index.
-    }
-    return {
-      version: sha,
-      gitRef: CCO_DEFAULT_GIT_REF,
-      publishedAt,
-      releasesBaseUrl: resolveArtifactReleasesBaseUrl(repoUrl),
-    };
+    return fetchDefaultGitReleaseIndex(repoUrl);
   }
 
-  const releaseBase = await fetchGithubLatestReleaseBase(parsed.owner, parsed.repo);
-  return {
-    version: sha,
-    gitRef: CCO_DEFAULT_GIT_REF,
-    publishedAt,
-    releasesBaseUrl: releaseBase ?? resolveArtifactReleasesBaseUrl(repoUrl),
-  };
+  return fetchCustomGitReleaseIndex(repoUrl, parsed.owner, parsed.repo);
 }
 
 export function resolveOrgGitRepoUrl(gitRepoUrl: string | null | undefined): string {
