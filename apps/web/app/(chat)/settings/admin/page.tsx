@@ -598,9 +598,7 @@ export default function IntegrationsSettingsPage() {
           id="pco-webhooks-heading"
           heading="Webhooks"
           badge={
-            webhookConfigured && webhookSecretCount > 0
-              ? `${webhookSecretCount} configured`
-              : null
+            webhookConfigured && webhookSecretCount > 0 ? "Configured" : null
           }
         >
           <WebhookSecretsField
