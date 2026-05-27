@@ -4404,9 +4404,9 @@ button.sidebar-group-header:focus-visible {
   color: #fff;
 }
 
-.chat-thread .message-bubble--own .mention {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+.chat-thread .message-bubble--own .mention:not(.mention--self) {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--color-primary-hover);
 }
 
 .chat-thread .message-bubble--own .mention--self {
