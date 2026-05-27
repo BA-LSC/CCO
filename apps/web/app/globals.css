@@ -1873,7 +1873,28 @@ button.sidebar-group-header:focus-visible {
 
 .empty-chat-pane-banner-slot .chat-home-banner {
   margin: 0;
-  padding: 12px 14px;
+  padding: 10px 12px 10px 13px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+}
+
+.empty-chat-pane-banner-slot .chat-home-banner.error {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-danger);
+}
+
+.empty-chat-pane-banner-slot .chat-home-banner.success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-success);
+}
+
+.empty-chat-pane-banner-slot .chat-home-banner.neutral {
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 .empty-chat-pane-banner-slot .chat-home-banner--exit {
@@ -2450,15 +2471,6 @@ button.sidebar-group-header:focus-visible {
 .chat-panel-banner-slot .send-error,
 .chat-panel-banner-slot .chat-home-banner-wrap {
   margin: 0;
-}
-
-.chat-panel-banner-slot .chat-home-banner {
-  margin: 0;
-  box-shadow: var(--shadow-md);
-}
-
-.chat-panel-banner-slot .send-error {
-  box-shadow: var(--shadow-md);
 }
 
 .chat-panel-details {
@@ -4207,6 +4219,39 @@ button.sidebar-group-header:focus-visible {
   padding: 8px 12px;
   background: var(--color-danger-soft);
   border-radius: var(--radius-sm);
+}
+
+/* Floating panel banners — solid surface so text stays readable over messages/images */
+.chat-panel-banner-slot .send-error,
+.chat-panel-banner-slot .chat-home-banner {
+  margin: 0;
+  padding: 10px 12px 10px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+}
+
+.chat-panel-banner-slot .send-error,
+.chat-panel-banner-slot .chat-home-banner.error {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-danger);
+}
+
+.chat-panel-banner-slot .chat-home-banner.success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+  box-shadow: var(--shadow-md), inset 3px 0 0 var(--color-success);
+}
+
+.chat-panel-banner-slot .chat-home-banner.neutral {
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 .chat-thread .messages {

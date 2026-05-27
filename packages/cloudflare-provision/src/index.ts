@@ -131,6 +131,12 @@ export {
 } from "./cache-rules";
 
 export {
+  buildR2UploadCorsRules,
+  ensureR2BucketCors,
+  type R2CorsRule,
+} from "./r2-cors";
+
+export {
   matchPresetNames,
   provisionRealtimeKitFromApiToken,
   resolveCloudflareAccountId,

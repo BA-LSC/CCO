@@ -11,6 +11,7 @@ import {
   ensureQueue,
   ensureR2AttachmentCacheRule,
   ensureR2Bucket,
+  ensureR2BucketCors,
   ensureWorkerCustomDomain,
   ensureWorkerRoute,
   fetchWebReleaseManifest,
@@ -265,6 +266,19 @@ export async function createInstallProvisionHandlers(
       throw new Error("API hostname is required before configure_cache_rules");
     }
     await ensureR2AttachmentCacheRule(zoneId, context.apiToken);
+
+    const chatHostname = context.chatHostname ?? state.resources.chatHostname;
+    const bucketName = state.resources.r2BucketName;
+    if (chatHostname && bucketName) {
+      await ensureR2BucketCors(resolveAccountId(state, context), context.apiToken, bucketName, [
+        chatHostname,
+      ]).catch((err) => {
+        console.warn(
+          "[provision] R2 upload CORS configuration skipped:",
+          err instanceof Error ? err.message : err,
+        );
+      });
+    }
   };
 
   const finalizeOrgStep: ProvisionStepHandlers["finalize_org"] = async (state, context) => {

@@ -113,28 +113,60 @@ type PresignResponse = {
   contentType: string;
 };
 
-async function uploadMediaViaPresign(file: File, contentType: string): Promise<string> {
-  const presignRes = await fetch(`${API_BASE}/api/v1/uploads/presign`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contentType, size: file.size }),
-  });
-  if (!presignRes.ok) {
-    const text = await presignRes.text();
-    throw new Error(parseApiError(text, presignRes.status));
+function uploadFetchErrorMessage(stage: "presign" | "storage", err: unknown): string {
+  if (err instanceof TypeError && err.message.trim() === "Failed to fetch") {
+    if (stage === "storage") {
+      return "Upload to storage was blocked by the browser. Your admin may need to configure R2 bucket CORS for your chat site.";
+    }
+    return "Could not reach the upload service. Check your connection and try again.";
   }
-  const presign = (await presignRes.json()) as PresignResponse;
-  const putRes = await fetch(presign.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": presign.contentType || contentType },
-    body: file,
-  });
-  if (!putRes.ok) {
-    const detail = (await putRes.text()).trim();
-    throw new Error(
-      detail && detail.length <= 240 ? detail : "Upload to storage failed. Please try again.",
-    );
+  return getErrorMessage(err);
+}
+
+async function uploadMediaViaPresign(file: File, contentType: string): Promise<string> {
+  let presign: PresignResponse;
+  try {
+    const presignRes = await fetch(`${API_BASE}/api/v1/uploads/presign`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentType, size: file.size }),
+    });
+    if (!presignRes.ok) {
+      const text = await presignRes.text();
+      throw new Error(parseApiError(text, presignRes.status));
+    }
+    presign = (await presignRes.json()) as PresignResponse;
+  } catch (err) {
+    if (err instanceof Error && err.message !== "Failed to fetch") {
+      throw err;
+    }
+    throw new Error(uploadFetchErrorMessage("presign", err));
+  }
+
+  if (!presign.uploadUrl?.trim()) {
+    throw new Error("Upload service returned an invalid storage URL. Please try again.");
+  }
+
+  try {
+    const putRes = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      mode: "cors",
+      credentials: "omit",
+      headers: { "Content-Type": presign.contentType || contentType },
+      body: file,
+    });
+    if (!putRes.ok) {
+      const detail = (await putRes.text()).trim();
+      throw new Error(
+        detail && detail.length <= 240 ? detail : "Upload to storage failed. Please try again.",
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message !== "Failed to fetch") {
+      throw err;
+    }
+    throw new Error(uploadFetchErrorMessage("storage", err));
   }
   return presign.url;
 }

@@ -4,6 +4,7 @@ import {
   deployAllProvisionWorkers,
   deployCcoWebWorker,
   ensureD1Database,
+  ensureR2BucketCors,
   fetchWebReleaseManifest,
   verifyCloudflareUpdateApplyPermissions,
   type CcoWorkerScriptName,
@@ -513,6 +514,18 @@ export async function executeCloudflareReleaseUpdate(
 ): Promise<{ appliedVersion: string; deployedWorkers: string[] }> {
   await setDeployDraining(true);
   try {
+    await ensureR2BucketCors(
+      job.accountId,
+      job.apiToken,
+      job.resources.r2BucketName,
+      [job.resources.chatHostname],
+    ).catch((err) => {
+      console.warn(
+        "[org-updates] R2 upload CORS configuration skipped:",
+        err instanceof Error ? err.message : err,
+      );
+    });
+
     await applyIncrementalD1Migrations(job);
 
     const deployedWorkers = await deployAllProvisionWorkers({
