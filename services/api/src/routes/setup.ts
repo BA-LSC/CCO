@@ -159,6 +159,7 @@ setupRouter.post("/draft", async (c) => {
       signInRedirectUri: parsed.data.signInRedirectUri,
       webhookUrl: parsed.data.webhookUrl,
       webhookSecret: webhookSecretRaw,
+      cloudflareApiToken: cloudflareApiToken || undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save setup";

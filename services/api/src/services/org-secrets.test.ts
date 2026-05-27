@@ -3,6 +3,7 @@ import { encryptSecret } from "../auth/token-crypto";
 import {
   collectOrganizationSecretsForStoreMigration,
   organizationHasPendingSecretsStoreMigration,
+  resolveOrgSecretsStoreContext,
 } from "./org-secrets";
 
 describe("organizationHasPendingSecretsStoreMigration", () => {
@@ -49,6 +50,50 @@ describe("organizationHasPendingSecretsStoreMigration", () => {
         cloudflareR2SecretAccessKeyEnc: null,
       }),
     ).toBe(false);
+  });
+});
+
+describe("resolveOrgSecretsStoreContext", () => {
+  const baseOrg = {
+    cloudflareSecretsStoreId: "store-1",
+    cloudflareAccountId: "acct-1",
+  };
+
+  test("returns null when Secrets Store is not configured", async () => {
+    expect(
+      await resolveOrgSecretsStoreContext({
+        cloudflareSecretsStoreId: null,
+        cloudflareAccountId: "acct-1",
+      } as never),
+    ).toBeNull();
+  });
+
+  test("prefers explicit apiToken over process.env", async () => {
+    const previous = process.env.CLOUDFLARE_API_TOKEN;
+    process.env.CLOUDFLARE_API_TOKEN = "env-token";
+    try {
+      const ctx = await resolveOrgSecretsStoreContext(baseOrg as never, "admin-token");
+      expect(ctx).toEqual({
+        accountId: "acct-1",
+        storeId: "store-1",
+        apiToken: "admin-token",
+      });
+    } finally {
+      if (previous === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+      else process.env.CLOUDFLARE_API_TOKEN = previous;
+    }
+  });
+
+  test("falls back to process.env when apiToken is omitted", async () => {
+    const previous = process.env.CLOUDFLARE_API_TOKEN;
+    process.env.CLOUDFLARE_API_TOKEN = "env-token";
+    try {
+      const ctx = await resolveOrgSecretsStoreContext(baseOrg as never);
+      expect(ctx?.apiToken).toBe("env-token");
+    } finally {
+      if (previous === undefined) delete process.env.CLOUDFLARE_API_TOKEN;
+      else process.env.CLOUDFLARE_API_TOKEN = previous;
+    }
   });
 });
 

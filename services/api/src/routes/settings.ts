@@ -71,6 +71,7 @@ const IntegrationsPatchSchema = z.object({
   webhookUrl: z.string().url().optional(),
   vapidSubjectEmail: z.string().email().optional(),
   giphyApiKey: z.string().min(1).optional(),
+  cloudflareApiToken: z.string().min(1).optional(),
   pcoNightlySyncEnabled: z.boolean().optional(),
   gitRepoUrl: z.string().min(1).optional(),
 });
@@ -188,6 +189,8 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     return c.json({ error: "No fields to update" }, 400);
   }
 
+  const cloudflareApiToken = data.cloudflareApiToken?.trim();
+
   await updateOrganizationOAuthSettings({
     organizationId: org.id,
     name: data.name,
@@ -196,6 +199,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     webhookSecret: data.webhookSecret,
     signInRedirectUri: data.signInRedirectUri,
     webhookUrl: data.webhookUrl,
+    cloudflareApiToken,
   });
 
   if (data.vapidSubjectEmail !== undefined) {
@@ -203,6 +207,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
       await updateOrganizationVapidSubject({
         organizationId: org.id,
         subjectEmail: data.vapidSubjectEmail,
+        cloudflareApiToken,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid VAPID contact email";
@@ -215,6 +220,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
       await updateOrganizationGiphyApiKey({
         organizationId: org.id,
         apiKey: data.giphyApiKey,
+        cloudflareApiToken,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Giphy API key";

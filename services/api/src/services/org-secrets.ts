@@ -192,17 +192,18 @@ export type OrgSecretsStoreContext = {
 
 export async function resolveOrgSecretsStoreContext(
   org: ConfiguredOrganizationRow,
+  apiToken?: string,
 ): Promise<OrgSecretsStoreContext | null> {
   if (!orgUsesSecretsStore(org)) return null;
   if (!org.cloudflareAccountId || !org.cloudflareSecretsStoreId) return null;
 
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  if (!apiToken) return null;
+  const token = apiToken?.trim() || process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (!token) return null;
 
   return {
     accountId: org.cloudflareAccountId,
     storeId: org.cloudflareSecretsStoreId,
-    apiToken,
+    apiToken: token,
   };
 }
 
@@ -219,6 +220,8 @@ export async function upsertOrgSecretForOrganization(params: {
   secretName: string;
   value: string;
   configuredPatch: Record<string, unknown>;
+  /** Church Cloudflare API token (e.g. admin-pasted); falls back to worker binding. */
+  apiToken?: string;
 }): Promise<void> {
   const rows = await db
     .select()
@@ -229,7 +232,7 @@ export async function upsertOrgSecretForOrganization(params: {
   if (!org) throw new Error("Organization not found");
 
   if (isCloudflareRuntime() && orgUsesSecretsStore(org)) {
-    const ctx = await resolveOrgSecretsStoreContext(org);
+    const ctx = await resolveOrgSecretsStoreContext(org, params.apiToken);
     if (!ctx) {
       throw new Error("Secrets Store is not configured for this organization");
     }

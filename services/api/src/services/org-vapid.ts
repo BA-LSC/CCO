@@ -39,7 +39,10 @@ export function parseVapidSubjectEmail(subject: string | null | undefined): stri
   return subject.startsWith("mailto:") ? subject.slice("mailto:".length) : subject;
 }
 
-export async function ensureVapidKeys(organizationId: string): Promise<void> {
+export async function ensureVapidKeys(
+  organizationId: string,
+  options?: { cloudflareApiToken?: string },
+): Promise<void> {
   const rows = await db
     .select({
       vapidPublicKey: organizations.vapidPublicKey,
@@ -72,6 +75,7 @@ export async function ensureVapidKeys(organizationId: string): Promise<void> {
       organizationId,
       secretName: CCO_STORE_SECRET.VAPID_PRIVATE_KEY,
       value: keys.privateKey,
+      apiToken: options?.cloudflareApiToken,
       configuredPatch: { vapidPrivateKeyConfigured: true, vapidPrivateKeyEnc: null },
     });
     return;
@@ -89,8 +93,11 @@ export async function ensureVapidKeys(organizationId: string): Promise<void> {
 export async function updateOrganizationVapidSubject(params: {
   organizationId: string;
   subjectEmail: string;
+  cloudflareApiToken?: string;
 }): Promise<void> {
-  await ensureVapidKeys(params.organizationId);
+  await ensureVapidKeys(params.organizationId, {
+    cloudflareApiToken: params.cloudflareApiToken,
+  });
 
   await db
     .update(organizations)

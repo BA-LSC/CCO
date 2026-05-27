@@ -132,6 +132,7 @@ export async function saveOrganizationCloudflareApiToken(params: {
       organizationId: params.organizationId,
       secretName: CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
       value: apiToken,
+      apiToken,
       configuredPatch: {
         cloudflareApiTokenConfigured: true,
         cloudflareApiTokenEnc: null,

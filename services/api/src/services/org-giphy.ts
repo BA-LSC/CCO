@@ -27,6 +27,7 @@ export async function resolveGiphyApiKey(): Promise<string | undefined> {
 export async function updateOrganizationGiphyApiKey(params: {
   organizationId: string;
   apiKey: string;
+  cloudflareApiToken?: string;
 }): Promise<void> {
   const trimmed = params.apiKey.trim();
   if (!trimmed) {
@@ -45,6 +46,7 @@ export async function updateOrganizationGiphyApiKey(params: {
       organizationId: params.organizationId,
       secretName: CCO_STORE_SECRET.GIPHY_API_KEY,
       value: trimmed,
+      apiToken: params.cloudflareApiToken,
       configuredPatch: { giphyApiKeyConfigured: true, giphyApiKeyEnc: null },
     });
     return;

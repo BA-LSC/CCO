@@ -247,6 +247,7 @@ internalRouter.post("/recover-pco-client-secret", async (c) => {
       organizationId: org.id,
       secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
       value: parsed.data.pcoClientSecret.trim(),
+      apiToken: bearer,
       configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
     });
     return c.json({ ok: true, recovered: true });

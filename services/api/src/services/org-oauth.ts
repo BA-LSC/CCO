@@ -122,6 +122,7 @@ export async function saveSetupDraft(params: {
   signInRedirectUri: string;
   webhookUrl: string;
   webhookSecret?: string | null;
+  cloudflareApiToken?: string;
 }): Promise<void> {
   const scope = DEFAULT_PCO_OAUTH_SCOPE;
   const clientId = params.clientId.trim();
@@ -165,6 +166,7 @@ export async function saveSetupDraft(params: {
         organizationId: orgId,
         secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
         value: params.clientSecret.trim(),
+        apiToken: params.cloudflareApiToken,
         configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
       });
 
@@ -173,6 +175,7 @@ export async function saveSetupDraft(params: {
           organizationId: orgId,
           secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
           value: params.webhookSecret.trim(),
+          apiToken: params.cloudflareApiToken,
           configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
         });
       }
@@ -258,6 +261,7 @@ export async function saveOrganizationOAuthSetup(params: {
   scope?: string;
   churchCenterSubdomain?: string | null;
   webhookSecret?: string | null;
+  cloudflareApiToken?: string;
 }): Promise<void> {
   const orgRows = await db
     .select()
@@ -293,6 +297,7 @@ export async function saveOrganizationOAuthSetup(params: {
         organizationId: params.organizationId,
         secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
         value: clientSecret,
+        apiToken: params.cloudflareApiToken,
         configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
       });
     }
@@ -301,12 +306,15 @@ export async function saveOrganizationOAuthSetup(params: {
         organizationId: params.organizationId,
         secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
         value: params.webhookSecret.trim(),
+        apiToken: params.cloudflareApiToken,
         configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
       });
     }
     invalidateOrgContextCache();
     const { ensureVapidKeys } = await import("./org-vapid");
-    await ensureVapidKeys(params.organizationId);
+    await ensureVapidKeys(params.organizationId, {
+      cloudflareApiToken: params.cloudflareApiToken,
+    });
     return;
   }
 
@@ -350,6 +358,7 @@ export async function updateOrganizationOAuthSettings(params: {
   webhookSecret?: string;
   signInRedirectUri?: string;
   webhookUrl?: string;
+  cloudflareApiToken?: string;
 }): Promise<void> {
   const orgRows = await db
     .select()
@@ -372,6 +381,7 @@ export async function updateOrganizationOAuthSettings(params: {
         organizationId: params.organizationId,
         secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
         value: params.clientSecret.trim(),
+        apiToken: params.cloudflareApiToken,
         configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
       });
     }
@@ -382,6 +392,7 @@ export async function updateOrganizationOAuthSettings(params: {
           organizationId: params.organizationId,
           secretName: CCO_STORE_SECRET.PCO_WEBHOOK_SECRETS,
           value: trimmed,
+          apiToken: params.cloudflareApiToken,
           configuredPatch: { pcoWebhookSecretsConfigured: true, pcoWebhookSecretEnc: null },
         });
       } else {
