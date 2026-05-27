@@ -69,6 +69,10 @@ cpSync(
   join(RELEASES, "0001_org_release_updates.sql"),
 );
 cpSync(
+  join(ROOT, "packages/db/drizzle/d1/0002_pco_nightly_sync_enabled.sql"),
+  join(RELEASES, "0002_pco_nightly_sync_enabled.sql"),
+);
+cpSync(
   join(ROOT, "packages/db/drizzle/d1/0003_org_git_repo_url.sql"),
   join(RELEASES, "0003_org_git_repo_url.sql"),
 );
@@ -102,7 +106,7 @@ Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE
 - Web manifest: \`cco-web-manifest.json\`
 - Release catalog: \`release-index.json\` (version + git ref for Admin Updates)
 - D1 baseline: \`0000_d1_baseline.sql\`
-- D1 incremental migrations: \`0001_org_release_updates.sql\` (Admin Updates day-two schema)
+- D1 incremental migrations: \`0001_org_release_updates.sql\`, \`0002_pco_nightly_sync_enabled.sql\`, \`0003_org_git_repo_url.sql\`, \`0004_secrets_store.sql\` (Admin Updates day-two schema)
 `;
 writeFileSync(join(RELEASES, "README.md"), releaseReadme);
 
