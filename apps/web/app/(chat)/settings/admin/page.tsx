@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AdminUpdatesSection } from "@/components/AdminUpdatesSection";
+import { AdminUpdatesSection, type UpdatesStatus } from "@/components/AdminUpdatesSection";
 import { LoadingState } from "@/components/PageStates";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
@@ -319,14 +319,17 @@ export default function IntegrationsSettingsPage() {
   const [pcoLastSyncedAt, setPcoLastSyncedAt] = useState<string | null>(null);
   const [pcoNightlySyncEnabled, setPcoNightlySyncEnabled] = useState(true);
   const [pcoNightlySyncSchedule, setPcoNightlySyncSchedule] = useState("Nightly at 3:00 AM UTC");
+  const [updatesStatus, setUpdatesStatus] = useState<UpdatesStatus | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [settings, redirectUris] = await Promise.all([
+        const [settings, redirectUris, updates] = await Promise.all([
           apiFetch<IntegrationsSettings>("/api/v1/settings/integrations"),
           fetch("/api/v1/setup/redirect-uris").then((r) => r.json() as Promise<SetupRedirectUris>),
+          apiFetch<UpdatesStatus>("/api/v1/settings/updates").catch(() => null),
         ]);
+        setUpdatesStatus(updates);
 
         setName(settings.name);
         setClientId(settings.clientId);
@@ -523,7 +526,10 @@ export default function IntegrationsSettingsPage() {
         <p>Integrations, Cloudflare, release updates, and org configuration. Saved secrets stay encrypted.</p>
       </header>
 
-      <AdminUpdatesSection applyCloudflareApiToken={cloudflareApiToken.trim() || undefined} />
+      <AdminUpdatesSection
+        initialStatus={updatesStatus}
+        applyCloudflareApiToken={cloudflareApiToken.trim() || undefined}
+      />
 
       <IntegrationsSection
         id="pco-sync-heading"

@@ -11,7 +11,7 @@ import {
   markDeployWait,
   probeServerAppVersion,
 } from "@/lib/app-update";
-type UpdatesStatus = {
+export type UpdatesStatus = {
   platform: "cloudflare" | "vps" | "unknown";
   currentVersion: string | null;
   latestVersion: string | null;
@@ -61,12 +61,15 @@ function formatStatusLine(status: UpdatesStatus): string {
 }
 
 export function AdminUpdatesSection({
+  initialStatus = null,
   applyCloudflareApiToken,
 }: {
+  /** Hydrated from the admin page load so the card does not flash loading on mount. */
+  initialStatus?: UpdatesStatus | null;
   /** When set, Apply update uses this token instead of the Secrets Store binding. */
   applyCloudflareApiToken?: string;
 } = {}) {
-  const [status, setStatus] = useState<UpdatesStatus | null>(null);
+  const [status, setStatus] = useState<UpdatesStatus | null>(initialStatus);
   const [busy, setBusy] = useState<"check" | "apply" | "toggle" | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
@@ -81,12 +84,8 @@ export function AdminUpdatesSection({
   }, []);
 
   useEffect(() => {
-    void loadStatus().catch((err) => {
-      setFeedback({
-        error: err instanceof Error ? err.message : "Failed to load updates",
-      });
-    });
-  }, [loadStatus]);
+    setStatus(initialStatus);
+  }, [initialStatus]);
 
   useEffect(() => {
     if (!deploying) return;
@@ -242,7 +241,23 @@ export function AdminUpdatesSection({
   if (!status) {
     return (
       <section className="integrations-section" aria-labelledby="updates-status-heading">
-        <p className="integrations-field-hint">Loading release status…</p>
+        <div className="integrations-section-top">
+          <div className="integrations-section-head">
+            <h2 id="updates-status-heading">Updates</h2>
+            <p>Install the latest release from your connected repository.</p>
+          </div>
+        </div>
+        <UpdatesFeedback error={feedback.error} success={feedback.success} />
+        <div className="integrations-actions">
+          <button
+            type="button"
+            className="btn btn-secondary integrations-action-btn"
+            disabled={busy !== null}
+            onClick={() => void handleCheck()}
+          >
+            {busy === "check" ? "Checking…" : "Check for updates"}
+          </button>
+        </div>
       </section>
     );
   }
