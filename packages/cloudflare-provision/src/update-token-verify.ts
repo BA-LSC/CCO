@@ -3,7 +3,7 @@ import {
   CloudflareApiError,
   verifyCloudflareApiToken,
 } from "./cloudflare-api";
-import { getZoneIdForHostname, listWorkerRoutes } from "./cloudflare-api-resources";
+import { getZoneIdForHostname, listR2Buckets, listWorkerRoutes } from "./cloudflare-api-resources";
 
 const WORKERS_SCRIPTS_HINT =
   "Add Account → Workers Scripts → Edit to the Cloudflare API token.";
@@ -12,6 +12,7 @@ const WORKERS_ROUTES_HINT =
 
 const SECRETS_STORE_HINT =
   "Add Account → Secrets Store → Write to the Cloudflare API token.";
+const R2_STORAGE_HINT = "Add Account → Workers R2 Storage → Edit to the Cloudflare API token.";
 
 function enrichCloudflareAuthMessage(err: CloudflareApiError): string {
   if (
@@ -21,7 +22,7 @@ function enrichCloudflareAuthMessage(err: CloudflareApiError): string {
     const base = err.message.includes("Secrets Store")
       ? err.message
       : `${err.message} Paste a new Cloudflare API token in Admin Settings → Cloudflare (recovery tokens expire).`;
-    return `${base} ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT} ${SECRETS_STORE_HINT}`;
+    return `${base} ${WORKERS_SCRIPTS_HINT} ${WORKERS_ROUTES_HINT} ${SECRETS_STORE_HINT} ${R2_STORAGE_HINT}`;
   }
   return err.message;
 }
@@ -38,6 +39,10 @@ async function assertWorkerScriptsAccess(accountId: string, apiToken: string): P
     apiToken,
     `/accounts/${accountId}/workers/scripts`,
   );
+}
+
+async function assertR2StorageAccess(accountId: string, apiToken: string): Promise<void> {
+  await listR2Buckets(accountId, apiToken);
 }
 
 async function assertWorkerRoutesAccess(
@@ -81,6 +86,7 @@ export async function verifyCloudflareUpdateApplyPermissions(
     }
 
     await assertWorkerScriptsAccess(params.accountId, apiToken);
+    await assertR2StorageAccess(params.accountId, apiToken);
     await assertSecretsStoreAccess(params.accountId, apiToken);
     await assertWorkerRoutesAccess(apiToken, params.apiHostname, "API");
     if (params.chatHostname !== params.apiHostname) {

@@ -10,15 +10,35 @@ type MockOrg = {
   cloudflareR2SecretAccessKeyEnc?: string | null;
   cloudflareApiTokenEnc?: string | null;
   cloudflareSecretsStoreId?: string | null;
+  pcoWebRedirectUri?: string | null;
 };
 
 let mockOrg: MockOrg | null = null;
+let r2CorsCalls = 0;
 
 mock.module("../services/org-oauth", () => ({
   getConfiguredOrganization: async () => mockOrg,
 }));
+
+mock.module("../services/org-secrets", () => ({
+  resolveApplyCloudflareApiToken: () => "cf-token",
+}));
+
+mock.module("@cco/cloudflare-provision", () => ({
+  createR2AccessKey: async () => ({
+    access_key_id: "temp-key",
+    secret_access_key: "temp-secret",
+    session_token: "temp-session",
+  }),
+  ensureR2BucketCors: async () => {
+    r2CorsCalls += 1;
+    return { updated: true };
+  },
+}));
+
 beforeEach(() => {
   mockOrg = null;
+  r2CorsCalls = 0;
   process.env = { ...ORIGINAL_ENV };
 });
 
@@ -66,5 +86,34 @@ describe("resolveR2Config", () => {
       secretAccessKey: "vps-secret",
       publicBaseUrl: "https://api.example.com/uploads",
     });
+  });
+});
+
+describe("ensureOrgR2UploadCorsOnce", () => {
+  test("configures R2 CORS once using chat hostname from OAuth redirect URI", async () => {
+    mockOrg = {
+      cloudflareAccountId: "acct-123",
+      cloudflareR2BucketName: "cco-uploads-acct",
+      pcoWebRedirectUri: "https://chat.example.com/auth/callback",
+    };
+
+    const { ensureOrgR2UploadCorsOnce } = await import(`./r2-uploads?t=${Date.now()}`);
+    await ensureOrgR2UploadCorsOnce();
+    await ensureOrgR2UploadCorsOnce();
+
+    expect(r2CorsCalls).toBe(1);
+  });
+
+  test("skips when chat hostname cannot be resolved", async () => {
+    mockOrg = {
+      cloudflareAccountId: "acct-123",
+      cloudflareR2BucketName: "cco-uploads-acct",
+      pcoWebRedirectUri: null,
+    };
+
+    const { ensureOrgR2UploadCorsOnce } = await import(`./r2-uploads?t=${Date.now()}`);
+    await ensureOrgR2UploadCorsOnce();
+
+    expect(r2CorsCalls).toBe(0);
   });
 });

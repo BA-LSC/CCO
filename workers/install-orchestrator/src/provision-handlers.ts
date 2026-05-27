@@ -130,7 +130,7 @@ export async function createInstallProvisionHandlers(
     const r2 = await ensureR2Bucket(accountId, context.apiToken, bucketName);
     state.resources.r2BucketName = r2.name;
 
-  const accessKey = await createR2AccessKey(
+    const accessKey = await createR2AccessKey(
       accountId,
       context.apiToken,
       r2.name,
@@ -145,6 +145,18 @@ export async function createInstallProvisionHandlers(
     if (accessKey) {
       state.resources.r2AccessKeyId = accessKey.access_key_id;
       state.resources.r2SecretAccessKey = accessKey.secret_access_key;
+    }
+
+    const chatHostname = context.chatHostname ?? state.resources.chatHostname;
+    if (chatHostname) {
+      await ensureR2BucketCors(accountId, context.apiToken, r2.name, [chatHostname]).catch(
+        (err) => {
+          console.warn(
+            "[provision] R2 upload CORS configuration skipped:",
+            err instanceof Error ? err.message : err,
+          );
+        },
+      );
     }
   };
 

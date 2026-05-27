@@ -9,7 +9,11 @@ import {
   buildR2SignedUploadUrl,
   isR2StorageEnabled,
 } from "../lib/uploads";
-import { resolveR2Config, createR2PresignedPutUrl } from "../lib/r2-uploads";
+import {
+  resolveR2Config,
+  createR2PresignedPutUrl,
+  ensureOrgR2UploadCorsOnce,
+} from "../lib/r2-uploads";
 
 type Env = { Variables: AuthVariables };
 
@@ -80,6 +84,13 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
 
   const ext = EXT_BY_MIME[contentType] ?? contentType.split("/")[1] ?? "bin";
   const filename = `${crypto.randomUUID()}.${ext}`;
+
+  await ensureOrgR2UploadCorsOnce().catch((err) => {
+    console.warn(
+      "[uploads/presign] R2 upload CORS configuration skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  });
 
   const uploadUrl = await createR2PresignedPutUrl({
     config: r2,

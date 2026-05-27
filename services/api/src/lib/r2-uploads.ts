@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { createR2AccessKey } from "@cco/cloudflare-provision";
+import { createR2AccessKey, ensureR2BucketCors } from "@cco/cloudflare-provision";
 import { decryptSecret } from "../auth/token-crypto";
 import { getWorkerBindings } from "../runtime/worker-context";
 import { getConfiguredOrganization } from "../services/org-oauth";
@@ -98,6 +98,42 @@ export async function resolveR2Config(): Promise<R2Config | null> {
 export function isR2UploadsEnabled(): boolean {
   if (getWorkerBindings()?.UPLOADS) return true;
   return Boolean(process.env.CLOUDFLARE_R2_BUCKET?.trim()) || process.env.UPLOAD_STORAGE === "r2";
+}
+
+function resolveChatHostnameFromOrg(org: {
+  pcoWebRedirectUri: string | null;
+}): string | null {
+  const signIn = org.pcoWebRedirectUri?.trim();
+  if (!signIn) return null;
+  try {
+    return new URL(signIn).hostname;
+  } catch {
+    return null;
+  }
+}
+
+let r2UploadCorsConfigured = false;
+
+/** Apply R2 bucket CORS for browser presigned PUT from the chat web origin (idempotent). */
+export async function ensureOrgR2UploadCorsOnce(): Promise<void> {
+  if (r2UploadCorsConfigured) return;
+
+  const org = await getConfiguredOrganization();
+  if (!org?.cloudflareAccountId || !org.cloudflareR2BucketName) return;
+
+  const chatHostname = resolveChatHostnameFromOrg(org);
+  if (!chatHostname) return;
+
+  const apiToken = resolveApplyCloudflareApiToken(org);
+  if (!apiToken) return;
+
+  await ensureR2BucketCors(
+    org.cloudflareAccountId,
+    apiToken,
+    org.cloudflareR2BucketName,
+    [chatHostname],
+  );
+  r2UploadCorsConfigured = true;
 }
 
 function r2Client(config: R2Config): AwsClient {

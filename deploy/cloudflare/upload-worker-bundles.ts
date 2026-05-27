@@ -11,6 +11,7 @@ import {
   ensureKvNamespace,
   ensureQueue,
   ensureR2Bucket,
+  ensureR2BucketCors,
   ensureSecretsStore,
   generateProvisionSecrets,
   listCloudflareAccounts,
@@ -44,6 +45,7 @@ const accountId = resolveCloudflareAccountId(accounts, accountIdOverride);
 
 const r2BucketName =
   process.env.CLOUDFLARE_R2_BUCKET?.trim() || `cco-uploads-${accountId.slice(0, 8).toLowerCase()}`;
+const chatDomain = process.env.CHAT_DOMAIN?.trim();
 
 console.log(`Provisioning resources in account ${accountId}...`);
 const [d1, r2, presenceKv, deployKv, pushQueue] = await Promise.all([
@@ -53,6 +55,15 @@ const [d1, r2, presenceKv, deployKv, pushQueue] = await Promise.all([
   ensureKvNamespace(accountId, apiToken, "cco-deploy"),
   ensureQueue(accountId, apiToken, CCO_PUSH_QUEUE_NAME),
 ]);
+
+if (chatDomain) {
+  await ensureR2BucketCors(accountId, apiToken, r2BucketName, [chatDomain]).catch((err) => {
+    console.warn(
+      "[upload-worker-bundles] R2 upload CORS configuration skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  });
+}
 
 const secrets = {
   ...generateProvisionSecrets(),
