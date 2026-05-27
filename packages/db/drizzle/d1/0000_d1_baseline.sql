@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS "organizations" (
   "realtime_kit_preset_member" TEXT,
   "realtime_kit_preset_guest" TEXT,
   "pco_last_synced_at" INTEGER,
+  "installed_release_version" TEXT,
+  "auto_update_enabled" INTEGER NOT NULL DEFAULT 0,
+  "last_update_check_at" INTEGER,
   "created_at" INTEGER NOT NULL DEFAULT (cast(unixepoch('subsec') * 1000 AS INTEGER)),
   CONSTRAINT "organizations_pco_organization_id_unique" UNIQUE("pco_organization_id")
 );

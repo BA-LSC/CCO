@@ -68,6 +68,18 @@ cpSync(
 const manifest = walkAssets(ASSETS_OUT);
 writeFileSync(join(RELEASES, "cco-web-manifest.json"), JSON.stringify(manifest, null, 2));
 
+const gitSha =
+  process.env.GITHUB_SHA?.trim() ||
+  (await $`git rev-parse HEAD`.cwd(ROOT).quiet().text()).trim();
+const gitRef = process.env.GITHUB_REF_NAME?.trim() || "main";
+const releaseIndex = {
+  version: gitSha,
+  gitRef,
+  publishedAt: new Date().toISOString(),
+  releasesBaseUrl: "https://setup-c.co/releases",
+};
+writeFileSync(join(RELEASES, "release-index.json"), JSON.stringify(releaseIndex, null, 2));
+
 const releaseReadme = `# CCO Cloudflare release artifacts
 
 Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE_URL / CCO_WORKER_BUNDLES_BASE_URL).
@@ -76,6 +88,7 @@ Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE
 - Web worker: \`cco-web.mjs\`
 - Web static assets: \`assets/\`
 - Web manifest: \`cco-web-manifest.json\`
+- Release catalog: \`release-index.json\` (version + git ref for Admin Updates)
 - D1 baseline: \`0000_d1_baseline.sql\`
 `;
 writeFileSync(join(RELEASES, "README.md"), releaseReadme);

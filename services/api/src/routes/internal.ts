@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { reconcileStaleMemberships } from "../jobs/reconcile";
+import { runScheduledUpdateCheck } from "../services/org-updates";
 import { recordWebhookDelivery } from "../webhooks/delivery";
 import {
   handleMembershipDestroyed,
@@ -108,6 +109,12 @@ internalRouter.post("/push/deliver", async (c) => {
   ]);
 
   return c.json({ ok: true });
+});
+
+internalRouter.post("/jobs/check-updates", async (c) => {
+  if (!verifyInternalAuth(c)) return c.json({ error: "Unauthorized" }, 401);
+  const result = await runScheduledUpdateCheck();
+  return c.json(result);
 });
 
 export { internalRouter };

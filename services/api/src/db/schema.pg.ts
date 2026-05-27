@@ -43,6 +43,9 @@ export const organizations = pgTable("organizations", {
   realtimeKitPresetMember: text("realtime_kit_preset_member"),
   realtimeKitPresetGuest: text("realtime_kit_preset_guest"),
   pcoLastSyncedAt: timestamp("pco_last_synced_at"),
+  installedReleaseVersion: text("installed_release_version"),
+  autoUpdateEnabled: boolean("auto_update_enabled").notNull().default(false),
+  lastUpdateCheckAt: timestamp("last_update_check_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -38,6 +38,11 @@ import { invalidateOrgContextCache } from "../services/org-context-cache";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
+import {
+  applyCloudflareReleaseUpdate,
+  getUpdatesStatus,
+  setAutoUpdateEnabled,
+} from "../services/org-updates";
 
 type Env = { Variables: AuthVariables };
 
@@ -58,6 +63,10 @@ const RealtimeKitSetupSchema = z.object({
 
 const CloudflareTokenSchema = z.object({
   cloudflareApiToken: z.string().min(1),
+});
+
+const UpdatesPatchSchema = z.object({
+  autoUpdateEnabled: z.boolean(),
 });
 
 export const settingsRouter = new Hono<Env>();
@@ -337,4 +346,86 @@ settingsRouter.post("/integrations/pco-sync", requireAuth, async (c) => {
     groups: result.groups,
     teams: result.teams,
   });
+});
+
+settingsRouter.get("/updates", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  try {
+    const status = await getUpdatesStatus();
+    return c.json(status);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load updates";
+    return c.json({ error: message }, 500);
+  }
+});
+
+settingsRouter.post("/updates/check", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  try {
+    const status = await getUpdatesStatus({ forceCheck: true });
+    return c.json(status);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Update check failed";
+    return c.json({ error: message }, 502);
+  }
+});
+
+settingsRouter.post("/updates/apply", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  try {
+    const result = await applyCloudflareReleaseUpdate();
+    const status = await getUpdatesStatus();
+    return c.json({ ok: true, ...result, status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Apply update failed";
+    return c.json({ error: message }, 400);
+  }
+});
+
+settingsRouter.patch("/updates", requireAuth, async (c) => {
+  const admin = await getOrgAdmin(c);
+  if (!admin) return c.json({ error: "Forbidden" }, 403);
+
+  if (!(await isSetupComplete())) {
+    return c.json({ error: "CCO is not configured" }, 409);
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = UpdatesPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  try {
+    await setAutoUpdateEnabled(parsed.data.autoUpdateEnabled);
+    const status = await getUpdatesStatus();
+    return c.json({ ok: true, ...status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to save update settings";
+    return c.json({ error: message }, 400);
+  }
 });

@@ -40,6 +40,10 @@
     "./install-origin": {
       "types": "./dist/install-origin.d.ts",
       "default": "./dist/install-origin.js"
+    },
+    "./release-index": {
+      "types": "./dist/release-index.d.ts",
+      "default": "./dist/release-index.js"
     }
   },
   "scripts": {

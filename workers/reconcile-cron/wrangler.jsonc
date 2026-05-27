@@ -4,7 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-05-26",
   "triggers": {
-    "crons": ["0 3 * * *"],
+    "crons": ["0 3 * * *", "0 */6 * * *"],
   },
   "vars": {
     // RECONCILE_INTERNAL_URL = https://api.example.com/internal/jobs/reconcile

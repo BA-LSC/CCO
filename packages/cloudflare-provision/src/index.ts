@@ -73,6 +73,8 @@ export {
   CCO_API_WORKER_ROUTES,
   CCO_PUSH_QUEUE_NAME,
   CCO_RECONCILE_CRON,
+  CCO_UPDATE_CHECK_CRON,
+  CCO_RECONCILE_WORKER_CRONS,
   buildWorkerBindings,
   buildWorkerSecrets,
   defaultWorkerBundleDir,

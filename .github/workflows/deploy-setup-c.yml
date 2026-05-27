@@ -1,0 +1,62 @@
+name: Deploy setup-c.co
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/install/**"
+      - "workers/install-orchestrator/**"
+      - "deploy/cloudflare/**"
+      - "packages/cloudflare-provision/**"
+      - "packages/shared/**"
+      - "packages/db/**"
+      - "apps/web/**"
+      - "services/api/**"
+      - "workers/**"
+      - ".github/workflows/deploy-setup-c.yml"
+
+concurrency:
+  group: deploy-setup-c
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build releases and deploy setup-c.co
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build release artifacts
+        run: bun deploy/cloudflare/build-release-artifacts.ts
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - name: Deploy install orchestrator
+        working-directory: workers/install-orchestrator
+        run: bunx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Build install wizard
+        working-directory: apps/install
+        run: bun run build:cloudflare
+
+      - name: Deploy install wizard
+        working-directory: apps/install
+        run: bunx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

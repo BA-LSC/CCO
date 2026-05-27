@@ -14,6 +14,8 @@ export type CcoWorkerScriptName = (typeof CCO_WORKER_BUILD_SPECS)[number]["scrip
 
 export const CCO_PUSH_QUEUE_NAME = "cco-push-notifications";
 export const CCO_RECONCILE_CRON = "0 3 * * *";
+export const CCO_UPDATE_CHECK_CRON = "0 */6 * * *";
+export const CCO_RECONCILE_WORKER_CRONS = [CCO_RECONCILE_CRON, CCO_UPDATE_CHECK_CRON] as const;
 
 export type CcoApiWorkerRoute = {
   patternSuffix: string;

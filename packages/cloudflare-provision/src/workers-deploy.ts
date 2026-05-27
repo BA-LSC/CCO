@@ -5,7 +5,7 @@ import {
   buildWorkerBindings,
   buildWorkerSecrets,
   CCO_API_WORKER_ROUTES,
-  CCO_RECONCILE_CRON,
+  CCO_RECONCILE_WORKER_CRONS,
   CCO_WORKER_BUILD_SPECS,
   resolveApiRoutePattern,
   type CcoWorkerScriptName,
@@ -148,8 +148,9 @@ export async function deployWorkerCronSchedule(
   accountId: string,
   apiToken: string,
   scriptName: string,
-  cron: string,
+  cron: string | readonly string[],
 ): Promise<void> {
+  const schedules = (Array.isArray(cron) ? cron : [cron]).map((entry) => ({ cron: entry }));
   const res = await fetch(
     `${CF_API}/accounts/${accountId}/workers/scripts/${scriptName}/schedules`,
     {
@@ -158,7 +159,7 @@ export async function deployWorkerCronSchedule(
         Authorization: `Bearer ${apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify([{ cron }]),
+      body: JSON.stringify(schedules),
     },
   );
   await readWorkerDeployResponse(res);
@@ -305,7 +306,12 @@ export async function deployAllProvisionWorkers(
     }
 
     if (spec.scriptName === "cco-reconcile-cron") {
-      await deployWorkerCronSchedule(accountId, apiToken, spec.scriptName, CCO_RECONCILE_CRON);
+      await deployWorkerCronSchedule(
+        accountId,
+        apiToken,
+        spec.scriptName,
+        CCO_RECONCILE_WORKER_CRONS,
+      );
     }
 
     if (spec.scriptName === "cco-push-consumer" && resources.pushQueueId) {

@@ -8,6 +8,13 @@
       "when": 1748217600000,
       "tag": "0000_d1_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1748304000000,
+      "tag": "0001_org_release_updates",
+      "breakpoints": true
     }
   ]
 }
