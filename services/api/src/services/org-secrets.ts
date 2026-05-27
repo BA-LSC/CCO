@@ -14,10 +14,11 @@ import { isCloudflareRuntime } from "../runtime/worker-context";
 import { invalidateOrgContextCache } from "./org-context-cache";
 import type { ConfiguredOrganizationRow } from "./org-select";
 
+/** True when org secrets are stored in Cloudflare Secrets Store (not D1 *_enc). */
 export function orgUsesSecretsStore(
-  org: Pick<ConfiguredOrganizationRow, "cloudflareSecretsStoreId" | "cloudflarePlatformProvisionedAt">,
+  org: Pick<ConfiguredOrganizationRow, "cloudflareSecretsStoreId">,
 ): boolean {
-  return Boolean(org.cloudflareSecretsStoreId?.trim() || org.cloudflarePlatformProvisionedAt);
+  return Boolean(org.cloudflareSecretsStoreId?.trim());
 }
 
 export function isPcoClientSecretConfigured(

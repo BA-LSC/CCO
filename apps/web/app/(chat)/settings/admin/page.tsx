@@ -211,25 +211,57 @@ function CloudflareSection({
   fromEnv,
   tokenConfigured,
   accountId,
+  onTokenSaved,
 }: {
   platformProvisioned: boolean;
   configured: boolean;
   fromEnv: boolean;
   tokenConfigured: boolean;
   accountId: string;
+  onTokenSaved: () => void;
 }) {
+  const [apiToken, setApiToken] = useState("");
+  const [savingToken, setSavingToken] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [tokenSuccess, setTokenSuccess] = useState<string | null>(null);
+
   const hasCloudflare =
     platformProvisioned || configured || fromEnv || tokenConfigured;
   if (!hasCloudflare) return null;
 
   const connected = platformProvisioned || tokenConfigured || fromEnv;
   const callsEnabled = configured || fromEnv;
+  const canEditToken = !fromEnv && (platformProvisioned || tokenConfigured);
 
   const description = platformProvisioned
-    ? "Connected during install. Audio and video calls use RealtimeKit, included with your Cloudflare deployment."
+    ? "Connected during install. Paste a new API token here after rotating credentials or adding permissions (including Secrets Store → Write)."
     : fromEnv
       ? "Configured via server environment. Token and call settings are managed outside this page."
       : "Cloudflare API token is stored encrypted for updates and RealtimeKit calls.";
+
+  async function handleSaveToken() {
+    const trimmed = apiToken.trim();
+    if (!trimmed) {
+      setTokenError("Paste a Cloudflare API token to save.");
+      return;
+    }
+    setSavingToken(true);
+    setTokenError(null);
+    setTokenSuccess(null);
+    try {
+      await apiFetch("/api/v1/settings/integrations/cloudflare", {
+        method: "POST",
+        body: JSON.stringify({ cloudflareApiToken: trimmed }),
+      });
+      setApiToken("");
+      setTokenSuccess("Cloudflare API token saved.");
+      onTokenSaved();
+    } catch (err) {
+      setTokenError(err instanceof Error ? err.message : "Failed to save Cloudflare token");
+    } finally {
+      setSavingToken(false);
+    }
+  }
 
   return (
     <IntegrationsSection
@@ -245,6 +277,29 @@ function CloudflareSection({
       ) : null}
       {callsEnabled ? (
         <p className="integrations-field-hint">Audio &amp; video calls are enabled.</p>
+      ) : null}
+      {canEditToken ? (
+        <div className="integrations-fields">
+          <SecretInput
+            label="Cloudflare API token"
+            configured={tokenConfigured}
+            value={apiToken}
+            onChange={setApiToken}
+            placeholder="Paste new token (Secrets Store → Write required for updates)"
+          />
+          <Feedback error={tokenError} success={tokenSuccess} />
+          <button
+            type="button"
+            className="btn btn-secondary integrations-action-btn"
+            disabled={savingToken}
+            onClick={() => void handleSaveToken()}
+          >
+            {savingToken ? "Saving…" : "Save Cloudflare token"}
+          </button>
+          <p className="integrations-field-hint">
+            Required for Admin Updates apply. Do not enable IP filtering on this token.
+          </p>
+        </div>
       ) : null}
     </IntegrationsSection>
   );
@@ -501,6 +556,7 @@ export default function IntegrationsSettingsPage() {
         fromEnv={realtimeKitFromEnv}
         tokenConfigured={cloudflareApiTokenConfigured}
         accountId={realtimeKitAccountId}
+        onTokenSaved={() => setCloudflareApiTokenConfigured(true)}
       />
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>

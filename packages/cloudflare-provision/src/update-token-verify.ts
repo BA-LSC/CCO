@@ -11,7 +11,7 @@ const WORKERS_ROUTES_HINT =
   "Add Zone → Workers Routes → Edit for your chat and API hostnames on the Cloudflare API token.";
 
 const SECRETS_STORE_HINT =
-  "Add Account → Secrets Store → Edit to the Cloudflare API token.";
+  "Add Account → Secrets Store → Write to the Cloudflare API token.";
 
 function enrichCloudflareAuthMessage(err: CloudflareApiError): string {
   if (/authentication error/i.test(err.message) || err.status === 403) {

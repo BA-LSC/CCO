@@ -46,10 +46,12 @@ import {
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import { syncPcoDataForUser } from "../services/pco-data-sync";
+import { verifyCloudflareUpdateApplyPermissions } from "@cco/cloudflare-provision";
 import {
   applyCloudflareReleaseUpdate,
   executeCloudflareReleaseUpdate,
   getUpdatesStatus,
+  resolveOrgHostnames,
   setAutoUpdateEnabled,
   setGitRepoUrl,
   startCloudflareReleaseUpdate,
@@ -343,16 +345,31 @@ settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
   }
 
   const current = getOrganizationRealtimeKitStatus(org);
+  const hostnames = resolveOrgHostnames(org);
+  if (!hostnames) {
+    return c.json({ error: "Could not resolve chat/API hostnames from organization URLs" }, 400);
+  }
+  const accountId = org.cloudflareAccountId?.trim() || current.realtimeKitAccountId?.trim();
+  if (!accountId) {
+    return c.json({ error: "Cloudflare account is not linked to this organization" }, 400);
+  }
 
   try {
+    const apiToken = parsed.data.cloudflareApiToken.trim();
+    await verifyCloudflareUpdateApplyPermissions({
+      accountId,
+      apiToken,
+      chatHostname: hostnames.chatHostname,
+      apiHostname: hostnames.apiHostname,
+    });
     await saveOrganizationCloudflareApiToken({
       organizationId: org.id,
-      apiToken: parsed.data.cloudflareApiToken,
+      apiToken,
       existingAccountId: current.realtimeKitAccountId || undefined,
     });
     await provisionCloudflarePlatform({
       organizationId: org.id,
-      apiToken: parsed.data.cloudflareApiToken,
+      apiToken,
       existingAccountId: current.realtimeKitAccountId || undefined,
     });
   } catch (err) {
