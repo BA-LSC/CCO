@@ -117,16 +117,30 @@ describe("resolveApplyCloudflareApiToken", () => {
     process.env.CLOUDFLARE_API_TOKEN = "binding-token";
     expect(
       resolveApplyCloudflareApiToken(
-        { cloudflareApiTokenEnc: encryptSecret("d1-token") },
+        {
+          cloudflareSecretsStoreId: "store-1",
+          cloudflareApiTokenEnc: encryptSecret("d1-token"),
+        },
         "override-token",
       ),
     ).toBe("override-token");
   });
 
-  test("uses D1 encrypted token when present even if Secrets Store id exists elsewhere", () => {
+  test("prefers worker binding over D1 enc when Secrets Store is configured", () => {
     process.env.CLOUDFLARE_API_TOKEN = "binding-token";
     expect(
       resolveApplyCloudflareApiToken({
+        cloudflareSecretsStoreId: "store-1",
+        cloudflareApiTokenEnc: encryptSecret("d1-token"),
+      }),
+    ).toBe("binding-token");
+  });
+
+  test("uses D1 encrypted token when Secrets Store is not configured", () => {
+    process.env.CLOUDFLARE_API_TOKEN = "binding-token";
+    expect(
+      resolveApplyCloudflareApiToken({
+        cloudflareSecretsStoreId: null,
         cloudflareApiTokenEnc: encryptSecret("d1-token"),
       }),
     ).toBe("d1-token");
@@ -134,7 +148,12 @@ describe("resolveApplyCloudflareApiToken", () => {
 
   test("falls back to worker binding when D1 enc is cleared", () => {
     process.env.CLOUDFLARE_API_TOKEN = "binding-token";
-    expect(resolveApplyCloudflareApiToken({ cloudflareApiTokenEnc: null })).toBe("binding-token");
+    expect(
+      resolveApplyCloudflareApiToken({
+        cloudflareSecretsStoreId: "store-1",
+        cloudflareApiTokenEnc: null,
+      }),
+    ).toBe("binding-token");
   });
 });
 

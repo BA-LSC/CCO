@@ -57,13 +57,24 @@ export function isCloudflareApiTokenConfigured(
   return Boolean(org.cloudflareApiTokenConfigured || org.cloudflareApiTokenEnc);
 }
 
-/** Token for Admin Apply update: explicit override, then D1 enc, then worker store binding. */
+/** Token for Admin Apply update: override, then Secrets Store binding, then legacy D1 enc. */
 export function resolveApplyCloudflareApiToken(
-  org: Pick<ConfiguredOrganizationRow, "cloudflareApiTokenEnc">,
+  org: Pick<
+    ConfiguredOrganizationRow,
+    "cloudflareApiTokenEnc" | "cloudflareSecretsStoreId"
+  >,
   overrideToken?: string,
 ): string {
   const trimmedOverride = overrideToken?.trim();
   if (trimmedOverride) return trimmedOverride;
+
+  const bindingToken = process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "";
+
+  // BYO installs store the apply token in Secrets Store. Prefer the live worker
+  // binding over legacy D1 *_enc so revoked install-time tokens cannot block apply.
+  if (orgUsesSecretsStore(org) && bindingToken) {
+    return bindingToken;
+  }
 
   if (org.cloudflareApiTokenEnc) {
     try {
@@ -73,7 +84,7 @@ export function resolveApplyCloudflareApiToken(
     }
   }
 
-  return process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "";
+  return bindingToken;
 }
 
 type OrganizationEncryptedSecretFields = Pick<
@@ -146,7 +157,8 @@ export function collectOrganizationSecretsForStoreMigration(
     });
   }
 
-  if (org.cloudflareApiTokenEnc) {
+  // Token is seeded into Secrets Store during install; do not overwrite with stale D1 enc.
+  if (org.cloudflareApiTokenEnc && !orgUsesSecretsStore(org)) {
     upserts.push({
       secretName: CCO_STORE_SECRET.CLOUDFLARE_API_TOKEN,
       value: decryptSecret(org.cloudflareApiTokenEnc),
