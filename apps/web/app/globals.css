@@ -878,8 +878,9 @@ html[data-theme="6"] .user-menu-dropdown {
 .user-menu-sidebar .user-menu-dropdown {
   top: auto;
   bottom: calc(100% + 6px);
-  left: 0;
-  right: 0;
+  left: 8px;
+  right: 8px;
+  width: auto;
   min-width: 0;
   max-height: min(70vh, 480px);
   overflow-y: auto;
