@@ -1,6 +1,7 @@
 name: Deploy setup-c.co
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -27,6 +28,10 @@ jobs:
     permissions:
       contents: read
 
+    # Repo secret CLOUDFLARE_API_TOKEN must include Account → Workers KV Storage → Edit
+    # (required for install-orchestrator KV binding; error 10023 if missing).
+    # Optional CLOUDFLARE_ACCOUNT_ID avoids wrangler listing accounts (GET /accounts).
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,9 +52,19 @@ jobs:
 
       - name: Deploy install orchestrator
         working-directory: workers/install-orchestrator
-        run: bunx wrangler deploy
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            if bunx wrangler deploy; then
+              exit 0
+            fi
+            echo "wrangler deploy failed (attempt ${attempt}/4)"
+            sleep $((attempt * 20))
+          done
+          exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Build install wizard
         working-directory: apps/install
@@ -57,6 +72,16 @@ jobs:
 
       - name: Deploy install wizard
         working-directory: apps/install
-        run: bunx wrangler deploy
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4; do
+            if bunx wrangler deploy; then
+              exit 0
+            fi
+            echo "wrangler deploy failed (attempt ${attempt}/4)"
+            sleep $((attempt * 20))
+          done
+          exit 1
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

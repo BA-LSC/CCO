@@ -3,7 +3,7 @@
 #
 # Prerequisites:
 #   - setup-c.co zone on the CCO Cloudflare account (proxied DNS)
-#   - CLOUDFLARE_API_TOKEN with Workers + Pages edit
+#   - CLOUDFLARE_API_TOKEN with Workers Scripts, Workers KV Storage, and Pages edit
 #   - wrangler authenticated (or CLOUDFLARE_API_TOKEN exported)
 #   - KV namespace for INSTALL_SESSIONS — set id in workers/install-orchestrator/wrangler.jsonc
 #   - wrangler secret put TOKEN_ENCRYPTION_KEY on cco-install-orchestrator
