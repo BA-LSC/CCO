@@ -954,8 +954,8 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding-bottom: 9px;
+  gap: 7px;
+  padding-bottom: 7px;
 }
 
 .chat-sidebar-overlay {
@@ -963,13 +963,13 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-section {
-  margin-bottom: 9px;
+  margin-bottom: 7px;
 }
 
 .sidebar-section-header {
   position: relative;
-  padding: 7px 9px;
-  margin-bottom: 7px;
+  padding: 6px 9px;
+  margin-bottom: 5px;
 }
 
 .sidebar-section-header-has-action {
