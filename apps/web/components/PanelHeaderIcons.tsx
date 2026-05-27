@@ -192,23 +192,9 @@ export function SidebarCrownIcon({ className = "sidebar-channel-prefix-glyph" }:
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
       <path
-        d="M5 17h14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
+        fill="currentColor"
+        d="M4 17.25h16V19H4v-1.75ZM6.1 8.2 8.35 13 12 6.75 15.65 13 17.9 8.2 20.5 7.5 18.25 17H5.75L3.5 7.5 6.1 8.2Z"
       />
-      <path
-        d="M6.5 17 8 10.5l2.2 3.2L12 7l1.8 6.7L16 10.5 17.5 17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="8" cy="9.5" r="0.9" fill="currentColor" />
-      <circle cx="12" cy="7.5" r="0.9" fill="currentColor" />
-      <circle cx="16" cy="9.5" r="0.9" fill="currentColor" />
     </svg>
   );
 }

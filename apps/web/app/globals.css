@@ -1227,8 +1227,8 @@ html[data-theme="6"] .user-menu-dropdown {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--sidebar-icon-btn);
-  height: var(--sidebar-icon-btn);
+  width: var(--sidebar-channel-prefix-width);
+  min-width: var(--sidebar-channel-prefix-width);
   color: var(--color-muted);
   flex-shrink: 0;
 }
@@ -1239,8 +1239,8 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-team-crown-glyph {
   display: block;
-  width: var(--sidebar-icon-glyph);
-  height: var(--sidebar-icon-glyph);
+  width: var(--sidebar-channel-prefix-size);
+  height: var(--sidebar-channel-prefix-size);
   flex-shrink: 0;
 }
 
