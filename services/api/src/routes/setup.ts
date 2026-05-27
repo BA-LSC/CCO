@@ -26,6 +26,7 @@ import {
   resolvePcoWebhookUrl,
 } from "../auth/pco-redirect-uris";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
+import { saveOrganizationCloudflareApiToken } from "../services/org-realtimekit";
 
 type Env = { Variables: AuthVariables };
 
@@ -35,18 +36,9 @@ const DraftSchema = z
     clientId: z.string().min(1),
     clientSecret: z.string().min(1).optional(),
     signInRedirectUri: z.string().url(),
-    webhooksEnabled: z.boolean().optional().default(false),
-    webhookUrl: z.string().url().optional(),
+    webhookUrl: z.string().url(),
     webhookSecret: z.string().min(1).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.webhooksEnabled && !data.webhookUrl) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Webhook URL is required when webhooks are enabled",
-        path: ["webhookUrl"],
-      });
-    }
+    cloudflareApiToken: z.string().min(1).optional(),
   });
 
 export const setupRouter = new Hono<Env>();
@@ -60,9 +52,12 @@ function draftFromOrg(org: typeof organizations.$inferSelect) {
     webhookConfigured: webhookSecrets.length > 0,
     webhookSecretCount: webhookSecrets.length,
     webhooksEnabled: webhookSecrets.length > 0,
-    credentialsSaved: Boolean(org.pcoClientId && org.pcoClientSecretEnc),
+    credentialsSaved: Boolean(
+      org.pcoClientId && org.pcoClientSecretEnc && webhookSecrets.length > 0,
+    ),
     signInRedirectUri: org.pcoWebRedirectUri ?? null,
     webhookUrl: resolvePcoWebhookUrl(org.pcoWebhookUrl),
+    cloudflareApiTokenConfigured: Boolean(org.cloudflareApiTokenEnc),
   };
 }
 
@@ -123,21 +118,54 @@ setupRouter.post("/draft", async (c) => {
     }
   }
 
+  let cloudflareApiToken = parsed.data.cloudflareApiToken?.trim() ?? "";
+  if (!cloudflareApiToken) {
+    if (existingOrg?.cloudflareApiTokenEnc) {
+      cloudflareApiToken = decryptSecret(existingOrg.cloudflareApiTokenEnc);
+    } else {
+      return c.json({ error: "Cloudflare API token is required" }, 400);
+    }
+  }
+
+  const existingWebhookSecrets = existingOrg
+    ? decryptWebhookSecrets(existingOrg.pcoWebhookSecretEnc)
+    : [];
+  let webhookSecretRaw = parsed.data.webhookSecret?.trim() ?? "";
+  if (!webhookSecretRaw) {
+    if (existingWebhookSecrets.length > 0) {
+      webhookSecretRaw = existingWebhookSecrets.join("\n");
+    } else {
+      return c.json({ error: "Webhook secrets are required" }, 400);
+    }
+  }
+
   try {
-    const webhooksEnabled = parsed.data.webhooksEnabled ?? false;
     await saveSetupDraft({
       name: parsed.data.name,
       clientId: parsed.data.clientId,
       clientSecret,
       signInRedirectUri: parsed.data.signInRedirectUri,
-      webhookUrl: webhooksEnabled
-        ? (parsed.data.webhookUrl ?? getDefaultPcoWebhookUrl())
-        : getDefaultPcoWebhookUrl(),
-      webhookSecret: webhooksEnabled ? parsed.data.webhookSecret : null,
+      webhookUrl: parsed.data.webhookUrl,
+      webhookSecret: webhookSecretRaw,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save setup";
     return c.json({ error: message }, 400);
+  }
+
+  const orgBeforeCloudflare = await getOrganizationWithOAuthCredentials();
+  if (orgBeforeCloudflare) {
+    try {
+      await saveOrganizationCloudflareApiToken({
+        organizationId: orgBeforeCloudflare.id,
+        apiToken: cloudflareApiToken,
+        existingAccountId: orgBeforeCloudflare.cloudflareAccountId ?? undefined,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Invalid Cloudflare API token";
+      return c.json({ error: message }, 400);
+    }
   }
 
   const org = await getOrganizationWithOAuthCredentials();

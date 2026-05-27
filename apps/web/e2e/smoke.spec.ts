@@ -15,4 +15,13 @@ test.describe("CCO smoke", () => {
     await expect(page.getByRole("link", { name: /Planning Center/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: "CCO" })).toBeVisible();
   });
+
+  test("setup page renders credentials form", async ({ page }) => {
+    await page.goto(`${WEB_URL}/setup`);
+    await expect(page.getByRole("heading", { name: "Connect Planning Center" })).toBeVisible();
+    await expect(page.getByText("Church name", { exact: true })).toBeVisible();
+    await expect(page.getByText("Webhook endpoint URL", { exact: true })).toBeVisible();
+    await expect(page.getByText("Cloudflare API token", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save credentials" })).toBeVisible();
+  });
 });

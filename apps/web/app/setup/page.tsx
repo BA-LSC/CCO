@@ -8,6 +8,7 @@ import { SetupLoading } from "@/components/SetupLoading";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
+import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import type { SetupRedirectUris } from "@/lib/setup";
 
 type SetupDraft = {
@@ -16,10 +17,10 @@ type SetupDraft = {
   hasClientSecret: boolean;
   webhookConfigured: boolean;
   webhookSecretCount: number;
-  webhooksEnabled: boolean;
   credentialsSaved: boolean;
   signInRedirectUri: string | null;
   webhookUrl: string | null;
+  cloudflareApiTokenConfigured?: boolean;
 };
 
 type SetupMe = {
@@ -74,8 +75,10 @@ export default function SetupPage() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [webhookSecretCount, setWebhookSecretCount] = useState(0);
-  const [webhooksEnabled, setWebhooksEnabled] = useState(false);
   const [hasClientSecret, setHasClientSecret] = useState(false);
+  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
+  const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
+  const [cloudflareTokenFocused, setCloudflareTokenFocused] = useState(false);
 
   const tryFinishSetup = useCallback(async () => {
     try {
@@ -130,7 +133,7 @@ export default function SetupPage() {
             setWebhookUrl(draftRes.draft.webhookUrl);
           }
           setWebhookSecretCount(draftRes.draft.webhookSecretCount ?? 0);
-          setWebhooksEnabled(draftRes.draft.webhooksEnabled ?? draftRes.draft.webhookSecretCount > 0);
+          setCloudflareApiTokenConfigured(draftRes.draft.cloudflareApiTokenConfigured ?? false);
           if (!forceCredentials && draftRes.draft.credentialsSaved) {
             setPhase("sign-in");
           }
@@ -178,12 +181,22 @@ export default function SetupPage() {
         name,
         clientId,
         signInRedirectUri,
-        webhooksEnabled,
+        webhookUrl,
       };
       if (clientSecret.trim()) body.clientSecret = clientSecret;
-      if (webhooksEnabled) {
-        body.webhookUrl = webhookUrl;
-        if (webhookSecret.trim()) body.webhookSecret = webhookSecret;
+      if (webhookSecret.trim()) {
+        body.webhookSecret = webhookSecret;
+      } else if (webhookSecretCount === 0) {
+        setError("Webhook secrets are required");
+        setSaving(false);
+        return;
+      }
+      if (cloudflareApiToken.trim()) {
+        body.cloudflareApiToken = cloudflareApiToken.trim();
+      } else if (!cloudflareApiTokenConfigured) {
+        setError("Cloudflare API token is required");
+        setSaving(false);
+        return;
       }
 
       const res = await fetch("/api/v1/setup/draft", {
@@ -203,11 +216,13 @@ export default function SetupPage() {
 
       setClientSecret("");
       setWebhookSecret("");
+      setCloudflareApiToken("");
       setHasClientSecret(true);
-      if (webhooksEnabled && webhookSecret.trim()) {
+      if (cloudflareApiToken.trim()) {
+        setCloudflareApiTokenConfigured(true);
+      }
+      if (webhookSecret.trim()) {
         setWebhookSecretCount(webhookSecret.split(/\r?\n/).filter((line) => line.trim()).length);
-      } else if (!webhooksEnabled) {
-        setWebhookSecretCount(0);
       }
       setPhase("sign-in");
     } catch (err) {
@@ -221,6 +236,11 @@ export default function SetupPage() {
     return <SetupLoading label="Loading setup" />;
   }
 
+  const cloudflareInputValue =
+    cloudflareApiTokenConfigured && cloudflareApiToken === "" && !cloudflareTokenFocused
+      ? SECRET_MASK_LINE
+      : cloudflareApiToken;
+
   return (
     <SetupThemeShell>
       <div className="setup-form-card">
@@ -231,7 +251,7 @@ export default function SetupPage() {
           <>
             <p className="setup-page-lede">
               Paste your church&apos;s PCO developer app credentials below. Register the OAuth
-              redirect URI in Planning Center; enable webhooks if you want membership sync feedback.
+              redirect URI and webhook endpoint in Planning Center.
             </p>
 
             <form className="setup-form" onSubmit={(e) => void handleSubmit(e)}>
@@ -272,7 +292,9 @@ export default function SetupPage() {
                   required
                   type="url"
                   autoComplete="off"
-                  placeholder={uris?.defaultSignInRedirectUri ?? "https://chat.example.com/api/auth/pco/callback"}
+                  placeholder={
+                    uris?.defaultSignInRedirectUri ?? "https://chat.example.com/api/auth/pco/callback"
+                  }
                 />
                 <span className="help-text">
                   <a href="https://developer.planning.center/" target="_blank" rel="noreferrer">
@@ -283,43 +305,60 @@ export default function SetupPage() {
 
               <hr className="setup-form-divider" aria-hidden="true" />
 
-              <label className="setup-form-toggle">
-                <span>Enable webhook feedback</span>
+              <label className="field">
+                <span>Webhook endpoint URL</span>
                 <input
-                  type="checkbox"
-                  role="switch"
-                  checked={webhooksEnabled}
-                  onChange={(e) => setWebhooksEnabled(e.target.checked)}
-                  aria-label="Enable webhook feedback"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  required
+                  type="url"
+                  autoComplete="off"
+                  placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
                 />
-                <span className="toggle-switch" aria-hidden="true" />
+                <span className="help-text">
+                  <a href="https://api.planningcenteronline.com/webhooks" target="_blank" rel="noreferrer">
+                    Planning Center webhooks
+                  </a>
+                </span>
               </label>
+              <WebhookSecretsField
+                value={webhookSecret}
+                onChange={setWebhookSecret}
+                configured={webhookSecretCount > 0}
+                secretCount={webhookSecretCount > 0 ? webhookSecretCount : undefined}
+                placeholder={
+                  webhookSecretCount > 0
+                    ? `${webhookSecretCount} secret(s) saved — paste new lines to replace all`
+                    : undefined
+                }
+              />
 
-              {webhooksEnabled ? (
-                <>
-                  <label className="field">
-                    <span>Webhook endpoint URL</span>
-                    <input
-                      value={webhookUrl}
-                      onChange={(e) => setWebhookUrl(e.target.value)}
-                      required
-                      type="url"
-                      autoComplete="off"
-                      placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
-                    />
-                  </label>
-                  <WebhookSecretsField
-                    value={webhookSecret}
-                    onChange={setWebhookSecret}
-                    configured={webhookSecretCount > 0}
-                    placeholder={
-                      webhookSecretCount > 0
-                        ? `${webhookSecretCount} secret(s) saved — paste new lines to replace all`
-                        : undefined
-                    }
-                  />
-                </>
-              ) : null}
+              <label className="field">
+                <span>Cloudflare API token</span>
+                <input
+                  value={cloudflareInputValue}
+                  onChange={(e) => setCloudflareApiToken(e.target.value)}
+                  onFocus={() => setCloudflareTokenFocused(true)}
+                  onBlur={() => setCloudflareTokenFocused(false)}
+                  required={!cloudflareApiTokenConfigured}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={
+                    cloudflareApiTokenConfigured && !cloudflareTokenFocused
+                      ? undefined
+                      : "Paste API token"
+                  }
+                />
+                <span className="help-text">
+                  <a
+                    href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Create API token
+                  </a>
+                </span>
+              </label>
 
               {error && (
                 <p className="help-text error-text" role="alert">
