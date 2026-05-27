@@ -328,13 +328,13 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                       <li key={conv.id}>
                         <Link
                           href={`/groups/${group.id}/c/${conv.id}`}
-                          className={`sidebar-item sidebar-nested-item ${
+                          className={`sidebar-item sidebar-team-item ${
                             activeConversationId === conv.id ? "sidebar-item-active" : ""
                           }`}
                         >
-                          <div className="sidebar-channel-row">
+                          <div className="sidebar-team-row">
                             <SidebarChannelPrefix conv={conv} />
-                            <span className="sidebar-item-label">{conv.title}</span>
+                            <span className="sidebar-item-label sidebar-team-name">{conv.title}</span>
                             <span className="sidebar-nested-trailing">
                               {conv.muted && (
                                 <span className="sidebar-badge" title="Muted">

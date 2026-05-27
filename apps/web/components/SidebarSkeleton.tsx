@@ -28,10 +28,10 @@ export function SidebarSkeleton() {
               <ul className="sidebar-nested">
                 {Array.from({ length: CHANNEL_ROWS }, (_, channelIndex) => (
                   <li key={channelIndex}>
-                    <div className="sidebar-item sidebar-nested-item sidebar-skeleton-nested-row">
-                      <div className="sidebar-channel-row">
+                    <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
+                      <div className="sidebar-team-row">
                         <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
-                        <span className="sidebar-skeleton-label sidebar-skeleton-label-channel" />
+                        <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
                       </div>
                     </div>
                   </li>
