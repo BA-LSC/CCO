@@ -21,6 +21,14 @@ afterEach(() => {
 });
 
 describe("secrets store client", () => {
+  test("store secret names avoid characters Cloudflare rejects", () => {
+    for (const name of Object.values(CCO_STORE_SECRET)) {
+      expect(name).not.toContain("/");
+      expect(name).not.toMatch(/\s/);
+      expect(name).toMatch(/^[a-z0-9_]+$/);
+    }
+  });
+
   test("ensureSecretsStore reuses existing store by name", async () => {
     mockFetch((url, init) => {
       if (url.endsWith("/secrets_store/stores") && init?.method !== "POST") {

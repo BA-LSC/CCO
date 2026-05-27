@@ -4,18 +4,21 @@ import type { CcoWorkerScriptName } from "./worker-definitions";
 /** Default Secrets Store name for CCO BYO installs. */
 export const CCO_SECRETS_STORE_NAME = "cco";
 
-/** Account-level secret names in Cloudflare Secrets Store. */
+/**
+ * Account-level secret names in Cloudflare Secrets Store.
+ * Use letters, numbers, and underscores only (no `/` — Cloudflare returns invalid_secret_name).
+ */
 export const CCO_STORE_SECRET = {
-  PCO_CLIENT_SECRET: "cco/pco_client_secret",
-  PCO_WEBHOOK_SECRETS: "cco/pco_webhook_secrets",
-  GIPHY_API_KEY: "cco/giphy_api_key",
-  CLOUDFLARE_API_TOKEN: "cco/cloudflare_api_token",
-  VAPID_PRIVATE_KEY: "cco/vapid_private_key",
-  R2_ACCESS_KEY_ID: "cco/r2_access_key_id",
-  R2_SECRET_ACCESS_KEY: "cco/r2_secret_access_key",
-  SESSION_SECRET: "cco/session_secret",
-  TOKEN_ENCRYPTION_KEY: "cco/token_encryption_key",
-  CF_INTERNAL_SECRET: "cco/cf_internal_secret",
+  PCO_CLIENT_SECRET: "cco_pco_client_secret",
+  PCO_WEBHOOK_SECRETS: "cco_pco_webhook_secrets",
+  GIPHY_API_KEY: "cco_giphy_api_key",
+  CLOUDFLARE_API_TOKEN: "cco_cloudflare_api_token",
+  VAPID_PRIVATE_KEY: "cco_vapid_private_key",
+  R2_ACCESS_KEY_ID: "cco_r2_access_key_id",
+  R2_SECRET_ACCESS_KEY: "cco_r2_secret_access_key",
+  SESSION_SECRET: "cco_session_secret",
+  TOKEN_ENCRYPTION_KEY: "cco_token_encryption_key",
+  CF_INTERNAL_SECRET: "cco_cf_internal_secret",
 } as const;
 
 export type CcoStoreSecretName = (typeof CCO_STORE_SECRET)[keyof typeof CCO_STORE_SECRET];
