@@ -19,11 +19,6 @@ let r2CorsCalls = 0;
 mock.module("../services/org-oauth", () => ({
   getConfiguredOrganization: async () => mockOrg,
 }));
-
-mock.module("../services/org-secrets", () => ({
-  resolveApplyCloudflareApiToken: () => "cf-token",
-}));
-
 mock.module("@cco/cloudflare-provision", () => ({
   createR2AccessKey: async () => ({
     access_key_id: "temp-key",
@@ -96,6 +91,7 @@ describe("ensureOrgR2UploadCorsOnce", () => {
       cloudflareR2BucketName: "cco-uploads-acct",
       pcoWebRedirectUri: "https://chat.example.com/auth/callback",
     };
+    process.env.CLOUDFLARE_API_TOKEN = "cf-token";
 
     const { ensureOrgR2UploadCorsOnce } = await import(`./r2-uploads?t=${Date.now()}`);
     await ensureOrgR2UploadCorsOnce();
