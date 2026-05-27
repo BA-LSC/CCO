@@ -260,25 +260,31 @@ export function ChatSidebar() {
             <GroupSidebarSection groups={groups} onGroupsReload={loadSidebar} />
 
             <section className="sidebar-section sidebar-section-messages" aria-label="Messages">
-              <SidebarSectionHeader
-                title="Messages"
-                action={
-                  <button
-                    type="button"
-                    className={`sidebar-add-channel-icon ${showNewDm ? "sidebar-add-channel-icon-active" : ""}`}
-                    aria-label={showNewDm ? "Cancel new message" : "New message"}
-                    aria-expanded={showNewDm}
-                    title={showNewDm ? "Cancel" : "New message"}
-                    onClick={() => {
-                      setShowNewDm((v) => !v);
-                      setDmSearch("");
-                      setDmPeople([]);
-                    }}
-                  >
+              <SidebarSectionHeader title="Messages" />
+
+              <button
+                type="button"
+                className={`sidebar-item sidebar-dm-item sidebar-new-message-btn ${
+                  showNewDm ? "sidebar-item-active" : ""
+                }`}
+                aria-label={showNewDm ? "Cancel new message" : "New message"}
+                aria-expanded={showNewDm}
+                title={showNewDm ? "Cancel" : "New message"}
+                onClick={() => {
+                  setShowNewDm((v) => !v);
+                  setDmSearch("");
+                  setDmPeople([]);
+                }}
+              >
+                <div className="sidebar-dm-row">
+                  <span className="sidebar-new-message-icon" aria-hidden>
                     {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
-                  </button>
-                }
-              />
+                  </span>
+                  <span className="sidebar-item-label">
+                    {showNewDm ? "Cancel" : "New message"}
+                  </span>
+                </div>
+              </button>
 
               {showNewDm && (
                 <div className="sidebar-new-dm">

@@ -39,10 +39,13 @@ export function SidebarSkeleton() {
       </section>
 
       <section className="sidebar-section sidebar-section-messages" aria-hidden>
-        <SidebarSectionHeader
-          title="Messages"
-          action={<span className="sidebar-add-channel-icon sidebar-skeleton-icon" aria-hidden />}
-        />
+        <SidebarSectionHeader title="Messages" />
+        <div className="sidebar-item sidebar-dm-item sidebar-new-message-btn sidebar-skeleton-dm-row" aria-hidden>
+          <div className="sidebar-dm-row">
+            <span className="sidebar-skeleton-avatar sidebar-dm-avatar" />
+            <span className="sidebar-skeleton-label sidebar-skeleton-label-dm" />
+          </div>
+        </div>
         <ul className="sidebar-list">
           {Array.from({ length: DM_ROWS }, (_, dmIndex) => (
             <li key={dmIndex}>
