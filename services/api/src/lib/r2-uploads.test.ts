@@ -17,16 +17,6 @@ let mockOrg: MockOrg | null = null;
 mock.module("../services/org-oauth", () => ({
   getConfiguredOrganization: async () => mockOrg,
 }));
-
-mock.module("../runtime/worker-context", () => ({
-  getWorkerBindings: () => undefined,
-  isCloudflareRuntime: () => false,
-}));
-
-mock.module("../services/org-secrets", () => ({
-  resolveApplyCloudflareApiToken: () => process.env.CLOUDFLARE_API_TOKEN?.trim() ?? "",
-}));
-
 beforeEach(() => {
   mockOrg = null;
   process.env = { ...ORIGINAL_ENV };
