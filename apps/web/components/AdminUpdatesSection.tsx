@@ -64,6 +64,8 @@ export function AdminUpdatesSection() {
   const [deploying, setDeploying] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
   const deployPollRef = useRef<number | null>(null);
+  /** Avoid reloading before the API marks deploy draining (prepare can take several seconds). */
+  const sawDeployUpdatingRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
@@ -87,9 +89,34 @@ export function AdminUpdatesSection() {
     const pollUntilReady = async () => {
       const { updating } = await probeServerAppVersion();
       if (cancelled) return;
-      if (!updating) {
-        void applyAppUpdate();
+      if (updating) {
+        sawDeployUpdatingRef.current = true;
+        return;
       }
+      if (!sawDeployUpdatingRef.current) return;
+
+      try {
+        const next = await loadStatus();
+        if (next.lastApplyError) {
+          clearDeployWait();
+          setDeploying(false);
+          setFeedback({ error: `Apply failed: ${next.lastApplyError}` });
+          return;
+        }
+        if (next.updateAvailable) {
+          clearDeployWait();
+          setDeploying(false);
+          setFeedback({
+            error:
+              "Deploy finished but the release is still pending. Check for updates and try Apply again.",
+          });
+          return;
+        }
+      } catch {
+        // Fall through to reload when status cannot be read.
+      }
+
+      void applyAppUpdate();
     };
 
     void pollUntilReady();
@@ -102,7 +129,7 @@ export function AdminUpdatesSection() {
         deployPollRef.current = null;
       }
     };
-  }, [deploying]);
+  }, [deploying, loadStatus]);
 
   useEffect(() => {
     const syncDeployPending = () => {
@@ -147,6 +174,7 @@ export function AdminUpdatesSection() {
     }
     setBusy("apply");
     setFeedback({});
+    sawDeployUpdatingRef.current = false;
     markDeployWait({ showOverlay: false });
     setDeploying(true);
     try {
