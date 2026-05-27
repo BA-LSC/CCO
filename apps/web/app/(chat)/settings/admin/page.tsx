@@ -41,6 +41,7 @@ type IntegrationsSettings = {
   realtimeKitPresetGuest?: string;
   cloudflarePlatformProvisionedAt?: string | null;
   cloudflarePlatformConfigured?: boolean;
+  updates?: UpdatesStatus;
 };
 
 type PcoSyncResult = {
@@ -324,12 +325,11 @@ export default function IntegrationsSettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [settings, redirectUris, updates] = await Promise.all([
+        const [settings, redirectUris] = await Promise.all([
           apiFetch<IntegrationsSettings>("/api/v1/settings/integrations"),
           fetch("/api/v1/setup/redirect-uris").then((r) => r.json() as Promise<SetupRedirectUris>),
-          apiFetch<UpdatesStatus>("/api/v1/settings/updates").catch(() => null),
         ]);
-        setUpdatesStatus(updates);
+        setUpdatesStatus(settings.updates ?? null);
 
         setName(settings.name);
         setClientId(settings.clientId);

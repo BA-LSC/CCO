@@ -52,6 +52,7 @@ import {
   applyCloudflareReleaseUpdate,
   checkCloudflareApplyTokenHealth,
   executeCloudflareReleaseUpdate,
+  getCachedUpdatesStatus,
   getUpdatesStatus,
   resolveOrgHostnames,
   setAutoUpdateEnabled,
@@ -151,6 +152,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     refreshed.cloudflareAccountId && isCloudflareApiTokenConfigured(refreshed)
       ? await checkCloudflareApplyTokenHealth(refreshed)
       : { valid: null, error: null };
+  const updates = await getCachedUpdatesStatus(refreshed, tokenHealth);
 
   return c.json({
     configured: true,
@@ -168,6 +170,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     ...platformStatus,
     cloudflareApiTokenValid: tokenHealth.valid,
     cloudflareApiTokenError: tokenHealth.error,
+    updates,
     gitRepoUrl: resolveOrgGitRepoUrl(refreshed.gitRepoUrl),
     defaultGitRepoUrl: CCO_DEFAULT_GIT_REPO_URL,
   });

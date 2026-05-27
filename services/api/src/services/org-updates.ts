@@ -202,6 +202,97 @@ function isUpdateAvailable(current: string | null, latest: string): boolean {
   return current !== latest;
 }
 
+type UpdatesApplyGating = {
+  canApply: boolean;
+  applyBlockedReason: string | null;
+  cloudflareApiTokenValid: boolean | null;
+  cloudflareApiTokenError: string | null;
+};
+
+function resolveUpdatesApplyGating(
+  org: NonNullable<Awaited<ReturnType<typeof getConfiguredOrganization>>>,
+  platform: UpdatePlatform,
+  updateAvailable: boolean,
+  lastApplyError: string | null,
+  checkError: string | null,
+  tokenHealth?: CloudflareApplyTokenHealth | { valid: boolean | null; error: string | null },
+): UpdatesApplyGating {
+  let canApply = platform === "cloudflare";
+  let applyBlockedReason: string | null = null;
+
+  if (platform === "vps") {
+    canApply = false;
+    applyBlockedReason =
+      "VPS deployments update via git pull on the server (./deploy/update.sh), not from Admin Updates.";
+  } else if (platform !== "cloudflare") {
+    canApply = false;
+    applyBlockedReason = "Update apply is only supported for BYO Cloudflare installs.";
+  } else if (!isCloudflareApiTokenConfigured(org)) {
+    canApply = false;
+    applyBlockedReason = "Cloudflare API token is not configured.";
+  } else if (!resolveOrgHostnames(org)) {
+    canApply = false;
+    applyBlockedReason = "Could not resolve chat/API hostnames from organization URLs.";
+  } else if (checkError) {
+    canApply = false;
+    applyBlockedReason = checkError;
+  } else if (!updateAvailable && !lastApplyError) {
+    canApply = false;
+    applyBlockedReason = "Already on the latest release.";
+  }
+
+  let cloudflareApiTokenValid: boolean | null = null;
+  let cloudflareApiTokenError: string | null = null;
+  if (platform === "cloudflare" && isCloudflareApiTokenConfigured(org)) {
+    if (tokenHealth) {
+      cloudflareApiTokenValid = tokenHealth.valid;
+      cloudflareApiTokenError = tokenHealth.error;
+    }
+    if (tokenHealth && tokenHealth.valid === false) {
+      canApply = false;
+      applyBlockedReason =
+        tokenHealth.error ??
+        "Cloudflare API token is invalid. Paste a new token under Cloudflare.";
+    }
+  }
+
+  return { canApply, applyBlockedReason, cloudflareApiTokenValid, cloudflareApiTokenError };
+}
+
+/** DB-backed updates snapshot for Admin Settings page load (no release index or token preflight). */
+export async function getCachedUpdatesStatus(
+  org: NonNullable<Awaited<ReturnType<typeof getConfiguredOrganization>>>,
+  tokenHealth?: CloudflareApplyTokenHealth | { valid: boolean | null; error: string | null },
+): Promise<UpdatesStatus> {
+  const platform = resolveUpdatePlatform(org);
+  const currentVersion =
+    org.installedReleaseVersion?.trim() || resolveRunningBuildVersion();
+  const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
+  const lastApplyError = await readDeployLastError();
+  const gating = resolveUpdatesApplyGating(
+    org,
+    platform,
+    false,
+    lastApplyError,
+    null,
+    tokenHealth,
+  );
+
+  return {
+    platform,
+    currentVersion,
+    latestVersion: null,
+    updateAvailable: false,
+    autoUpdateEnabled: org.autoUpdateEnabled ?? false,
+    lastUpdateCheckAt: org.lastUpdateCheckAt?.toISOString() ?? null,
+    latestPublishedAt: null,
+    releasesBaseUrl: null,
+    gitRepoUrl,
+    lastApplyError,
+    ...gating,
+  };
+}
+
 export async function getUpdatesStatus(options?: {
   forceCheck?: boolean;
 }): Promise<UpdatesStatus> {
@@ -247,43 +338,16 @@ export async function getUpdatesStatus(options?: {
     ? isUpdateAvailable(currentVersion, latestVersion)
     : false;
 
-  let canApply = platform === "cloudflare";
-  let applyBlockedReason: string | null = null;
-
-  if (platform === "vps") {
-    canApply = false;
-    applyBlockedReason =
-      "VPS deployments update via git pull on the server (./deploy/update.sh), not from Admin Updates.";
-  } else if (platform !== "cloudflare") {
-    canApply = false;
-    applyBlockedReason = "Update apply is only supported for BYO Cloudflare installs.";
-  } else if (!isCloudflareApiTokenConfigured(org)) {
-    canApply = false;
-    applyBlockedReason = "Cloudflare API token is not configured.";
-  } else if (!resolveOrgHostnames(org)) {
-    canApply = false;
-    applyBlockedReason = "Could not resolve chat/API hostnames from organization URLs.";
-  } else if (checkError) {
-    canApply = false;
-    applyBlockedReason = checkError;
-  } else if (!updateAvailable && !lastApplyError) {
-    canApply = false;
-    applyBlockedReason = "Already on the latest release.";
-  }
-
-  let cloudflareApiTokenValid: boolean | null = null;
-  let cloudflareApiTokenError: string | null = null;
-  if (platform === "cloudflare" && isCloudflareApiTokenConfigured(org)) {
-    const tokenHealth = await checkCloudflareApplyTokenHealth(org);
-    cloudflareApiTokenValid = tokenHealth.valid;
-    cloudflareApiTokenError = tokenHealth.error;
-    if (!tokenHealth.valid) {
-      canApply = false;
-      applyBlockedReason =
-        tokenHealth.error ??
-        "Cloudflare API token is invalid. Paste a new token under Cloudflare.";
-    }
-  }
+  const gating = resolveUpdatesApplyGating(
+    org,
+    platform,
+    updateAvailable,
+    lastApplyError,
+    checkError,
+    platform === "cloudflare" && isCloudflareApiTokenConfigured(org)
+      ? await checkCloudflareApplyTokenHealth(org)
+      : undefined,
+  );
 
   return {
     platform,
@@ -296,10 +360,7 @@ export async function getUpdatesStatus(options?: {
     releasesBaseUrl: latestIndex ? resolveReleasesBaseUrl(latestIndex) : null,
     gitRepoUrl,
     lastApplyError,
-    canApply,
-    applyBlockedReason,
-    cloudflareApiTokenValid,
-    cloudflareApiTokenError,
+    ...gating,
   };
 }
 

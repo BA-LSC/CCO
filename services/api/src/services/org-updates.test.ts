@@ -108,8 +108,8 @@ describe("getUpdatesStatus apply gating", () => {
   test("allows canApply when last apply failed but version matches latest", () => {
     const source = readFileSync(ORG_UPDATES_PATH, "utf8");
     const fnBody = source.slice(
-      source.indexOf("export async function getUpdatesStatus"),
-      source.indexOf("function requireProvisionSecrets"),
+      source.indexOf("function resolveUpdatesApplyGating"),
+      source.indexOf("/** DB-backed updates snapshot"),
     );
     expect(fnBody).toContain("!updateAvailable && !lastApplyError");
     expect(fnBody).not.toMatch(/else if \(!updateAvailable\) \{\s*\n\s*canApply = false/);

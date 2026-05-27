@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import {
-  APP_UPDATE_EVENT,
   applyAppUpdate,
   clearDeployWait,
   DEPLOY_POLL_MS,
-  isDeployPending,
   markDeployWait,
   probeServerAppVersion,
 } from "@/lib/app-update";
@@ -61,14 +59,14 @@ function formatStatusLine(status: UpdatesStatus): string {
 }
 
 export function AdminUpdatesSection({
-  initialStatus = null,
+  initialStatus,
   applyCloudflareApiToken,
 }: {
   /** Hydrated from the admin page load so the card does not flash loading on mount. */
-  initialStatus?: UpdatesStatus | null;
+  initialStatus: UpdatesStatus | null;
   /** When set, Apply update uses this token instead of the Secrets Store binding. */
   applyCloudflareApiToken?: string;
-} = {}) {
+}) {
   const [status, setStatus] = useState<UpdatesStatus | null>(initialStatus);
   const [busy, setBusy] = useState<"check" | "apply" | "toggle" | null>(null);
   const [deploying, setDeploying] = useState(false);
@@ -76,6 +74,7 @@ export function AdminUpdatesSection({
   const deployPollRef = useRef<number | null>(null);
   /** Avoid reloading before the API marks deploy draining (prepare can take several seconds). */
   const sawDeployUpdatingRef = useRef(false);
+  const backgroundRefreshStartedRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
@@ -86,6 +85,14 @@ export function AdminUpdatesSection({
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    if (!initialStatus || backgroundRefreshStartedRef.current) return;
+    backgroundRefreshStartedRef.current = true;
+    void loadStatus().catch(() => {
+      // Keep hydrated snapshot when background refresh fails.
+    });
+  }, [initialStatus, loadStatus]);
 
   useEffect(() => {
     if (!deploying) return;
@@ -136,17 +143,6 @@ export function AdminUpdatesSection({
       }
     };
   }, [deploying, loadStatus]);
-
-  useEffect(() => {
-    const syncDeployPending = () => {
-      if (isDeployPending()) {
-        setDeploying(true);
-      }
-    };
-    syncDeployPending();
-    window.addEventListener(APP_UPDATE_EVENT, syncDeployPending);
-    return () => window.removeEventListener(APP_UPDATE_EVENT, syncDeployPending);
-  }, []);
 
   async function handleCheck() {
     setBusy("check");
@@ -239,34 +235,16 @@ export function AdminUpdatesSection({
   }
 
   if (!status) {
-    return (
-      <section className="integrations-section" aria-labelledby="updates-status-heading">
-        <div className="integrations-section-top">
-          <div className="integrations-section-head">
-            <h2 id="updates-status-heading">Updates</h2>
-            <p>Install the latest release from your connected repository.</p>
-          </div>
-        </div>
-        <UpdatesFeedback error={feedback.error} success={feedback.success} />
-        <div className="integrations-actions">
-          <button
-            type="button"
-            className="btn btn-secondary integrations-action-btn"
-            disabled={busy !== null}
-            onClick={() => void handleCheck()}
-          >
-            {busy === "check" ? "Checking…" : "Check for updates"}
-          </button>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   const statusBadge = status.updateAvailable
     ? { label: "Update available", variant: "update" as const }
-    : { label: "Up to date", variant: "success" as const };
+    : status.lastUpdateCheckAt
+      ? { label: "Up to date", variant: "success" as const }
+      : { label: "Not checked yet", variant: "muted" as const };
 
-  const isUpdating = deploying || isDeployPending();
+  const isUpdating = deploying;
   const controlsDisabled = busy !== null || isUpdating;
 
   return (
