@@ -4409,6 +4409,11 @@ button.sidebar-group-header:focus-visible {
   color: #fff;
 }
 
+.chat-thread .message-bubble--own .mention--self {
+  background: #fde047;
+  color: #422006;
+}
+
 .chat-thread .message-bubble--own .link-btn {
   color: rgba(255, 255, 255, 0.92);
 }
@@ -5267,6 +5272,11 @@ button.sidebar-group-header:focus-visible {
   background: var(--color-primary-soft);
   padding: 1px 4px;
   border-radius: 4px;
+}
+
+.mention--self {
+  background: #fef08a;
+  color: #854d0e;
 }
 
 .chat-thread .message-bubble-stack {

@@ -277,7 +277,9 @@ function ChatMessageListInner({
                             }}
                           />
                         )}
-                        {m.body ? <MessageBody body={m.body} /> : null}
+                        {m.body ? (
+                          <MessageBody body={m.body} currentUserId={resolvedUserId} />
+                        ) : null}
                       </div>
                     </MessageBubbleStack>
                   </>
