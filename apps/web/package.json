@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun --env-file=../../.env next dev -p 3000",
     "build": "next build",
-    "build:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare build && node scripts/prepare-opennext.mjs restore",
+    "build:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare NEXT_PUBLIC_DIRECT_UPLOADS=1 opennextjs-cloudflare build && node scripts/prepare-opennext.mjs restore",
     "preview:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare preview && node scripts/prepare-opennext.mjs restore",
     "deploy:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare deploy && node scripts/prepare-opennext.mjs restore",
     "postbuild": "node scripts/prepare-standalone.mjs",

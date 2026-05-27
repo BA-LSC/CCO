@@ -136,7 +136,15 @@ async function uploadMediaViaPresign(file: File, contentType: string): Promise<s
   return presign.url;
 }
 
-async function uploadMediaMultipart(file: File): Promise<string> {
+const MULTIPART_BLOCKED_ON_CLOUDFLARE =
+  "Multipart upload is not supported on Cloudflare Pages";
+
+function isPresignUnavailableError(err: unknown): boolean {
+  const msg = getErrorMessage(err);
+  return msg.includes("R2 uploads are not configured") || /\(\s*503\s*\)/.test(msg);
+}
+
+async function uploadMediaMultipart(file: File, contentType: string): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`${API_BASE}/api/v1/uploads`, {
@@ -146,36 +154,44 @@ async function uploadMediaMultipart(file: File): Promise<string> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(parseApiError(text, res.status));
+    const error = parseApiError(text, res.status);
+    // Older Cloudflare builds may miss NEXT_PUBLIC_DIRECT_UPLOADS — recover via presign.
+    if (res.status === 400 && error.includes(MULTIPART_BLOCKED_ON_CLOUDFLARE)) {
+      return uploadMediaViaPresign(file, contentType);
+    }
+    throw new Error(error);
   }
   const data = (await res.json()) as { url: string };
   return data.url;
 }
 
+async function uploadPreparedMedia(
+  file: File,
+  contentType: string,
+): Promise<string> {
+  if (isDirectR2UploadsEnabled()) {
+    return uploadMediaViaPresign(file, contentType);
+  }
+  try {
+    return await uploadMediaViaPresign(file, contentType);
+  } catch (presignErr) {
+    if (isPresignUnavailableError(presignErr)) {
+      return uploadMediaMultipart(file, contentType);
+    }
+    throw presignErr;
+  }
+}
+
 export async function uploadImage(file: File): Promise<string> {
   const prepared = await prepareImageForUpload(file);
   const contentType = prepared.type || "image/jpeg";
-  if (isDirectR2UploadsEnabled()) {
-    return uploadMediaViaPresign(prepared, contentType);
-  }
-  try {
-    return await uploadMediaViaPresign(prepared, contentType);
-  } catch {
-    return uploadMediaMultipart(prepared);
-  }
+  return uploadPreparedMedia(prepared, contentType);
 }
 
 export async function uploadVideo(file: File): Promise<string> {
   const prepared = await prepareVideoForUpload(file);
   const contentType = prepared.type || "video/mp4";
-  if (isDirectR2UploadsEnabled()) {
-    return uploadMediaViaPresign(prepared, contentType);
-  }
-  try {
-    return await uploadMediaViaPresign(prepared, contentType);
-  } catch {
-    return uploadMediaMultipart(prepared);
-  }
+  return uploadPreparedMedia(prepared, contentType);
 }
 
 export type GroupSummary = {

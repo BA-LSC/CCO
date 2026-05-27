@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   env:
     process.env.CCO_DEPLOY_TARGET === "cloudflare"
       ? {
+          NEXT_PUBLIC_DIRECT_UPLOADS: "1",
           SERVER_API_ORIGIN: (() => {
             const apiUrl = process.env.API_URL?.trim();
             if (apiUrl) {
