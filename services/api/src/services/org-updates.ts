@@ -5,6 +5,7 @@ import {
   deployCcoWebWorker,
   ensureD1Database,
   ensureR2BucketCors,
+  resolveR2UploadChatOrigins,
   fetchWebReleaseManifest,
   verifyCloudflareUpdateApplyPermissions,
   type CcoWorkerScriptName,
@@ -518,7 +519,10 @@ export async function executeCloudflareReleaseUpdate(
       job.accountId,
       job.apiToken,
       job.resources.r2BucketName,
-      [job.resources.chatHostname],
+      resolveR2UploadChatOrigins({
+        webUrl: `https://${job.resources.chatHostname}`,
+        signInRedirectUri: `https://${job.resources.chatHostname}/api/auth/pco/callback`,
+      }),
     ).catch((err) => {
       console.warn(
         "[org-updates] R2 upload CORS configuration skipped:",

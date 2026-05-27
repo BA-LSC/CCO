@@ -1,15 +1,47 @@
 import { describe, expect, test } from "bun:test";
-import { buildR2UploadCorsRules } from "./r2-cors";
+import {
+  buildR2UploadCorsRules,
+  parseHttpOrigin,
+  resolveR2UploadChatOrigins,
+} from "./r2-cors";
+
+describe("parseHttpOrigin", () => {
+  test("normalizes full URLs and bare hostnames", () => {
+    expect(parseHttpOrigin("https://cco.example.com/")).toBe("https://cco.example.com");
+    expect(parseHttpOrigin("cco.example.com")).toBe("https://cco.example.com");
+    expect(parseHttpOrigin("http://localhost:3000/chat")).toBe("http://localhost:3000");
+  });
+});
+
+describe("resolveR2UploadChatOrigins", () => {
+  test("merges deployment URL, OAuth redirect, and browser Origin", () => {
+    expect(
+      resolveR2UploadChatOrigins({
+        webUrl: "https://cco.example.com",
+        signInRedirectUri: "https://cco.example.com/api/auth/pco/callback",
+        requestOrigin: "https://www.cco.example.com",
+      }),
+    ).toEqual(["https://cco.example.com", "https://www.cco.example.com"]);
+  });
+
+  test("derives origin from Referer when Origin is omitted", () => {
+    expect(
+      resolveR2UploadChatOrigins({
+        requestReferer: "https://chat.example.com/groups/abc",
+      }),
+    ).toEqual(["https://chat.example.com"]);
+  });
+});
 
 describe("buildR2UploadCorsRules", () => {
-  test("allows PUT from chat origin with Content-Type header", () => {
+  test("allows PUT from chat origin with wildcard request headers", () => {
     const rules = buildR2UploadCorsRules(["https://cco.example.com"]);
     expect(rules).toEqual([
       {
         allowed: {
           origins: ["https://cco.example.com"],
           methods: ["PUT", "GET", "HEAD"],
-          headers: ["Content-Type", "content-type"],
+          headers: ["*"],
         },
         exposeHeaders: ["ETag"],
         maxAgeSeconds: 3600,

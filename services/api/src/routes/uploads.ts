@@ -12,7 +12,7 @@ import {
 import {
   resolveR2Config,
   createR2PresignedPutUrl,
-  ensureOrgR2UploadCorsOnce,
+  reconcileOrgR2UploadCors,
 } from "../lib/r2-uploads";
 
 type Env = { Variables: AuthVariables };
@@ -85,7 +85,10 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
   const ext = EXT_BY_MIME[contentType] ?? contentType.split("/")[1] ?? "bin";
   const filename = `${crypto.randomUUID()}.${ext}`;
 
-  await ensureOrgR2UploadCorsOnce().catch((err) => {
+  await reconcileOrgR2UploadCors({
+    requestOrigin: c.req.header("Origin"),
+    requestReferer: c.req.header("Referer"),
+  }).catch((err) => {
     console.warn(
       "[uploads/presign] R2 upload CORS configuration skipped:",
       err instanceof Error ? err.message : err,

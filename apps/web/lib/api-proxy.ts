@@ -75,6 +75,10 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
   if (setupBootstrap) headers.set("x-setup-bootstrap", setupBootstrap);
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
+  const origin = request.headers.get("origin");
+  if (origin) headers.set("origin", origin);
+  const referer = request.headers.get("referer");
+  if (referer) headers.set("referer", referer);
 
   const uploadPost = isUploadPost(request.method, path);
   const uploadMedia = isUploadMediaRequest(request.method, path);

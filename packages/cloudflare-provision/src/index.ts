@@ -133,7 +133,10 @@ export {
 export {
   buildR2UploadCorsRules,
   ensureR2BucketCors,
+  parseHttpOrigin,
+  resolveR2UploadChatOrigins,
   type R2CorsRule,
+  type R2UploadChatOriginSources,
 } from "./r2-cors";
 
 export {

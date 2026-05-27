@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { resolveR2UploadChatOrigins } from "@cco/cloudflare-provision";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -15,6 +16,7 @@ type MockOrg = {
 
 let mockOrg: MockOrg | null = null;
 let r2CorsCalls = 0;
+let lastCorsOrigins: string[] | null = null;
 
 mock.module("../services/org-oauth", () => ({
   getConfiguredOrganization: async () => mockOrg,
@@ -25,8 +27,15 @@ mock.module("@cco/cloudflare-provision", () => ({
     secret_access_key: "temp-secret",
     session_token: "temp-session",
   }),
-  ensureR2BucketCors: async () => {
+  resolveR2UploadChatOrigins,
+  ensureR2BucketCors: async (
+    _accountId: string,
+    _apiToken: string,
+    _bucketName: string,
+    chatOrigins: string[],
+  ) => {
     r2CorsCalls += 1;
+    lastCorsOrigins = chatOrigins;
     return { updated: true };
   },
 }));
@@ -34,6 +43,7 @@ mock.module("@cco/cloudflare-provision", () => ({
 beforeEach(() => {
   mockOrg = null;
   r2CorsCalls = 0;
+  lastCorsOrigins = null;
   process.env = { ...ORIGINAL_ENV };
 });
 
@@ -84,31 +94,36 @@ describe("resolveR2Config", () => {
   });
 });
 
-describe("ensureOrgR2UploadCorsOnce", () => {
-  test("configures R2 CORS once using chat hostname from OAuth redirect URI", async () => {
+describe("reconcileOrgR2UploadCors", () => {
+  test("configures R2 CORS from WEB_URL, OAuth redirect, and browser Origin", async () => {
     mockOrg = {
       cloudflareAccountId: "acct-123",
       cloudflareR2BucketName: "cco-uploads-acct",
-      pcoWebRedirectUri: "https://chat.example.com/auth/callback",
+      pcoWebRedirectUri: "https://chat.example.com/api/auth/pco/callback",
     };
+    process.env.WEB_URL = "https://chat.example.com";
     process.env.CLOUDFLARE_API_TOKEN = "cf-token";
 
-    const { ensureOrgR2UploadCorsOnce } = await import(`./r2-uploads?t=${Date.now()}`);
-    await ensureOrgR2UploadCorsOnce();
-    await ensureOrgR2UploadCorsOnce();
+    const { reconcileOrgR2UploadCors } = await import(`./r2-uploads?t=${Date.now()}`);
+    await reconcileOrgR2UploadCors({ requestOrigin: "https://www.chat.example.com" });
+    await reconcileOrgR2UploadCors({ requestOrigin: "https://www.chat.example.com" });
 
-    expect(r2CorsCalls).toBe(1);
+    expect(r2CorsCalls).toBe(2);
+    expect(lastCorsOrigins).toEqual([
+      "https://chat.example.com",
+      "https://www.chat.example.com",
+    ]);
   });
 
-  test("skips when chat hostname cannot be resolved", async () => {
+  test("skips when no chat origins can be resolved", async () => {
     mockOrg = {
       cloudflareAccountId: "acct-123",
       cloudflareR2BucketName: "cco-uploads-acct",
       pcoWebRedirectUri: null,
     };
 
-    const { ensureOrgR2UploadCorsOnce } = await import(`./r2-uploads?t=${Date.now()}`);
-    await ensureOrgR2UploadCorsOnce();
+    const { reconcileOrgR2UploadCors } = await import(`./r2-uploads?t=${Date.now()}`);
+    await reconcileOrgR2UploadCors();
 
     expect(r2CorsCalls).toBe(0);
   });
