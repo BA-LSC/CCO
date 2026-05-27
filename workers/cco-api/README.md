@@ -22,6 +22,7 @@ Main CCO API for Cloudflare-native installs. Reuses route handlers from `service
 - `/v1/uploads/*` — presign + serve (R2 binding)
 - `/v1/presence/*`, `/v1/unread/*`, `/v1/push/*`
 - `/v1/calls/*`, `/v1/services/*`
+- `/v1/giphy/*` — GIF search, import (session auth; same handlers as Bun API)
 - `/internal/*` — edge worker callbacks (PCO webhooks, reconcile cron, push consumer)
 
 ## WebSocket (Phase 5)
@@ -32,7 +33,6 @@ Main CCO API for Cloudflare-native installs. Reuses route handlers from `service
 
 ## Deferred (other workers)
 | `POST /webhooks/pco` | **Edge** — `cco-pco-webhook` → `/internal/webhooks/pco` |
-| `/v1/giphy/*` | **Edge** — `cco-giphy-proxy` |
 | Local disk uploads (`Bun.write`) | Not supported — R2 only |
 | Redis pub/sub | Replaced by `REALTIME_FANOUT` service binding |
 | Hyperdrive / Postgres | Not used — D1 only |

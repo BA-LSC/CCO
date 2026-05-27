@@ -1,6 +1,7 @@
 import { fetchFromApi } from "@/lib/api-fetch-server";
 import { isCloudflareDeployTarget, isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
 import { isDeployDraining } from "@/lib/deploy-status.server";
+import { buildUpstreamAuthHeaders } from "@/lib/upstream-auth";
 
 const UPLOAD_PROXY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_PROXY_TIMEOUT_MS = 30_000;
@@ -63,11 +64,9 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
   const path = pathSegments.join("/");
   const targetPath = `/v1/${path}${incoming.search}`;
 
-  const headers = new Headers();
+  const headers = buildUpstreamAuthHeaders(request);
   const cookie = request.headers.get("cookie");
   if (cookie) headers.set("cookie", cookie);
-  const authorization = request.headers.get("authorization");
-  if (authorization) headers.set("authorization", authorization);
   const pcoToken = request.headers.get("x-pco-access-token");
   if (pcoToken) headers.set("x-pco-access-token", pcoToken);
   const setupToken = readSetupToken(request);

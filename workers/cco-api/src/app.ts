@@ -9,6 +9,7 @@ import { authRouter } from "../../../services/api/src/routes/auth";
 import { mountConversationCallRoutes, callsRouter } from "../../../services/api/src/routes/calls";
 import { conversationsRouter } from "../../../services/api/src/routes/conversations";
 import { dmsRouter } from "../../../services/api/src/routes/dms";
+import { giphyRouter } from "../../../services/api/src/routes/giphy";
 import { groupsRouter } from "../../../services/api/src/routes/groups";
 import { internalRouter } from "../../../services/api/src/routes/internal";
 import { messagesRouter } from "../../../services/api/src/routes/messages";
@@ -65,6 +66,7 @@ export function createApp(): Hono<{ Variables: AuthVariables }> {
   app.route("/v1/setup", setupRouter);
   app.route("/v1/settings", settingsRouter);
   app.route("/v1/presence", presenceRouter);
+  app.route("/v1/giphy", giphyRouter);
   app.route("/internal", internalRouter);
 
   app.onError((err, c) => {

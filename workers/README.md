@@ -10,7 +10,7 @@ Workers extend CCO beyond the VPS. Resource IDs (R2 bucket, KV, Queues, Hyperdri
 | `cco-install-orchestrator` | `setup-c.co/api/*` / local `:8787` | Install API (session KV, Cloudflare verify, provision pipeline) |
 | `cco-api` | `{API_DOMAIN}/*` (catch-all) | Main Hono API on D1 + R2 + KV + Queues |
 | `cco-pco-webhook` | `{API_DOMAIN}/webhooks/pco` | Edge HMAC verify + forward to internal handler |
-| `cco-giphy-proxy` | `{API_DOMAIN}/v1/giphy/*` | Cached Giphy API proxy |
+| `cco-giphy-proxy` | _(unused — giphy served by `cco-api`)_ | Legacy edge proxy (not routed after provision) |
 | `cco-reconcile-cron` | Cron `0 3 * * *` | Nightly PCO reconcile (batch user sync) |
 | `cco-push-consumer` | Queue `cco-push-notifications` | Retryable Expo/Web Push delivery |
 | `cco-realtime-fanout` | `{API_DOMAIN}/v1/ws` | Per-conversation Durable Object WebSocket hub (replaces Bun WS + Redis) |

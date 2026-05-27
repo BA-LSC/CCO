@@ -158,7 +158,6 @@ describe("ensureCcoApiWorkerRoutes", () => {
     await ensureCcoApiWorkerRoutes("zone-1", "cf-token", "api.example.com");
     expect(patterns).toEqual([
       "api.example.com/webhooks/pco",
-      "api.example.com/v1/giphy/*",
       "api.example.com/v1/ws",
       "api.example.com/*",
     ]);

@@ -25,7 +25,6 @@ export type CcoApiWorkerRoute = {
 /** Most-specific routes first; catch-all last. */
 export const CCO_API_WORKER_ROUTES: readonly CcoApiWorkerRoute[] = [
   { patternSuffix: "/webhooks/pco", script: "cco-pco-webhook" },
-  { patternSuffix: "/v1/giphy/*", script: "cco-giphy-proxy" },
   { patternSuffix: "/v1/ws", script: "cco-realtime-fanout" },
   { patternSuffix: "/*", script: "cco-api" },
 ] as const;
