@@ -54,6 +54,15 @@ export const configuredOrganizationColumns = {
   realtimeKitPresetGuest: organizations.realtimeKitPresetGuest,
   pcoLastSyncedAt: organizations.pcoLastSyncedAt,
   pcoNightlySyncEnabled: organizations.pcoNightlySyncEnabled,
+  cloudflareR2BucketName: organizations.cloudflareR2BucketName,
+  cloudflareKvPresenceNamespaceId: organizations.cloudflareKvPresenceNamespaceId,
+  cloudflareKvDeployNamespaceId: organizations.cloudflareKvDeployNamespaceId,
+  cloudflarePushQueueId: organizations.cloudflarePushQueueId,
+  cloudflarePlatformProvisionedAt: organizations.cloudflarePlatformProvisionedAt,
+  installedReleaseVersion: organizations.installedReleaseVersion,
+  autoUpdateEnabled: organizations.autoUpdateEnabled,
+  lastUpdateCheckAt: organizations.lastUpdateCheckAt,
+  gitRepoUrl: organizations.gitRepoUrl,
 };
 
 export function extendConfiguredOrganizationRow(
@@ -69,6 +78,15 @@ export function extendConfiguredOrganizationRow(
     realtimeKitPresetGuest: null,
     pcoLastSyncedAt: null,
     pcoNightlySyncEnabled: true,
+    cloudflareR2BucketName: null,
+    cloudflareKvPresenceNamespaceId: null,
+    cloudflareKvDeployNamespaceId: null,
+    cloudflarePushQueueId: null,
+    cloudflarePlatformProvisionedAt: null,
+    installedReleaseVersion: null,
+    autoUpdateEnabled: false,
+    lastUpdateCheckAt: null,
+    gitRepoUrl: null,
   };
 }
 
@@ -98,5 +116,14 @@ export type ConfiguredOrganizationRow = {
   realtimeKitPresetGuest: string | null;
   pcoLastSyncedAt: Date | null;
   pcoNightlySyncEnabled: boolean;
+  cloudflareR2BucketName: string | null;
+  cloudflareKvPresenceNamespaceId: string | null;
+  cloudflareKvDeployNamespaceId: string | null;
+  cloudflarePushQueueId: string | null;
+  cloudflarePlatformProvisionedAt: Date | null;
+  installedReleaseVersion: string | null;
+  autoUpdateEnabled: boolean;
+  lastUpdateCheckAt: Date | null;
+  gitRepoUrl: string | null;
   createdAt: Date;
 };

@@ -47,8 +47,11 @@ import {
   executeCloudflareReleaseUpdate,
   getUpdatesStatus,
   setAutoUpdateEnabled,
+  setGitRepoUrl,
   startCloudflareReleaseUpdate,
 } from "../services/org-updates";
+import { resolveOrgGitRepoUrl } from "../services/git-release-index";
+import { CCO_DEFAULT_GIT_REPO_URL } from "@cco/shared";
 import { getExecutionContext, isCloudflareRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
@@ -63,6 +66,7 @@ const IntegrationsPatchSchema = z.object({
   vapidSubjectEmail: z.string().email().optional(),
   giphyApiKey: z.string().min(1).optional(),
   pcoNightlySyncEnabled: z.boolean().optional(),
+  gitRepoUrl: z.string().min(1).optional(),
 });
 
 const RealtimeKitSetupSchema = z.object({
@@ -73,9 +77,14 @@ const CloudflareTokenSchema = z.object({
   cloudflareApiToken: z.string().min(1),
 });
 
-const UpdatesPatchSchema = z.object({
-  autoUpdateEnabled: z.boolean(),
-});
+const UpdatesPatchSchema = z
+  .object({
+    autoUpdateEnabled: z.boolean().optional(),
+    gitRepoUrl: z.string().min(1).optional(),
+  })
+  .refine((data) => data.autoUpdateEnabled !== undefined || data.gitRepoUrl !== undefined, {
+    message: "No fields to update",
+  });
 
 export const settingsRouter = new Hono<Env>();
 
@@ -140,6 +149,8 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     ...giphyStatus,
     ...realtimeKitStatus,
     ...platformStatus,
+    gitRepoUrl: resolveOrgGitRepoUrl(refreshed.gitRepoUrl),
+    defaultGitRepoUrl: CCO_DEFAULT_GIT_REPO_URL,
   });
 });
 
@@ -201,6 +212,15 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid Giphy API key";
+      return c.json({ error: message }, 400);
+    }
+  }
+
+  if (data.gitRepoUrl !== undefined) {
+    try {
+      await setGitRepoUrl(data.gitRepoUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid git repository URL";
       return c.json({ error: message }, 400);
     }
   }
@@ -465,7 +485,12 @@ settingsRouter.patch("/updates", requireAuth, async (c) => {
   }
 
   try {
-    await setAutoUpdateEnabled(parsed.data.autoUpdateEnabled);
+    if (parsed.data.autoUpdateEnabled !== undefined) {
+      await setAutoUpdateEnabled(parsed.data.autoUpdateEnabled);
+    }
+    if (parsed.data.gitRepoUrl !== undefined) {
+      await setGitRepoUrl(parsed.data.gitRepoUrl);
+    }
     const status = await getUpdatesStatus();
     return c.json({ ok: true, ...status });
   } catch (err) {

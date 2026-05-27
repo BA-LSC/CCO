@@ -58,6 +58,7 @@ export const organizations = sqliteTable("organizations", {
     .notNull()
     .default(false),
   lastUpdateCheckAt: timestampMs("last_update_check_at"),
+  gitRepoUrl: text("git_repo_url"),
   createdAt: timestampMsNow("created_at"),
 });
 

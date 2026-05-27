@@ -23,6 +23,7 @@ const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "installed_release_version" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "auto_update_enabled" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "last_update_check_at" timestamp`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "git_repo_url" text`,
 ] as const;
 
 /** Call tables from 0021 — optional; must not block Cloudflare token save. */

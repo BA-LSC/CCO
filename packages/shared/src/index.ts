@@ -1,4 +1,5 @@
 export * from "./install-origin";
+export * from "./git-repo";
 export * from "./release-index";
 export * from "./notification-navigation";
 export * from "./pco-sync";

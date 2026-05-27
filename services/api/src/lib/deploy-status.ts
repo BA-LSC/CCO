@@ -4,6 +4,7 @@ import { getWorkerBindings } from "../runtime/worker-context";
 
 export const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
+export const DEPLOY_LAST_ERROR_KEY = "cco:deploy:last-error";
 
 let redis: Redis | null = null;
 
@@ -108,6 +109,76 @@ async function publishDeploySignal(updating: boolean): Promise<void> {
     if (kv) {
       await kvPut(kv, DEPLOY_SIGNAL_CHANNEL, updating ? "updating" : "ready", 120);
     }
+  }
+}
+
+export async function readDeployLastError(): Promise<string | null> {
+  try {
+    if (await shouldUseKvDeploy()) {
+      const binding = getWorkerBindings()?.DEPLOY_KV;
+      if (binding) {
+        const raw = await kvGetBinding(binding, DEPLOY_LAST_ERROR_KEY);
+        return raw?.trim() || null;
+      }
+      const kv = await resolveDeployKvConfig();
+      if (kv) {
+        const raw = await kvGet(kv, DEPLOY_LAST_ERROR_KEY);
+        return raw?.trim() || null;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    if (client.status !== "ready") {
+      await client.connect().catch(() => null);
+    }
+    if (client.status !== "ready") return null;
+    const raw = await client.get(DEPLOY_LAST_ERROR_KEY);
+    return raw?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setDeployLastError(message: string | null): Promise<void> {
+  if (!(await shouldUseKvDeploy())) {
+    const client = getRedis();
+    if (!client) return;
+    try {
+      if (client.status !== "ready") {
+        await client.connect().catch(() => null);
+      }
+      if (client.status !== "ready") return;
+      if (message) {
+        await client.set(DEPLOY_LAST_ERROR_KEY, message, "EX", 86_400);
+      } else {
+        await client.del(DEPLOY_LAST_ERROR_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  const binding = getWorkerBindings()?.DEPLOY_KV;
+  if (binding) {
+    if (message) {
+      await kvPutBinding(binding, DEPLOY_LAST_ERROR_KEY, message, 86_400);
+    } else {
+      await kvPutBinding(binding, DEPLOY_LAST_ERROR_KEY, "", 1);
+    }
+    return;
+  }
+  const kv = await resolveDeployKvConfig();
+  if (!kv) return;
+  if (message) {
+    await kvPut(kv, DEPLOY_LAST_ERROR_KEY, message, 86_400);
+  } else {
+    await kvPut(kv, DEPLOY_LAST_ERROR_KEY, "", 1);
   }
 }
 

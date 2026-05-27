@@ -1,4 +1,9 @@
 export {
+  verifyCloudflareUpdateApplyPermissions,
+  type VerifyCloudflareUpdateApplyParams,
+} from "./update-token-verify";
+
+export {
   cfRequest,
   cfRealtimeKitRequest,
   CloudflareApiError,

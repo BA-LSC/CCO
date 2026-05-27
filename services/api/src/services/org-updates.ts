@@ -1,13 +1,11 @@
-import {
-  CCO_RELEASE_INDEX_URL,
-  type ReleaseIndex,
-} from "@cco/shared/release-index";
+import { CCO_DEFAULT_GIT_REPO_URL, type ReleaseIndex } from "@cco/shared";
 import {
   applyD1MigrationStatements,
   deployAllProvisionWorkers,
   deployCcoWebWorker,
   ensureD1Database,
   fetchWebReleaseManifest,
+  verifyCloudflareUpdateApplyPermissions,
   type CcoWorkerScriptName,
   type ProvisionSecrets,
 } from "@cco/cloudflare-provision";
@@ -17,7 +15,8 @@ import { decryptSecret } from "../auth/token-crypto";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { isCloudflareRuntime } from "../runtime/worker-context";
-import { setDeployDraining } from "../lib/deploy-status";
+import { readDeployLastError, setDeployDraining, setDeployLastError } from "../lib/deploy-status";
+import { fetchGitReleaseIndex, resolveOrgGitRepoUrl } from "./git-release-index";
 import { getConfiguredOrganization } from "./org-oauth";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import { invalidateOrgContextCache } from "./org-context-cache";
@@ -26,6 +25,7 @@ const D1_UPDATE_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN "installed_release_version" TEXT`,
   `ALTER TABLE "organizations" ADD COLUMN "auto_update_enabled" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "organizations" ADD COLUMN "last_update_check_at" INTEGER`,
+  `ALTER TABLE "organizations" ADD COLUMN "git_repo_url" TEXT`,
 ] as const;
 
 function splitSqlStatements(sqlText: string): string[] {
@@ -58,6 +58,8 @@ export type UpdatesStatus = {
   lastUpdateCheckAt: string | null;
   latestPublishedAt: string | null;
   releasesBaseUrl: string | null;
+  gitRepoUrl: string;
+  lastApplyError: string | null;
   canApply: boolean;
   applyBlockedReason: string | null;
 };
@@ -90,16 +92,12 @@ function resolveRunningBuildVersion(): string | null {
   return fromEnv && fromEnv !== "dev" ? fromEnv : null;
 }
 
-function resolveReleaseIndexUrl(): string {
-  const explicit = process.env.CCO_RELEASE_INDEX_URL?.trim();
-  if (explicit) return explicit;
-  const base = process.env.CCO_RELEASES_BASE_URL?.trim()?.replace(/\/+$/, "");
-  if (base) return `${base}/release-index.json`;
-  return CCO_RELEASE_INDEX_URL;
-}
-
 function resolveReleasesBaseUrl(index: ReleaseIndex): string {
   return index.releasesBaseUrl.replace(/\/+$/, "");
+}
+
+async function fetchReleaseIndexForOrg(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
+  return fetchGitReleaseIndex(gitRepoUrl);
 }
 
 export function resolveOrgHostnames(org: {
@@ -137,19 +135,8 @@ export function resolveUpdatePlatform(org: {
   return "unknown";
 }
 
-export async function fetchReleaseIndex(): Promise<ReleaseIndex> {
-  const url = resolveReleaseIndexUrl();
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) {
-    throw new Error(`Release index unavailable (HTTP ${res.status})`);
-  }
-  const json = (await res.json()) as ReleaseIndex;
-  if (!json.version?.trim()) {
-    throw new Error("Release index missing version");
-  }
-  return json;
+export async function fetchReleaseIndex(gitRepoUrl?: string | null): Promise<ReleaseIndex> {
+  return fetchReleaseIndexForOrg(gitRepoUrl);
 }
 
 function isUpdateAvailable(current: string | null, latest: string): boolean {
@@ -172,9 +159,12 @@ export async function getUpdatesStatus(options?: {
   let latestIndex: ReleaseIndex | null = null;
   let checkError: string | null = null;
 
+  const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
+  const lastApplyError = await readDeployLastError();
+
   if (options?.forceCheck || !org.lastUpdateCheckAt) {
     try {
-      latestIndex = await fetchReleaseIndex();
+      latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
     } catch (err) {
       checkError = err instanceof Error ? err.message : "Release check failed";
     }
@@ -184,7 +174,7 @@ export async function getUpdatesStatus(options?: {
       .where(eq(organizations.id, org.id));
   } else {
     try {
-      latestIndex = await fetchReleaseIndex();
+      latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
     } catch {
       // Stale check data is acceptable when not forcing.
     }
@@ -228,6 +218,8 @@ export async function getUpdatesStatus(options?: {
     lastUpdateCheckAt: org.lastUpdateCheckAt?.toISOString() ?? null,
     latestPublishedAt: latestIndex?.publishedAt ?? null,
     releasesBaseUrl: latestIndex ? resolveReleasesBaseUrl(latestIndex) : null,
+    gitRepoUrl,
+    lastApplyError,
     canApply,
     applyBlockedReason,
   };
@@ -297,7 +289,8 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
     throw new Error("Could not resolve chat/API hostnames from organization URLs");
   }
 
-  const releaseIndex = await fetchReleaseIndex();
+  const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
+  const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
   const currentVersion =
     org.installedReleaseVersion?.trim() || resolveRunningBuildVersion();
@@ -307,8 +300,16 @@ export async function prepareCloudflareReleaseUpdate(): Promise<CloudflareReleas
 
   const apiToken = decryptSecret(org.cloudflareApiTokenEnc);
   const accountId = org.cloudflareAccountId;
+  await verifyCloudflareUpdateApplyPermissions({
+    accountId,
+    apiToken,
+    chatHostname: hostnames.chatHostname,
+    apiHostname: hostnames.apiHostname,
+  });
+
   const secrets = requireProvisionSecrets();
   const readBundle = createRemoteBundleLoader(releasesBase);
+  await setDeployLastError(null);
 
   const d1 = await ensureD1Database(accountId, apiToken, "cco");
   const resources = {
@@ -382,8 +383,13 @@ export async function executeCloudflareReleaseUpdate(
       })
       .where(eq(organizations.id, job.orgId));
     invalidateOrgContextCache();
+    await setDeployLastError(null);
 
     return { appliedVersion: job.targetVersion, deployedWorkers };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Apply update failed";
+    await setDeployLastError(message);
+    throw err;
   } finally {
     await setDeployDraining(false);
   }
@@ -404,6 +410,21 @@ export async function applyCloudflareReleaseUpdate(): Promise<{
 }> {
   const job = await prepareCloudflareReleaseUpdate();
   return executeCloudflareReleaseUpdate(job);
+}
+
+export async function setGitRepoUrl(gitRepoUrl: string): Promise<void> {
+  await ensureOrgUpdateSettingsColumns();
+  const org = await getConfiguredOrganization();
+  if (!org) throw new Error("Organization not found");
+
+  const normalized = resolveOrgGitRepoUrl(gitRepoUrl);
+  await db
+    .update(organizations)
+    .set({
+      gitRepoUrl: normalized === CCO_DEFAULT_GIT_REPO_URL ? null : normalized,
+    })
+    .where(eq(organizations.id, org.id));
+  invalidateOrgContextCache();
 }
 
 export async function setAutoUpdateEnabled(enabled: boolean): Promise<void> {

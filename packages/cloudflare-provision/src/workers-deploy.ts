@@ -245,10 +245,22 @@ async function listWorkerMigrationTags(
   const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts`, {
     headers: { Authorization: `Bearer ${apiToken}` },
   });
+  if (res.status === 404) {
+    return new Map<string, string>();
+  }
+
   const json = (await res.json()) as {
     success?: boolean;
     result?: Array<{ id: string; migration_tag?: string }>;
+    errors?: Array<{ message: string; code?: number }>;
   };
+  if (!res.ok || json.success === false) {
+    const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
+    if (res.status === 403 || /authentication error/i.test(detail)) {
+      throw new CloudflareApiError(detail || "Failed to list worker scripts", res.status);
+    }
+    return new Map<string, string>();
+  }
   const tags = new Map<string, string>();
   for (const script of json.result ?? []) {
     if (script.migration_tag) {

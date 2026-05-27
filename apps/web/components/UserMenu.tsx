@@ -355,20 +355,12 @@ export function UserMenu({ variant = "default" }: Props) {
             <div className="user-menu-admin" role="group" aria-label="Admin">
               <span className="user-menu-dropdown-label">Admin</span>
               <a
-                href="/settings/integrations"
+                href="/settings/admin"
                 className="user-menu-item"
                 role="menuitem"
                 onClick={() => setOpen(false)}
               >
-                Integrations
-              </a>
-              <a
-                href="/settings/updates"
-                className="user-menu-item"
-                role="menuitem"
-                onClick={() => setOpen(false)}
-              >
-                Updates
+                Admin Settings
               </a>
             </div>
           )}

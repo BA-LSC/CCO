@@ -47,6 +47,7 @@ export const organizations = pgTable("organizations", {
   installedReleaseVersion: text("installed_release_version"),
   autoUpdateEnabled: boolean("auto_update_enabled").notNull().default(false),
   lastUpdateCheckAt: timestamp("last_update_check_at"),
+  gitRepoUrl: text("git_repo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

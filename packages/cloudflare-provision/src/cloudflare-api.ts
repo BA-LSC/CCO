@@ -23,11 +23,22 @@ export class CloudflareApiError extends Error {
   }
 }
 
+type CloudflareApiErrorEntry = {
+  message: string;
+  code?: number;
+};
+
 function cloudflareErrorDetail(
   res: Response,
-  errors?: Array<{ message: string }>,
+  errors?: CloudflareApiErrorEntry[],
 ): string {
-  return errors?.map((e) => e.message).join("; ") ?? res.statusText;
+  if (!errors?.length) return res.statusText;
+  return errors
+    .map((entry) => {
+      const code = entry.code != null ? `[${entry.code}] ` : "";
+      return `${code}${entry.message}`;
+    })
+    .join("; ");
 }
 
 async function readCloudflareJson(res: Response): Promise<unknown> {

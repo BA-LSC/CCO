@@ -44,6 +44,10 @@
     "./release-index": {
       "types": "./dist/release-index.d.ts",
       "default": "./dist/release-index.js"
+    },
+    "./git-repo": {
+      "types": "./dist/git-repo.d.ts",
+      "default": "./dist/git-repo.js"
     }
   },
   "scripts": {

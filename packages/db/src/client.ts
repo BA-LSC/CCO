@@ -30,7 +30,11 @@ export function getD1MigrationSqlFiles(): string[] {
 
 /** Incremental D1 migration filenames shipped in release artifacts (apply order). */
 export function getD1IncrementalMigrationFilenames(): string[] {
-  return ["0001_org_release_updates.sql", "0002_pco_nightly_sync_enabled.sql"];
+  return [
+    "0001_org_release_updates.sql",
+    "0002_pco_nightly_sync_enabled.sql",
+    "0003_org_git_repo_url.sql",
+  ];
 }
 
 /** Read baseline migration SQL (for Workers without filesystem or provision API batch). */

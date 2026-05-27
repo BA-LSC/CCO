@@ -68,6 +68,10 @@ cpSync(
   join(ROOT, "packages/db/drizzle/d1/0001_org_release_updates.sql"),
   join(RELEASES, "0001_org_release_updates.sql"),
 );
+cpSync(
+  join(ROOT, "packages/db/drizzle/d1/0003_org_git_repo_url.sql"),
+  join(RELEASES, "0003_org_git_repo_url.sql"),
+);
 
 const manifest = walkAssets(ASSETS_OUT);
 writeFileSync(join(RELEASES, "cco-web-manifest.json"), JSON.stringify(manifest, null, 2));
