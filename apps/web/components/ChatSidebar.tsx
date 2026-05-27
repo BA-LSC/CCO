@@ -8,7 +8,7 @@ import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
-import { UserStatusMessage } from "@/components/UserStatusMessage";
+import { DmSidebarSubtitle } from "@/components/DmSidebarSubtitle";
 import { usePresenceWatch } from "@/components/PresenceProvider";
 import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
@@ -19,8 +19,10 @@ import {
   type DmParticipant,
   type DmSummary,
   type GroupSidebarItem,
+  type Message,
   type ServiceTeamSummary,
 } from "@/lib/api";
+import { formatSidebarMessagePreview } from "@/lib/message-preview";
 import { subscribeUnreadChanged } from "@/lib/sidebar-events";
 import { fetchSetupStatus } from "@/lib/setup";
 import {
@@ -28,10 +30,43 @@ import {
   shouldShowTeamServiceSections,
 } from "@/lib/service-team-sidebar";
 
+function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
+  return [...dms].sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+}
+
+function previewFromMessage(message: Message, currentUserId: string | undefined): string | null {
+  return formatSidebarMessagePreview({
+    body: message.body,
+    attachmentUrl: message.attachmentUrl,
+    messageType: message.messageType,
+    authorIsSelf: message.authorId === currentUserId,
+  });
+}
+
+function applyDmMessagePreview(
+  dms: DmSummary[],
+  conversationId: string,
+  preview: string | null,
+  activityAt: string,
+  hasUnread?: boolean,
+): DmSummary[] {
+  const next = dms.map((dm) => {
+    if (dm.id !== conversationId) return dm;
+    return {
+      ...dm,
+      lastMessagePreview: preview,
+      lastActivityAt: activityAt,
+      ...(hasUnread !== undefined ? { hasUnread } : {}),
+    };
+  });
+  return sortDmsByActivity(next);
+}
+
 export function ChatSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { sidebarOpen, closeSidebar } = useChatLayout();
+  const { sidebarOpen, closeSidebar, subscribeRealtime, session, activeConversationId } =
+    useChatLayout();
 
   const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
   const [dms, setDms] = useState<DmSummary[]>([]);
@@ -113,6 +148,37 @@ export function ChatSidebar() {
       );
     });
   }, []);
+
+  useEffect(() => {
+    return subscribeRealtime((event) => {
+      if (!activeConversationId) return;
+
+      if (event.type === "message.created" && event.message) {
+        const preview = previewFromMessage(event.message, session?.userId);
+        setDms((prev) =>
+          applyDmMessagePreview(
+            prev,
+            activeConversationId,
+            preview,
+            event.message.createdAt,
+          ),
+        );
+        return;
+      }
+
+      if (event.type === "message.updated" && event.message) {
+        const preview = previewFromMessage(event.message, session?.userId);
+        setDms((prev) =>
+          applyDmMessagePreview(prev, activeConversationId, preview, event.message.createdAt),
+        );
+        return;
+      }
+
+      if (event.type === "message.deleted") {
+        void loadSidebar({ silent: true });
+      }
+    });
+  }, [activeConversationId, loadSidebar, session?.userId, subscribeRealtime]);
 
   useEffect(() => {
     closeSidebar();
@@ -330,10 +396,7 @@ export function ChatSidebar() {
                               <span className="sidebar-item-label sidebar-dm-name">
                                   {creatingDm === p.id ? "Opening…" : p.displayName}
                                 </span>
-                                <UserStatusMessage
-                                  userId={p.id}
-                                  className="sidebar-dm-status"
-                                />
+                                <DmSidebarSubtitle userId={p.id} />
                             </div>
                           </button>
                         </li>
@@ -366,9 +429,9 @@ export function ChatSidebar() {
                           <span className="sidebar-item-label sidebar-dm-name">
                             {dm.participant.displayName}
                           </span>
-                          <UserStatusMessage
+                          <DmSidebarSubtitle
                             userId={dm.participant.id}
-                            className="sidebar-dm-status"
+                            preview={dm.lastMessagePreview}
                           />
                           {dm.hasUnread && activeDmId !== dm.id && (
                             <span className="sidebar-unread-dot" aria-label="Unread messages" />

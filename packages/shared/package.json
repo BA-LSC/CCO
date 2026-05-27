@@ -28,6 +28,10 @@
     "./calls": {
       "types": "./dist/calls.d.ts",
       "default": "./dist/calls.js"
+    },
+    "./message-preview": {
+      "types": "./dist/message-preview.d.ts",
+      "default": "./dist/message-preview.js"
     }
   },
   "scripts": {

@@ -2,21 +2,35 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { conversationMembers } from "../db/schema";
 
+export type LastConversationMessage = {
+  authorId: string;
+  createdAt: Date;
+  body: string;
+  messageType: string;
+  attachmentUrl: string | null;
+};
+
 export async function fetchLastMessagesForConversations(
   conversationIds: string[],
-): Promise<Map<string, { authorId: string; createdAt: Date }>> {
-  const result = new Map<string, { authorId: string; createdAt: Date }>();
+): Promise<Map<string, LastConversationMessage>> {
+  const result = new Map<string, LastConversationMessage>();
   if (conversationIds.length === 0) return result;
 
   const rows = await db.execute<{
     conversation_id: string;
     author_id: string;
     created_at: Date | string;
+    body: string;
+    message_type: string;
+    attachment_url: string | null;
   }>(sql`
     SELECT DISTINCT ON (conversation_id)
       conversation_id,
       author_id,
-      created_at
+      created_at,
+      body,
+      message_type,
+      attachment_url
     FROM messages
     WHERE conversation_id IN (${sql.join(
       conversationIds.map((id) => sql`${id}::uuid`),
@@ -32,6 +46,9 @@ export async function fetchLastMessagesForConversations(
     result.set(row.conversation_id, {
       authorId: row.author_id,
       createdAt,
+      body: row.body,
+      messageType: row.message_type,
+      attachmentUrl: row.attachment_url,
     });
   }
 

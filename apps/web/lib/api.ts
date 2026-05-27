@@ -166,6 +166,7 @@ export type DmSummary = {
   participant: DmParticipant;
   hasUnread: boolean;
   lastActivityAt: string | null;
+  lastMessagePreview: string | null;
   muted: boolean;
 };
 

@@ -17,6 +17,7 @@ import {
   mergeSignedUpMemberRecords,
   type SignedUpMemberRecord,
 } from "./cco-member-status";
+import { formatSidebarMessagePreview } from "@cco/shared/message-preview";
 import { fetchLastMessagesForConversations } from "./unread";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
@@ -30,6 +31,7 @@ export type DmSummary = {
   participant: DmParticipant;
   hasUnread: boolean;
   lastActivityAt: string | null;
+  lastMessagePreview: string | null;
   muted: boolean;
 };
 
@@ -428,11 +430,21 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
 
   const lastByConvRaw = await fetchLastMessagesForConversations(convIds);
   const lastByConv = new Map<string, { authorId: string; createdAt: string }>();
+  const previewByConv = new Map<string, string | null>();
   for (const [conversationId, last] of lastByConvRaw) {
     lastByConv.set(conversationId, {
       authorId: last.authorId,
       createdAt: last.createdAt.toISOString(),
     });
+    previewByConv.set(
+      conversationId,
+      formatSidebarMessagePreview({
+        body: last.body,
+        attachmentUrl: last.attachmentUrl,
+        messageType: last.messageType,
+        authorIsSelf: last.authorId === userId,
+      }),
+    );
   }
 
   const summaries: DmSummary[] = convIds
@@ -452,6 +464,7 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
         participant,
         hasUnread,
         lastActivityAt: last?.createdAt ?? null,
+        lastMessagePreview: previewByConv.get(id) ?? null,
         muted: member?.muted ?? false,
       };
     })
