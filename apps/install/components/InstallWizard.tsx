@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { InstallThemeShell } from "@/components/InstallThemeShell";
 import {
   CLOUDFLARE_TOKEN_TEMPLATE_URL,
   createInstallSession,
@@ -149,230 +150,215 @@ export function InstallWizard() {
   };
 
   return (
-    <main
-      style={{
-        maxWidth: 560,
-        margin: "0 auto",
-        padding: "2.5rem 1.25rem 4rem",
-      }}
-    >
-      <header style={{ marginBottom: "2rem" }}>
-        <p style={{ color: "var(--muted)", margin: 0, fontSize: "0.875rem" }}>CCO Install</p>
-        <h1 style={{ margin: "0.35rem 0 0", fontSize: "1.75rem", fontWeight: 700 }}>
-          Bring your church online
-        </h1>
-        <p style={{ color: "var(--muted)", marginTop: "0.5rem", lineHeight: 1.5 }}>
-          Deploy Chat Center Online into your Cloudflare account — no server or terminal required.
-        </p>
-      </header>
+    <InstallThemeShell>
+      <div className="install-wizard">
+        <header className="install-wizard-header">
+          <p className="setup-eyebrow">CCO Install</p>
+          <h1 className="setup-page-title">Bring your church online</h1>
+          <p className="setup-page-lede">
+            Deploy Chat Center Online into your Cloudflare account — no server or terminal required.
+          </p>
+        </header>
 
-      <div
-        role="progressbar"
-        aria-valuenow={progressPct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        style={{
-          height: 6,
-          borderRadius: 999,
-          background: "var(--surface)",
-          overflow: "hidden",
-          marginBottom: "1.5rem",
-        }}
-      >
         <div
-          style={{
-            width: `${progressPct}%`,
-            height: "100%",
-            background: "var(--accent)",
-            transition: "width 0.25s ease",
-          }}
-        />
-      </div>
+          role="progressbar"
+          aria-valuenow={progressPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Install progress"
+          className="install-progress"
+        >
+          <div className="install-progress-fill" style={{ width: `${progressPct}%` }} />
+        </div>
 
-      <ol
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          listStyle: "none",
-          padding: 0,
-          margin: "0 0 2rem",
-          flexWrap: "wrap",
-        }}
-      >
-        {STEPS.map((s, i) => (
-          <li
-            key={s.id}
-            style={{
-              fontSize: "0.8rem",
-              color: i <= stepIndex ? "var(--text)" : "var(--muted)",
-              fontWeight: i === stepIndex ? 600 : 400,
-            }}
-          >
-            {i + 1}. {s.label}
-          </li>
-        ))}
-      </ol>
+        <ol className="install-step-nav" aria-label="Install steps">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.id}
+              className={[
+                "install-step-nav-item",
+                i === stepIndex ? "is-active" : "",
+                i < stepIndex ? "is-complete" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {i + 1}. {s.label}
+            </li>
+          ))}
+        </ol>
 
-      <section
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          padding: "1.5rem",
-        }}
-      >
-        {step === "welcome" && (
-          <>
-            <h2 style={{ marginTop: 0, fontSize: "1.15rem" }}>Welcome</h2>
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.5 }}>
-              We&apos;ll guide you through connecting Cloudflare and deploying CCO for your church.
-            </p>
-            <div className="field">
-              <label htmlFor="churchName">Church name</label>
-              <input
-                id="churchName"
-                value={churchName}
-                onChange={(e) => setChurchName(e.target.value)}
-                placeholder="Grace Community Church"
-                autoComplete="organization"
-              />
-            </div>
-            <button type="button" disabled={loading || !churchName.trim()} onClick={() => void handleWelcome()}>
-              {loading ? "Starting…" : "Continue"}
-            </button>
-          </>
-        )}
-
-        {step === "cloudflare" && (
-          <>
-            <h2 style={{ marginTop: 0, fontSize: "1.15rem" }}>Cloudflare API token</h2>
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.5 }}>
-              Create a token with Workers, D1, R2, KV, Queues, DNS, and Realtime permissions for your
-              zone.{" "}
-              <a href={CLOUDFLARE_TOKEN_TEMPLATE_URL} target="_blank" rel="noopener noreferrer">
-                Open Cloudflare token page
-              </a>
-            </p>
-            <div className="field">
-              <label htmlFor="apiToken">API token</label>
-              <input
-                id="apiToken"
-                type="password"
-                value={apiToken}
-                onChange={(e) => setApiToken(e.target.value)}
-                placeholder="Paste token here"
-                autoComplete="off"
-              />
-            </div>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setStep("welcome")}
-                disabled={loading}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                disabled={loading || !apiToken.trim()}
-                onClick={() => void handleVerifyToken()}
-              >
-                {loading ? "Verifying…" : "Verify token"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === "domains" && (
-          <>
-            <h2 style={{ marginTop: 0, fontSize: "1.15rem" }}>Domains</h2>
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem", lineHeight: 1.5 }}>
-              Choose the zone where chat and API hostnames will live. SSL must cover both hostnames.
-            </p>
-            <div className="field">
-              <label htmlFor="zone">Zone</label>
-              <select id="zone" value={selectedZoneId} onChange={(e) => onZoneChange(e.target.value)}>
-                {zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.name} ({zone.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="chatHost">Chat hostname</label>
-              <input
-                id="chatHost"
-                value={chatHostname}
-                onChange={(e) => setChatHostname(e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="apiHost">API hostname</label>
-              <input
-                id="apiHost"
-                value={apiHostname}
-                onChange={(e) => setApiHostname(e.target.value)}
-              />
-            </div>
-            <p style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
-              Requires Cloudflare Workers Paid (~$5/month). RealtimeKit usage may incur additional
-              charges after beta.
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-              <button type="button" className="secondary" onClick={() => setStep("cloudflare")} disabled={loading}>
-                Back
-              </button>
-              <button
-                type="button"
-                disabled={loading || !selectedZoneId || !chatHostname.trim() || !apiHostname.trim()}
-                onClick={() => void handleDomains()}
-              >
-                {loading ? "Saving…" : "Start deploy"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === "deploy" && (
-          <>
-            <h2 style={{ marginTop: 0, fontSize: "1.15rem" }}>Deploy progress</h2>
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-              Provisioning D1, R2, Workers, DNS, and related resources. This usually takes a few
-              minutes.
-            </p>
-            {provisionStatus ? (
-              <ul style={{ listStyle: "none", padding: 0, margin: "1rem 0" }}>
-                {Object.entries(provisionStatus.stepStatus).map(([name, info]) => (
-                  <li
-                    key={name}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      padding: "0.35rem 0",
-                      fontSize: "0.85rem",
-                      color: info.status === "failed" ? "var(--danger)" : "var(--text)",
-                    }}
-                  >
-                    <span>{name.replace(/_/g, " ")}</span>
-                    <span style={{ color: "var(--muted)" }}>{info.status}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ color: "var(--muted)" }}>Starting provision…</p>
-            )}
-            {provisionStatus?.complete && (
-              <p style={{ color: "var(--success)" }}>
-                Complete — redirecting to your church setup…
+        <section className="setup-form-card" aria-live="polite">
+          {step === "welcome" && (
+            <>
+              <h2 className="install-step-title">Welcome</h2>
+              <p className="install-step-body">
+                We&apos;ll guide you through connecting Cloudflare and deploying CCO for your church.
               </p>
-            )}
-          </>
-        )}
+              <div className="setup-form">
+                <label className="field" htmlFor="churchName">
+                  <span>Church name</span>
+                  <input
+                    id="churchName"
+                    value={churchName}
+                    onChange={(e) => setChurchName(e.target.value)}
+                    placeholder="Grace Community Church"
+                    autoComplete="organization"
+                  />
+                </label>
+                <div className="setup-form-actions">
+                  <button
+                    type="button"
+                    className="setup-btn-primary"
+                    disabled={loading || !churchName.trim()}
+                    onClick={() => void handleWelcome()}
+                  >
+                    {loading ? "Starting…" : "Continue"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
-        {error && <p className="error">{error}</p>}
-      </section>
-    </main>
+          {step === "cloudflare" && (
+            <>
+              <h2 className="install-step-title">Cloudflare API token</h2>
+              <p className="install-step-body">
+                Create a token with Workers, D1, R2, KV, Queues, DNS, and Realtime permissions for your
+                zone.{" "}
+                <a href={CLOUDFLARE_TOKEN_TEMPLATE_URL} target="_blank" rel="noopener noreferrer">
+                  Open Cloudflare token page
+                </a>
+              </p>
+              <div className="setup-form">
+                <label className="field" htmlFor="apiToken">
+                  <span>API token</span>
+                  <input
+                    id="apiToken"
+                    type="password"
+                    value={apiToken}
+                    onChange={(e) => setApiToken(e.target.value)}
+                    placeholder="Paste token here"
+                    autoComplete="off"
+                  />
+                </label>
+                <div className="setup-form-actions">
+                  <button
+                    type="button"
+                    className="setup-btn-secondary"
+                    onClick={() => setStep("welcome")}
+                    disabled={loading}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="setup-btn-primary"
+                    disabled={loading || !apiToken.trim()}
+                    onClick={() => void handleVerifyToken()}
+                  >
+                    {loading ? "Verifying…" : "Verify token"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === "domains" && (
+            <>
+              <h2 className="install-step-title">Domains</h2>
+              <p className="install-step-body">
+                Choose the zone where chat and API hostnames will live. SSL must cover both hostnames.
+              </p>
+              <div className="setup-form">
+                <label className="field" htmlFor="zone">
+                  <span>Zone</span>
+                  <select id="zone" value={selectedZoneId} onChange={(e) => onZoneChange(e.target.value)}>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name} ({zone.status})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field" htmlFor="chatHost">
+                  <span>Chat hostname</span>
+                  <input
+                    id="chatHost"
+                    value={chatHostname}
+                    onChange={(e) => setChatHostname(e.target.value)}
+                  />
+                </label>
+                <label className="field" htmlFor="apiHost">
+                  <span>API hostname</span>
+                  <input
+                    id="apiHost"
+                    value={apiHostname}
+                    onChange={(e) => setApiHostname(e.target.value)}
+                  />
+                </label>
+                <p className="install-step-note">
+                  Requires Cloudflare Workers Paid (~$5/month). RealtimeKit usage may incur additional
+                  charges after beta.
+                </p>
+                <div className="setup-form-actions">
+                  <button
+                    type="button"
+                    className="setup-btn-secondary"
+                    onClick={() => setStep("cloudflare")}
+                    disabled={loading}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="setup-btn-primary"
+                    disabled={loading || !selectedZoneId || !chatHostname.trim() || !apiHostname.trim()}
+                    onClick={() => void handleDomains()}
+                  >
+                    {loading ? "Saving…" : "Start deploy"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === "deploy" && (
+            <>
+              <h2 className="install-step-title">Deploy progress</h2>
+              <p className="install-step-body">
+                Provisioning D1, R2, Workers, DNS, and related resources. This usually takes a few
+                minutes.
+              </p>
+              {provisionStatus ? (
+                <ul className="install-deploy-steps">
+                  {Object.entries(provisionStatus.stepStatus).map(([name, info]) => (
+                    <li
+                      key={name}
+                      className={[
+                        "install-deploy-step",
+                        info.status === "failed" ? "is-failed" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <span>{name.replace(/_/g, " ")}</span>
+                      <span className="install-deploy-step-status">{info.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="install-step-body">Starting provision…</p>
+              )}
+              {provisionStatus?.complete && (
+                <p className="install-success-text">Complete — redirecting to your church setup…</p>
+              )}
+            </>
+          )}
+
+          {error && <p className="error-text">{error}</p>}
+        </section>
+      </div>
+    </InstallThemeShell>
   );
 }

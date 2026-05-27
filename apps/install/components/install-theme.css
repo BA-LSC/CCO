@@ -1,0 +1,324 @@
+.setup-welcome {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.setup-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.setup-page-hero {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: clamp(2.5rem, 8vh, 4rem);
+  padding-bottom: clamp(2.5rem, 8vh, 4rem);
+}
+
+.install-wizard {
+  width: min(100%, 32rem);
+  margin: 0 auto;
+}
+
+.install-wizard-header {
+  margin-bottom: 1.75rem;
+}
+
+.setup-eyebrow {
+  margin: 0 0 0.75rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--home-accent);
+}
+
+.setup-page-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--home-text);
+}
+
+.setup-page-lede {
+  margin: 0.65rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--home-muted);
+}
+
+.install-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--home-surface) 72%, var(--home-border));
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.install-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(59, 158, 255, 0.45) 0%, var(--home-accent) 100%);
+  transition: width 0.25s ease;
+}
+
+.install-step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+}
+
+.install-step-nav-item {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--home-muted);
+}
+
+.install-step-nav-item.is-active {
+  color: var(--home-text);
+  font-weight: 600;
+}
+
+.install-step-nav-item.is-complete {
+  color: var(--home-accent);
+}
+
+.setup-form-card {
+  width: 100%;
+  padding: 1.5rem 1.5rem 1.35rem;
+  border: 1px solid var(--home-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--home-surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--home-surface) 88%, var(--home-bg)) 100%
+    );
+  box-shadow: var(--shadow-md);
+}
+
+.install-step-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--home-text);
+}
+
+.install-step-body {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--home-muted);
+}
+
+.install-step-body a {
+  color: var(--home-accent);
+  text-decoration: none;
+}
+
+.install-step-body a:hover {
+  text-decoration: underline;
+}
+
+.install-step-note {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--home-muted);
+}
+
+.setup-form {
+  display: grid;
+  gap: 14px;
+}
+
+.setup-form .field {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.setup-form .field span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-text);
+}
+
+.setup-form input,
+.setup-form select,
+.setup-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--home-border);
+  border-radius: 8px;
+  font: inherit;
+  background: rgba(9, 11, 16, 0.65);
+  color: var(--home-text);
+}
+
+.setup-form select {
+  cursor: pointer;
+}
+
+.setup-form input::placeholder,
+.setup-form textarea::placeholder {
+  color: var(--home-muted);
+}
+
+.setup-form input:focus,
+.setup-form select:focus,
+.setup-form textarea:focus {
+  outline: none;
+  border-color: rgba(59, 158, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 158, 255, 0.15);
+}
+
+.setup-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.setup-btn-primary,
+button.setup-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.85rem 1.35rem;
+  border: 1px solid rgba(59, 158, 255, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(59, 158, 255, 0.28) 0%, rgba(59, 158, 255, 0.14) 100%);
+  color: var(--home-text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 12px 32px rgba(59, 158, 255, 0.12);
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.setup-btn-primary:hover:not(:disabled),
+button.setup-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--home-accent);
+  background: linear-gradient(180deg, rgba(59, 158, 255, 0.36) 0%, rgba(59, 158, 255, 0.18) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 16px 40px rgba(59, 158, 255, 0.18);
+}
+
+.setup-btn-primary:disabled,
+button.setup-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.setup-btn-secondary,
+button.setup-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid var(--home-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--home-surface) 72%, transparent);
+  color: var(--home-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.setup-btn-secondary:hover:not(:disabled),
+button.setup-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(59, 158, 255, 0.35);
+  background: rgba(59, 158, 255, 0.08);
+}
+
+.setup-btn-secondary:disabled,
+button.setup-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.install-deploy-steps {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.install-deploy-step {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+  color: var(--home-text);
+}
+
+.install-deploy-step.is-failed {
+  color: var(--home-danger);
+}
+
+.install-deploy-step-status {
+  flex-shrink: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--home-muted);
+  text-transform: lowercase;
+}
+
+.install-success-text {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--home-success);
+}
+
+.error-text {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: #fca5a5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-btn-primary:hover:not(:disabled),
+  button.setup-btn-primary:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .install-progress-fill {
+    transition: none;
+  }
+}

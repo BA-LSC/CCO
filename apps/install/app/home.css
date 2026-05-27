@@ -1,0 +1,67 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+
+.home {
+  /* Matches apps/web Signal theme (design-tokens theme "1") */
+  --home-bg: #090b10;
+  --home-surface: #111620;
+  --home-text: #e8edf5;
+  --home-muted: #7b8496;
+  --home-accent: #3b9eff;
+  --home-accent-dim: rgba(59, 158, 255, 0.12);
+  --home-border: rgba(232, 237, 245, 0.08);
+  --home-success: #34d399;
+  --home-danger: #f87171;
+  --home-max: 960px;
+  --shadow-md: 0 24px 48px rgba(0, 0, 0, 0.22);
+
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--home-bg);
+  color: var(--home-text);
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+.home-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-bg-gradient {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -10%,
+      color-mix(in srgb, var(--home-accent) 14%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 40% 30% at 100% 20%,
+      color-mix(in srgb, var(--home-accent) 6%, transparent),
+      transparent 50%
+    );
+}
+
+.home-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--home-text) 7%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, black 30%, transparent 90%);
+}
+
+.home-hero {
+  position: relative;
+  z-index: 1;
+  width: min(100%, var(--home-max));
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4vw, 2rem);
+}
