@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { UserAvatar } from "@/components/UserAvatar";
-import { SidebarAnnouncementIcon, SidebarChevronIcon, SidebarLockIcon } from "@/components/PanelHeaderIcons";
+import {
+  SidebarAnnouncementIcon,
+  SidebarChevronRightIcon,
+  SidebarLockIcon,
+} from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import {
   apiFetch,
@@ -207,62 +211,56 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
             return (
               <li key={group.id} className="sidebar-group">
                 <div className="sidebar-group-block">
-                  <div className="sidebar-group-name-row">
-                    <div
-                      className={`sidebar-group-header ${
-                        activeGroupId === group.id ? "sidebar-group-header-active" : ""
-                      }`}
-                    >
-                      <UserAvatar
-                        displayName={group.name}
-                        avatarUrl={group.imageUrl}
-                        className="sidebar-group-avatar"
-                      />
-                      <span className="sidebar-item-label">{group.name}</span>
-                    </div>
-                    {leader && (
-                      <div className="sidebar-group-actions">
-                        <div className="sidebar-group-menu">
-                          <button
-                            type="button"
-                            className={`sidebar-add-channel-icon ${menuOpenForGroup === group.id ? "sidebar-add-channel-icon-active" : ""}`}
-                            title="Group options"
-                            aria-label="Group options"
-                            aria-haspopup="menu"
-                            aria-expanded={menuOpenForGroup === group.id}
-                            onClick={() => {
-                              setMenuOpenForGroup((current) =>
-                                current === group.id ? null : group.id,
-                              );
-                            }}
-                          >
-                            <span
-                              className={`sidebar-group-menu-chevron${menuOpenForGroup === group.id ? " sidebar-group-menu-chevron-open" : ""}`}
-                              aria-hidden
+                  <div
+                    className={`sidebar-group-header ${
+                      activeGroupId === group.id ? "sidebar-group-header-active" : ""
+                    }`}
+                  >
+                    <UserAvatar
+                      displayName={group.name}
+                      avatarUrl={group.imageUrl}
+                      className="sidebar-group-avatar"
+                    />
+                    <span className="sidebar-item-label">{group.name}</span>
+                    {leader ? (
+                      <div className="sidebar-group-menu">
+                        <button
+                          type="button"
+                          className={`sidebar-group-menu-trigger${
+                            menuOpenForGroup === group.id ? " sidebar-group-menu-trigger-open" : ""
+                          }`}
+                          title="Group options"
+                          aria-label="Group options"
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpenForGroup === group.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuOpenForGroup((current) =>
+                              current === group.id ? null : group.id,
+                            );
+                          }}
+                        >
+                          <SidebarChevronRightIcon />
+                        </button>
+                        {menuOpenForGroup === group.id ? (
+                          <div className="sidebar-group-menu-dropdown" role="menu">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="sidebar-group-menu-item"
+                              onClick={() => {
+                                setMenuOpenForGroup(null);
+                                setCreatingForGroup(group.id);
+                                setNewChannelName("");
+                                setCreateError(null);
+                              }}
                             >
-                              <SidebarChevronIcon />
-                            </span>
-                          </button>
-                          {menuOpenForGroup === group.id ? (
-                            <div className="sidebar-group-menu-dropdown" role="menu">
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="sidebar-group-menu-item"
-                                onClick={() => {
-                                  setMenuOpenForGroup(null);
-                                  setCreatingForGroup(group.id);
-                                  setNewChannelName("");
-                                  setCreateError(null);
-                                }}
-                              >
-                                Add channel
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
+                              Add channel
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {creatingForGroup === group.id && (

@@ -52,6 +52,21 @@ export function SidebarChevronIcon({ className = "sidebar-add-channel-icon-glyph
   );
 }
 
+export function SidebarChevronRightIcon({ className = "sidebar-group-menu-trigger-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M9 6l6 6-6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SidebarComposeIcon({ className = "sidebar-add-channel-icon-glyph" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>

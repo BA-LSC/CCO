@@ -16,11 +16,13 @@ export function SidebarSkeleton() {
           {Array.from({ length: GROUP_ROWS }, (_, groupIndex) => (
             <li key={groupIndex} className="sidebar-group">
               <div className="sidebar-group-block">
-                <div className="sidebar-group-name-row">
-                  <div className="sidebar-group-header">
-                    <span className="sidebar-skeleton-avatar sidebar-group-avatar" />
-                    <span className="sidebar-skeleton-label sidebar-skeleton-label-group" />
-                  </div>
+                <div className="sidebar-group-header">
+                  <span className="sidebar-skeleton-avatar sidebar-group-avatar" />
+                  <span className="sidebar-skeleton-label sidebar-skeleton-label-group" />
+                  <span
+                    className="sidebar-group-menu-trigger sidebar-skeleton-icon"
+                    aria-hidden
+                  />
                 </div>
               </div>
               <ul className="sidebar-nested">
