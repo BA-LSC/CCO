@@ -1021,26 +1021,6 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-left: var(--sidebar-nest);
 }
 
-.sidebar-section-teams .sidebar-team-item {
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.sidebar-team-leader-slot {
-  flex-shrink: 0;
-  width: 24px;
-  min-width: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 2px;
-}
-
-.sidebar-team-leader-star {
-  font-size: 0.7rem;
-  line-height: 1;
-}
-
 .sidebar-team-label {
   display: flex;
   flex-direction: column;

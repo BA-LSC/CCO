@@ -136,3 +136,17 @@ export function SidebarAnnouncementIcon({
     </svg>
   );
 }
+
+export function SidebarLeaderIcon({ className = "sidebar-channel-prefix-glyph" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 3.5 14.2 9H20l-4.8 3.5 1.8 5.5L12 15.8 7 18l1.8-5.5L4 9h5.8L12 3.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

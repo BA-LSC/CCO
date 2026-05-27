@@ -10,7 +10,7 @@ import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { DmSidebarSubtitle } from "@/components/DmSidebarSubtitle";
 import { usePresenceWatch } from "@/components/PresenceProvider";
-import { SidebarCloseIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
+import { SidebarCloseIcon, SidebarLeaderIcon, SidebarPlusIcon } from "@/components/PanelHeaderIcons";
 import { SidebarSectionHeader } from "@/components/SidebarSectionHeader";
 import { UserMenu } from "@/components/UserMenu";
 import {
@@ -203,25 +203,33 @@ export function ChatSidebar() {
     [teamGroups],
   );
 
+  function renderTeamPrefix(team: ServiceTeamSummary) {
+    if (team.role === "leader") {
+      return (
+        <span className="sidebar-channel-prefix" title="Team leader">
+          <SidebarLeaderIcon />
+        </span>
+      );
+    }
+
+    return <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>;
+  }
+
   function renderTeamItem(team: ServiceTeamSummary) {
     return (
       <Link
         href={`/teams/${team.id}`}
-        className={`sidebar-item sidebar-team-item ${
+        className={`sidebar-item sidebar-team-item sidebar-nested-item ${
           activeTeamId === team.id ? "sidebar-item-active" : ""
         }`}
       >
-        <span className="sidebar-team-leader-slot" aria-hidden>
-          {team.role === "leader" && (
-            <span className="sidebar-team-leader-star" title="Team leader">
-              ★
-            </span>
+        {renderTeamPrefix(team)}
+        <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
+        <span className="sidebar-nested-trailing">
+          {team.hasUnread && activeTeamId !== team.id && (
+            <span className="sidebar-unread-dot" aria-label="Unread messages" />
           )}
         </span>
-        <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
-        {team.hasUnread && activeTeamId !== team.id && (
-          <span className="sidebar-unread-dot" aria-label="Unread messages" />
-        )}
       </Link>
     );
   }

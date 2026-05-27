@@ -70,8 +70,8 @@ export function SidebarSkeleton() {
             <ul className="sidebar-list">
               {Array.from({ length: TEAM_ROWS }, (_, teamIndex) => (
                 <li key={teamIndex}>
-                  <div className="sidebar-item sidebar-team-item sidebar-skeleton-team-row">
-                    <span className="sidebar-team-leader-slot" />
+                  <div className="sidebar-item sidebar-team-item sidebar-nested-item sidebar-skeleton-team-row">
+                    <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
                     <span className="sidebar-skeleton-label sidebar-skeleton-label-team" />
                   </div>
                 </li>
