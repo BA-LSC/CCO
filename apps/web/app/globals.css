@@ -819,8 +819,8 @@ html[data-theme="6"] .user-menu-dropdown {
   --sidebar-icon-btn: 24px;
   --sidebar-icon-glyph: 14px;
   --sidebar-icon-glyph-sm: 13px;
-  --sidebar-channel-prefix-width: 1.1rem;
-  --sidebar-channel-prefix-size: 0.935rem;
+  --sidebar-channel-prefix-width: 1.15rem;
+  --sidebar-channel-prefix-size: 1rem;
   --sidebar-brand-size: 1.24rem;
   --sidebar-user-menu-avatar: 31px;
   --sidebar-user-menu-min-h: 51px;
@@ -1355,8 +1355,8 @@ html[data-theme="6"] .user-menu-dropdown {
 
 .sidebar-channel-prefix-glyph {
   display: block;
-  width: var(--sidebar-icon-glyph);
-  height: var(--sidebar-icon-glyph);
+  width: var(--sidebar-channel-prefix-size);
+  height: var(--sidebar-channel-prefix-size);
   flex-shrink: 0;
 }
 
