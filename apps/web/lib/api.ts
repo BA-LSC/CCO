@@ -1,7 +1,11 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
 import { isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
-import { markDeployWait, probeServerAppVersion } from "@/lib/app-update";
+import {
+  isDeployOverlaySuppressed,
+  markDeployWait,
+  probeServerAppVersion,
+} from "@/lib/app-update";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -38,12 +42,20 @@ function parseApiError(text: string, status: number): string {
   return trimmed;
 }
 
+function markDeployUnavailable(): void {
+  if (isDeployOverlaySuppressed()) {
+    markDeployWait({ showOverlay: false });
+    return;
+  }
+  markDeployWait();
+}
+
 async function maybeHandleDeployUnavailable(res: Response, text: string): Promise<boolean> {
   if (res.status !== 503) return false;
   try {
     const body = JSON.parse(text) as { updating?: boolean };
     if (body.updating) {
-      markDeployWait();
+      markDeployUnavailable();
       return true;
     }
   } catch {
@@ -51,7 +63,7 @@ async function maybeHandleDeployUnavailable(res: Response, text: string): Promis
   }
   const probe = await probeServerAppVersion();
   if (probe.updating) {
-    markDeployWait();
+    markDeployUnavailable();
     return true;
   }
   return false;

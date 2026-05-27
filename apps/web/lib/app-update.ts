@@ -21,8 +21,14 @@ declare global {
   interface Window {
     __ccoApplyingUpdate?: boolean;
     __ccoDeployPending?: boolean;
+    __ccoSuppressDeployOverlay?: boolean;
   }
 }
+
+export type MarkDeployWaitOptions = {
+  showOverlay?: boolean;
+  onUpdating?: () => void | Promise<void>;
+};
 
 let deployWaitActive = false;
 
@@ -141,21 +147,42 @@ function notifyAppUpdating(): void {
   window.dispatchEvent(new Event(APP_UPDATE_EVENT));
 }
 
+export function isDeployOverlaySuppressed(): boolean {
+  return (
+    typeof window !== "undefined" && Boolean(window.__ccoSuppressDeployOverlay)
+  );
+}
+
 export function resumeAppUpdateUi(): void {
   if (typeof window === "undefined") return;
   if (!isAppUpdateInProgress() && !isDeployPending()) return;
+  if (isDeployOverlaySuppressed()) return;
   showAppUpdateOverlay();
 }
 
-export function markDeployWait(onUpdating?: () => void | Promise<void>): void {
+export function markDeployWait(
+  optionsOrCallback?: MarkDeployWaitOptions | (() => void | Promise<void>),
+): void {
+  let options: MarkDeployWaitOptions = {};
+  if (typeof optionsOrCallback === "function") {
+    options = { onUpdating: optionsOrCallback };
+  } else if (optionsOrCallback) {
+    options = optionsOrCallback;
+  }
+
   deployWaitActive = true;
   if (typeof window !== "undefined") {
     window.__ccoApplyingUpdate = true;
     window.__ccoDeployPending = true;
+    if (options.showOverlay === false) {
+      window.__ccoSuppressDeployOverlay = true;
+    }
   }
-  showAppUpdateOverlay();
+  if (options.showOverlay !== false && !isDeployOverlaySuppressed()) {
+    showAppUpdateOverlay();
+  }
   notifyAppUpdating();
-  void onUpdating?.();
+  void options.onUpdating?.();
 }
 
 export function clearDeployWait(): void {
@@ -163,6 +190,7 @@ export function clearDeployWait(): void {
   if (typeof window !== "undefined") {
     window.__ccoApplyingUpdate = false;
     window.__ccoDeployPending = false;
+    window.__ccoSuppressDeployOverlay = false;
   }
   hideAppUpdateOverlay();
 }

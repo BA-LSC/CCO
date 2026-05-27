@@ -3,6 +3,7 @@ import {
   checkAppVersion,
   clearDeployWait,
   DEPLOY_POLL_MS,
+  isDeployOverlaySuppressed,
   isDeployPending,
   markDeployWait,
   probeServerAppVersion,
@@ -18,11 +19,15 @@ function isUpdateOverlayVisible(): boolean {
   );
 }
 
+function markDeployUpdating(): void {
+  markDeployWait({ showOverlay: !isDeployOverlaySuppressed() });
+}
+
 /** Finish a deploy: full reload when the update screen was shown, otherwise version-check only. */
 async function finishDeployUpdate(): Promise<void> {
   if (isDeployPending() || isUpdateOverlayVisible()) {
     if (!isDeployPending()) {
-      markDeployWait();
+      markDeployUpdating();
     }
     await applyAppUpdate();
     return;
@@ -45,7 +50,7 @@ export function listenForDeployEvents(): () => void {
 
   const handleSignal = (updating: boolean) => {
     if (updating) {
-      markDeployWait();
+      markDeployUpdating();
       return;
     }
     void finishDeployUpdateSafely();
@@ -64,7 +69,7 @@ export function listenForDeployEvents(): () => void {
   const pollDeployState = async () => {
     const { updating } = await probeServerAppVersion();
     if (updating) {
-      markDeployWait();
+      markDeployUpdating();
       return;
     }
     if (isDeployPending()) {

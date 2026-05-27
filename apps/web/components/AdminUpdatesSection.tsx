@@ -1,8 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { clearDeployWait, markDeployWait } from "@/lib/app-update";
+import {
+  APP_UPDATE_EVENT,
+  applyAppUpdate,
+  clearDeployWait,
+  DEPLOY_POLL_MS,
+  isDeployPending,
+  markDeployWait,
+  probeServerAppVersion,
+} from "@/lib/app-update";
 import { CCO_DEFAULT_GIT_REPO_URL } from "@cco/shared";
 
 type UpdatesStatus = {
@@ -64,7 +72,9 @@ export function AdminUpdatesSection({
   const [status, setStatus] = useState<UpdatesStatus | null>(null);
   const [gitRepoUrl, setGitRepoUrl] = useState(initialGitRepoUrl);
   const [busy, setBusy] = useState<"check" | "apply" | "toggle" | "saveRepo" | null>(null);
+  const [deploying, setDeploying] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
+  const deployPollRef = useRef<number | null>(null);
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
@@ -80,6 +90,42 @@ export function AdminUpdatesSection({
       });
     });
   }, [loadStatus]);
+
+  useEffect(() => {
+    if (!deploying) return;
+
+    let cancelled = false;
+
+    const pollUntilReady = async () => {
+      const { updating } = await probeServerAppVersion();
+      if (cancelled) return;
+      if (!updating) {
+        void applyAppUpdate();
+      }
+    };
+
+    void pollUntilReady();
+    deployPollRef.current = window.setInterval(() => void pollUntilReady(), DEPLOY_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (deployPollRef.current !== null) {
+        window.clearInterval(deployPollRef.current);
+        deployPollRef.current = null;
+      }
+    };
+  }, [deploying]);
+
+  useEffect(() => {
+    const syncDeployPending = () => {
+      if (isDeployPending()) {
+        setDeploying(true);
+      }
+    };
+    syncDeployPending();
+    window.addEventListener(APP_UPDATE_EVENT, syncDeployPending);
+    return () => window.removeEventListener(APP_UPDATE_EVENT, syncDeployPending);
+  }, []);
 
   async function handleCheck() {
     setBusy("check");
@@ -113,7 +159,8 @@ export function AdminUpdatesSection({
     }
     setBusy("apply");
     setFeedback({});
-    markDeployWait();
+    markDeployWait({ showOverlay: false });
+    setDeploying(true);
     try {
       const result = await apiFetch<{
         ok: boolean;
@@ -132,6 +179,7 @@ export function AdminUpdatesSection({
       });
     } catch (err) {
       clearDeployWait();
+      setDeploying(false);
       setFeedback({ error: err instanceof Error ? err.message : "Apply failed" });
       await loadStatus();
     } finally {
@@ -193,8 +241,11 @@ export function AdminUpdatesSection({
   }
 
   const statusBadge = status.updateAvailable
-    ? { label: "Update available", variant: "muted" as const }
+    ? { label: "Update available", variant: "update" as const }
     : { label: "Up to date", variant: "success" as const };
+
+  const isUpdating = deploying || isDeployPending();
+  const controlsDisabled = busy !== null || isUpdating;
 
   return (
     <section className="integrations-section" aria-labelledby="updates-status-heading">
@@ -223,11 +274,18 @@ export function AdminUpdatesSection({
 
       <UpdatesFeedback error={feedback.error} success={feedback.success} />
 
+      {isUpdating && (
+        <div className="integrations-updates-deploying" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <span>Updating CCO…</span>
+        </div>
+      )}
+
       <div className="integrations-actions">
         <button
           type="button"
           className="btn btn-secondary integrations-action-btn"
-          disabled={busy !== null}
+          disabled={controlsDisabled}
           onClick={() => void handleCheck()}
         >
           {busy === "check" ? "Checking…" : "Check for updates"}
@@ -235,11 +293,11 @@ export function AdminUpdatesSection({
         <button
           type="button"
           className="btn btn-primary integrations-action-btn"
-          disabled={busy !== null}
+          disabled={controlsDisabled}
           aria-disabled={!status.canApply}
           onClick={() => void handleApply()}
         >
-          {busy === "apply"
+          {busy === "apply" || isUpdating
             ? "Applying…"
             : status.lastApplyError && status.canApply
               ? "Retry apply"
@@ -259,7 +317,7 @@ export function AdminUpdatesSection({
               type="checkbox"
               role="switch"
               checked={status.autoUpdateEnabled}
-              disabled={busy !== null}
+              disabled={controlsDisabled}
               onChange={(event) => void handleToggleAutoUpdate(event.target.checked)}
               aria-label="Auto-install updates"
             />
@@ -289,7 +347,7 @@ export function AdminUpdatesSection({
             <button
               type="submit"
               className="btn btn-secondary integrations-action-btn"
-              disabled={busy !== null}
+              disabled={controlsDisabled}
             >
               {busy === "saveRepo" ? "Saving…" : "Save repository"}
             </button>
