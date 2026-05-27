@@ -359,29 +359,43 @@ export function ChatSidebar() {
             <section className="sidebar-section sidebar-section-messages" aria-label="Messages">
               <SidebarSectionHeader title="Messages" />
 
-              <button
-                type="button"
-                className={`sidebar-item sidebar-dm-item sidebar-new-message-btn ${
-                  showNewDm ? "sidebar-item-active" : ""
-                }`}
-                aria-label={showNewDm ? "Cancel new message" : "New message"}
-                aria-expanded={showNewDm}
-                title={showNewDm ? "Cancel" : "New message"}
-                onClick={() => {
-                  setShowNewDm((v) => !v);
-                  setDmSearch("");
-                  setDmPeople([]);
-                }}
-              >
-                <div className="sidebar-dm-row">
-                  <span className="sidebar-new-message-icon" aria-hidden>
-                    {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
-                  </span>
-                  <span className="sidebar-item-label">
-                    {showNewDm ? "Cancel" : "New message"}
-                  </span>
-                </div>
-              </button>
+              {dms.length === 0 ? (
+                <p className="sidebar-empty">No direct messages yet.</p>
+              ) : (
+                <ul className="sidebar-list">
+                  {dms.map((dm) => (
+                    <li key={dm.id}>
+                      <Link
+                        href={`/dms/${dm.id}`}
+                        className={`sidebar-item sidebar-dm-item ${
+                          activeDmId === dm.id ? "sidebar-item-active" : ""
+                        }`}
+                      >
+                        <div className="sidebar-dm-row">
+                          <UserAvatarWithPresence
+                            userId={dm.participant.id}
+                            displayName={dm.participant.displayName}
+                            avatarUrl={dm.participant.avatarUrl}
+                            className="sidebar-dm-avatar"
+                            size="xs"
+                          />
+                          <span className="sidebar-item-label sidebar-dm-name">
+                            {dm.participant.displayName}
+                          </span>
+                          <DmSidebarSubtitle
+                            userId={dm.participant.id}
+                            preview={dm.lastMessagePreview}
+                          />
+                          {dm.hasUnread && activeDmId !== dm.id && (
+                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                          )}
+                          {dm.muted && <span className="sidebar-badge" title="Muted">🔕</span>}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {showNewDm && (
                 <div className="sidebar-new-dm">
@@ -437,43 +451,29 @@ export function ChatSidebar() {
                 </div>
               )}
 
-              {dms.length === 0 ? (
-                <p className="sidebar-empty">No direct messages yet.</p>
-              ) : (
-                <ul className="sidebar-list">
-                  {dms.map((dm) => (
-                    <li key={dm.id}>
-                      <Link
-                        href={`/dms/${dm.id}`}
-                        className={`sidebar-item sidebar-dm-item ${
-                          activeDmId === dm.id ? "sidebar-item-active" : ""
-                        }`}
-                      >
-                        <div className="sidebar-dm-row">
-                          <UserAvatarWithPresence
-                            userId={dm.participant.id}
-                            displayName={dm.participant.displayName}
-                            avatarUrl={dm.participant.avatarUrl}
-                            className="sidebar-dm-avatar"
-                            size="xs"
-                          />
-                          <span className="sidebar-item-label sidebar-dm-name">
-                            {dm.participant.displayName}
-                          </span>
-                          <DmSidebarSubtitle
-                            userId={dm.participant.id}
-                            preview={dm.lastMessagePreview}
-                          />
-                          {dm.hasUnread && activeDmId !== dm.id && (
-                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
-                          )}
-                          {dm.muted && <span className="sidebar-badge" title="Muted">🔕</span>}
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <button
+                type="button"
+                className={`sidebar-item sidebar-dm-item sidebar-new-message-btn ${
+                  showNewDm ? "sidebar-item-active" : ""
+                }`}
+                aria-label={showNewDm ? "Cancel new message" : "New message"}
+                aria-expanded={showNewDm}
+                title={showNewDm ? "Cancel" : "New message"}
+                onClick={() => {
+                  setShowNewDm((v) => !v);
+                  setDmSearch("");
+                  setDmPeople([]);
+                }}
+              >
+                <div className="sidebar-dm-row">
+                  <span className="sidebar-new-message-icon" aria-hidden>
+                    {showNewDm ? <SidebarCloseIcon /> : <SidebarPlusIcon />}
+                  </span>
+                  <span className="sidebar-item-label">
+                    {showNewDm ? "Cancel" : "New message"}
+                  </span>
+                </div>
+              </button>
             </section>
 
             <section className="sidebar-section sidebar-section-teams" aria-label="Teams">
