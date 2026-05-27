@@ -6,6 +6,7 @@ const EXTENDED_ORG_COLUMN_MARKERS = [
   "cloudflare_api_token_enc",
   "realtime_kit_",
   "pco_last_synced_at",
+  "pco_nightly_sync_enabled",
 ] as const;
 
 function collectErrorText(err: unknown): string {

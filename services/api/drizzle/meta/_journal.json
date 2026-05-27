@@ -169,6 +169,13 @@
       "when": 1747708823000,
       "tag": "0023_pco_last_synced_at",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1747708824000,
+      "tag": "0024_pco_nightly_sync_enabled",
+      "breakpoints": true
     }
   ]
 }

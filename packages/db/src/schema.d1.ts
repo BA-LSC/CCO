@@ -50,6 +50,9 @@ export const organizations = sqliteTable("organizations", {
   realtimeKitPresetMember: text("realtime_kit_preset_member"),
   realtimeKitPresetGuest: text("realtime_kit_preset_guest"),
   pcoLastSyncedAt: timestampMs("pco_last_synced_at"),
+  pcoNightlySyncEnabled: integer("pco_nightly_sync_enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   installedReleaseVersion: text("installed_release_version"),
   autoUpdateEnabled: integer("auto_update_enabled", { mode: "boolean" })
     .notNull()

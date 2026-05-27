@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminSettingsNav } from "@/components/AdminSettingsNav";
 import { LoadingState } from "@/components/PageStates";
 import { apiFetch } from "@/lib/api";
 import { clearDeployWait, markDeployWait } from "@/lib/app-update";
@@ -152,9 +153,7 @@ export default function UpdatesSettingsPage() {
           </a>
           . BYO Cloudflare sites redeploy release artifacts — never git pull.
         </p>
-        <p className="integrations-field-hint">
-          <Link href="/settings/integrations">Integrations settings</Link>
-        </p>
+        <AdminSettingsNav />
       </header>
 
       {error && <p className="integrations-feedback integrations-feedback--error">{error}</p>}

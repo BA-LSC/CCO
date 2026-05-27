@@ -3418,6 +3418,15 @@ button.sidebar-group-header:focus-visible {
   align-items: stretch;
 }
 
+@media (min-width: 769px) {
+  .chat-shell--no-sidebar .chat-main > .integrations-settings.page {
+    align-self: center;
+    width: 100%;
+    max-width: 520px;
+    padding-inline: 24px;
+  }
+}
+
 .integrations-settings-header {
   display: flex;
   flex-direction: column;
@@ -3438,6 +3447,37 @@ button.sidebar-group-header:focus-visible {
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--color-muted);
+}
+
+.admin-settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.admin-settings-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-decoration: none;
+  background: var(--color-surface);
+}
+
+.admin-settings-nav-link:hover {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-border) 70%, var(--color-text));
+}
+
+.admin-settings-nav-link-active {
+  color: var(--color-text);
+  border-color: var(--color-accent, var(--color-text));
+  background: color-mix(in srgb, var(--color-accent, var(--color-text)) 12%, var(--color-surface));
 }
 
 .integrations-section {
@@ -3577,6 +3617,12 @@ button.sidebar-group-header:focus-visible {
 .integrations-badge--success {
   color: var(--color-success);
   background: var(--color-success-soft);
+}
+
+.integrations-badge--muted {
+  color: var(--color-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
 }
 
 .integrations-inline-status {
@@ -5525,10 +5571,6 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   gap: 4px;
   width: 100%;
-}
-
-.chat-thread .message-item--own .message-reaction-pills {
-  justify-content: flex-end;
 }
 
 .chat-thread .message-reaction-add-picker {

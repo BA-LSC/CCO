@@ -19,6 +19,7 @@ const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_member" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_guest" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_last_synced_at" timestamp`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_nightly_sync_enabled" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "installed_release_version" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "auto_update_enabled" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "last_update_check_at" timestamp`,

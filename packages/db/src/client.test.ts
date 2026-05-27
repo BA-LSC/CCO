@@ -27,7 +27,7 @@ describe("D1 client helpers", () => {
 
   test("getD1IncrementalMigrationFilenames lists shipped day-two migrations", () => {
     const files = getD1IncrementalMigrationFilenames();
-    expect(files).toEqual(["0001_org_release_updates.sql"]);
+    expect(files).toEqual(["0001_org_release_updates.sql", "0002_pco_nightly_sync_enabled.sql"]);
   });
 });
 

@@ -1,4 +1,4 @@
--- D1 baseline: greenfield schema consolidating Postgres migrations 0000–0023.
+-- D1 baseline: greenfield schema consolidating Postgres migrations 0000–0024.
 -- Timestamps are INTEGER milliseconds since epoch. IDs are TEXT (UUID strings).
 
 PRAGMA foreign_keys = ON;
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS "organizations" (
   "realtime_kit_preset_member" TEXT,
   "realtime_kit_preset_guest" TEXT,
   "pco_last_synced_at" INTEGER,
+  "pco_nightly_sync_enabled" INTEGER NOT NULL DEFAULT 1,
   "installed_release_version" TEXT,
   "auto_update_enabled" INTEGER NOT NULL DEFAULT 0,
   "last_update_check_at" INTEGER,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AdminSettingsNav } from "@/components/AdminSettingsNav";
 import { LoadingState } from "@/components/PageStates";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
@@ -19,6 +20,9 @@ type IntegrationsSettings = {
   signInRedirectUri: string;
   webhookUrl: string;
   pcoLastSyncedAt?: string | null;
+  pcoNightlySyncEnabled?: boolean;
+  pcoNightlySyncCron?: string;
+  pcoNightlySyncSchedule?: string;
   vapidKeysConfigured: boolean;
   vapidSubjectEmail: string;
   webPushConfigured: boolean;
@@ -33,6 +37,8 @@ type IntegrationsSettings = {
   realtimeKitPresetHost?: string;
   realtimeKitPresetMember?: string;
   realtimeKitPresetGuest?: string;
+  cloudflarePlatformProvisionedAt?: string | null;
+  cloudflarePlatformConfigured?: boolean;
 };
 
 type PcoSyncResult = {
@@ -90,12 +96,14 @@ function IntegrationsSection({
   heading,
   description,
   badge,
+  badgeVariant = "success",
   children,
 }: {
   id: string;
   heading: string;
   description?: React.ReactNode;
   badge?: string | null;
+  badgeVariant?: "success" | "muted";
   children: React.ReactNode;
 }) {
   return (
@@ -107,7 +115,9 @@ function IntegrationsSection({
         </div>
         {badge ? (
           <div className="integrations-section-badges">
-            <span className="integrations-badge integrations-badge--success">{badge}</span>
+            <span className={`integrations-badge integrations-badge--${badgeVariant}`}>
+              {badge}
+            </span>
           </div>
         ) : null}
       </div>
@@ -161,225 +171,80 @@ function Feedback({ error, success }: { error?: string | null; success?: string 
   );
 }
 
-function formatPcoLastSynced(iso: string): string {
+function formatPcoSyncBadge(iso: string | null): { label: string; variant: "success" | "muted" } {
+  if (!iso) {
+    return { label: "Not synced yet", variant: "muted" };
+  }
+
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  if (Number.isNaN(date.getTime())) {
+    return { label: "Synced recently", variant: "success" };
+  }
+
+  const diffMs = date.getTime() - Date.now();
+  const diffMinutes = Math.round(diffMs / (60 * 1000));
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 60) {
+    return { label: `Synced ${rtf.format(diffMinutes, "minute")}`, variant: "success" };
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 48) {
+    return { label: `Synced ${rtf.format(diffHours, "hour")}`, variant: "success" };
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 14) {
+    return { label: `Synced ${rtf.format(diffDays, "day")}`, variant: "success" };
+  }
+
+  const formatted = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return { label: `Synced ${formatted}`, variant: "success" };
 }
 
 function CloudflareSection({
-  name,
+  platformProvisioned,
   configured,
   fromEnv,
   tokenConfigured,
   accountId,
-  appId,
-  presetsConfigured,
-  onStatusChange,
 }: {
-  name: string;
+  platformProvisioned: boolean;
   configured: boolean;
   fromEnv: boolean;
   tokenConfigured: boolean;
   accountId: string;
-  appId: string;
-  presetsConfigured: boolean;
-  onStatusChange: (status: Pick<
-    IntegrationsSettings,
-    | "realtimeKitConfigured"
-    | "realtimeKitFromEnv"
-    | "cloudflareApiTokenConfigured"
-    | "realtimeKitAccountId"
-    | "realtimeKitAppId"
-    | "realtimeKitTokenConfigured"
-    | "realtimeKitPresetsConfigured"
-  >) => void;
 }) {
-  const [busy, setBusy] = useState(false);
-  const [tokenBusy, setTokenBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [cloudflareApiToken, setCloudflareApiToken] = useState("");
+  const hasCloudflare =
+    platformProvisioned || configured || fromEnv || tokenConfigured;
+  if (!hasCloudflare) return null;
 
-  type CloudflareStatus = Pick<
-    IntegrationsSettings,
-    | "realtimeKitConfigured"
-    | "realtimeKitFromEnv"
-    | "cloudflareApiTokenConfigured"
-    | "realtimeKitAccountId"
-    | "realtimeKitAppId"
-    | "realtimeKitTokenConfigured"
-    | "realtimeKitPresetsConfigured"
-  >;
+  const connected = platformProvisioned || tokenConfigured || fromEnv;
+  const callsEnabled = configured || fromEnv;
 
-  async function saveApiToken() {
-    const token = cloudflareApiToken.trim();
-    if (!token) {
-      setError("Paste a Cloudflare API token to save.");
-      return;
-    }
-
-    setTokenBusy(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const updated = await apiFetch<CloudflareStatus & { ok: boolean }>(
-        "/api/v1/settings/integrations/cloudflare",
-        {
-          method: "POST",
-          body: JSON.stringify({ cloudflareApiToken: token }),
-        },
-      );
-      onStatusChange({
-        ...updated,
-        cloudflareApiTokenConfigured:
-          updated.cloudflareApiTokenConfigured ?? updated.realtimeKitTokenConfigured ?? true,
-        realtimeKitTokenConfigured:
-          updated.realtimeKitTokenConfigured ?? updated.cloudflareApiTokenConfigured ?? true,
-      });
-      setCloudflareApiToken("");
-      setSuccess("Cloudflare API token saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save Cloudflare token");
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  async function handleCallsToggle(enabled: boolean) {
-    if (busy) return;
-
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const updated = await apiFetch<CloudflareStatus & { ok: boolean }>(
-        "/api/v1/settings/integrations/realtimekit",
-        {
-          method: "POST",
-          body: JSON.stringify({ enabled }),
-        },
-      );
-      onStatusChange(updated);
-      setSuccess(
-        enabled
-          ? updated.realtimeKitPresetsConfigured
-            ? "Audio & video calls enabled."
-            : "Calls enabled. Create host, group_call_participant, and guest presets in RealtimeKit if needed."
-          : "Audio & video calls disabled. API token kept for other Cloudflare features.",
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Cloudflare setup failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const toggleChecked = configured || fromEnv;
-  const toggleDisabled = busy || fromEnv;
-  const sectionBusy = busy || tokenBusy;
+  const description = platformProvisioned
+    ? "Connected during install. Audio and video calls use RealtimeKit, included with your Cloudflare deployment."
+    : fromEnv
+      ? "Configured via server environment. Token and call settings are managed outside this page."
+      : "Cloudflare API token is stored encrypted for updates and RealtimeKit calls.";
 
   return (
-    <section className="integrations-section" aria-labelledby="cloudflare-heading">
-      <div className="integrations-section-top">
-        <div className="integrations-section-head">
-          <h2 id="cloudflare-heading">Cloudflare</h2>
-          <p>
-            Store an API token for Cloudflare integrations. RealtimeKit powers group calls without
-            opening ports — free tier includes 1,000 GB/month egress, then $0.05/GB.{" "}
-            <a
-              href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Create API token
-            </a>
-          </p>
-        </div>
-        {configured ? (
-          <div className="integrations-section-badges">
-            <span className="integrations-badge integrations-badge--success">Calls enabled</span>
-          </div>
-        ) : tokenConfigured || fromEnv ? (
-          <div className="integrations-section-badges">
-            <span className="integrations-badge integrations-badge--success">Configured</span>
-          </div>
-        ) : null}
-      </div>
-
-      {!fromEnv ? (
-        <div className="integrations-fields">
-          <SecretInput
-            label="Cloudflare API token"
-            configured={tokenConfigured}
-            value={cloudflareApiToken}
-            onChange={setCloudflareApiToken}
-            placeholder="Paste API token"
-          />
-          <button
-            type="button"
-            className="btn btn-secondary integrations-action-btn"
-            disabled={sectionBusy || !cloudflareApiToken.trim()}
-            onClick={() => void saveApiToken()}
-          >
-            {tokenBusy ? "Saving…" : "Save token"}
-          </button>
-          {tokenConfigured && accountId ? (
-            <p className="integrations-field-hint">
-              Account <code>{accountId}</code>
-            </p>
-          ) : (
-            <p className="integrations-field-hint">
-              Saved encrypted. Use for RealtimeKit calls and future Cloudflare features.
-            </p>
-          )}
-        </div>
-      ) : (
+    <IntegrationsSection
+      id="cloudflare-heading"
+      heading="Cloudflare"
+      description={description}
+      badge={connected ? "Connected" : undefined}
+    >
+      {accountId ? (
         <p className="integrations-field-hint">
-          Configured via server environment. Token and call settings are managed outside this page.
-        </p>
-      )}
-
-      <label className="integrations-toggle channel-settings-toggle">
-        <span className="integrations-toggle-label">Audio &amp; video calls</span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={toggleChecked}
-          disabled={toggleDisabled}
-          aria-label="Enable audio and video calls"
-          onChange={(e) => void handleCallsToggle(e.target.checked)}
-        />
-        <span className="toggle-switch" aria-hidden="true" />
-      </label>
-
-      {configured ? (
-        <div className="integrations-field-hint">
-          {appId ? (
-            <p>
-              RealtimeKit app <code>{appId}</code>
-            </p>
-          ) : null}
-          {presetsConfigured ? (
-            <p>Preset roles detected from your RealtimeKit app.</p>
-          ) : (
-            <p>
-              Presets not auto-detected for {name || "your church"}. Create <code>host</code>,{" "}
-              <code>group_call_participant</code>, and <code>guest</code> in the RealtimeKit
-              dashboard, or override via env vars.
-            </p>
-          )}
-        </div>
-      ) : tokenConfigured && !fromEnv ? (
-        <p className="integrations-field-hint">
-          Token is ready. Turn on calls to provision RealtimeKit automatically.
+          Account <code>{accountId}</code>
         </p>
       ) : null}
-
-      <Feedback error={error} success={success} />
-    </section>
+      {callsEnabled ? (
+        <p className="integrations-field-hint">Audio &amp; video calls are enabled.</p>
+      ) : null}
+    </IntegrationsSection>
   );
 }
 
@@ -408,12 +273,14 @@ export default function IntegrationsSettingsPage() {
   const [realtimeKitFromEnv, setRealtimeKitFromEnv] = useState(false);
   const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
   const [realtimeKitAccountId, setRealtimeKitAccountId] = useState("");
-  const [realtimeKitAppId, setRealtimeKitAppId] = useState("");
-  const [realtimeKitPresetsConfigured, setRealtimeKitPresetsConfigured] = useState(false);
+  const [cloudflarePlatformProvisioned, setCloudflarePlatformProvisioned] = useState(false);
   const [pcoSyncing, setPcoSyncing] = useState(false);
+  const [pcoSyncBusy, setPcoSyncBusy] = useState<"sync" | "toggle" | null>(null);
   const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
   const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
   const [pcoLastSyncedAt, setPcoLastSyncedAt] = useState<string | null>(null);
+  const [pcoNightlySyncEnabled, setPcoNightlySyncEnabled] = useState(true);
+  const [pcoNightlySyncSchedule, setPcoNightlySyncSchedule] = useState("Nightly at 3:00 AM UTC");
 
   useEffect(() => {
     async function load() {
@@ -426,6 +293,8 @@ export default function IntegrationsSettingsPage() {
         setName(settings.name);
         setClientId(settings.clientId);
         setPcoLastSyncedAt(settings.pcoLastSyncedAt ?? null);
+        setPcoNightlySyncEnabled(settings.pcoNightlySyncEnabled ?? true);
+        setPcoNightlySyncSchedule(settings.pcoNightlySyncSchedule ?? "Nightly at 3:00 AM UTC");
         setSignInRedirectUri(settings.signInRedirectUri);
         setWebhookUrl(settings.webhookUrl);
         setClientSecretConfigured(settings.clientSecretConfigured);
@@ -436,13 +305,15 @@ export default function IntegrationsSettingsPage() {
         setWebPushConfigured(settings.webPushConfigured ?? false);
         setGiphyApiKeyConfigured(settings.giphyApiKeyConfigured ?? false);
         setRealtimeKitAccountId(settings.realtimeKitAccountId ?? "");
-        setRealtimeKitAppId(settings.realtimeKitAppId ?? "");
         setRealtimeKitConfigured(settings.realtimeKitConfigured ?? false);
         setRealtimeKitFromEnv(settings.realtimeKitFromEnv ?? false);
         setCloudflareApiTokenConfigured(
           settings.cloudflareApiTokenConfigured ?? settings.realtimeKitTokenConfigured ?? false,
         );
-        setRealtimeKitPresetsConfigured(settings.realtimeKitPresetsConfigured ?? false);
+        setCloudflarePlatformProvisioned(
+          Boolean(settings.cloudflarePlatformProvisionedAt) ||
+            Boolean(settings.cloudflarePlatformConfigured),
+        );
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -511,6 +382,7 @@ export default function IntegrationsSettingsPage() {
   }
 
   async function handlePcoSync() {
+    setPcoSyncBusy("sync");
     setPcoSyncing(true);
     setPcoSyncError(null);
     setPcoSyncResult(null);
@@ -528,6 +400,37 @@ export default function IntegrationsSettingsPage() {
       setPcoSyncError(err instanceof Error ? err.message : "Planning Center sync failed");
     } finally {
       setPcoSyncing(false);
+      setPcoSyncBusy(null);
+    }
+  }
+
+  async function handleTogglePcoNightlySync(enabled: boolean) {
+    setPcoSyncBusy("toggle");
+    setPcoSyncError(null);
+    setPcoSyncResult(null);
+
+    try {
+      const updated = await apiFetch<IntegrationsSettings & { ok: boolean }>(
+        "/api/v1/settings/integrations",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ pcoNightlySyncEnabled: enabled }),
+        },
+      );
+      setPcoNightlySyncEnabled(updated.pcoNightlySyncEnabled ?? enabled);
+      if (updated.pcoLastSyncedAt !== undefined) {
+        setPcoLastSyncedAt(updated.pcoLastSyncedAt ?? null);
+      }
+      if (updated.pcoNightlySyncSchedule) {
+        setPcoNightlySyncSchedule(updated.pcoNightlySyncSchedule);
+      }
+      setPcoSyncResult(
+        enabled ? "Nightly Planning Center sync enabled." : "Nightly Planning Center sync disabled.",
+      );
+    } catch (err) {
+      setPcoSyncError(err instanceof Error ? err.message : "Failed to save sync setting");
+    } finally {
+      setPcoSyncBusy(null);
     }
   }
 
@@ -540,6 +443,8 @@ export default function IntegrationsSettingsPage() {
         ? "Keys ready"
         : null;
 
+  const pcoSyncBadge = formatPcoSyncBadge(pcoLastSyncedAt);
+
   return (
     <div className="page page-narrow settings-page integrations-settings">
       <header className="integrations-settings-header">
@@ -548,49 +453,45 @@ export default function IntegrationsSettingsPage() {
         </Link>
         <h1>Integrations</h1>
         <p>OAuth, webhooks, and connected services. Saved secrets stay encrypted.</p>
+        <AdminSettingsNav />
       </header>
 
-      <section className="integrations-section" aria-labelledby="pco-sync-heading">
-        <div className="integrations-section-head">
-          <h2 id="pco-sync-heading">Planning Center sync</h2>
-          <p>Refresh groups, teams, and rosters for your account.</p>
-        </div>
+      <IntegrationsSection
+        id="pco-sync-heading"
+        heading="Planning Center sync"
+        description="Refresh groups, teams, and rosters for your account."
+        badge={pcoSyncBadge.label}
+        badgeVariant={pcoSyncBadge.variant}
+      >
         <Feedback error={pcoSyncError} success={pcoSyncResult} />
         <button
           type="button"
           className="btn btn-secondary integrations-action-btn"
-          disabled={pcoSyncing}
+          disabled={pcoSyncBusy !== null}
           onClick={() => void handlePcoSync()}
         >
           {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
         </button>
-        {pcoLastSyncedAt ? (
-          <p className="integrations-field-hint">
-            Last synced {formatPcoLastSynced(pcoLastSyncedAt)}
-          </p>
-        ) : (
-          <p className="integrations-field-hint">Not synced yet</p>
-        )}
-      </section>
+        <p className="integrations-field-hint">{pcoNightlySyncSchedule}</p>
+        <label className="integrations-toggle">
+          <input
+            type="checkbox"
+            checked={pcoNightlySyncEnabled}
+            disabled={pcoSyncBusy !== null}
+            onChange={(event) => void handleTogglePcoNightlySync(event.target.checked)}
+          />
+          <span className="integrations-toggle-label">
+            Run automatic nightly sync for all linked Planning Center accounts.
+          </span>
+        </label>
+      </IntegrationsSection>
 
       <CloudflareSection
-        name={name}
+        platformProvisioned={cloudflarePlatformProvisioned}
         configured={realtimeKitConfigured}
         fromEnv={realtimeKitFromEnv}
         tokenConfigured={cloudflareApiTokenConfigured}
         accountId={realtimeKitAccountId}
-        appId={realtimeKitAppId}
-        presetsConfigured={realtimeKitPresetsConfigured}
-        onStatusChange={(status) => {
-          setRealtimeKitConfigured(status.realtimeKitConfigured ?? false);
-          setRealtimeKitFromEnv(status.realtimeKitFromEnv ?? false);
-          setCloudflareApiTokenConfigured(
-            status.cloudflareApiTokenConfigured ?? status.realtimeKitTokenConfigured ?? false,
-          );
-          setRealtimeKitPresetsConfigured(status.realtimeKitPresetsConfigured ?? false);
-          if (status.realtimeKitAccountId) setRealtimeKitAccountId(status.realtimeKitAccountId);
-          if (status.realtimeKitAppId) setRealtimeKitAppId(status.realtimeKitAppId);
-        }}
       />
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>

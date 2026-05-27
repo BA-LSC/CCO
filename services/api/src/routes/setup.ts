@@ -26,7 +26,10 @@ import {
   resolvePcoWebhookUrl,
 } from "../auth/pco-redirect-uris";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
-import { saveOrganizationCloudflareApiToken } from "../services/org-realtimekit";
+import {
+  enableOrganizationRealtimeKit,
+  saveOrganizationCloudflareApiToken,
+} from "../services/org-realtimekit";
 import { provisionCloudflarePlatform } from "../services/cloudflare-platform-provision";
 import {
   applyInstallHandoff,
@@ -163,7 +166,7 @@ setupRouter.post("/draft", async (c) => {
   }
 
   const orgBeforeCloudflare = await getOrganizationWithOAuthCredentials();
-  if (orgBeforeCloudflare && cloudflareApiToken) {
+  if (orgBeforeCloudflare && cloudflareApiToken && !platformProvisioned) {
     try {
       await saveOrganizationCloudflareApiToken({
         organizationId: orgBeforeCloudflare.id,
@@ -176,6 +179,12 @@ setupRouter.post("/draft", async (c) => {
         existingAccountId: orgBeforeCloudflare.cloudflareAccountId ?? undefined,
       }).catch((err) => {
         console.warn("[setup] Cloudflare platform provisioning skipped:", err);
+      });
+      await enableOrganizationRealtimeKit({
+        organizationId: orgBeforeCloudflare.id,
+        organizationName: orgBeforeCloudflare.name,
+      }).catch((err) => {
+        console.warn("[setup] RealtimeKit auto-provisioning skipped:", err);
       });
     } catch (err) {
       const message =

@@ -53,6 +53,7 @@ export const configuredOrganizationColumns = {
   realtimeKitPresetMember: organizations.realtimeKitPresetMember,
   realtimeKitPresetGuest: organizations.realtimeKitPresetGuest,
   pcoLastSyncedAt: organizations.pcoLastSyncedAt,
+  pcoNightlySyncEnabled: organizations.pcoNightlySyncEnabled,
 };
 
 export function extendConfiguredOrganizationRow(
@@ -67,6 +68,7 @@ export function extendConfiguredOrganizationRow(
     realtimeKitPresetMember: null,
     realtimeKitPresetGuest: null,
     pcoLastSyncedAt: null,
+    pcoNightlySyncEnabled: true,
   };
 }
 
@@ -95,5 +97,6 @@ export type ConfiguredOrganizationRow = {
   realtimeKitPresetMember: string | null;
   realtimeKitPresetGuest: string | null;
   pcoLastSyncedAt: Date | null;
+  pcoNightlySyncEnabled: boolean;
   createdAt: Date;
 };

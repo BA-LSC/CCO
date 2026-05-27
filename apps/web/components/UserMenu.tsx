@@ -352,14 +352,15 @@ export function UserMenu({ variant = "default" }: Props) {
             </div>
           )}
           {user.siteAdministrator && (
-            <>
+            <div className="user-menu-admin" role="group" aria-label="Admin">
+              <span className="user-menu-dropdown-label">Admin</span>
               <a
                 href="/settings/integrations"
                 className="user-menu-item"
                 role="menuitem"
                 onClick={() => setOpen(false)}
               >
-                Admin Settings
+                Integrations
               </a>
               <a
                 href="/settings/updates"
@@ -369,7 +370,7 @@ export function UserMenu({ variant = "default" }: Props) {
               >
                 Updates
               </a>
-            </>
+            </div>
           )}
           <a
             href="/auth/sign-out?next=/"

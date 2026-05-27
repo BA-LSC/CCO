@@ -6,9 +6,11 @@ import {
   fetchMyGroups,
 } from "@cco/pco-client";
 import { db } from "../db";
-import { groupMemberships, userPcoCredentials, users } from "../db/schema";
+import { groupMemberships, organizations, userPcoCredentials, users } from "../db/schema";
 import { getPcoAccessToken } from "../auth/pco-tokens";
 import { persistGroupSync } from "../services/group-sync";
+import { getConfiguredOrganization } from "../services/org-oauth";
+import { invalidateOrgContextCache } from "../services/org-context-cache";
 
 const STALE_DAYS = 7;
 export const RECONCILE_BATCH_SIZE = 8;
@@ -90,7 +92,13 @@ export async function reconcileUserContextsBatch(
 export async function reconcileStaleMemberships(): Promise<{
   removed: number;
   resynced: number;
+  skipped?: boolean;
 }> {
+  const org = await getConfiguredOrganization();
+  if (org?.pcoNightlySyncEnabled === false) {
+    return { removed: 0, resynced: 0, skipped: true };
+  }
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - STALE_DAYS);
 
@@ -102,12 +110,22 @@ export async function reconcileStaleMemberships(): Promise<{
     .from(groupMemberships)
     .where(lt(groupMemberships.syncedAt, cutoff));
 
-  if (stale.length === 0) return { removed: 0, resynced };
+  let removed = 0;
+  if (stale.length > 0) {
+    const staleIds = stale.map((row) => row.id);
+    await db.transaction(async (tx) => {
+      await tx.delete(groupMemberships).where(inArray(groupMemberships.id, staleIds));
+    });
+    removed = staleIds.length;
+  }
 
-  const staleIds = stale.map((row) => row.id);
-  await db.transaction(async (tx) => {
-    await tx.delete(groupMemberships).where(inArray(groupMemberships.id, staleIds));
-  });
+  if (org) {
+    await db
+      .update(organizations)
+      .set({ pcoLastSyncedAt: new Date() })
+      .where(eq(organizations.id, org.id));
+    invalidateOrgContextCache();
+  }
 
-  return { removed: staleIds.length, resynced };
+  return { removed, resynced };
 }

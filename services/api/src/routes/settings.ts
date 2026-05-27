@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import {
+  PCO_NIGHTLY_RECONCILE_CRON,
+  PCO_NIGHTLY_RECONCILE_SCHEDULE_LABEL,
+} from "@cco/shared";
 import { db } from "../db";
 import { users, organizations } from "../db/schema";
 import {
@@ -58,6 +62,7 @@ const IntegrationsPatchSchema = z.object({
   webhookUrl: z.string().url().optional(),
   vapidSubjectEmail: z.string().email().optional(),
   giphyApiKey: z.string().min(1).optional(),
+  pcoNightlySyncEnabled: z.boolean().optional(),
 });
 
 const RealtimeKitSetupSchema = z.object({
@@ -73,6 +78,18 @@ const UpdatesPatchSchema = z.object({
 });
 
 export const settingsRouter = new Hono<Env>();
+
+function pcoSyncSettingsFields(org: {
+  pcoLastSyncedAt: Date | null;
+  pcoNightlySyncEnabled: boolean;
+}) {
+  return {
+    pcoLastSyncedAt: org.pcoLastSyncedAt?.toISOString() ?? null,
+    pcoNightlySyncEnabled: org.pcoNightlySyncEnabled,
+    pcoNightlySyncCron: PCO_NIGHTLY_RECONCILE_CRON,
+    pcoNightlySyncSchedule: PCO_NIGHTLY_RECONCILE_SCHEDULE_LABEL,
+  };
+}
 
 async function getOrgAdmin(c: { get: (key: "session") => { userId: string } }) {
   const session = c.get("session");
@@ -118,7 +135,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     webhookSecretCount: webhookSecrets.length,
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
-    pcoLastSyncedAt: refreshed.pcoLastSyncedAt?.toISOString() ?? null,
+    ...pcoSyncSettingsFields(refreshed),
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
@@ -188,6 +205,14 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     }
   }
 
+  if (data.pcoNightlySyncEnabled !== undefined) {
+    await db
+      .update(organizations)
+      .set({ pcoNightlySyncEnabled: data.pcoNightlySyncEnabled })
+      .where(eq(organizations.id, org.id));
+    invalidateOrgContextCache();
+  }
+
   const updated = await getConfiguredOrganization();
   const webhookSecrets = decryptWebhookSecrets(
     updated?.pcoWebhookSecretEnc ?? org.pcoWebhookSecretEnc,
@@ -211,6 +236,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     webhookUrl: resolvePcoWebhookUrl(
       updated?.pcoWebhookUrl ?? org.pcoWebhookUrl,
     ),
+    ...(updated ? pcoSyncSettingsFields(updated) : pcoSyncSettingsFields(org)),
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
