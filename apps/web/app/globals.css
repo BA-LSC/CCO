@@ -5802,7 +5802,7 @@ button.sidebar-group-header:focus-visible {
 
 /* Panel layout — full-height chat with pinned composer */
 .chat-thread-panel {
-  --chat-inset-x: 144px;
+  --chat-inset-x: 152px;
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
   --chat-composer-bottom-padding: 8px;
