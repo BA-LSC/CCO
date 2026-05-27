@@ -1,6 +1,7 @@
+import { fetchFromApi } from "@/lib/api-fetch-server";
+import { isCloudflareDeployTarget, isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
 import { isDeployDraining } from "@/lib/deploy-status.server";
 
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 const UPLOAD_PROXY_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_PROXY_TIMEOUT_MS = 30_000;
 
@@ -60,7 +61,7 @@ function copyUpstreamMediaHeaders(upstream: Response): Headers {
 export async function proxyToApi(request: Request, pathSegments: string[]): Promise<Response> {
   const incoming = new URL(request.url);
   const path = pathSegments.join("/");
-  const target = `${API_URL}/v1/${path}${incoming.search}`;
+  const targetPath = `/v1/${path}${incoming.search}`;
 
   const headers = new Headers();
   const cookie = request.headers.get("cookie");
@@ -78,6 +79,17 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
 
   const uploadPost = isUploadPost(request.method, path);
   const uploadMedia = isUploadMediaRequest(request.method, path);
+
+  if (uploadPost && isDirectR2UploadsEnabled()) {
+    return Response.json(
+      {
+        error:
+          "Multipart upload is not supported on Cloudflare Pages. Use POST /api/v1/uploads/presign and PUT directly to R2.",
+      },
+      { status: 400 },
+    );
+  }
+
   const range = request.headers.get("range");
   if (range && uploadMedia) headers.set("range", range);
 
@@ -103,7 +115,7 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
       fetchInit.duplex = "half";
     }
 
-    const upstream = await fetch(target, fetchInit);
+    const upstream = await fetchFromApi(targetPath, fetchInit);
 
     if (uploadMedia) {
       return new Response(request.method === "HEAD" ? null : upstream.body, {
@@ -128,14 +140,16 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
       headers: responseHeaders,
     });
   } catch (err) {
-    console.error("API proxy failed:", target, err);
+    console.error("API proxy failed:", targetPath, err);
     const updating = await isDeployDraining();
     const error =
       updating
         ? "CCO is updating. Please wait a moment."
         : process.env.NODE_ENV === "production"
           ? "The server is temporarily unavailable. Please try again in a moment."
-          : "CCO API is unavailable. Start it with: cd services/api && bun run dev";
+          : isCloudflareDeployTarget()
+            ? "CCO API is unavailable. Check api.<your-domain> health."
+            : "CCO API is unavailable. Start it with: cd services/api && bun run dev";
     return Response.json({ error, updating }, { status: 503 });
   }
 }

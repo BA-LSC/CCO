@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-reconcile-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "triggers": {
+    "crons": ["0 3 * * *"],
+  },
+  "vars": {
+    // RECONCILE_INTERNAL_URL = https://api.example.com/internal/jobs/reconcile
+    // RECONCILE_INTERNAL_SECRET — wrangler secret
+  },
+}

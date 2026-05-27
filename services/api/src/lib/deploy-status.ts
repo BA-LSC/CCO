@@ -1,6 +1,9 @@
 import Redis from "ioredis";
+import { kvGet, kvGetBinding, kvPut, kvPutBinding, resolveDeployKvConfig } from "../lib/cloudflare-kv";
+import { getWorkerBindings } from "../runtime/worker-context";
 
-const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
+export const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
+export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 
 let redis: Redis | null = null;
 
@@ -18,7 +21,33 @@ function getRedis(): Redis | null {
   return redis;
 }
 
+async function shouldUseKvDeploy(): Promise<boolean> {
+  if (getWorkerBindings()?.DEPLOY_KV) return true;
+  if (process.env.CF_DEPLOY_KV === "1") return true;
+  if (process.env.REDIS_URL) return false;
+  try {
+    return Boolean(await resolveDeployKvConfig());
+  } catch {
+    return false;
+  }
+}
+
 export async function isDeployDraining(): Promise<boolean> {
+  try {
+    if (await shouldUseKvDeploy()) {
+      const binding = getWorkerBindings()?.DEPLOY_KV;
+      if (binding) {
+        return (await kvGetBinding(binding, DEPLOY_DRAINING_KEY)) === "1";
+      }
+      const kv = await resolveDeployKvConfig();
+      if (kv) {
+        return (await kvGet(kv, DEPLOY_DRAINING_KEY)) === "1";
+      }
+    }
+  } catch {
+    // Fall through to Redis when KV/DB is unavailable (e.g. unit tests).
+  }
+
   const client = getRedis();
   if (!client) return false;
   try {
@@ -30,4 +59,72 @@ export async function isDeployDraining(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function setDeployDraining(updating: boolean): Promise<void> {
+  const value = updating ? "1" : "0";
+
+  if (await shouldUseKvDeploy()) {
+    const binding = getWorkerBindings()?.DEPLOY_KV;
+    if (binding) {
+      await kvPutBinding(binding, DEPLOY_DRAINING_KEY, value);
+      await publishDeploySignal(updating);
+      return;
+    }
+    const kv = await resolveDeployKvConfig();
+    if (kv) {
+      await kvPut(kv, DEPLOY_DRAINING_KEY, value);
+      await publishDeploySignal(updating);
+      return;
+    }
+  }
+
+  const client = getRedis();
+  if (!client) return;
+  try {
+    if (client.status !== "ready") {
+      await client.connect().catch(() => null);
+    }
+    if (client.status !== "ready") return;
+    if (updating) {
+      await client.set(DEPLOY_DRAINING_KEY, "1");
+    } else {
+      await client.del(DEPLOY_DRAINING_KEY);
+    }
+    await client.publish(DEPLOY_SIGNAL_CHANNEL, updating ? "updating" : "ready");
+  } catch {
+    // ignore deploy signal failures
+  }
+}
+
+async function publishDeploySignal(updating: boolean): Promise<void> {
+  if (await shouldUseKvDeploy()) {
+    const binding = getWorkerBindings()?.DEPLOY_KV;
+    if (binding) {
+      await kvPutBinding(binding, DEPLOY_SIGNAL_CHANNEL, updating ? "updating" : "ready", 120);
+      return;
+    }
+    const kv = await resolveDeployKvConfig();
+    if (kv) {
+      await kvPut(kv, DEPLOY_SIGNAL_CHANNEL, updating ? "updating" : "ready", 120);
+    }
+  }
+}
+
+export async function readDeploySignal(): Promise<boolean> {
+  if (await shouldUseKvDeploy()) {
+    const binding = getWorkerBindings()?.DEPLOY_KV;
+    if (binding) {
+      const raw = await kvGetBinding(binding, DEPLOY_SIGNAL_CHANNEL);
+      if (raw === "updating") return true;
+      if (raw === "ready") return false;
+    }
+    const kv = await resolveDeployKvConfig();
+    if (kv) {
+      const raw = await kvGet(kv, DEPLOY_SIGNAL_CHANNEL);
+      if (raw === "updating") return true;
+      if (raw === "ready") return false;
+    }
+  }
+  return isDeployDraining();
 }

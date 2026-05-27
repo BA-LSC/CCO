@@ -1,0 +1,25 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-install",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "vars": {
+    // Same-origin API calls — orchestrator worker handles /api/* on setup-c.co
+    "NEXT_PUBLIC_INSTALL_API_URL": "",
+  },
+  // Custom domain for the install wizard UI (API on /api/* is routed to cco-install-orchestrator).
+  "routes": [
+    {
+      "pattern": "setup-c.co",
+      "custom_domain": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

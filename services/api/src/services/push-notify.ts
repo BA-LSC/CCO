@@ -14,6 +14,7 @@ import {
 } from "./notification-format";
 import { appendNotificationAnchorToUrl } from "@cco/shared/notification-navigation";
 import { collectWebPushSubscriptions, sendWebPushNotifications } from "./web-push";
+import { enqueuePushNotification, isPushQueueEnabled } from "./push-queue";
 
 async function collectPushTokens(userIds: string[]): Promise<string[]> {
   if (userIds.length === 0) return [];
@@ -125,8 +126,26 @@ async function notifyUsersOfMessage(params: {
   body: string;
   icon?: string | null;
   image?: string | null;
+  kind?: "message" | "call";
+  callId?: string;
 }): Promise<void> {
   if (params.userIds.length === 0) return;
+
+  const queued =
+    isPushQueueEnabled() &&
+    (await enqueuePushNotification({
+      kind: params.kind ?? "message",
+      userIds: params.userIds,
+      title: params.title,
+      body: params.body,
+      url: appendNotificationAnchorToUrl(params.url),
+      conversationId: params.conversationId,
+      icon: params.icon ?? null,
+      image: params.image ?? null,
+      callId: params.callId,
+    }));
+
+  if (queued) return;
 
   const [expoTokens, webSubscriptions] = await Promise.all([
     collectPushTokens(params.userIds),
@@ -143,7 +162,7 @@ async function notifyUsersOfMessage(params: {
   };
 
   await Promise.all([
-    sendExpoPush(expoTokens, params.title, params.body, params.url),
+    sendExpoPush(expoTokens, params.title, params.body, params.url, params.callId ? { type: "call", callId: params.callId } : undefined),
     sendWebPushNotifications(webSubscriptions, payload),
   ]);
 }
@@ -231,24 +250,15 @@ export async function notifyIncomingCall(params: {
   const title = meta.title;
   const body = `${params.hostDisplayName} started a call`;
 
-  const [expoTokens, webSubscriptions] = await Promise.all([
-    collectPushTokens(userIds),
-    collectWebPushSubscriptions(userIds),
-  ]);
-
-  const payload = {
+  await notifyUsersOfMessage({
+    userIds,
+    conversationId: params.conversationId,
+    url: callUrl,
     title,
     body,
-    url: appendNotificationAnchorToUrl(callUrl),
-    conversationId: params.conversationId,
-    icon: null,
-    image: null,
-  };
-
-  await Promise.all([
-    sendExpoPush(expoTokens, title, body, callUrl, { type: "call", callId: params.callId }),
-    sendWebPushNotifications(webSubscriptions, payload),
-  ]);
+    kind: "call",
+    callId: params.callId,
+  });
 }
 
 async function sendExpoPush(
@@ -258,31 +268,8 @@ async function sendExpoPush(
   url: string,
   extraData?: Record<string, string>,
 ): Promise<void> {
-  if (tokens.length === 0) return;
-
-  const messages = tokens.map((to) => ({
-    to,
-    sound: "default" as const,
-    title,
-    body,
-    data: { url, ...extraData },
-  }));
-
-  try {
-    const res = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(messages),
-    });
-    if (!res.ok) {
-      console.warn("Expo push failed:", await res.text());
-    }
-  } catch (err) {
-    console.warn("Expo push error:", err);
-  }
+  const { sendExpoPushDirect } = await import("./push-delivery");
+  await sendExpoPushDirect(tokens, title, body, url, extraData);
 }
 
 export async function registerPushToken(userId: string, expoPushToken: string): Promise<void> {

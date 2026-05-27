@@ -1,5 +1,6 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
+import { isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
 import { markDeployWait, probeServerAppVersion } from "@/lib/app-update";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -94,10 +95,38 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (await res.json()) as T;
 }
 
-export async function uploadImage(file: File): Promise<string> {
-  const prepared = await prepareImageForUpload(file);
+type PresignResponse = {
+  uploadUrl: string;
+  url: string;
+  contentType: string;
+};
+
+async function uploadMediaViaPresign(file: File, contentType: string): Promise<string> {
+  const presignRes = await fetch(`${API_BASE}/api/v1/uploads/presign`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType, size: file.size }),
+  });
+  if (!presignRes.ok) {
+    const text = await presignRes.text();
+    throw new Error(parseApiError(text, presignRes.status));
+  }
+  const presign = (await presignRes.json()) as PresignResponse;
+  const putRes = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": presign.contentType || contentType },
+    body: file,
+  });
+  if (!putRes.ok) {
+    throw new Error("Upload to storage failed. Please try again.");
+  }
+  return presign.url;
+}
+
+async function uploadMediaMultipart(file: File): Promise<string> {
   const form = new FormData();
-  form.append("file", prepared);
+  form.append("file", file);
   const res = await fetch(`${API_BASE}/api/v1/uploads`, {
     method: "POST",
     body: form,
@@ -111,21 +140,30 @@ export async function uploadImage(file: File): Promise<string> {
   return data.url;
 }
 
+export async function uploadImage(file: File): Promise<string> {
+  const prepared = await prepareImageForUpload(file);
+  const contentType = prepared.type || "image/jpeg";
+  if (isDirectR2UploadsEnabled()) {
+    return uploadMediaViaPresign(prepared, contentType);
+  }
+  try {
+    return await uploadMediaViaPresign(prepared, contentType);
+  } catch {
+    return uploadMediaMultipart(prepared);
+  }
+}
+
 export async function uploadVideo(file: File): Promise<string> {
   const prepared = await prepareVideoForUpload(file);
-  const form = new FormData();
-  form.append("file", prepared);
-  const res = await fetch(`${API_BASE}/api/v1/uploads`, {
-    method: "POST",
-    body: form,
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(parseApiError(text, res.status));
+  const contentType = prepared.type || "video/mp4";
+  if (isDirectR2UploadsEnabled()) {
+    return uploadMediaViaPresign(prepared, contentType);
   }
-  const data = (await res.json()) as { url: string };
-  return data.url;
+  try {
+    return await uploadMediaViaPresign(prepared, contentType);
+  } catch {
+    return uploadMediaMultipart(prepared);
+  }
 }
 
 export type GroupSummary = {

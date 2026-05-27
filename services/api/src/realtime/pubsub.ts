@@ -9,14 +9,28 @@ import {
   publishMessageEventRedis,
   subscribeToConversationRedis,
 } from "./pubsub-redis";
+import {
+  initCloudflarePubSub,
+  isCloudflarePubSubEnabled,
+  publishMessageEventCloudflare,
+  subscribeToConversationCloudflare,
+} from "./pubsub-cloudflare";
 
-let useRedis = false;
+type PubSubBackend = "memory" | "redis" | "cloudflare";
+
+let backend: PubSubBackend = "memory";
 
 export function configurePubSub(): void {
+  if (isCloudflarePubSubEnabled()) {
+    initCloudflarePubSub();
+    backend = "cloudflare";
+    return;
+  }
+
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
     initRedisPubSub(redisUrl);
-    useRedis = true;
+    backend = "redis";
   }
 }
 
@@ -26,12 +40,17 @@ export function subscribeToConversation(
   conversationId: string,
   listener: (event: RealtimeEvent) => void,
 ): () => void {
-  if (useRedis) return subscribeToConversationRedis(conversationId, listener);
+  if (backend === "cloudflare") return subscribeToConversationCloudflare(conversationId, listener);
+  if (backend === "redis") return subscribeToConversationRedis(conversationId, listener);
   return subscribeToConversationMemory(conversationId, listener);
 }
 
 export async function publishMessageEvent(event: RealtimeEvent): Promise<void> {
-  if (useRedis) {
+  if (backend === "cloudflare") {
+    await publishMessageEventCloudflare(event);
+    return;
+  }
+  if (backend === "redis") {
     await publishMessageEventRedis(event);
     return;
   }
@@ -40,5 +59,9 @@ export async function publishMessageEvent(event: RealtimeEvent): Promise<void> {
 
 export function resetPubSubForTests(): void {
   resetPubSubMemoryForTests();
-  useRedis = false;
+  backend = "memory";
+}
+
+export function getPubSubBackendForTests(): PubSubBackend {
+  return backend;
 }

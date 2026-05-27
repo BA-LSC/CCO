@@ -459,3 +459,19 @@
   border-color: var(--home-border);
   border-top-color: var(--home-accent);
 }
+
+.setup-readonly-url-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.setup-readonly-url-row .setup-form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup-copy-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+}

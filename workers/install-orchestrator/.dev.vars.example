@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored) for local wrangler dev.
+TOKEN_ENCRYPTION_KEY=REPLACE_WITH_32_BYTE_OR_LONGER_DEV_KEY
+CCO_INSTALL_ORIGIN=http://localhost:3002
+CCO_WORKER_BUNDLES_BASE_URL=http://localhost:8787/static/bundles
+CCO_D1_BASELINE_URL=

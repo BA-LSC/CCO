@@ -1,5 +1,6 @@
 import Redis from "ioredis";
-import { DEPLOY_SIGNAL_CHANNEL, isDeployDraining } from "@/lib/deploy-status.server";
+import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
+import { DEPLOY_SIGNAL_CHANNEL, isDeployDraining, readDeploySignalValue } from "@/lib/deploy-status.server";
 
 export type DeploySignal = {
   updating: boolean;
@@ -10,6 +11,8 @@ type DeploySignalListener = (signal: DeploySignal) => void;
 const listeners = new Set<DeploySignalListener>();
 
 let subscriber: Redis | null = null;
+
+const CF_POLL_MS = 5_000;
 
 function parseDeploySignal(raw: string): DeploySignal {
   if (raw === "updating") return { updating: true };
@@ -22,10 +25,35 @@ function parseDeploySignal(raw: string): DeploySignal {
   }
 }
 
+function startApiPollingSubscriber(): void {
+  void (async () => {
+    let lastUpdating: boolean | null = null;
+    const poll = async () => {
+      const updating = await isDeployDraining();
+      if (lastUpdating === null || updating !== lastUpdating) {
+        lastUpdating = updating;
+        const signal = { updating };
+        for (const listener of listeners) listener(signal);
+      }
+    };
+    await poll();
+    setInterval(poll, CF_POLL_MS);
+  })();
+}
+
 function ensureDeploySignalSubscriber(): void {
   if (subscriber) return;
+
+  if (isCloudflareDeployTarget() || process.env.CF_DEPLOY_KV === "1" || !process.env.REDIS_URL) {
+    startApiPollingSubscriber();
+    return;
+  }
+
   const url = process.env.REDIS_URL;
-  if (!url) return;
+  if (!url) {
+    startApiPollingSubscriber();
+    return;
+  }
 
   subscriber = new Redis(url, {
     connectTimeout: 1000,
@@ -35,6 +63,7 @@ function ensureDeploySignalSubscriber(): void {
 
   void subscriber.connect().then(() => subscriber?.subscribe(DEPLOY_SIGNAL_CHANNEL)).catch(() => {
     subscriber = null;
+    startApiPollingSubscriber();
   });
 
   subscriber.on("message", (_channel, payload) => {
@@ -98,4 +127,15 @@ export function createDeployEventStream(signal?: AbortSignal): ReadableStream<Ui
       cleanup();
     },
   });
+}
+
+/** Poll-only deploy status for clients that skip SSE (Cloudflare Pages). */
+export async function readDeploySignal(): Promise<DeploySignal> {
+  if (isCloudflareDeployTarget()) {
+    return { updating: await isDeployDraining() };
+  }
+
+  const raw = await readDeploySignalValue();
+  if (raw != null) return parseDeploySignal(raw);
+  return { updating: await isDeployDraining() };
 }

@@ -1,26 +1,10 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { Suspense } from "react";
-import { SetupLoading } from "@/components/SetupLoading";
-import { SetupWelcome } from "@/components/SetupWelcome";
-import { fetchSetupStatus } from "@/lib/setup";
+import { SetupHomeGate } from "@/components/SetupHomeGate";
 
-async function HomePageContent() {
+/** Setup gate must run at request time — never bake SetupWelcome at build when org is already configured. */
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
   const session = (await cookies()).get("connect_session")?.value;
-  const status = await fetchSetupStatus();
-
-  if (status.configured) {
-    if (session) redirect("/groups");
-    redirect("/auth/sign-in");
-  }
-
-  return <SetupWelcome />;
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={<SetupLoading />}>
-      <HomePageContent />
-    </Suspense>
-  );
+  return <SetupHomeGate hasSession={Boolean(session)} />;
 }

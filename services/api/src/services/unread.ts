@@ -1,6 +1,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { fetchLastMessagesForConversationsD1 } from "@cco/db/queries/unread";
 import { db } from "../db";
 import { conversationMembers } from "../db/schema";
+import { getWorkerD1 } from "../runtime/worker-context";
 
 export type LastConversationMessage = {
   authorId: string;
@@ -13,6 +15,11 @@ export type LastConversationMessage = {
 export async function fetchLastMessagesForConversations(
   conversationIds: string[],
 ): Promise<Map<string, LastConversationMessage>> {
+  const d1 = getWorkerD1();
+  if (d1) {
+    return fetchLastMessagesForConversationsD1(d1, conversationIds);
+  }
+
   const result = new Map<string, LastConversationMessage>();
   if (conversationIds.length === 0) return result;
 

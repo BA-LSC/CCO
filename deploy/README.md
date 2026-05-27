@@ -1,6 +1,14 @@
 # Production deployment
 
-Deploy **CCO (Chat Center Online)** on a single Linux server with Docker, **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** (no public HTTP/S ports), PostgreSQL, Redis, and containerized API + web services.
+> **Recommended for new churches:** install in your own Cloudflare account with the browser wizard at **[https://setup-c.co](https://setup-c.co)** — no VPS, Docker, or SSH. Full guide: **[docs/install/README.md](../docs/install/README.md)** (token permissions, zone SSL, D1 limits, and wizard steps).
+
+The sections below are **Advanced: Self-host on a server** — Docker on a Linux VPS, **[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)** (no public HTTP/S ports), PostgreSQL, Redis, and containerized API + web services. Use this path when you need full control over the stack, an existing Postgres deployment, or self-hosted infrastructure instead of the Cloudflare Workers + D1 greenfield install.
+
+---
+
+## Advanced: Self-host on a server
+
+Deploy **CCO (Chat Center Online)** on a single Linux server.
 
 **Time:** ~30 minutes (excluding DNS propagation)
 
@@ -11,9 +19,7 @@ Deploy **CCO (Chat Center Online)** on a single Linux server with Docker, **[Clo
 | Web app | `https://chat.example.com` |
 | API (REST, WebSocket, uploads, webhooks) | `https://api.example.com` |
 
----
-
-## Quick deploy (one command)
+### Quick deploy (one command)
 
 On any fresh Linux server (Ubuntu, Debian, Vultr, etc.):
 
@@ -56,7 +62,7 @@ curl -s "https://api.example.com/health"
 
 Open `https://chat.example.com/setup` and complete first-time app setup.
 
-### Scripts
+#### Scripts
 
 | Script | Purpose |
 |--------|---------|
@@ -73,7 +79,7 @@ External PostgreSQL is auto-detected from `DATABASE_URL`. Set `BUNDLED_DATABASE=
 
 For manual `.env` editing and troubleshooting, continue below.
 
-### Selective deploy builds
+#### Selective deploy builds
 
 `./deploy/update.sh` builds only images affected by the pulled commits (API package changes → `migrate` + `api`; web changes → `web`). Override when needed:
 
@@ -84,7 +90,7 @@ For manual `.env` editing and troubleshooting, continue below.
 ./deploy/bootstrap.sh --all       # same flags without git pull
 ```
 
-### Docker registry build cache (optional)
+#### Docker registry build cache (optional)
 
 Set `CCO_BUILD_CACHE_IMAGE` in `.env` to a registry prefix (e.g. `ghcr.io/org/cco/cache`) before deploy. Builds use `docker buildx` with `--cache-from` / `--cache-to` for faster VPS rebuilds. Requires `docker buildx` and registry push access.
 
@@ -534,6 +540,8 @@ Add `-v` only if you intend to **delete all data** (database, uploads, TLS certs
 ---
 
 ## Troubleshooting
+
+**Browser install at [setup-c.co](https://setup-c.co):** token permissions, zone SSL, and D1 limits are covered in **[docs/install/README.md](../docs/install/README.md#troubleshooting)**.
 
 ### Blank page (no styles)
 

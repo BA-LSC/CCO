@@ -1,17 +1,29 @@
 import { buildAuthorizeUrl } from "@cco/pco-client";
 import { NextRequest, NextResponse } from "next/server";
+import { fetchFromApi } from "@/lib/api-fetch-server";
 import { getDefaultPcoWebRedirectUri } from "@/lib/pco-oauth";
 import { publicUrl } from "@/lib/public-origin";
 import { safeNextPath, secureCookie } from "@/lib/safe-next-path";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
+async function fetchSetupRouteApi(
+  request: NextRequest,
+  apiPath: string,
+): Promise<Response | null> {
+  const direct = await fetchFromApi(apiPath, { cache: "no-store" }).catch(() => null);
+  if (direct?.ok) return direct;
 
-export async function GET(request: NextRequest) {
-  const availabilityRes = await fetch(`${API_URL}/v1/setup/oauth-available`, {
+  const viaWebProxy = await fetch(publicUrl(request, `/api${apiPath}`), {
     cache: "no-store",
   }).catch(() => null);
+  if (viaWebProxy?.ok) return viaWebProxy;
+
+  return direct;
+}
+
+export async function GET(request: NextRequest) {
+  const availabilityRes = await fetchSetupRouteApi(request, "/v1/setup/oauth-available");
 
   if (!availabilityRes?.ok) {
     return NextResponse.json({ error: "CCO API is not running" }, { status: 503 });
@@ -27,7 +39,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const configRes = await fetch(`${API_URL}/v1/setup/oauth-config`, { cache: "no-store" });
+  const configRes = await fetchSetupRouteApi(request, "/v1/setup/oauth-config");
+  if (!configRes) {
+    return NextResponse.json({ error: "CCO API is not running" }, { status: 503 });
+  }
   if (!configRes.ok) {
     if (configRes.status === 503) {
       const message = encodeURIComponent(

@@ -10,6 +10,9 @@ node_modules/
 !.env.example
 !deploy/.env.production.example
 
+# Git worktrees (local agent isolation)
+.worktrees/
+
 # Monorepo tooling
 .turbo/
 
@@ -17,9 +20,15 @@ node_modules/
 dist/
 build/
 out/
+deploy/cloudflare/bundles/
+deploy/cloudflare/releases/
+deploy/cloudflare/.tmp-web-bundle/
+deploy/cloudflare/.tmp-web-worker.mjs
 
 # Next.js
 .next/
+.open-next/
+apps/web/middleware.ts
 next-env.d.ts
 
 # Expo / React Native
@@ -72,6 +81,9 @@ AGENTS.md
 
 # Deploy / hosting
 .vercel
+.wrangler/
 
 # Internal planning docs (local only)
-docs/
+docs/*
+!docs/install/
+!docs/install/**

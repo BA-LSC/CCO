@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fetchFromApi } from "@/lib/api-fetch-server";
+import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 import { getPublicOrigin, publicUrl } from "@/lib/public-origin";
 import { isSecureCookieContext } from "@/lib/session-cookies";
 
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
 const EXCHANGE_TIMEOUT_MS = 30_000;
 
 function callbackRedirectUri(request: NextRequest): string {
@@ -16,6 +17,17 @@ function errorRedirect(request: NextRequest, message: string) {
   const response = NextResponse.redirect(target, 303);
   response.headers.set("Cache-Control", "no-store");
   return response;
+}
+
+function apiUnavailableMessage(timedOut: boolean): string {
+  if (timedOut) {
+    return isCloudflareDeployTarget()
+      ? "Sign-in timed out. Check that api.<your-domain> is healthy, then try again."
+      : "Sign-in timed out. Check that the API container is healthy, then try again.";
+  }
+  return isCloudflareDeployTarget()
+    ? "CCO API is unavailable. Check api.<your-domain> health."
+    : "CCO API is not running. Start services/api.";
 }
 
 export async function handlePcoOAuthCallback(request: NextRequest) {
@@ -38,7 +50,7 @@ export async function handlePcoOAuthCallback(request: NextRequest) {
 
   let exchangeRes: Response;
   try {
-    exchangeRes = await fetch(`${API_URL}/auth/pco/exchange`, {
+    exchangeRes = await fetchFromApi("/auth/pco/exchange", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,12 +66,7 @@ export async function handlePcoOAuthCallback(request: NextRequest) {
     });
   } catch (err) {
     const timedOut = err instanceof Error && err.name === "TimeoutError";
-    return errorRedirect(
-      request,
-      timedOut
-        ? "Sign-in timed out. Check that the API container is healthy, then try again."
-        : "CCO API is not running. Start services/api.",
-    );
+    return errorRedirect(request, apiUnavailableMessage(timedOut));
   }
 
   if (!exchangeRes.ok) {

@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-giphy-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "vars": {
+    // GIPHY_API_KEY — wrangler secret
+  },
+}

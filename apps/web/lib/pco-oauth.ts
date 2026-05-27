@@ -1,4 +1,5 @@
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
+import { fetchFromApi } from "@/lib/api-fetch-server";
+import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 
 /** Env-derived default — used when org URLs are not saved yet. */
 export function getDefaultPcoWebRedirectUri(): string {
@@ -6,7 +7,10 @@ export function getDefaultPcoWebRedirectUri(): string {
     return process.env.PCO_WEB_REDIRECT_URI.trim();
   }
   const base = process.env.WEB_URL ?? "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/auth/pco/callback`;
+  const path = isCloudflareDeployTarget() || !base.includes("localhost")
+    ? "/api/auth/pco/callback"
+    : "/auth/pco/callback";
+  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 export function getLegacyPcoWebRedirectUri(): string {
@@ -16,7 +20,7 @@ export function getLegacyPcoWebRedirectUri(): string {
 
 export async function fetchPcoWebRedirectUri(): Promise<string> {
   try {
-    const res = await fetch(`${API_URL}/v1/setup/redirect-uris`, {
+    const res = await fetchFromApi("/v1/setup/redirect-uris", {
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
     });

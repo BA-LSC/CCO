@@ -4,10 +4,10 @@ import { getPublicOrigin } from "./public-origin";
 describe("getPublicOrigin", () => {
   test("prefers WEB_URL over internal request host", () => {
     const prev = process.env.WEB_URL;
-    process.env.WEB_URL = "https://cco.lscavl.dev";
+    process.env.WEB_URL = "https://chat.example.com";
     try {
       const request = new Request("http://0.0.0.0:3000/auth/sign-out");
-      expect(getPublicOrigin(request)).toBe("https://cco.lscavl.dev");
+      expect(getPublicOrigin(request)).toBe("https://chat.example.com");
     } finally {
       if (prev === undefined) delete process.env.WEB_URL;
       else process.env.WEB_URL = prev;
@@ -22,11 +22,11 @@ describe("getPublicOrigin", () => {
     try {
       const request = new Request("http://0.0.0.0:3000/auth/sign-out", {
         headers: {
-          "x-forwarded-host": "cco.lscavl.dev",
+          "x-forwarded-host": "chat.example.com",
           "x-forwarded-proto": "https",
         },
       });
-      expect(getPublicOrigin(request)).toBe("https://cco.lscavl.dev");
+      expect(getPublicOrigin(request)).toBe("https://chat.example.com");
     } finally {
       if (prevWeb === undefined) delete process.env.WEB_URL;
       else process.env.WEB_URL = prevWeb;

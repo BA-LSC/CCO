@@ -14,6 +14,7 @@ function expiresAtFromToken(token: TokenResponse): Date | null {
 
 export async function savePcoTokens(userId: string, token: TokenResponse): Promise<void> {
   const expiresAt = expiresAtFromToken(token);
+  const updatedAt = new Date();
   await db
     .insert(userPcoCredentials)
     .values({
@@ -21,6 +22,7 @@ export async function savePcoTokens(userId: string, token: TokenResponse): Promi
       accessToken: encryptSecret(token.access_token),
       refreshToken: token.refresh_token ? encryptSecret(token.refresh_token) : null,
       expiresAt,
+      updatedAt,
     })
     .onConflictDoUpdate({
       target: userPcoCredentials.userId,

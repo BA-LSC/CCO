@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "bun --env-file=../../.env next dev -p 3000",
     "build": "next build",
+    "build:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare build && node scripts/prepare-opennext.mjs restore",
+    "preview:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare preview && node scripts/prepare-opennext.mjs restore",
+    "deploy:cloudflare": "node scripts/prepare-opennext.mjs hide && CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare deploy && node scripts/prepare-opennext.mjs restore",
     "postbuild": "node scripts/prepare-standalone.mjs",
     "start": "node .next/standalone/apps/web/server.js",
     "start:next": "next start",
@@ -24,6 +27,7 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.11",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
@@ -32,6 +36,7 @@
     "emojibase-data": "^17.0.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "wrangler": "^4.86.0"
   }
 }

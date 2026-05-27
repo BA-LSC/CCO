@@ -42,3 +42,23 @@ export function isBootstrapAuthorized(bootstrapHeader: string | undefined): bool
     return false;
   }
 }
+
+/** Accept install orchestrator handoff using SETUP_BOOTSTRAP_SECRET or CF_INTERNAL_SECRET. */
+export function isInstallHandoffAuthorized(bootstrapHeader: string | undefined): boolean {
+  if (!bootstrapHeader) return false;
+  const candidates = [
+    process.env.SETUP_BOOTSTRAP_SECRET?.trim(),
+    process.env.CF_INTERNAL_SECRET?.trim(),
+  ].filter(Boolean) as string[];
+
+  for (const secret of candidates) {
+    try {
+      if (timingSafeEqual(Buffer.from(bootstrapHeader, "utf8"), Buffer.from(secret, "utf8"))) {
+        return true;
+      }
+    } catch {
+      // length mismatch — try next candidate
+    }
+  }
+  return false;
+}

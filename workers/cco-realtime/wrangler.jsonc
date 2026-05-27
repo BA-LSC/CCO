@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-realtime-fanout",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cco",
+      "database_id": "PROVISIONED_AT_INSTALL",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION_ROOM",
+        "class_name": "ConversationRoom",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationRoom"],
+    },
+  ],
+  // Secrets (wrangler secret put): SESSION_SECRET, CF_INTERNAL_SECRET
+  "observability": {
+    "enabled": true,
+  },
+}

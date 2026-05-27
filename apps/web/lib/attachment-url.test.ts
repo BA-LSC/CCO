@@ -4,19 +4,19 @@ import { extractUploadFilename, resolveAttachmentDisplayUrl } from "./attachment
 describe("extractUploadFilename", () => {
   test("parses API upload URLs", () => {
     expect(
-      extractUploadFilename("https://api.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999"),
+      extractUploadFilename("https://api.example.com/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
   });
 
   test("parses same-origin /api/v1/uploads URLs", () => {
     expect(
-      extractUploadFilename("https://cco.lscavl.dev/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999"),
+      extractUploadFilename("https://chat.example.com/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
   });
 
   test("parses legacy /api/uploads URLs", () => {
     expect(
-      extractUploadFilename("https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999"),
+      extractUploadFilename("https://chat.example.com/api/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
   });
 });
@@ -25,7 +25,7 @@ describe("resolveAttachmentDisplayUrl", () => {
   test("rewrites API upload URLs to same-origin proxy and keeps signed params", () => {
     expect(
       resolveAttachmentDisplayUrl(
-        "https://api.lscavl.dev/uploads/abc.jpeg?sig=deadbeef&exp=999",
+        "https://api.example.com/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
     ).toBe("/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });
@@ -33,7 +33,7 @@ describe("resolveAttachmentDisplayUrl", () => {
   test("rewrites same-origin /api/uploads URLs from PUBLIC_UPLOAD_URL", () => {
     expect(
       resolveAttachmentDisplayUrl(
-        "https://cco.lscavl.dev/api/uploads/abc.jpeg?sig=deadbeef&exp=999",
+        "https://chat.example.com/api/uploads/abc.jpeg?sig=deadbeef&exp=999",
       ),
     ).toBe("/api/v1/uploads/abc.jpeg?sig=deadbeef&exp=999");
   });

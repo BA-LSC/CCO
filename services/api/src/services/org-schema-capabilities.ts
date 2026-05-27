@@ -1,10 +1,20 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_account_id" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_app_id" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_api_token_enc" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_bucket_name" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_access_key_id_enc" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_secret_access_key_enc" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_public_url" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_hyperdrive_id" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_kv_presence_namespace_id" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_kv_deploy_namespace_id" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_push_queue_id" text`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_platform_provisioned_at" timestamp`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_host" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_member" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "realtime_kit_preset_guest" text`,
@@ -109,8 +119,12 @@ async function runEnsureCallSessionSchema(): Promise<void> {
   }
 }
 
-/** Org columns for Cloudflare / RealtimeKit settings (required, small, safe). */
+/** Org columns for Cloudflare / RealtimeKit / platform settings (required, small, safe). */
 export async function ensureCloudflareOrganizationColumns(): Promise<void> {
+  if (isCloudflareRuntime()) {
+    orgColumnsReady = true;
+    return;
+  }
   if (orgColumnsReady) return;
   if (!orgColumnsPromise) {
     orgColumnsPromise = runEnsureCloudflareOrganizationColumns().catch((err) => {
@@ -121,8 +135,17 @@ export async function ensureCloudflareOrganizationColumns(): Promise<void> {
   await orgColumnsPromise;
 }
 
+/** @deprecated Alias — includes R2, KV, Queues, Hyperdrive columns. */
+export async function ensureCloudflarePlatformColumns(): Promise<void> {
+  await ensureCloudflareOrganizationColumns();
+}
+
 /** Call session tables (best-effort; logged and skipped on failure). */
 export async function ensureCallSessionSchema(): Promise<void> {
+  if (isCloudflareRuntime()) {
+    callSchemaReady = true;
+    return;
+  }
   if (callSchemaReady) return;
   if (!callSchemaPromise) {
     callSchemaPromise = runEnsureCallSessionSchema().catch((err) => {

@@ -29,6 +29,10 @@ import {
   getOrganizationRealtimeKitStatus,
   saveOrganizationCloudflareApiToken,
 } from "../services/org-realtimekit";
+import {
+  getOrganizationCloudflarePlatformStatus,
+  provisionCloudflarePlatform,
+} from "../services/cloudflare-platform-provision";
 import { selectConfiguredOrganizationRow } from "../services/configured-org-query";
 import { invalidateOrgContextCache } from "../services/org-context-cache";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
@@ -90,6 +94,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
   const vapidStatus = await getOrganizationVapidStatus(refreshed);
   const giphyStatus = getOrganizationGiphyStatus(refreshed);
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(refreshed);
+  const platformStatus = getOrganizationCloudflarePlatformStatus(refreshed);
   const webhookSecrets = decryptWebhookSecrets(refreshed.pcoWebhookSecretEnc);
 
   return c.json({
@@ -105,6 +110,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
+    ...platformStatus,
   });
 });
 
@@ -286,6 +292,11 @@ settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
       apiToken: parsed.data.cloudflareApiToken,
       existingAccountId: current.realtimeKitAccountId || undefined,
     });
+    await provisionCloudflarePlatform({
+      organizationId: org.id,
+      apiToken: parsed.data.cloudflareApiToken,
+      existingAccountId: current.realtimeKitAccountId || undefined,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid Cloudflare API token";
     return c.json({ error: message }, 400);
@@ -295,9 +306,11 @@ settingsRouter.post("/integrations/cloudflare", requireAuth, async (c) => {
   const updated =
     (await selectConfiguredOrganizationRow(eq(organizations.id, org.id))) ?? org;
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(updated);
+  const platformStatus = getOrganizationCloudflarePlatformStatus(updated);
   return c.json({
     ok: true,
     ...realtimeKitStatus,
+    ...platformStatus,
   });
 });
 

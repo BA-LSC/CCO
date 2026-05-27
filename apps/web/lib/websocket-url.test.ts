@@ -8,7 +8,7 @@ import {
 describe("deriveApiHostname", () => {
   test("maps web subdomain to api on the zone root", () => {
     expect(deriveApiHostname("chat.example.com")).toBe("api.example.com");
-    expect(deriveApiHostname("cco.lscavl.dev")).toBe("api.lscavl.dev");
+    expect(deriveApiHostname("chat.mychurch.org")).toBe("api.mychurch.org");
   });
 
   test("prefixes api for bare hostnames", () => {

@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildInstallSetupUrls,
+  deriveApiHostnameFromWeb,
   getDefaultPcoApiRedirectUri,
   getDefaultPcoMobileRedirectUri,
   getDefaultPcoWebRedirectUri,
   getDefaultPcoWebhookUrl,
   isAllowedPcoRedirectUri,
+  webhookUrlForApiHostname,
 } from "./pco-redirect-uris";
 
 describe("pco redirect uris", () => {
@@ -40,5 +43,19 @@ describe("pco redirect uris", () => {
       if (prevApi === undefined) delete process.env.API_URL;
       else process.env.API_URL = prevApi;
     }
+  });
+
+  test("buildInstallSetupUrls derives chat and api hostnames for BYO install", () => {
+    expect(deriveApiHostnameFromWeb("chat.grace.org")).toBe("api.grace.org");
+    expect(webhookUrlForApiHostname("api.grace.org")).toBe("https://api.grace.org/webhooks/pco");
+
+    const urls = buildInstallSetupUrls({
+      chatHostname: "chat.grace.org",
+      apiHostname: "api.grace.org",
+    });
+    expect(urls.signInRedirectUri).toBe("https://chat.grace.org/api/auth/pco/callback");
+    expect(urls.webhookUrl).toBe("https://api.grace.org/webhooks/pco");
+    expect(urls.apiRedirectUri).toBe("https://api.grace.org/auth/pco/callback");
+    expect(urls.mobileRedirectUri).toBe("https://api.grace.org/auth/pco/mobile/callback");
   });
 });

@@ -1,0 +1,41 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-install-orchestrator",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../../deploy/cloudflare/releases",
+    "binding": "RELEASES_ASSETS",
+    "run_worker_first": true,
+  },
+  "vars": {
+    "CCO_INSTALL_ORIGIN": "https://setup-c.co",
+    "CCO_RELEASES_BASE_URL": "https://setup-c.co/releases",
+  },
+  "kv_namespaces": [
+    {
+      "binding": "INSTALL_SESSIONS",
+      "id": "914809dd40b740f8851a86b812e1030d",
+      "preview_id": "914809dd40b740f8851a86b812e1030d",
+    },
+  ],
+  // Production routes on setup-c.co (zone must be on the CCO Cloudflare account).
+  "routes": [
+    {
+      "pattern": "setup-c.co/api/*",
+      "zone_name": "setup-c.co",
+    },
+    {
+      "pattern": "setup-c.co/health",
+      "zone_name": "setup-c.co",
+    },
+    {
+      "pattern": "setup-c.co/releases/*",
+      "zone_name": "setup-c.co",
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}

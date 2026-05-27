@@ -1,0 +1,62 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  // Provisioned at install — replace placeholder IDs after BYO wizard deploy
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cco",
+      "database_id": "PROVISIONED_AT_INSTALL",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "cco-uploads-xxxxxxxx",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "PRESENCE_KV",
+      "id": "PROVISIONED_PRESENCE_KV_ID",
+    },
+    {
+      "binding": "DEPLOY_KV",
+      "id": "PROVISIONED_DEPLOY_KV_ID",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "PUSH_QUEUE",
+        "queue": "cco-push-notifications",
+      },
+    ],
+  },
+  "services": [
+    {
+      "binding": "REALTIME_FANOUT",
+      "service": "cco-realtime-fanout",
+    },
+  ],
+  "vars": {
+    "UPLOAD_STORAGE": "r2",
+    "CCO_BUNDLE_TARGET": "cloudflare",
+  },
+  "define": {
+    "process.env.CCO_BUNDLE_TARGET": "\"cloudflare\"",
+  },
+  // Secrets (wrangler secret put): SESSION_SECRET, TOKEN_ENCRYPTION_KEY,
+  // CF_INTERNAL_SECRET, CF_REALTIME_INTERNAL_SECRET, WEB_URL, MOBILE_ORIGIN,
+  // PUBLIC_UPLOAD_URL
+  "observability": {
+    "enabled": true,
+  },
+  "alias": {
+    "../../../services/api/src/db/schema": "@cco/db/schema",
+    "../../../services/api/src/services/org-schema-capabilities": "@cco/db/queries/org-schema",
+  },
+}

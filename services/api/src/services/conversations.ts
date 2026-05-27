@@ -289,7 +289,7 @@ export async function listGroupsForSidebar(userId: string) {
   const groupMemberCounts = await db
     .select({
       groupId: groupMemberships.groupId,
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`cast(count(*) as integer)`,
     })
     .from(groupMemberships)
     .where(inArray(groupMemberships.groupId, groupIds))
@@ -320,7 +320,7 @@ export async function listGroupsForSidebar(userId: string) {
     const convMemberCounts = await db
       .select({
         conversationId: conversationMembers.conversationId,
-        count: sql<number>`count(*)::int`,
+        count: sql<number>`cast(count(*) as integer)`,
       })
       .from(conversationMembers)
       .where(inArray(conversationMembers.conversationId, convIds))
@@ -436,7 +436,7 @@ export async function getGroupWithConversations(groupId: string, userId: string)
     const counts = await db
       .select({
         conversationId: conversationMembers.conversationId,
-        count: sql<number>`count(*)::int`,
+        count: sql<number>`cast(count(*) as integer)`,
       })
       .from(conversationMembers)
       .where(inArray(conversationMembers.conversationId, convIds))

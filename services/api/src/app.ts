@@ -23,6 +23,7 @@ import { settingsRouter } from "./routes/settings";
 import { unreadRouter } from "./routes/unread";
 import { presenceRouter } from "./routes/presence";
 import { webhooksRouter } from "./webhooks/pco";
+import { internalRouter } from "./routes/internal";
 
 void mkdir(getUploadDir(), { recursive: true });
 
@@ -69,6 +70,7 @@ app.route("/v1/settings", settingsRouter);
 app.route("/v1/presence", presenceRouter);
 app.route("/v1/giphy", giphyRouter);
 app.route("/webhooks", webhooksRouter);
+app.route("/internal", internalRouter);
 
 app.onError((err, c) => {
   console.error("Unhandled API error:", err);

@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-push-consumer",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "",
+    },
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "cco-push-notifications",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+      },
+    ],
+  },
+}

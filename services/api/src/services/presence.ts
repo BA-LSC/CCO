@@ -2,9 +2,11 @@ import { and, eq, inArray } from "drizzle-orm";
 import Redis from "ioredis";
 import { db } from "../db";
 import { conversationMembers, users } from "../db/schema";
+import { kvMget, kvMgetBinding, kvPut, kvPutBinding, resolvePresenceKvConfig } from "../lib/cloudflare-kv";
+import { getWorkerBindings } from "../runtime/worker-context";
+import { PRESENCE_KEY_PREFIX, PRESENCE_TTL_SECONDS, presenceKey } from "../realtime/presence-keys";
 
-const PRESENCE_KEY_PREFIX = "cco:presence:";
-export const PRESENCE_TTL_SECONDS = 45;
+export { PRESENCE_TTL_SECONDS };
 
 let redis: Redis | null = null;
 
@@ -15,15 +17,36 @@ function getRedis(): Redis | null {
   return redis;
 }
 
-function presenceKey(userId: string): string {
-  return `${PRESENCE_KEY_PREFIX}${userId}`;
+async function shouldUseKvPresence(): Promise<boolean> {
+  if (getWorkerBindings()?.PRESENCE_KV) return true;
+  if (process.env.CF_PRESENCE_KV === "1") return true;
+  if (process.env.REDIS_URL) return false;
+  try {
+    return Boolean(await resolvePresenceKvConfig());
+  } catch {
+    return false;
+  }
 }
 
 /** Mark a user as actively viewing the app (page visible). */
 export async function touchUserPresence(userId: string, callId?: string | null): Promise<void> {
+  const value = callId ? `call:${callId}` : "1";
+
+  if (await shouldUseKvPresence()) {
+    const binding = getWorkerBindings()?.PRESENCE_KV;
+    if (binding) {
+      await kvPutBinding(binding, presenceKey(userId), value, PRESENCE_TTL_SECONDS);
+      return;
+    }
+    const kv = await resolvePresenceKvConfig();
+    if (kv) {
+      await kvPut(kv, presenceKey(userId), value, PRESENCE_TTL_SECONDS);
+      return;
+    }
+  }
+
   const client = getRedis();
   if (!client) return;
-  const value = callId ? `call:${callId}` : "1";
   await client.set(presenceKey(userId), value, "EX", PRESENCE_TTL_SECONDS);
 }
 
@@ -38,8 +61,43 @@ export async function getUsersPresenceState(
     inCall[userId] = null;
   }
 
+  if (userIds.length === 0) return { online, inCall };
+
+  if (await shouldUseKvPresence()) {
+    const binding = getWorkerBindings()?.PRESENCE_KV;
+    if (binding) {
+      const values = await kvMgetBinding(
+        binding,
+        userIds.map(presenceKey),
+      );
+      userIds.forEach((userId, index) => {
+        const raw = values[index];
+        online[userId] = raw != null;
+        if (raw?.startsWith("call:")) {
+          inCall[userId] = raw.slice("call:".length) || null;
+        }
+      });
+      return { online, inCall };
+    }
+    const kv = await resolvePresenceKvConfig();
+    if (kv) {
+      const values = await kvMget(
+        kv,
+        userIds.map(presenceKey),
+      );
+      userIds.forEach((userId, index) => {
+        const raw = values[index];
+        online[userId] = raw != null;
+        if (raw?.startsWith("call:")) {
+          inCall[userId] = raw.slice("call:".length) || null;
+        }
+      });
+      return { online, inCall };
+    }
+  }
+
   const client = getRedis();
-  if (!client || userIds.length === 0) return { online, inCall };
+  if (!client) return { online, inCall };
 
   const values = await client.mget(...userIds.map(presenceKey));
   userIds.forEach((userId, index) => {
@@ -102,3 +160,6 @@ export async function resolvePresenceVisibleUserIds(
 
   return [...allowed];
 }
+
+/** @internal */
+export { PRESENCE_KEY_PREFIX };

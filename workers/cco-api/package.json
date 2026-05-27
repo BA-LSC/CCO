@@ -1,0 +1,29 @@
+{
+  "name": "@cco/worker-api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "bun test",
+    "typecheck": "echo 'Worker types checked at bundle time via wrangler; shared API types via root typecheck'"
+  },
+  "dependencies": {
+    "@cco/db": "workspace:*",
+    "@cco/pco-client": "workspace:*",
+    "@cco/shared": "workspace:*",
+    "aws4fetch": "^1.0.20",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.21",
+    "jose": "^6.2.3",
+    "web-push": "^3.6.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "bun-types": "1.3.14",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.19.1"
+  }
+}

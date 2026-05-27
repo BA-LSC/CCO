@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import path from "node:path";
+import { buildR2AttachmentUrl, resolveR2Config } from "./r2-uploads";
 
 export function getUploadDir(): string {
   return process.env.UPLOAD_DIR ?? path.join(process.cwd(), "uploads");
@@ -7,6 +8,11 @@ export function getUploadDir(): string {
 
 export const PUBLIC_UPLOAD_URL =
   process.env.PUBLIC_UPLOAD_URL ?? "http://localhost:3001/uploads";
+
+export async function isR2StorageEnabled(): Promise<boolean> {
+  if (process.env.UPLOAD_STORAGE === "local") return false;
+  return Boolean(await resolveR2Config());
+}
 
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -103,8 +109,31 @@ export function extractUploadFilename(urlOrPath: string): string | null {
 export function refreshAttachmentUrl(stored: string | null): string | null {
   if (!stored) return null;
   const filename = extractUploadFilename(stored);
-  if (!filename || safeUploadPath(getUploadDir(), filename) === null) return stored;
+  if (!filename) return stored;
+
+  if (process.env.CLOUDFLARE_R2_BUCKET?.trim() || process.env.UPLOAD_STORAGE === "r2") {
+    return buildSignedUploadUrl(filename);
+  }
+
+  if (safeUploadPath(getUploadDir(), filename) === null) return stored;
   return buildSignedUploadUrl(filename);
+}
+
+export async function refreshAttachmentUrlAsync(stored: string | null): Promise<string | null> {
+  if (!stored) return null;
+  const filename = extractUploadFilename(stored);
+  if (!filename) return stored;
+
+  if (await isR2StorageEnabled()) {
+    const r2Url = await buildR2SignedUploadUrl(filename);
+    if (r2Url) return r2Url;
+  }
+
+  return refreshAttachmentUrl(stored);
+}
+
+export async function buildR2SignedUploadUrl(filename: string): Promise<string | null> {
+  return buildR2AttachmentUrl(filename);
 }
 
 export function isAllowedAttachmentUrl(
@@ -120,11 +149,16 @@ export function isAllowedAttachmentUrl(
     return false;
   }
 
-  if (allowed.protocol !== candidate.protocol) return false;
-  if (allowed.host !== candidate.host) return false;
-
   const filename = extractUploadFilename(attachmentUrl);
   if (!filename) return false;
+
+  if (process.env.CLOUDFLARE_R2_BUCKET?.trim() || process.env.UPLOAD_STORAGE === "r2") {
+    if (candidate.host.includes("r2.cloudflarestorage.com")) return true;
+    if (allowed.host === candidate.host) return true;
+  }
+
+  if (allowed.protocol !== candidate.protocol) return false;
+  if (allowed.host !== candidate.host) return false;
 
   return safeUploadPath(getUploadDir(), filename) !== null;
 }

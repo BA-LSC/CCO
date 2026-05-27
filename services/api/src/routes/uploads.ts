@@ -6,7 +6,10 @@ import {
   getUploadDir,
   buildSignedUploadUrl,
   safeUploadPath,
+  buildR2SignedUploadUrl,
+  isR2StorageEnabled,
 } from "../lib/uploads";
+import { resolveR2Config, createR2PresignedPutUrl } from "../lib/r2-uploads";
 
 type Env = { Variables: AuthVariables };
 
@@ -44,12 +47,61 @@ function inferUploadMimeType(file: File): string {
   return file.type;
 }
 
+function validateMediaType(contentType: string, size: number): string | null {
+  const isImage = IMAGE_TYPES.has(contentType);
+  const isVideo = VIDEO_TYPES.has(contentType);
+  if (!isImage && !isVideo) return "Unsupported file type";
+  if (size > MAX_MEDIA_BYTES) return "File too large (max 95MB)";
+  return null;
+}
+
 export const uploadsRouter = new Hono<Env>();
 
 uploadsRouter.get("/:filename", serveUploadFile);
 
+/** Returns presigned R2 PUT URL for direct client upload when R2 is configured. */
+uploadsRouter.post("/presign", requireAuth, async (c) => {
+  const r2 = await resolveR2Config();
+  if (!r2) {
+    return c.json({ error: "R2 uploads are not configured" }, 503);
+  }
+
+  let body: { contentType?: string; size?: number };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const contentType = body.contentType?.trim() ?? "";
+  const size = Number(body.size ?? 0);
+  const validationError = validateMediaType(contentType, size);
+  if (validationError) return c.json({ error: validationError }, 400);
+
+  const ext = EXT_BY_MIME[contentType] ?? contentType.split("/")[1] ?? "bin";
+  const filename = `${crypto.randomUUID()}.${ext}`;
+
+  const uploadUrl = await createR2PresignedPutUrl({
+    config: r2,
+    objectKey: filename,
+    contentType,
+    ttlSeconds: 3600,
+  });
+
+  const publicUrl = await buildR2SignedUploadUrl(filename);
+
+  return c.json({
+    uploadUrl,
+    url: publicUrl,
+    filename,
+    contentType,
+    storage: "r2",
+  });
+});
+
 uploadsRouter.post("/", requireAuth, async (c) => {
   try {
+    const r2 = await resolveR2Config();
     const body = await c.req.parseBody();
     const file = body.file;
 
@@ -58,21 +110,26 @@ uploadsRouter.post("/", requireAuth, async (c) => {
     }
 
     const contentType = inferUploadMimeType(file);
-    const isImage = IMAGE_TYPES.has(contentType);
-    const isVideo = VIDEO_TYPES.has(contentType);
-
-    if (!isImage && !isVideo) {
-      return c.json({ error: "Unsupported file type" }, 400);
-    }
-
-    if (file.size > MAX_MEDIA_BYTES) {
-      return c.json({ error: "File too large (max 95MB)" }, 400);
-    }
-
-    await mkdir(getUploadDir(), { recursive: true });
+    const validationError = validateMediaType(contentType, file.size);
+    if (validationError) return c.json({ error: validationError }, 400);
 
     const ext = EXT_BY_MIME[contentType] ?? contentType.split("/")[1] ?? "bin";
     const filename = `${crypto.randomUUID()}.${ext}`;
+
+    if (r2) {
+      const { putR2Object } = await import("../lib/r2-uploads");
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await putR2Object({
+        config: r2,
+        objectKey: filename,
+        body: buffer,
+        contentType,
+      });
+      const url = await buildR2SignedUploadUrl(filename);
+      return c.json({ url, filename, contentType, storage: "r2" });
+    }
+
+    await mkdir(getUploadDir(), { recursive: true });
     const dest = safeUploadPath(getUploadDir(), filename);
     if (!dest) {
       return c.json({ error: "Invalid filename" }, 400);
@@ -85,6 +142,7 @@ uploadsRouter.post("/", requireAuth, async (c) => {
       url: buildSignedUploadUrl(filename),
       filename,
       contentType,
+      storage: "local",
     });
   } catch (err) {
     console.error("Upload failed:", err);
@@ -92,3 +150,5 @@ uploadsRouter.post("/", requireAuth, async (c) => {
     return c.json({ error: message }, 500);
   }
 });
+
+export { isR2StorageEnabled };

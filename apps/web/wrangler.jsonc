@@ -1,0 +1,26 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "vars": {
+    "CCO_DEPLOY_TARGET": "cloudflare",
+    "CF_DEPLOY_KV": "1",
+    "NEXT_PUBLIC_DIRECT_UPLOADS": "1",
+    // Set at provision time (Pages secrets or vars overrides):
+    // WEB_URL = "https://chat.example.com"
+    // API_DOMAIN = "api.example.com"
+    // NEXT_PUBLIC_WEB_URL = "https://chat.example.com"
+    // NEXT_PUBLIC_WS_URL = "wss://api.example.com"
+    // PUBLIC_UPLOAD_URL = "https://chat.example.com/api/v1/uploads"
+    // PCO_WEB_REDIRECT_URI = "https://chat.example.com/api/auth/pco/callback"
+  },
+  "observability": {
+    "enabled": true,
+  },
+}

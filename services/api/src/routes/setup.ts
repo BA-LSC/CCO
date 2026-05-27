@@ -27,6 +27,13 @@ import {
 } from "../auth/pco-redirect-uris";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { saveOrganizationCloudflareApiToken } from "../services/org-realtimekit";
+import { provisionCloudflarePlatform } from "../services/cloudflare-platform-provision";
+import {
+  applyInstallHandoff,
+  getInstallSetupContext,
+  InstallHandoffSchema,
+} from "../services/install-setup";
+import { isInstallHandoffAuthorized } from "../services/setup-session";
 
 type Env = { Variables: AuthVariables };
 
@@ -58,6 +65,7 @@ function draftFromOrg(org: typeof organizations.$inferSelect) {
     signInRedirectUri: org.pcoWebRedirectUri ?? null,
     webhookUrl: resolvePcoWebhookUrl(org.pcoWebhookUrl),
     cloudflareApiTokenConfigured: Boolean(org.cloudflareApiTokenEnc),
+    cloudflarePlatformProvisioned: Boolean(org.cloudflarePlatformProvisionedAt),
   };
 }
 
@@ -119,7 +127,8 @@ setupRouter.post("/draft", async (c) => {
   }
 
   let cloudflareApiToken = parsed.data.cloudflareApiToken?.trim() ?? "";
-  if (!cloudflareApiToken) {
+  const platformProvisioned = Boolean(existingOrg?.cloudflarePlatformProvisionedAt);
+  if (!cloudflareApiToken && !platformProvisioned) {
     if (existingOrg?.cloudflareApiTokenEnc) {
       cloudflareApiToken = decryptSecret(existingOrg.cloudflareApiTokenEnc);
     } else {
@@ -154,12 +163,19 @@ setupRouter.post("/draft", async (c) => {
   }
 
   const orgBeforeCloudflare = await getOrganizationWithOAuthCredentials();
-  if (orgBeforeCloudflare) {
+  if (orgBeforeCloudflare && cloudflareApiToken) {
     try {
       await saveOrganizationCloudflareApiToken({
         organizationId: orgBeforeCloudflare.id,
         apiToken: cloudflareApiToken,
         existingAccountId: orgBeforeCloudflare.cloudflareAccountId ?? undefined,
+      });
+      await provisionCloudflarePlatform({
+        organizationId: orgBeforeCloudflare.id,
+        apiToken: cloudflareApiToken,
+        existingAccountId: orgBeforeCloudflare.cloudflareAccountId ?? undefined,
+      }).catch((err) => {
+        console.warn("[setup] Cloudflare platform provisioning skipped:", err);
       });
     } catch (err) {
       const message =
@@ -237,6 +253,52 @@ setupRouter.get("/redirect-uris", async (c) => {
     defaultSignInRedirectUri: getDefaultPcoWebRedirectUri(),
     defaultWebhookUrl: getDefaultPcoWebhookUrl(),
   });
+});
+
+setupRouter.get("/install-context", async (c) => {
+  if (c.req.query("install") !== "complete") {
+    return c.json({ error: "install=complete query parameter is required" }, 400);
+  }
+
+  const context = await getInstallSetupContext({
+    chatHostname: c.req.query("chatHostname"),
+    apiHostname: c.req.query("apiHostname"),
+  });
+
+  return c.json(context);
+});
+
+setupRouter.post("/install-handoff", async (c) => {
+  if (!isInstallHandoffAuthorized(c.req.header("x-setup-bootstrap"))) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+
+  const parsed = InstallHandoffSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.flatten() }, 400);
+  }
+
+  if (await isSetupComplete()) {
+    if (!parsed.data.cloudflareAccountId) {
+      return c.json({ error: "CCO is already configured" }, 409);
+    }
+  }
+
+  try {
+    await applyInstallHandoff(parsed.data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Install handoff failed";
+    return c.json({ error: message }, 400);
+  }
+
+  return c.json({ ok: true });
 });
 
 setupRouter.get("/me", requireAuth, async (c) => {

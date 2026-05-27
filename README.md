@@ -1,48 +1,54 @@
 # CCO (Chat Center Online)
 
-Groups chat app integrated with Planning Center (hybrid model: PCO identity + in-app messaging).
+Groups chat integrated with Planning Center — PCO identity, in-app messaging, teams, calls, and push notifications.
 
-## Stack
+## Production install (recommended)
 
-- **API:** Bun + Hono + Drizzle + PostgreSQL
-- **Web:** Next.js 16
-- **Mobile:** Expo Router
+**Greenfield:** install entirely in **your** Cloudflare account with the browser wizard — no VPS, Docker, or SSH.
 
-## Production deployment
+1. Open **[https://setup-c.co](https://setup-c.co)**
+2. Create a Cloudflare API token (permissions listed in the wizard)
+3. Choose your zone; confirm `chat.<zone>` and `api.<zone>`
+4. Wait for provisioning (D1, Workers, Pages, R2, KV, Queues, DNS, RealtimeKit)
+5. Connect Planning Center OAuth and webhooks (URLs pre-filled)
+6. Open `https://chat.<zone>/setup` to finish first-time configuration
 
-One command on any Linux server — installs Docker, clones CCO, and walks through Cloudflare Tunnel, database, and deploy. No public web ports; traffic enters through Cloudflare. Planning Center OAuth is configured at `/setup` in the browser after deploy:
+Full walkthrough: **[docs/install/README.md](docs/install/README.md)** (token scopes, SSL, D1 limits, smoke checklist).
+
+**Day-two updates (Cloudflare orgs):** churches do not `git pull` on Workers. Apply releases from **Admin → Updates** (or redeploy published artifacts from [setup-c.co/releases](https://setup-c.co/releases)). Operator docs: **[deploy/cloudflare/README.md](deploy/cloudflare/README.md)**.
+
+CCO hosts only the install wizard and orchestrator at `setup-c.co`; your chat app runs in your Cloudflare account.
+
+---
+
+## Architecture (Cloudflare)
+
+| Layer | Technology |
+|-------|------------|
+| API | Hono on **Cloudflare Workers** (`workers/cco-api`), **D1**, **R2**, **KV**, **Queues** |
+| Web | **Next.js 16** on **Cloudflare Pages** via OpenNext (`apps/web`) |
+| Realtime | **Durable Objects** WebSocket hub (`workers/cco-realtime`) |
+| Edge | PCO webhooks, Giphy proxy, push consumer, reconcile cron |
+| Calls | **Cloudflare RealtimeKit** (configured in Integrations) |
+| Install | OpenNext wizard + orchestrator worker (`apps/install`, `workers/install-orchestrator`) |
+
+Wrangler config is **`wrangler.jsonc`** (not `.toml`) in each deployable app/worker. Monorepo tooling: **Bun**, **Turborepo**, shared packages under `packages/`.
+
+Worker map: **[workers/README.md](workers/README.md)**.
+
+---
+
+## Advanced: self-host on a VPS
+
+Docker on Linux + **Cloudflare Tunnel** (no public 80/443 on the server), PostgreSQL, Redis, containerized API and web. Use when you need full control of Postgres or an existing VPS workflow.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BA-LSC/CCO/main/deploy/install.sh | bash
 ```
 
-Full guide: **[deploy/README.md](deploy/README.md)**.
+Guide: **[deploy/README.md](deploy/README.md)** — `./deploy/update.sh`, `./deploy/compose.sh`, `/setup` for OAuth and webhooks.
 
-**Already cloned:**
-
-```bash
-./deploy/install.sh
-```
-
-Then open `https://<your-web-domain>/setup` for app configuration (church name, OAuth, webhooks).
-
-**Day-two:**
-
-```bash
-./deploy/update.sh
-./deploy/compose.sh ps
-./deploy/compose.sh logs -f api
-./deploy/compose.sh --profile jobs run --rm reconcile
-```
-
-| Script | When to use |
-|--------|-------------|
-| `./deploy/install.sh` | First-time server setup (recommended) |
-| `./deploy/setup.sh` | Same wizard if repo is already cloned |
-| `./deploy/update.sh` | Pull latest code, migrate, and redeploy |
-| `./deploy/bootstrap.sh` | Redeploy without pulling (when `.env` is ready) |
-| `./deploy/compose.sh` | Logs, one-off commands, cron |
-| `bun run deploy:install` | Same as `./deploy/install.sh` |
+Optional **Workers at the edge** (R2 cache, webhook verify) alongside the VPS stack is documented in `deploy/cloudflare/`; that is not the default greenfield path.
 
 ---
 
@@ -50,117 +56,49 @@ Then open `https://<your-web-domain>/setup` for app configuration (church name, 
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) **1.3+** (repo pins `bun@1.3.14` in `package.json`)
-- [Docker](https://docs.docker.com/get-docker/) with Compose v2 (PostgreSQL + Redis only)
-
-Install Bun if needed:
+- [Bun](https://bun.sh) **1.3+**
+- [Docker](https://docs.docker.com/get-docker/) Compose v2 — **PostgreSQL + Redis** only (mirrors VPS data layer; Cloudflare path uses D1/R2 in production)
 
 ```bash
 curl -fsSL https://bun.sh/install | bash
-bun --version
-```
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/<org>/<repo>.git cco
+git clone https://github.com/BA-LSC/CCO.git cco
 cd cco
 bun install
 ```
 
-Git hooks install automatically via `bun install` (pre-commit secret scan, pre-push lint + unit tests). To reinstall manually: `bash scripts/install-git-hooks.sh`.
+Hooks install with `bun install` (pre-commit secret scan, pre-push lint + unit tests).
 
-Shared packages compile to `dist/` — `bun run build:packages` runs automatically before `dev:api` / `dev:web`. For a full production build: `bun run build`.
+**Mobile** (`apps/mobile`) is outside the root workspace — see [apps/mobile/README.md](apps/mobile/README.md).
 
-**Mobile** is outside the root workspace (keeps Expo out of web/API installs). See [apps/mobile/README.md](apps/mobile/README.md).
-
-### 2. Start infrastructure
+### Run locally
 
 ```bash
 docker compose up -d
-cp .env.example .env
-```
-
-Edit `.env` and set at minimum:
-
-| Variable | Notes |
-|----------|--------|
-| `PCO_CLIENT_ID` / `PCO_CLIENT_SECRET` | From [Planning Center Developers](https://developer.planning.center/) |
-| `SESSION_SECRET` | Run `openssl rand -hex 32` (32+ characters) |
-| `TOKEN_ENCRYPTION_KEY` | Same command — use the full 64-character hex output |
-
-### 3. Database migrations
-
-```bash
+cp .env.example .env   # set PCO_CLIENT_ID/SECRET, SESSION_SECRET, TOKEN_ENCRYPTION_KEY
 bun run db:migrate
-```
-
-If `drizzle-kit migrate` fails, apply SQL files in `services/api/drizzle/` in order (`0000` through `0010`).
-
-### 4. Run services
-
-**Option A — two terminals**
-
-```bash
-# Terminal 1 — API
-bun run dev:api
-
-# Terminal 2 — Web
-bun run dev:web
-```
-
-**Option B — single command (background API)**
-
-```bash
-bun run dev:all
+bun run dev:all        # or dev:api + dev:web in two terminals
 ```
 
 | Service | URL |
 |---------|-----|
-| Web (sign in here) | http://localhost:3000 |
+| Web | http://localhost:3000 |
 | API | http://localhost:3001 |
 
-Use `localhost`, not `127.0.0.1` or a LAN IP, for OAuth in the browser.
+Use `localhost` (not `127.0.0.1`) for OAuth. Web redirect: `http://localhost:3000/api/auth/pco/callback`.
 
-### 5. Planning Center OAuth app
-
-Register at [Planning Center Developers](https://developer.planning.center/) with redirect URIs that match **exactly**:
-
-| Client | Redirect URI |
-|--------|----------------|
-| Web | `http://localhost:3000/api/auth/pco/callback` |
-| Mobile | `http://localhost:3001/auth/pco/mobile/callback` |
-
-### Mobile sign-in
-
-The Expo app uses `connect://oauth/callback` via `expo-web-browser`. Start the API before signing in on a device or simulator. On a physical device, set `EXPO_PUBLIC_API_URL` to your machine’s LAN IP (e.g. `http://192.168.1.10:3001`).
-
-CCO is the product name; internal OAuth and database identifiers may still use the legacy `connect` prefix.
-
-### 6. Webhooks (production)
-
-Point PCO webhooks to:
-
-```text
-https://<your-api-domain>/webhooks/pco
-```
-
-Subscribe to: `groups.v2.events.membership.*`, `people.v2.events.person.updated`. Configure webhook secrets during production `/setup` — paste one PCO `authenticity_secret` per line (one per subscription, all using the same endpoint URL).
+Production webhooks: `https://<api-domain>/webhooks/pco` — subscribe to `groups.v2.events.membership.*` and `people.v2.events.person.updated`.
 
 ---
 
 ## Features
 
 - PCO OAuth (web + mobile) with encrypted token storage
-- Group sync with **leader/admin role** mapping from PCO
-- **Roster sync** for leaders (`POST /v1/groups/:id/roster/sync`)
+- Group sync with leader/admin roles from PCO; roster sync for leaders
 - Realtime chat (WebSocket) with membership checks
-- Message edit/delete, **reactions**, **@mentions** with targeted push
+- Message edit/delete, reactions, @mentions with targeted push
 - Multiple conversations per group (create, mute, archive)
-- Cursor-based message history
-- Services team chat
-- Webhooks: membership created/updated/destroyed, person updated
-- Nightly reconcile job re-syncs groups from PCO
+- Services team chat; audio/video via RealtimeKit when configured
+- PCO webhooks + nightly reconcile
 
 ## API overview
 
@@ -183,7 +121,7 @@ Subscribe to: `groups.v2.events.membership.*`, `people.v2.events.person.updated`
 | PATCH | `/v1/messages/:id` | Edit own message |
 | DELETE | `/v1/messages/:id` | Delete own message (leaders can moderate) |
 | GET/POST/DELETE | `/v1/messages/:id/reactions` | Message reactions |
-| POST | `/v1/uploads` | Image upload (local dev storage) |
+| POST | `/v1/uploads` | Image upload (local dev; Cloudflare uses presigned R2) |
 | POST | `/v1/push/register` | Register Expo push token |
 | GET | `/v1/services/teams` | List service teams |
 | GET | `/v1/services/teams/:id` | Team detail + conversation |
@@ -191,32 +129,29 @@ Subscribe to: `groups.v2.events.membership.*`, `people.v2.events.person.updated`
 | WS | `/v1/ws?conversationId=&token=` | Realtime events |
 | POST | `/webhooks/pco` | PCO webhook receiver |
 
-Web OAuth entry: `/auth/sign-in` → Planning Center → `/api/auth/pco/callback`
+Web sign-in: `/auth/sign-in` → Planning Center → `/api/auth/pco/callback`
 
-## Jobs
+## Jobs (VPS / local)
 
 ```bash
 cd services/api && bun run jobs:reconcile
 ```
 
-## Tests
+On Cloudflare, reconcile runs on the `cco-reconcile-cron` worker.
 
-Unit tests (API + packages):
+## Tests
 
 ```bash
 bun run test:unit
-```
-
-E2E (Playwright — API and web must be running):
-
-```bash
-cd apps/web && bunx playwright install chromium && bun run test:e2e
+cd apps/web && bunx playwright install chromium && bun run test:e2e   # API + web running
 ```
 
 ## Docs
 
+- Install: [docs/install/README.md](docs/install/README.md)
+- Deploy (VPS): [deploy/README.md](deploy/README.md)
+- Deploy (Cloudflare): [deploy/cloudflare/README.md](deploy/cloudflare/README.md)
 - Design: `docs/superpowers/specs/2026-05-19-pco-chat-groups-design.md`
-- Plan: `docs/superpowers/plans/2026-05-19-pco-chat-groups.md`
 
 ## License
 

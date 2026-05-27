@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"],
+    "paths": {
+      "@cco/db/schema": ["../../packages/db/src/schema.d1.ts"],
+      "@cco/db/queries/org-schema": ["../../packages/db/src/queries/org-schema.d1.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { SetupLoading } from "@/components/SetupLoading";
+import { SetupReadOnlyUrl } from "@/components/SetupReadOnlyUrl";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
 import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
-import type { SetupRedirectUris } from "@/lib/setup";
+import type { InstallSetupContext, SetupRedirectUris } from "@/lib/setup";
+import { deriveApiHostname } from "@/lib/websocket-url";
 
 type SetupDraft = {
   name: string;
@@ -21,6 +23,7 @@ type SetupDraft = {
   signInRedirectUri: string | null;
   webhookUrl: string | null;
   cloudflareApiTokenConfigured?: boolean;
+  cloudflarePlatformProvisioned?: boolean;
 };
 
 type SetupMe = {
@@ -78,7 +81,12 @@ export default function SetupPage() {
   const [hasClientSecret, setHasClientSecret] = useState(false);
   const [cloudflareApiToken, setCloudflareApiToken] = useState("");
   const [cloudflareApiTokenConfigured, setCloudflareApiTokenConfigured] = useState(false);
+  const [cloudflarePlatformProvisioned, setCloudflarePlatformProvisioned] = useState(false);
   const [cloudflareTokenFocused, setCloudflareTokenFocused] = useState(false);
+  const [fromInstall, setFromInstall] = useState(false);
+  const [readOnlyUrls, setReadOnlyUrls] = useState(false);
+  const [apiRedirectUri, setApiRedirectUri] = useState("");
+  const [mobileRedirectUri, setMobileRedirectUri] = useState("");
 
   const tryFinishSetup = useCallback(async () => {
     try {
@@ -98,15 +106,25 @@ export default function SetupPage() {
       const params = new URLSearchParams(window.location.search);
       const forceCredentials =
         params.get("step") === "credentials" || params.get("edit") === "1";
+      const installComplete = params.get("install") === "complete";
 
       try {
-        const [statusRes, draftResRaw, redirectUris] = await Promise.all([
+        const chatHostname = window.location.hostname;
+        const apiHostname = deriveApiHostname(chatHostname);
+        const installContextPromise = installComplete
+          ? fetch(
+              `/api/v1/setup/install-context?install=complete&chatHostname=${encodeURIComponent(chatHostname)}&apiHostname=${encodeURIComponent(apiHostname)}`,
+            ).then(async (r) => (r.ok ? ((await r.json()) as InstallSetupContext) : null))
+          : Promise.resolve(null);
+
+        const [statusRes, draftResRaw, redirectUris, installContext] = await Promise.all([
           fetch("/api/v1/setup/status").then((r) => r.json() as Promise<{
             configured: boolean;
             signInAvailable?: boolean;
           }>),
           fetch("/api/v1/setup/draft", { headers: setupDraftHeaders() }),
           fetch("/api/v1/setup/redirect-uris").then((r) => r.json() as Promise<SetupRedirectUris>),
+          installContextPromise,
         ]);
 
         const draftRes = draftResRaw.ok
@@ -121,19 +139,37 @@ export default function SetupPage() {
         setUris(redirectUris);
         setSignInRedirectUri(redirectUris.signInRedirectUri);
         setWebhookUrl(redirectUris.webhookUrl);
+        if (redirectUris.apiRedirectUri) setApiRedirectUri(redirectUris.apiRedirectUri);
+        if (redirectUris.mobileRedirectUri) setMobileRedirectUri(redirectUris.mobileRedirectUri);
+
+        if (installContext) {
+          setFromInstall(true);
+          setReadOnlyUrls(installContext.readOnlyUrls);
+          if (installContext.churchName) setName(installContext.churchName);
+          setSignInRedirectUri(installContext.signInRedirectUri);
+          setWebhookUrl(installContext.webhookUrl);
+          setApiRedirectUri(installContext.apiRedirectUri);
+          setMobileRedirectUri(installContext.mobileRedirectUri);
+          setCloudflarePlatformProvisioned(installContext.cloudflarePlatformProvisioned);
+        }
 
         if (draftRes.draft) {
-          setName(draftRes.draft.name);
+          setName((current) => current || draftRes.draft!.name);
           setClientId(draftRes.draft.clientId);
           setHasClientSecret(draftRes.draft.hasClientSecret);
-          if (draftRes.draft.signInRedirectUri) {
-            setSignInRedirectUri(draftRes.draft.signInRedirectUri);
-          }
-          if (draftRes.draft.webhookUrl) {
-            setWebhookUrl(draftRes.draft.webhookUrl);
+          if (!installContext) {
+            if (draftRes.draft.signInRedirectUri) {
+              setSignInRedirectUri(draftRes.draft.signInRedirectUri);
+            }
+            if (draftRes.draft.webhookUrl) {
+              setWebhookUrl(draftRes.draft.webhookUrl);
+            }
           }
           setWebhookSecretCount(draftRes.draft.webhookSecretCount ?? 0);
           setCloudflareApiTokenConfigured(draftRes.draft.cloudflareApiTokenConfigured ?? false);
+          setCloudflarePlatformProvisioned(
+            (current) => current || (draftRes.draft?.cloudflarePlatformProvisioned ?? false),
+          );
           if (!forceCredentials && draftRes.draft.credentialsSaved) {
             setPhase("sign-in");
           }
@@ -193,7 +229,7 @@ export default function SetupPage() {
       }
       if (cloudflareApiToken.trim()) {
         body.cloudflareApiToken = cloudflareApiToken.trim();
-      } else if (!cloudflareApiTokenConfigured) {
+      } else if (!cloudflareApiTokenConfigured && !cloudflarePlatformProvisioned) {
         setError("Cloudflare API token is required");
         setSaving(false);
         return;
@@ -250,8 +286,9 @@ export default function SetupPage() {
         {phase === "credentials" ? (
           <>
             <p className="setup-page-lede">
-              Paste your church&apos;s PCO developer app credentials below. Register the OAuth
-              redirect URI and webhook endpoint in Planning Center.
+              {fromInstall
+                ? "Cloudflare provisioning is complete. Paste your church\u2019s PCO developer app credentials below and register the OAuth redirect URI and webhook endpoint shown in Planning Center."
+                : "Paste your church\u2019s PCO developer app credentials below. Register the OAuth redirect URI and webhook endpoint in Planning Center."}
             </p>
 
             <form className="setup-form" onSubmit={(e) => void handleSubmit(e)}>
@@ -284,43 +321,76 @@ export default function SetupPage() {
                   placeholder={hasClientSecret ? "Leave blank to keep saved secret" : undefined}
                 />
               </label>
-              <label className="field">
-                <span>OAuth redirect URI</span>
-                <input
-                  value={signInRedirectUri}
-                  onChange={(e) => setSignInRedirectUri(e.target.value)}
-                  required
-                  type="url"
-                  autoComplete="off"
-                  placeholder={
-                    uris?.defaultSignInRedirectUri ?? "https://chat.example.com/api/auth/pco/callback"
-                  }
-                />
-                <span className="help-text">
-                  <a href="https://developer.planning.center/" target="_blank" rel="noreferrer">
-                    developer.planning.center
-                  </a>
-                </span>
-              </label>
+
+              {readOnlyUrls ? (
+                <>
+                  <SetupReadOnlyUrl
+                    label="OAuth redirect URI"
+                    value={signInRedirectUri}
+                    help={
+                      <a href="https://developer.planning.center/" target="_blank" rel="noreferrer">
+                        developer.planning.center
+                      </a>
+                    }
+                  />
+                  {apiRedirectUri ? (
+                    <SetupReadOnlyUrl label="API OAuth redirect URI (mobile / legacy)" value={apiRedirectUri} />
+                  ) : null}
+                  {mobileRedirectUri ? (
+                    <SetupReadOnlyUrl label="Mobile OAuth redirect URI" value={mobileRedirectUri} />
+                  ) : null}
+                </>
+              ) : (
+                <label className="field">
+                  <span>OAuth redirect URI</span>
+                  <input
+                    value={signInRedirectUri}
+                    onChange={(e) => setSignInRedirectUri(e.target.value)}
+                    required
+                    type="url"
+                    autoComplete="off"
+                    placeholder={
+                      uris?.defaultSignInRedirectUri ?? "https://chat.example.com/api/auth/pco/callback"
+                    }
+                  />
+                  <span className="help-text">
+                    <a href="https://developer.planning.center/" target="_blank" rel="noreferrer">
+                      developer.planning.center
+                    </a>
+                  </span>
+                </label>
+              )}
 
               <hr className="setup-form-divider" aria-hidden="true" />
 
-              <label className="field">
-                <span>Webhook endpoint URL</span>
-                <input
+              {readOnlyUrls ? (
+                <SetupReadOnlyUrl
+                  label="Webhook endpoint URL"
                   value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
-                  required
-                  type="url"
-                  autoComplete="off"
-                  placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
+                  help={
+                    <a href="https://api.planningcenteronline.com/webhooks" target="_blank" rel="noreferrer">
+                      Planning Center webhooks
+                    </a>
+                  }
                 />
-                <span className="help-text">
-                  <a href="https://api.planningcenteronline.com/webhooks" target="_blank" rel="noreferrer">
-                    Planning Center webhooks
-                  </a>
-                </span>
-              </label>
+              ) : (
+                <label className="field">
+                  <span>Webhook endpoint URL</span>
+                  <input
+                    value={webhookUrl}
+                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    required
+                    type="url"
+                    autoComplete="off"
+                    placeholder={uris?.defaultWebhookUrl ?? "https://api.example.com/webhooks/pco"}
+                  />
+                  <span className="help-text">
+                    <a href="https://api.planningcenteronline.com/webhooks" target="_blank" rel="noreferrer">
+                      Planning Center webhooks
+                    </a>
+                  </span>
+                </label>
+              )}
               <WebhookSecretsField
                 value={webhookSecret}
                 onChange={setWebhookSecret}
@@ -333,32 +403,34 @@ export default function SetupPage() {
                 }
               />
 
-              <label className="field">
-                <span>Cloudflare API token</span>
-                <input
-                  value={cloudflareInputValue}
-                  onChange={(e) => setCloudflareApiToken(e.target.value)}
-                  onFocus={() => setCloudflareTokenFocused(true)}
-                  onBlur={() => setCloudflareTokenFocused(false)}
-                  required={!cloudflareApiTokenConfigured}
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder={
-                    cloudflareApiTokenConfigured && !cloudflareTokenFocused
-                      ? undefined
-                      : "Paste API token"
-                  }
-                />
-                <span className="help-text">
-                  <a
-                    href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Create API token
-                  </a>
-                </span>
-              </label>
+              {!cloudflarePlatformProvisioned ? (
+                <label className="field">
+                  <span>Cloudflare API token</span>
+                  <input
+                    value={cloudflareInputValue}
+                    onChange={(e) => setCloudflareApiToken(e.target.value)}
+                    onFocus={() => setCloudflareTokenFocused(true)}
+                    onBlur={() => setCloudflareTokenFocused(false)}
+                    required={!cloudflareApiTokenConfigured}
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={
+                      cloudflareApiTokenConfigured && !cloudflareTokenFocused
+                        ? undefined
+                        : "Paste API token"
+                    }
+                  />
+                  <span className="help-text">
+                    <a
+                      href="https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Create API token
+                    </a>
+                  </span>
+                </label>
+              ) : null}
 
               {error && (
                 <p className="help-text error-text" role="alert">

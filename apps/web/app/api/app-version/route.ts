@@ -1,13 +1,12 @@
 import { resolveAppBuildVersion } from "@/lib/build-version.server";
+import { fetchFromApi } from "@/lib/api-fetch-server";
 import { isDeployDraining } from "@/lib/deploy-status.server";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.API_URL ?? "http://127.0.0.1:3001";
-
 async function readDeployUpdatingFromApi(): Promise<boolean | null> {
   try {
-    const res = await fetch(`${API_URL}/health`, {
+    const res = await fetchFromApi("/health", {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });

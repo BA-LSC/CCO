@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "cco-pco-webhook",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-26",
+  "alias": {
+    "@cco/shared/webhook-auth": "../../packages/shared/src/webhook-auth.ts",
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "",
+      // Set after auto-provision or wrangler secret
+    },
+  ],
+  "vars": {
+    // WEBHOOK_SECRETS — newline-separated HMAC secrets (wrangler secret)
+    // INTERNAL_FORWARD_URL — optional VPS fallback for complex handlers
+    // INTERNAL_FORWARD_SECRET — bearer token for internal forward
+  },
+}

@@ -12,6 +12,9 @@
     "jobs:reconcile": "bun run src/jobs/runner.ts"
   },
   "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "@cco/cloudflare-provision": "workspace:*",
+    "@cco/db": "workspace:*",
     "@cco/pco-client": "workspace:*",
     "@cco/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",

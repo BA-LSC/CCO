@@ -32,6 +32,14 @@
     "./message-preview": {
       "types": "./dist/message-preview.d.ts",
       "default": "./dist/message-preview.js"
+    },
+    "./webhook-auth": {
+      "types": "./dist/webhook-auth.d.ts",
+      "default": "./dist/webhook-auth.js"
+    },
+    "./install-origin": {
+      "types": "./dist/install-origin.d.ts",
+      "default": "./dist/install-origin.js"
     }
   },
   "scripts": {
