@@ -55,12 +55,15 @@ import {
   getCachedUpdatesStatus,
   getUpdatesStatus,
   resolveOrgHostnames,
-  setAutoUpdateEnabled,
+  setAutoUpdateSettings,
   setGitRepoUrl,
   startCloudflareReleaseUpdate,
 } from "../services/org-updates";
 import { resolveOrgGitRepoUrl } from "../services/git-release-index";
-import { CCO_DEFAULT_GIT_REPO_URL } from "@cco/shared";
+import {
+  AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
+  CCO_DEFAULT_GIT_REPO_URL,
+} from "@cco/shared";
 import { getExecutionContext, isCloudflareRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
@@ -94,11 +97,20 @@ const UpdatesApplySchema = z.object({
 const UpdatesPatchSchema = z
   .object({
     autoUpdateEnabled: z.boolean().optional(),
+    autoUpdateCheckIntervalMinutes: z
+      .number()
+      .int()
+      .min(AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES)
+      .optional(),
     gitRepoUrl: z.string().min(1).optional(),
   })
-  .refine((data) => data.autoUpdateEnabled !== undefined || data.gitRepoUrl !== undefined, {
-    message: "No fields to update",
-  });
+  .refine(
+    (data) =>
+      data.autoUpdateEnabled !== undefined ||
+      data.autoUpdateCheckIntervalMinutes !== undefined ||
+      data.gitRepoUrl !== undefined,
+    { message: "No fields to update" },
+  );
 
 export const settingsRouter = new Hono<Env>();
 
@@ -542,8 +554,14 @@ settingsRouter.patch("/updates", requireAuth, async (c) => {
   }
 
   try {
-    if (parsed.data.autoUpdateEnabled !== undefined) {
-      await setAutoUpdateEnabled(parsed.data.autoUpdateEnabled);
+    if (
+      parsed.data.autoUpdateEnabled !== undefined ||
+      parsed.data.autoUpdateCheckIntervalMinutes !== undefined
+    ) {
+      await setAutoUpdateSettings({
+        autoUpdateEnabled: parsed.data.autoUpdateEnabled,
+        autoUpdateCheckIntervalMinutes: parsed.data.autoUpdateCheckIntervalMinutes,
+      });
     }
     if (parsed.data.gitRepoUrl !== undefined) {
       await setGitRepoUrl(parsed.data.gitRepoUrl);

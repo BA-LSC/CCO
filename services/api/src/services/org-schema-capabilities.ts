@@ -22,6 +22,7 @@ const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "pco_nightly_sync_enabled" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "installed_release_version" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "auto_update_enabled" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "auto_update_check_interval_minutes" integer NOT NULL DEFAULT 360`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "last_update_check_at" timestamp`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "git_repo_url" text`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_secrets_store_id" text`,

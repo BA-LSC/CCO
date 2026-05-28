@@ -5,6 +5,7 @@ import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminUpdatesSection, type UpdatesStatus } from "@/components/AdminUpdatesSection";
+import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { LoadingState } from "@/components/PageStates";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
@@ -159,18 +160,6 @@ function TextInput({
         autoComplete={autoComplete}
       />
     </label>
-  );
-}
-
-function Feedback({ error, success }: { error?: string | null; success?: string | null }) {
-  if (!error && !success) return null;
-  return (
-    <p
-      className={`integrations-feedback${error ? " integrations-feedback--error" : " integrations-feedback--success"}`}
-      role={error ? "alert" : "status"}
-    >
-      {error ?? success}
-    </p>
   );
 }
 
@@ -532,7 +521,14 @@ export default function IntegrationsSettingsPage() {
         badge={pcoSyncBadge.label}
         badgeVariant={pcoSyncBadge.variant}
       >
-        <Feedback error={pcoSyncError} success={pcoSyncResult} />
+        <IntegrationsFeedbackToast
+          error={pcoSyncError}
+          success={pcoSyncResult}
+          onDismiss={() => {
+            setPcoSyncError(null);
+            setPcoSyncResult(null);
+          }}
+        />
         <button
           type="button"
           className="btn btn-secondary integrations-action-btn"
@@ -678,7 +674,14 @@ export default function IntegrationsSettingsPage() {
         </IntegrationsSection>
 
         <footer className="integrations-form-footer">
-          <Feedback error={error} success={saved ? "Settings saved." : null} />
+          <IntegrationsFeedbackToast
+            error={error}
+            success={saved ? "Settings saved." : null}
+            onDismiss={() => {
+              setError(null);
+              setSaved(false);
+            }}
+          />
           <button type="submit" className="btn btn-primary integrations-save-btn" disabled={saving}>
             {saving ? "Saving…" : "Save changes"}
           </button>

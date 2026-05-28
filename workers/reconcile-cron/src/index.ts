@@ -1,3 +1,5 @@
+import { CCO_UPDATE_CHECK_CRON } from "@cco/shared";
+
 type SecretsStoreSecretBinding = { get(): Promise<string> };
 
 export interface Env {
@@ -32,7 +34,7 @@ export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const auth = await resolveSecret(env.RECONCILE_INTERNAL_SECRET);
 
-    if (controller.cron === "0 */6 * * *") {
+    if (controller.cron === CCO_UPDATE_CHECK_CRON) {
       const url = updateCheckUrl(env.RECONCILE_INTERNAL_URL);
       const res = await postInternal(url, auth);
       if (!res.ok) {

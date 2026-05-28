@@ -47,6 +47,7 @@ function org(partial: Partial<ConfiguredOrganizationRow>): ConfiguredOrganizatio
     cloudflarePlatformProvisionedAt: null,
     installedReleaseVersion: partial.installedReleaseVersion ?? null,
     autoUpdateEnabled: false,
+    autoUpdateCheckIntervalMinutes: 360,
     lastUpdateCheckAt: partial.lastUpdateCheckAt ?? null,
     gitRepoUrl: null,
   };

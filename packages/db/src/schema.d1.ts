@@ -67,6 +67,9 @@ export const organizations = sqliteTable("organizations", {
   autoUpdateEnabled: integer("auto_update_enabled", { mode: "boolean" })
     .notNull()
     .default(false),
+  autoUpdateCheckIntervalMinutes: integer("auto_update_check_interval_minutes")
+    .notNull()
+    .default(360),
   lastUpdateCheckAt: timestampMs("last_update_check_at"),
   gitRepoUrl: text("git_repo_url"),
   createdAt: timestampMsNow("created_at"),

@@ -713,6 +713,10 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   animation: chaos-rainbow-bg 1.5s linear infinite;
 }
 
+.user-menu-theme-list--portal {
+  z-index: 1300;
+}
+
 .user-menu-theme-list {
   position: absolute;
   z-index: 20;
@@ -977,6 +981,8 @@ html[data-theme="11"] .user-menu-dropdown {
 }
 
 .sidebar-footer {
+  position: relative;
+  z-index: 40;
   flex-shrink: 0;
   margin: 0 -9px;
   background: var(--color-surface);
@@ -1087,7 +1093,14 @@ html[data-theme="11"] .user-menu-dropdown {
   min-width: 0;
   max-height: min(70vh, 480px);
   overflow-y: auto;
+  overflow-x: visible;
+  z-index: 50;
   padding: 12px 14px 14px;
+}
+
+.user-menu-sidebar .user-menu-theme,
+.user-menu-sidebar .user-menu-theme-picker {
+  overflow: visible;
 }
 
 .user-menu-sidebar .user-menu-theme,
@@ -3051,6 +3064,47 @@ button.sidebar-group-header:focus-visible {
 
 .chat-home-banner-wrap--fixed .chat-home-banner {
   margin: 0;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--color-bg) 22%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+}
+
+.chat-home-banner-wrap--fixed .chat-home-banner:not(.chat-home-banner--exit) {
+  animation: chat-toast-pop-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes chat-toast-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.chat-home-banner-wrap--fixed .chat-home-banner.success {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border));
+}
+
+.chat-home-banner-wrap--fixed .chat-home-banner.error {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger-soft) 42%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+}
+
+.chat-home-banner-wrap--fixed .chat-home-banner.neutral {
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 .chat-home-banner-wrap--panel {
@@ -3992,6 +4046,10 @@ button.sidebar-group-header:focus-visible {
   100% {
     transform: translateX(320%);
   }
+}
+
+.integrations-auto-update-fields {
+  margin-top: 10px;
 }
 
 .integrations-toggle {

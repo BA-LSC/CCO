@@ -54,6 +54,9 @@ export const organizations = pgTable("organizations", {
   pcoNightlySyncEnabled: boolean("pco_nightly_sync_enabled").notNull().default(true),
   installedReleaseVersion: text("installed_release_version"),
   autoUpdateEnabled: boolean("auto_update_enabled").notNull().default(false),
+  autoUpdateCheckIntervalMinutes: integer("auto_update_check_interval_minutes")
+    .notNull()
+    .default(360),
   lastUpdateCheckAt: timestamp("last_update_check_at"),
   gitRepoUrl: text("git_repo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

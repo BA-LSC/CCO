@@ -1,4 +1,9 @@
-import { CCO_DEFAULT_GIT_REPO_URL, type ReleaseIndex } from "@cco/shared";
+import {
+  AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
+  CCO_DEFAULT_GIT_REPO_URL,
+  normalizeAutoUpdateCheckIntervalMinutes,
+  type ReleaseIndex,
+} from "@cco/shared";
 import {
   applyD1MigrationStatements,
   deployAllProvisionWorkers,
@@ -33,6 +38,7 @@ const D1_UPDATE_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN "auto_update_enabled" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "organizations" ADD COLUMN "last_update_check_at" INTEGER`,
   `ALTER TABLE "organizations" ADD COLUMN "git_repo_url" TEXT`,
+  `ALTER TABLE "organizations" ADD COLUMN "auto_update_check_interval_minutes" INTEGER NOT NULL DEFAULT 360`,
 ] as const;
 
 function splitSqlStatements(sqlText: string): string[] {
@@ -62,6 +68,7 @@ export type UpdatesStatus = {
   latestVersion: string | null;
   updateAvailable: boolean;
   autoUpdateEnabled: boolean;
+  autoUpdateCheckIntervalMinutes: number;
   lastUpdateCheckAt: string | null;
   latestPublishedAt: string | null;
   releasesBaseUrl: string | null;
@@ -286,6 +293,9 @@ export async function getCachedUpdatesStatus(
     latestVersion: null,
     updateAvailable: false,
     autoUpdateEnabled: org.autoUpdateEnabled ?? false,
+    autoUpdateCheckIntervalMinutes: normalizeAutoUpdateCheckIntervalMinutes(
+      org.autoUpdateCheckIntervalMinutes,
+    ),
     lastUpdateCheckAt: org.lastUpdateCheckAt?.toISOString() ?? null,
     latestPublishedAt: null,
     releasesBaseUrl: null,
@@ -357,6 +367,9 @@ export async function getUpdatesStatus(options?: {
     latestVersion,
     updateAvailable,
     autoUpdateEnabled: org.autoUpdateEnabled ?? false,
+    autoUpdateCheckIntervalMinutes: normalizeAutoUpdateCheckIntervalMinutes(
+      org.autoUpdateCheckIntervalMinutes,
+    ),
     lastUpdateCheckAt: lastUpdateCheckAt?.toISOString() ?? null,
     latestPublishedAt: latestIndex?.publishedAt ?? null,
     releasesBaseUrl: latestIndex ? resolveReleasesBaseUrl(latestIndex) : null,
@@ -627,14 +640,44 @@ export async function setGitRepoUrl(gitRepoUrl: string): Promise<void> {
 }
 
 export async function setAutoUpdateEnabled(enabled: boolean): Promise<void> {
+  await setAutoUpdateSettings({ autoUpdateEnabled: enabled });
+}
+
+export async function setAutoUpdateCheckIntervalMinutes(minutes: number): Promise<void> {
+  await setAutoUpdateSettings({ autoUpdateCheckIntervalMinutes: minutes });
+}
+
+export async function setAutoUpdateSettings(options: {
+  autoUpdateEnabled?: boolean;
+  autoUpdateCheckIntervalMinutes?: number;
+}): Promise<void> {
   await ensureOrgUpdateSettingsColumns();
   const org = await getConfiguredOrganization();
   if (!org) throw new Error("Organization not found");
 
-  await db
-    .update(organizations)
-    .set({ autoUpdateEnabled: enabled })
-    .where(eq(organizations.id, org.id));
+  const patch: {
+    autoUpdateEnabled?: boolean;
+    autoUpdateCheckIntervalMinutes?: number;
+  } = {};
+
+  if (options.autoUpdateEnabled !== undefined) {
+    patch.autoUpdateEnabled = options.autoUpdateEnabled;
+  }
+  if (options.autoUpdateCheckIntervalMinutes !== undefined) {
+    if (
+      !Number.isFinite(options.autoUpdateCheckIntervalMinutes) ||
+      options.autoUpdateCheckIntervalMinutes < AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES
+    ) {
+      throw new Error(
+        `Check interval must be at least ${AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES} minutes`,
+      );
+    }
+    patch.autoUpdateCheckIntervalMinutes = Math.floor(options.autoUpdateCheckIntervalMinutes);
+  }
+
+  if (Object.keys(patch).length === 0) return;
+
+  await db.update(organizations).set(patch).where(eq(organizations.id, org.id));
   invalidateOrgContextCache();
 }
 
@@ -656,6 +699,17 @@ export async function runScheduledUpdateCheck(): Promise<{
   }
   if (!org.autoUpdateEnabled) {
     return { checked: false, updateAvailable: false, applied: false, version: null };
+  }
+
+  const intervalMinutes = normalizeAutoUpdateCheckIntervalMinutes(
+    org.autoUpdateCheckIntervalMinutes,
+  );
+  const intervalMs = intervalMinutes * 60 * 1000;
+  if (org.lastUpdateCheckAt) {
+    const elapsed = Date.now() - org.lastUpdateCheckAt.getTime();
+    if (elapsed < intervalMs) {
+      return { checked: false, updateAvailable: false, applied: false, version: null };
+    }
   }
 
   const status = await getUpdatesStatus({ forceCheck: true });

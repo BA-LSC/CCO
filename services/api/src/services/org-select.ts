@@ -67,6 +67,7 @@ export const configuredOrganizationColumns = {
   cloudflarePlatformProvisionedAt: organizations.cloudflarePlatformProvisionedAt,
   installedReleaseVersion: organizations.installedReleaseVersion,
   autoUpdateEnabled: organizations.autoUpdateEnabled,
+  autoUpdateCheckIntervalMinutes: organizations.autoUpdateCheckIntervalMinutes,
   lastUpdateCheckAt: organizations.lastUpdateCheckAt,
   gitRepoUrl: organizations.gitRepoUrl,
 };
@@ -97,6 +98,7 @@ export function extendConfiguredOrganizationRow(
     cloudflarePlatformProvisionedAt: null,
     installedReleaseVersion: null,
     autoUpdateEnabled: false,
+    autoUpdateCheckIntervalMinutes: 360,
     lastUpdateCheckAt: null,
     gitRepoUrl: null,
   };
@@ -141,6 +143,7 @@ export type ConfiguredOrganizationRow = {
   cloudflarePlatformProvisionedAt: Date | null;
   installedReleaseVersion: string | null;
   autoUpdateEnabled: boolean;
+  autoUpdateCheckIntervalMinutes: number;
   lastUpdateCheckAt: Date | null;
   gitRepoUrl: string | null;
   createdAt: Date;

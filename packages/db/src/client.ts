@@ -35,6 +35,7 @@ export function getD1IncrementalMigrationFilenames(): string[] {
     "0002_pco_nightly_sync_enabled.sql",
     "0003_org_git_repo_url.sql",
     "0004_secrets_store.sql",
+    "0005_auto_update_check_interval.sql",
   ];
 }
 

@@ -251,6 +251,7 @@ export function UserMenu({ variant = "default" }: Props) {
             <ThemePicker
               theme={theme}
               chaosUnlocked={chaosUnlocked}
+              placement={variant}
               onPick={(next) => handleThemePick(next)}
             />
             {chaosHint && (
