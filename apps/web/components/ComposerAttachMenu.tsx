@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   disabled?: boolean;
@@ -9,22 +9,53 @@ type Props = {
   onPickGiphy?: () => void;
 };
 
+const ATTACH_MENU_ANIM_MS = 200;
+
 export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPickGiphy }: Props) {
   const [open, setOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const showGiphy = Boolean(giphyEnabled && onPickGiphy);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setMenuVisible(false);
+  }, []);
+
+  const openMenu = useCallback(() => {
+    setOpen(true);
+    setMenuMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!menuMounted || !open) {
+      if (!menuMounted) setMenuVisible(false);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setMenuVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, [menuMounted, open]);
+
+  useEffect(() => {
+    if (open || !menuMounted) return;
+
+    const timer = window.setTimeout(() => setMenuMounted(false), ATTACH_MENU_ANIM_MS);
+    return () => clearTimeout(timer);
+  }, [open, menuMounted]);
 
   useEffect(() => {
     if (!open) return;
 
     function onPointerDown(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        closeMenu();
       }
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closeMenu();
     }
 
     document.addEventListener("mousedown", onPointerDown);
@@ -33,7 +64,7 @@ export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPick
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [closeMenu, open]);
 
   return (
     <div className="composer-attach" ref={menuRef}>
@@ -44,7 +75,7 @@ export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPick
         aria-haspopup="menu"
         disabled={disabled}
         aria-label="Add attachment"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? closeMenu() : openMenu())}
       >
         <svg viewBox="0 0 24 24" aria-hidden>
           <path
@@ -57,14 +88,17 @@ export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPick
         </svg>
       </button>
 
-      {open && (
-        <div className="composer-attach-menu" role="menu">
+      {menuMounted && (
+        <div
+          className={`composer-attach-menu${menuVisible ? " composer-attach-menu--open" : ""}`}
+          role="menu"
+        >
           <button
             type="button"
             role="menuitem"
             className="composer-attach-menu-item"
             onClick={() => {
-              setOpen(false);
+              closeMenu();
               onPickMedia();
             }}
           >
@@ -76,7 +110,7 @@ export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPick
               role="menuitem"
               className="composer-attach-menu-item"
               onClick={() => {
-                setOpen(false);
+                closeMenu();
                 onPickGiphy?.();
               }}
             >

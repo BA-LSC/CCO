@@ -649,7 +649,18 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   z-index: 20;
   box-sizing: border-box;
   transform-origin: top right;
-  animation: cco-pop-down var(--motion-normal) var(--motion-ease-out);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-normal) var(--motion-ease-out),
+    transform var(--motion-normal) var(--motion-ease-out);
+}
+
+.user-menu-dropdown--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .user-menu-dropdown-label {
@@ -1265,7 +1276,11 @@ html[data-theme="11"] .user-menu-dropdown {
   z-index: 60;
   padding: 12px 14px 14px;
   transform-origin: bottom center;
-  animation: cco-slide-up var(--motion-slow) var(--motion-ease-out);
+  transform: translateY(14px) scale(0.98);
+}
+
+.user-menu-sidebar .user-menu-dropdown--open {
+  transform: translateY(0) scale(1);
 }
 
 .user-menu-dropdown-sidebar {
@@ -1910,7 +1925,18 @@ button.sidebar-group-header.sidebar-group-header-menu-open .sidebar-group-menu-t
   box-shadow: var(--shadow-md);
   z-index: 20;
   transform-origin: top right;
-  animation: cco-pop-down var(--motion-normal) var(--motion-ease-out);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-normal) var(--motion-ease-out),
+    transform var(--motion-normal) var(--motion-ease-out);
+}
+
+.sidebar-group-menu-dropdown--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .sidebar-group-menu-item {
@@ -5503,7 +5529,18 @@ button.sidebar-group-header:focus-visible {
   box-shadow: var(--shadow-md);
   z-index: 10;
   transform-origin: bottom left;
-  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-normal) var(--motion-ease-out),
+    transform var(--motion-normal) var(--motion-ease-out);
+}
+
+.chat-thread .composer-attach-menu--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .chat-thread .composer-attach-menu-item {
@@ -6631,11 +6668,21 @@ button.sidebar-group-header:focus-visible {
 
 /* Panel layout — full-height chat with pinned composer */
 .chat-panel-content:has(> .chat-thread-panel) {
-  --chat-inset-x: 152px;
+  --chat-inset-x: 172px;
+  --chat-content-max-width: 960px;
+  --chat-inline-padding: max(
+    var(--chat-inset-x),
+    calc((100% - var(--chat-content-max-width)) / 2)
+  );
 }
 
 .chat-thread-panel {
-  --chat-inset-x: 152px;
+  --chat-inset-x: 172px;
+  --chat-content-max-width: 960px;
+  --chat-inline-padding: max(
+    var(--chat-inset-x),
+    calc((100% - var(--chat-content-max-width)) / 2)
+  );
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
   --chat-composer-bottom-padding: 8px;
@@ -6692,7 +6739,7 @@ button.sidebar-group-header:focus-visible {
   justify-content: flex-end;
   box-sizing: border-box;
   position: relative;
-  padding: 0 var(--chat-inset-x);
+  padding: 0 var(--chat-inline-padding);
 }
 
 .chat-thread-panel .chat-panel-messages-inner::after {
@@ -6773,10 +6820,15 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread-panel .chat-composer-stack {
-  padding-left: var(--chat-inset-x);
-  padding-right: var(--chat-inset-x);
+  padding-left: var(--chat-inline-padding);
+  padding-right: var(--chat-inline-padding);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
+}
+
+.chat-thread-panel .chat-panel-banner-slot {
+  padding-left: var(--chat-inline-padding);
+  padding-right: var(--chat-inline-padding);
 }
 
 .composer-send-error {
@@ -7185,6 +7237,7 @@ html.standalone-display .chat-thread-panel {
   .chat-panel-content:has(> .chat-thread-panel),
   .chat-thread-panel {
     --chat-inset-x: 14px;
+    --chat-inline-padding: var(--chat-inset-x);
     --chat-messages-bottom-gap: 36px;
     --chat-composer-top-padding: 6px;
     --chat-composer-bottom-padding: 6px;
@@ -7318,6 +7371,7 @@ html.standalone-display .chat-thread-panel {
   .chat-panel-content:has(> .chat-thread-panel),
   .chat-thread-panel {
     --chat-inset-x: 10px;
+    --chat-inline-padding: var(--chat-inset-x);
     --chat-messages-bottom-gap: 28px;
     --chat-composer-top-padding: 4px;
     --chat-composer-bottom-padding: 6px;
@@ -7344,6 +7398,7 @@ html.standalone-display .chat-thread-panel {
   html.standalone-display .chat-panel-content:has(> .chat-thread-panel),
   html.standalone-display .chat-thread-panel {
     --chat-inset-x: 6px;
+    --chat-inline-padding: var(--chat-inset-x);
     --chat-messages-bottom-gap: 18px;
     --chat-composer-top-padding: 4px;
     --chat-composer-bottom-padding: 4px;

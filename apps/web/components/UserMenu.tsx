@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import {
   USER_STATUS_LABELS,
@@ -30,6 +30,8 @@ type Props = {
   variant?: "default" | "sidebar";
 };
 
+const USER_MENU_ANIM_MS = 200;
+
 function isPlaceholderDisplayName(name: string | null | undefined): boolean {
   const normalized = name
     ?.trim()
@@ -55,6 +57,8 @@ export function UserMenu({ variant = "default" }: Props) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const [chaosHint, setChaosHint] = useState(false);
   const [statusMessageDraft, setStatusMessageDraft] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
@@ -73,6 +77,33 @@ export function UserMenu({ variant = "default" }: Props) {
       .finally(() => setLoading(false));
   }, []);
 
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setMenuVisible(false);
+  }, []);
+
+  const openMenu = useCallback(() => {
+    setOpen(true);
+    setMenuMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!menuMounted || !open) {
+      if (!menuMounted) setMenuVisible(false);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setMenuVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, [menuMounted, open]);
+
+  useEffect(() => {
+    if (open || !menuMounted) return;
+
+    const timer = window.setTimeout(() => setMenuMounted(false), USER_MENU_ANIM_MS);
+    return () => clearTimeout(timer);
+  }, [open, menuMounted]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -90,11 +121,11 @@ export function UserMenu({ variant = "default" }: Props) {
       const target = e.target;
       if (!(target instanceof Node)) return;
       if (shouldKeepMenuOpen(target)) return;
-      setOpen(false);
+      closeMenu();
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closeMenu();
     }
 
     document.addEventListener("pointerdown", onPointerDown);
@@ -103,7 +134,7 @@ export function UserMenu({ variant = "default" }: Props) {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [closeMenu, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -219,7 +250,7 @@ export function UserMenu({ variant = "default" }: Props) {
         className="user-menu-trigger"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? closeMenu() : openMenu())}
       >
         <span className="user-menu-avatar-wrap">
           <UserAvatar
@@ -270,11 +301,15 @@ export function UserMenu({ variant = "default" }: Props) {
         </span>
       </button>
 
-      {open && (
+      {menuMounted && (
         <div
-          className={`user-menu-dropdown${
-            variant === "sidebar" ? " user-menu-dropdown-sidebar" : ""
-          }`}
+          className={[
+            "user-menu-dropdown",
+            variant === "sidebar" ? "user-menu-dropdown-sidebar" : "",
+            menuVisible ? "user-menu-dropdown--open" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           role="menu"
         >
           <div className="user-menu-dropdown-theme">
@@ -341,7 +376,7 @@ export function UserMenu({ variant = "default" }: Props) {
                 href="/settings/admin"
                 className="user-menu-item user-menu-item-admin"
                 role="menuitem"
-                onClick={() => setOpen(false)}
+                onClick={closeMenu}
               >
                 <span>Admin Settings</span>
                 {adminUpdateAvailable ? (
@@ -353,7 +388,7 @@ export function UserMenu({ variant = "default" }: Props) {
               href="/auth/sign-out?next=/"
               className="user-menu-item user-menu-item-danger"
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onClick={closeMenu}
             >
               Sign out
             </a>

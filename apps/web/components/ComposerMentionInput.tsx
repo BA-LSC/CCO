@@ -3,7 +3,6 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -217,21 +216,21 @@ export const ComposerMentionInput = forwardRef<ComposerMentionInputHandle, Props
       [disabled, readOnly, syncFromEditor],
     );
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       const root = editorRef.current;
       if (!root) return;
-      if (lastRenderedValueRef.current === value) return;
-      const active = document.activeElement === root;
-      renderComposerBody(root, value);
-      lastRenderedValueRef.current = value;
-      if (active) placeCaretAtEnd(root);
-      onMentionQueryChange(getActiveMentionQuery(readTextBeforeCaret(root)));
-    }, [onMentionQueryChange, value]);
 
-    useLayoutEffect(() => {
-      syncComposerTextareaHeight(editorRef.current);
+      if (lastRenderedValueRef.current !== value) {
+        const active = document.activeElement === root;
+        renderComposerBody(root, value);
+        lastRenderedValueRef.current = value;
+        if (active) placeCaretAtEnd(root);
+        onMentionQueryChange(getActiveMentionQuery(readTextBeforeCaret(root)));
+      }
+
+      syncComposerTextareaHeight(root);
       onLayout?.();
-    }, [onLayout, value]);
+    }, [onLayout, onMentionQueryChange, value]);
 
     return (
       <div

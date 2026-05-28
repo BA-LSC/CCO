@@ -28,6 +28,8 @@ function isLeaderRole(role: string | undefined): boolean {
   return role === "leader" || role === "admin";
 }
 
+const GROUP_MENU_ANIM_MS = 200;
+
 function SidebarChannelPrefix({ conv }: { conv: GroupSidebarConversation }) {
   if (conv.hasRestrictedAccess) {
     return (
@@ -54,6 +56,8 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
   const [groups, setGroups] = useState(initialGroups);
   const [creatingForGroup, setCreatingForGroup] = useState<string | null>(null);
   const [menuOpenForGroup, setMenuOpenForGroup] = useState<string | null>(null);
+  const [menuMountedForGroup, setMenuMountedForGroup] = useState<string | null>(null);
+  const [menuVisibleForGroup, setMenuVisibleForGroup] = useState<string | null>(null);
   const [newChannelName, setNewChannelName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -132,6 +136,34 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
     void loadGroupDetailForChannel(creatingForGroup);
   }, [creatingForGroup, loadGroupDetailForChannel]);
 
+  const closeGroupMenu = useCallback(() => {
+    setMenuOpenForGroup(null);
+    setMenuVisibleForGroup(null);
+  }, []);
+
+  const openGroupMenu = useCallback((groupId: string) => {
+    setMenuOpenForGroup(groupId);
+    setMenuMountedForGroup(groupId);
+    setMenuVisibleForGroup(null);
+  }, []);
+
+  useEffect(() => {
+    if (!menuMountedForGroup || menuOpenForGroup !== menuMountedForGroup) {
+      if (!menuMountedForGroup) setMenuVisibleForGroup(null);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setMenuVisibleForGroup(menuMountedForGroup));
+    return () => cancelAnimationFrame(frame);
+  }, [menuMountedForGroup, menuOpenForGroup]);
+
+  useEffect(() => {
+    if (menuOpenForGroup || !menuMountedForGroup) return;
+
+    const timer = window.setTimeout(() => setMenuMountedForGroup(null), GROUP_MENU_ANIM_MS);
+    return () => clearTimeout(timer);
+  }, [menuOpenForGroup, menuMountedForGroup]);
+
   useEffect(() => {
     if (!menuOpenForGroup) return;
 
@@ -139,11 +171,11 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
       const target = e.target;
       if (!(target instanceof Element)) return;
       if (target.closest(".sidebar-group-menu")) return;
-      setMenuOpenForGroup(null);
+      closeGroupMenu();
     }
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpenForGroup(null);
+      if (e.key === "Escape") closeGroupMenu();
     }
 
     document.addEventListener("mousedown", onPointerDown);
@@ -152,7 +184,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [menuOpenForGroup]);
+  }, [closeGroupMenu, menuOpenForGroup]);
 
   async function createChannel(e: React.FormEvent, groupId: string) {
     e.preventDefault();
@@ -225,9 +257,11 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                         aria-haspopup="menu"
                         aria-expanded={menuOpenForGroup === group.id}
                         onClick={() => {
-                          setMenuOpenForGroup((current) =>
-                            current === group.id ? null : group.id,
-                          );
+                          if (menuOpenForGroup === group.id) {
+                            closeGroupMenu();
+                          } else {
+                            openGroupMenu(group.id);
+                          }
                         }}
                       >
                         <UserAvatar
@@ -240,14 +274,21 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                           <SidebarChevronRightIcon />
                         </span>
                       </button>
-                      {menuOpenForGroup === group.id ? (
-                        <div className="sidebar-group-menu-dropdown" role="menu">
+                      {menuMountedForGroup === group.id ? (
+                        <div
+                          className={`sidebar-group-menu-dropdown${
+                            menuVisibleForGroup === group.id
+                              ? " sidebar-group-menu-dropdown--open"
+                              : ""
+                          }`}
+                          role="menu"
+                        >
                           <button
                             type="button"
                             role="menuitem"
                             className="sidebar-group-menu-item"
                             onClick={() => {
-                              setMenuOpenForGroup(null);
+                              closeGroupMenu();
                               setCreatingForGroup(group.id);
                               setNewChannelName("");
                               setCreateError(null);
