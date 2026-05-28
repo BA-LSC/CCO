@@ -542,6 +542,20 @@ export function ChatSidebar() {
       </aside>
 
       {sidebarOpen ? (
+        <div
+          className={[
+            "chat-sidebar-safe-area",
+            process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim()
+              ? "chat-sidebar-safe-area--video"
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden
+        />
+      ) : null}
+
+      {sidebarOpen ? (
         <button
           type="button"
           className="chat-sidebar-overlay"
