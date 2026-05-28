@@ -1,6 +1,7 @@
 import {
   CCO_DEFAULT_GIT_REF,
   CCO_DEFAULT_GIT_REPO_URL,
+  CCO_RELEASE_INDEX_URL,
   CCO_RELEASES_ORIGIN,
   isDefaultGitRepo,
   normalizeGitRepoUrl,
@@ -118,18 +119,50 @@ async function fetchGithubLatestReleaseIndex(owner: string, repo: string): Promi
   };
 }
 
+async function fetchSetupCoReleaseIndex(): Promise<ReleaseIndex | null> {
+  const res = await fetch(CCO_RELEASE_INDEX_URL, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": GITHUB_USER_AGENT,
+    },
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as ReleaseIndex;
+  if (!json.version?.trim()) return null;
+  return {
+    ...json,
+    version: json.version.trim(),
+    releasesBaseUrl: json.releasesBaseUrl?.trim() || `${CCO_RELEASES_ORIGIN}/releases`,
+  };
+}
+
 async function fetchCustomGitReleaseIndex(
   repoUrl: string,
   owner: string,
   repo: string,
 ): Promise<ReleaseIndex> {
+  const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
+
+  if (isDefaultGitRepo(repoUrl)) {
+    const catalog = await fetchSetupCoReleaseIndex();
+    return {
+      version: sha,
+      gitRef: catalog?.gitRef?.trim() || CCO_DEFAULT_GIT_REF,
+      publishedAt,
+      releasesBaseUrl: catalog?.releasesBaseUrl?.trim() || resolveArtifactReleasesBaseUrl(repoUrl),
+    };
+  }
+
   const releaseIndex = await fetchGithubLatestReleaseIndex(owner, repo);
   if (releaseIndex) {
-    return releaseIndex;
+    return {
+      ...releaseIndex,
+      version: sha,
+      publishedAt,
+    };
   }
 
   const releaseAsset = await fetchGithubLatestReleaseAsset(owner, repo, "release-index.json");
-  const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
   return {
     version: sha,
     gitRef: CCO_DEFAULT_GIT_REF,
@@ -140,7 +173,8 @@ async function fetchCustomGitReleaseIndex(
 
 /**
  * Resolve the release catalog for Admin Updates from the org git repository URL.
- * Always reads the configured GitHub repo (release assets, then main commit SHA).
+ * Version is always the configured git ref HEAD on GitHub; artifact base URL comes from
+ * setup-c.co (default repo) or the latest GitHub release assets for custom forks.
  */
 export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
   const repoUrl = normalizeGitRepoUrl(gitRepoUrl);

@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
-  parseGitHubRepoUrl,
-} from "@cco/shared";
+import { AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES } from "@cco/shared";
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
 import { dispatchAdminUpdateStatus } from "@/lib/admin-update-events";
@@ -54,22 +51,20 @@ function UpdatesFeedback({ error, success }: { error?: string | null; success?: 
   );
 }
 
-function formatGitRepoLabel(gitRepoUrl: string): string {
-  const parsed = parseGitHubRepoUrl(gitRepoUrl);
-  return parsed ? `${parsed.owner}/${parsed.repo}` : gitRepoUrl;
-}
-
 function UpdatesStatusMeta({ status }: { status: UpdatesStatus }) {
   const installed = shortenSha(status.currentVersion);
   const checked = formatWhen(status.lastUpdateCheckAt);
 
   return (
     <div className="integrations-inline-status integrations-field-hint">
-      <p>Releases from {formatGitRepoLabel(status.gitRepoUrl)}</p>
       <p>
         {status.updateAvailable ? (
           <>
             Installed {installed} · Latest {shortenSha(status.latestVersion)}
+          </>
+        ) : status.latestVersion ? (
+          <>
+            Version {installed} · Latest {shortenSha(status.latestVersion)}
           </>
         ) : (
           <>Version {installed}</>
@@ -303,9 +298,11 @@ export function AdminUpdatesSection({
 
   const statusBadge = status.updateAvailable
     ? { label: "Update available", variant: "update" as const }
-    : status.lastUpdateCheckAt
+    : status.latestVersion
       ? { label: "Up to date", variant: "success" as const }
-      : { label: "Not checked yet", variant: "muted" as const };
+      : status.lastUpdateCheckAt
+        ? { label: "Check failed", variant: "muted" as const }
+        : { label: "Not checked yet", variant: "muted" as const };
 
   const isUpdating = deploying;
   const controlsDisabled = busy !== null || isUpdating;
