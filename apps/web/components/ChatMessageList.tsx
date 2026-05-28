@@ -148,8 +148,10 @@ function ChatMessageListInner({
         const isSending = Boolean(m.pendingSend || m.pendingUpload);
         const isLatestOwn = isOwn && m.id === lastOwnMessageId;
         const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
-        const showDeliveryFooter = isLatestOwn && !isEditing;
-        const showPeerAvatar = isLastPeerRead && isLatestOwn;
+        const showDeliveryFooter =
+          isOwn && !isEditing && (isLatestOwn || isLastPeerRead || isSending);
+        const showPeerAvatar = isLastPeerRead;
+        const showDeliveryCheck = isLatestOwn;
 
         return (
           <Fragment key={m.id}>
@@ -367,6 +369,7 @@ function ChatMessageListInner({
                           message={m}
                           peerUser={peerUser}
                           showPeerAvatar={showPeerAvatar}
+                          showDeliveryCheck={showDeliveryCheck}
                         />
                       </div>
                     ) : null}

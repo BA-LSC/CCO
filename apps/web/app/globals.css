@@ -4494,6 +4494,8 @@ button.sidebar-group-header:focus-visible {
 .chat-thread {
   --color-chat-own: color-mix(in srgb, var(--color-primary) 78%, #000);
   --color-chat-own-hover: color-mix(in srgb, var(--color-primary) 70%, #000);
+  --color-chat-own-text: #fff;
+  --color-chat-own-text-muted: rgba(255, 255, 255, 0.92);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -4801,7 +4803,7 @@ button.sidebar-group-header:focus-visible {
 
 .chat-thread .message-bubble--own {
   background: var(--color-chat-own);
-  color: #fff;
+  color: var(--color-chat-own-text);
   border-bottom-right-radius: 6px;
 }
 
@@ -4839,18 +4841,18 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-bubble--own .message-body {
-  color: #fff;
+  color: var(--color-chat-own-text);
 }
 
 .chat-thread .message-bubble--own .mention:not(.mention--self) {
   background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  color: var(--color-chat-own-text);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .chat-thread .message-bubble--own .mention--self {
   background: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  color: var(--color-chat-own-text);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
@@ -4865,7 +4867,7 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-bubble--own .link-btn {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--color-chat-own-text-muted);
 }
 
 .chat-thread .message-bubble--own .link-btn.danger {
@@ -5210,7 +5212,7 @@ button.sidebar-group-header:focus-visible {
   width: var(--composer-control-height);
   min-width: var(--composer-control-height);
   background: var(--color-chat-own);
-  color: #fff;
+  color: var(--color-chat-own-text);
   border: none;
 }
 

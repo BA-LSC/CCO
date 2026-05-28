@@ -6,7 +6,10 @@ import type { Message, PeerUser } from "@/lib/api";
 type Props = {
   message: Message;
   peerUser: PeerUser | null;
+  /** Peer read receipt on the last-read own message (any age). */
   showPeerAvatar: boolean;
+  /** Delivery check only on the newest own message. */
+  showDeliveryCheck: boolean;
 };
 
 function isMessageSending(message: Message): boolean {
@@ -46,32 +49,35 @@ export function MessageDeliveryStatus({
   message,
   peerUser,
   showPeerAvatar,
+  showDeliveryCheck,
 }: Props) {
   const sending = isMessageSending(message);
   const delivered = isMessageDelivered(message);
 
   let label = "Sending";
   if (delivered && showPeerAvatar) label = "Read";
-  else if (delivered) label = "Delivered";
+  else if (delivered && showDeliveryCheck) label = "Delivered";
 
   return (
     <div className="message-delivery-status" aria-label={label}>
       {sending ? (
         <span className="spinner message-delivery-spinner" aria-hidden />
-      ) : delivered ? (
+      ) : delivered && (showDeliveryCheck || showPeerAvatar) ? (
         <>
-          <svg
-            className="message-delivery-check"
-            viewBox="0 0 24 24"
-            aria-hidden
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          {showDeliveryCheck ? (
+            <svg
+              className="message-delivery-check"
+              viewBox="0 0 24 24"
+              aria-hidden
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          ) : null}
           {showPeerAvatar && peerUser ? (
             <UserAvatar
               displayName={peerUser.displayName}
