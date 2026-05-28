@@ -12,3 +12,21 @@ export function isCloudflareDeployTarget(): boolean {
 export function isDirectR2UploadsEnabled(): boolean {
   return isCloudflareDeployTarget();
 }
+
+/** Multipart POST is for local dev only; production/BYO must use presigned R2 PUT. */
+export function shouldUseMultipartUploadFallback(hostname?: string): boolean {
+  if (isDirectR2UploadsEnabled()) return false;
+
+  const resolvedHostname =
+    hostname ?? (typeof window !== "undefined" ? window.location.hostname : "");
+  if (
+    resolvedHostname &&
+    resolvedHostname !== "localhost" &&
+    resolvedHostname !== "127.0.0.1" &&
+    resolvedHostname !== "[::1]"
+  ) {
+    return false;
+  }
+
+  return true;
+}

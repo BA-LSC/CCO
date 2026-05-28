@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isCloudflareDeployTarget, isDirectR2UploadsEnabled } from "./cloudflare-deploy";
+import { isCloudflareDeployTarget, isDirectR2UploadsEnabled, shouldUseMultipartUploadFallback } from "./cloudflare-deploy";
 
 describe("isDirectR2UploadsEnabled", () => {
   test("matches Cloudflare deploy target only", () => {
@@ -43,6 +43,51 @@ describe("isDirectR2UploadsEnabled", () => {
     } finally {
       if (prevTarget === undefined) delete process.env.CCO_DEPLOY_TARGET;
       else process.env.CCO_DEPLOY_TARGET = prevTarget;
+    }
+  });
+});
+
+describe("shouldUseMultipartUploadFallback", () => {
+  test("never falls back on Cloudflare deploy targets", () => {
+    const prevDirect = process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+    process.env.NEXT_PUBLIC_DIRECT_UPLOADS = "1";
+    try {
+      expect(shouldUseMultipartUploadFallback("localhost")).toBe(false);
+      expect(shouldUseMultipartUploadFallback("cco.example.com")).toBe(false);
+    } finally {
+      if (prevDirect === undefined) delete process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+      else process.env.NEXT_PUBLIC_DIRECT_UPLOADS = prevDirect;
+    }
+  });
+
+  test("allows multipart fallback on localhost when presign is unavailable", () => {
+    const prevTarget = process.env.CCO_DEPLOY_TARGET;
+    const prevDirect = process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+    delete process.env.CCO_DEPLOY_TARGET;
+    delete process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+    try {
+      expect(shouldUseMultipartUploadFallback("localhost")).toBe(true);
+      expect(shouldUseMultipartUploadFallback("127.0.0.1")).toBe(true);
+    } finally {
+      if (prevTarget === undefined) delete process.env.CCO_DEPLOY_TARGET;
+      else process.env.CCO_DEPLOY_TARGET = prevTarget;
+      if (prevDirect === undefined) delete process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+      else process.env.NEXT_PUBLIC_DIRECT_UPLOADS = prevDirect;
+    }
+  });
+
+  test("blocks multipart fallback on production hostnames without deploy flags", () => {
+    const prevTarget = process.env.CCO_DEPLOY_TARGET;
+    const prevDirect = process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+    delete process.env.CCO_DEPLOY_TARGET;
+    delete process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+    try {
+      expect(shouldUseMultipartUploadFallback("cco.lscavl.dev")).toBe(false);
+    } finally {
+      if (prevTarget === undefined) delete process.env.CCO_DEPLOY_TARGET;
+      else process.env.CCO_DEPLOY_TARGET = prevTarget;
+      if (prevDirect === undefined) delete process.env.NEXT_PUBLIC_DIRECT_UPLOADS;
+      else process.env.NEXT_PUBLIC_DIRECT_UPLOADS = prevDirect;
     }
   });
 });

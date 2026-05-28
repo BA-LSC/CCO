@@ -1,6 +1,9 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
-import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
+import {
+  isDirectR2UploadsEnabled,
+  shouldUseMultipartUploadFallback,
+} from "@/lib/cloudflare-deploy";
 import {
   isDeployOverlaySuppressed,
   markDeployWait,
@@ -129,17 +132,10 @@ function uploadFetchErrorMessage(stage: "presign" | "storage", err: unknown): st
 async function uploadMediaViaPresign(file: File, contentType: string): Promise<string> {
   let presign: PresignResponse;
   try {
-    const presignRes = await fetch(`${API_BASE}/api/v1/uploads/presign`, {
+    presign = await apiFetch<PresignResponse>("/api/v1/uploads/presign", {
       method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contentType, size: file.size }),
     });
-    if (!presignRes.ok) {
-      const text = await presignRes.text();
-      throw new Error(parseApiError(text, presignRes.status));
-    }
-    presign = (await presignRes.json()) as PresignResponse;
   } catch (err) {
     if (err instanceof Error && err.message !== "Failed to fetch") {
       throw err;
@@ -200,11 +196,14 @@ async function uploadPreparedMedia(
   file: File,
   contentType: string,
 ): Promise<string> {
+  if (isDirectR2UploadsEnabled()) {
+    return uploadMediaViaPresign(file, contentType);
+  }
+
   try {
     return await uploadMediaViaPresign(file, contentType);
   } catch (presignErr) {
-    // Cloudflare BYO only supports presigned R2 PUT — multipart POST is rejected by cco-api.
-    if (isCloudflareDeployTarget()) {
+    if (!shouldUseMultipartUploadFallback()) {
       throw presignErr;
     }
     if (isPresignUnavailableError(presignErr) || isStorageCorsBlockedError(presignErr)) {
