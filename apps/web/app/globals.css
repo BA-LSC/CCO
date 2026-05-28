@@ -1716,6 +1716,35 @@ html[data-theme="11"] .user-menu-dropdown {
   background: color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
+.messages-day-divider-wrap {
+  list-style: none;
+  margin: 1rem 0 0.5rem;
+  padding: 0 0.75rem;
+}
+
+.messages-day-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.messages-day-divider time {
+  flex-shrink: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.messages-day-divider::before,
+.messages-day-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
 .sidebar-channel-prefix,
 .sidebar-hash {
   flex-shrink: 0;
@@ -4769,6 +4798,9 @@ button.sidebar-group-header:focus-visible {
   --color-chat-own-hover: color-mix(in srgb, var(--color-primary) 70%, #000);
   --color-chat-own-text: #fff;
   --color-chat-own-text-muted: rgba(255, 255, 255, 0.92);
+  --message-avatar-size: 36px;
+  --message-meta-name-size: 0.875rem;
+  --message-meta-detail-size: 0.75rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -4921,8 +4953,8 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-avatar {
-  width: 32px;
-  height: 32px;
+  width: var(--message-avatar-size);
+  height: var(--message-avatar-size);
   border-radius: 50%;
   background: var(--color-primary-soft);
   color: var(--color-primary);
@@ -4930,13 +4962,13 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
   overflow: hidden;
 }
 
 .chat-thread .message-avatar-spacer {
-  width: 32px;
+  width: var(--message-avatar-size);
   flex-shrink: 0;
 }
 
@@ -4944,7 +4976,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-item--other.message-item--group-first,
 .chat-thread .message-item--other.message-item--group-single {
   display: grid;
-  grid-template-columns: 32px minmax(0, 70%);
+  grid-template-columns: var(--message-avatar-size) minmax(0, 70%);
   column-gap: 10px;
   row-gap: 2px;
   align-items: start;
@@ -5033,7 +5065,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-header time,
 .chat-thread .message-header .message-edited,
 .chat-thread .message-meta .message-edited {
-  font-size: 0.7rem;
+  font-size: var(--message-meta-detail-size);
   color: var(--color-muted);
 }
 
@@ -5046,12 +5078,12 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-meta strong {
-  font-size: 0.8rem;
+  font-size: var(--message-meta-name-size);
   font-weight: 600;
 }
 
 .chat-thread .message-meta time {
-  font-size: 0.7rem;
+  font-size: var(--message-meta-detail-size);
   color: var(--color-muted);
 }
 

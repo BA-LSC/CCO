@@ -16,18 +16,16 @@ import {
   resolveAttachmentDisplayUrl,
 } from "@/lib/attachment-url";
 import { buildMessageLayoutInfos } from "@/lib/message-grouping";
+import {
+  formatMessageDayDivider,
+  formatMessageTime,
+  messageStartsNewDay,
+} from "@/lib/message-time";
 import type { Message, PeerUser } from "@/lib/api";
 import type { AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import type { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 
 type MessageActionsReveal = ReturnType<typeof useMessageActionsReveal>;
-
-function formatMessageTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 type Member = { id?: string; displayName: string; onCco?: boolean };
 
@@ -170,6 +168,13 @@ function ChatMessageListInner({
 
         return (
           <Fragment key={m.clientMessageId ?? m.id}>
+            {messageStartsNewDay(messages, index) && (
+              <li className="messages-day-divider-wrap" aria-hidden={false}>
+                <div className="messages-day-divider" role="separator">
+                  <time dateTime={m.createdAt}>{formatMessageDayDivider(m.createdAt)}</time>
+                </div>
+              </li>
+            )}
             {firstUnreadMessageId === m.id && (
               <li className="messages-unread-divider-wrap" aria-hidden={false}>
                 <div ref={unreadDividerRef} className="messages-unread-divider" role="separator">
