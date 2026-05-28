@@ -24,6 +24,70 @@
   --max-width: 760px;
   --header-height: 56px;
   --sidebar-width: 280px;
+  --motion-fast: 0.15s;
+  --motion-normal: 0.2s;
+  --motion-slow: 0.32s;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cco-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cco-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cco-pop-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cco-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes cco-banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 * {
@@ -504,6 +568,19 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   margin-left: auto;
 }
 
+@keyframes user-menu-update-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scale(1.1);
+  }
+}
+
 .user-menu-update-dot {
   width: 8px;
   height: 8px;
@@ -512,6 +589,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   background: #a78bfa;
   box-shadow: 0 0 0 2px var(--color-surface);
   box-sizing: border-box;
+  animation: user-menu-update-dot-pulse 2.4s ease-in-out infinite;
 }
 
 .user-menu-sidebar .user-menu-trigger:hover .user-menu-update-dot {
@@ -558,6 +636,8 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   padding: 8px;
   z-index: 20;
   box-sizing: border-box;
+  transform-origin: top right;
+  animation: cco-pop-down var(--motion-normal) var(--motion-ease-out);
 }
 
 .user-menu-dropdown-label {
@@ -1364,6 +1444,9 @@ html[data-theme="11"] .user-menu-dropdown {
   border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: left;
+  transition:
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 .sidebar-item:hover {
@@ -1782,6 +1865,8 @@ button.sidebar-group-header.sidebar-group-header-menu-open .sidebar-group-menu-t
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   z-index: 20;
+  transform-origin: top right;
+  animation: cco-pop-down var(--motion-normal) var(--motion-ease-out);
 }
 
 .sidebar-group-menu-item {
@@ -2190,13 +2275,6 @@ button.sidebar-group-header:focus-visible {
   animation: empty-chat-menu-pulse 2s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .empty-chat-pane-menu--pulse {
-    animation: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);
-  }
-}
-
 .empty-chat-pane-brand {
   min-width: 0;
   overflow: hidden;
@@ -2450,8 +2528,13 @@ button.sidebar-group-header:focus-visible {
   color: var(--color-muted);
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    color 0.15s ease;
+    background var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform 0.1s ease;
+}
+
+.panel-header-icon-btn:active:not(:disabled) {
+  transform: scale(0.92);
 }
 
 .panel-header-icon-btn:hover {
@@ -3209,6 +3292,12 @@ button.sidebar-group-header:focus-visible {
   margin: 0;
 }
 
+.chat-home-banner-wrap--panel .chat-home-banner:not(.chat-home-banner--exit),
+.chat-panel-banner-slot .chat-home-banner:not(.chat-home-banner--exit),
+.empty-chat-pane-banner-slot .chat-home-banner:not(.chat-home-banner--exit) {
+  animation: cco-banner-slide-in var(--motion-slow) var(--motion-ease);
+}
+
 .chat-home-banner {
   margin: 12px 20px 0;
   padding: 12px 14px;
@@ -3445,7 +3534,15 @@ button.sidebar-group-header:focus-visible {
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    transform 0.1s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:hover {
@@ -3631,6 +3728,7 @@ button.sidebar-group-header:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 14px;
+  animation: cco-fade-in 0.35s var(--motion-ease-out);
 }
 
 .loading-screen-label {
@@ -3703,6 +3801,7 @@ button.sidebar-group-header:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
+  animation: cco-pop-in 0.4s var(--motion-ease-out);
 }
 
 .state-card h1 {
@@ -4965,7 +5064,10 @@ button.sidebar-group-header:focus-visible {
   gap: 2px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transform: translateY(4px);
+  transition:
+    opacity var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -5003,6 +5105,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-bubble--actions-visible .message-actions {
   opacity: 1;
   pointer-events: auto;
+  transform: translateY(0);
 }
 
 @media (hover: hover) {
@@ -5011,6 +5114,7 @@ button.sidebar-group-header:focus-visible {
   .chat-thread .message-actions:hover {
     opacity: 1;
     pointer-events: auto;
+    transform: translateY(0);
   }
 }
 
@@ -5060,6 +5164,7 @@ button.sidebar-group-header:focus-visible {
   color: inherit;
   border-radius: 4px;
   flex-shrink: 0;
+  transition: transform var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
 .chat-thread .message-action-emoji:hover,
@@ -5294,6 +5399,12 @@ button.sidebar-group-header:focus-visible {
   box-sizing: border-box;
   flex-shrink: 0;
   overflow: visible;
+  transition: transform 0.1s ease, background var(--motion-fast) ease;
+}
+
+.chat-thread .composer-attach-trigger:active:not(:disabled),
+.chat-thread .composer-send:active:not(:disabled) {
+  transform: scale(0.94);
 }
 
 .chat-thread .composer-send {
@@ -5347,6 +5458,8 @@ button.sidebar-group-header:focus-visible {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   z-index: 10;
+  transform-origin: bottom left;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .chat-thread .composer-attach-menu-item {
@@ -5385,6 +5498,8 @@ button.sidebar-group-header:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
+  transform-origin: bottom center;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .composer-giphy-picker-header {
@@ -5781,6 +5896,7 @@ button.sidebar-group-header:focus-visible {
     env(safe-area-inset-right, 0px)
     env(safe-area-inset-bottom, 0px)
     env(safe-area-inset-left, 0px);
+  animation: cco-fade-in 0.22s var(--motion-ease-out);
 }
 
 .attachment-lightbox-toolbar {
@@ -5866,6 +5982,7 @@ button.sidebar-group-header:focus-visible {
   -webkit-user-drag: none;
   transform-origin: center center;
   will-change: transform;
+  animation: cco-scale-in 0.28s var(--motion-spring);
 }
 
 .message-body {
@@ -5966,6 +6083,8 @@ button.sidebar-group-header:focus-visible {
   z-index: 1000;
   color: var(--color-text);
   box-sizing: border-box;
+  transform-origin: bottom center;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .message-emoji-picker--floating {
@@ -6235,6 +6354,14 @@ button.sidebar-group-header:focus-visible {
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   max-width: 100%;
+  transition:
+    transform var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease;
+}
+
+.chat-thread .message-reaction-pill:hover {
+  transform: scale(1.04);
 }
 
 .chat-thread .message-reaction-pill:hover,
@@ -6331,6 +6458,8 @@ button.sidebar-group-header:focus-visible {
   box-shadow: var(--shadow-md);
   max-height: 280px;
   overflow-y: auto;
+  transform-origin: bottom center;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .mention-suggestions li + li {
@@ -6913,6 +7042,7 @@ html.standalone-display .chat-thread-panel {
     background: rgba(15, 23, 42, 0.35);
     border: none;
     cursor: pointer;
+    animation: cco-fade-in var(--motion-normal) var(--motion-ease-out);
   }
 
   .sidebar-footer {
@@ -7202,24 +7332,6 @@ html.standalone-display .chat-thread-panel {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
-
-  .chat-panel-title-skeleton,
-  .chat-panel-subtitle-skeleton,
-  .chat-panel-header-avatar-skeleton,
-  .sidebar-skeleton-label,
-  .sidebar-skeleton-avatar {
-    animation: none;
-  }
-
-  .chat-thread .messages {
-    scroll-behavior: auto;
-  }
-}
-
 .call-header-btn--idle {
   color: var(--color-muted);
 }
@@ -7281,6 +7393,7 @@ html.standalone-display .chat-thread-panel {
   display: flex;
   flex-direction: column;
   background: #111;
+  animation: cco-fade-in 0.25s var(--motion-ease-out);
 }
 
 .call-overlay-meeting {
@@ -7297,6 +7410,7 @@ html.standalone-display .chat-thread-panel {
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
   padding: 16px;
+  animation: cco-fade-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .call-invite-dialog {
@@ -7307,6 +7421,7 @@ html.standalone-display .chat-thread-panel {
   background: var(--color-surface);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
+  animation: cco-scale-in 0.28s var(--motion-spring);
 }
 
 .call-invite-dialog-header {
