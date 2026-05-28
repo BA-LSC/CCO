@@ -28,6 +28,35 @@
   max-width: 36rem;
 }
 
+.setup-welcome:not(.setup-page) .setup-hero-main > * {
+  animation: cco-fade-in 0.2s var(--motion-ease-out) both;
+}
+
+.setup-welcome:not(.setup-page) .setup-hero-main > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.setup-welcome:not(.setup-page) .setup-hero-main > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.setup-welcome:not(.setup-page) .setup-hero-main > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+.setup-welcome:not(.setup-page) .setup-hero-main > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+
+.setup-welcome:not(.setup-page) .setup-hero-main > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+
+.setup-welcome:not(.setup-page) .setup-steps-card {
+  animation: cco-scale-in 0.22s var(--motion-spring) both;
+  animation-delay: 120ms;
+}
+
 .setup-eyebrow {
   margin: 0 0 1rem;
   font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -298,6 +327,31 @@
       color-mix(in srgb, var(--home-surface) 88%, var(--color-bg, var(--home-bg))) 100%
     );
   box-shadow: var(--shadow-md, 0 24px 48px rgba(0, 0, 0, 0.22));
+  animation: cco-scale-in 0.22s var(--motion-spring) both;
+}
+
+.setup-form-card > * {
+  animation: cco-fade-in 0.18s var(--motion-ease-out) both;
+}
+
+.setup-form-card > *:nth-child(1) {
+  animation-delay: 60ms;
+}
+
+.setup-form-card > *:nth-child(2) {
+  animation-delay: 110ms;
+}
+
+.setup-form-card > *:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.setup-form-card > *:nth-child(4) {
+  animation-delay: 210ms;
+}
+
+.setup-form-card > *:nth-child(5) {
+  animation-delay: 260ms;
 }
 
 .setup-form-card-centered {
@@ -449,6 +503,10 @@
   min-height: 40vh;
   width: 100%;
   background: transparent;
+}
+
+.setup-welcome .loading-screen-content {
+  animation: cco-fade-in 0.2s var(--motion-ease-out) both;
 }
 
 .setup-welcome .loading-screen-label {

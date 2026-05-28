@@ -336,6 +336,8 @@ type PillsProps = {
   reactionAlign?: "own" | "other";
 };
 
+const REACTION_PILL_STAGGER_MS = 50;
+
 export function MessageReactionPills({
   messageId,
   reactions,
@@ -343,6 +345,9 @@ export function MessageReactionPills({
   onToggleReaction,
   reactionAlign = "other",
 }: PillsProps) {
+  const initializedRef = useRef(false);
+  const seenEmojisRef = useRef(new Set<string>());
+
   const grouped = Array.from(
     reactions.reduce((map, reaction) => {
       const list = map.get(reaction.emoji) ?? [];
@@ -351,6 +356,23 @@ export function MessageReactionPills({
       return map;
     }, new Map<string, Reaction[]>()),
   );
+
+  const enterDelayByEmoji = useMemo(() => {
+    if (!initializedRef.current) return new Map<string, number>();
+    const newlyAdded = grouped.filter(([emoji]) => !seenEmojisRef.current.has(emoji));
+    return new Map(
+      newlyAdded.map(([emoji], index) => [emoji, index * REACTION_PILL_STAGGER_MS]),
+    );
+  }, [grouped]);
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
+      return;
+    }
+    grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
+  }, [grouped]);
 
   if (grouped.length === 0) return null;
 
@@ -367,11 +389,24 @@ export function MessageReactionPills({
     const mine = list.some((reaction) => reaction.userId === currentUserId);
     const title = list.map((reaction) => reaction.userName).join(", ");
     const count = list.length;
+    const enterDelayMs = enterDelayByEmoji.get(emoji);
+    const isEntering = enterDelayMs !== undefined;
     return (
       <button
         key={emoji}
         type="button"
-        className={`message-reaction-pill${mine ? " message-reaction-pill--mine" : ""}`}
+        className={[
+          "message-reaction-pill",
+          mine ? "message-reaction-pill--mine" : "",
+          isEntering ? "message-reaction-pill--enter" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={
+          isEntering && enterDelayMs > 0
+            ? ({ ["--reaction-enter-delay" as string]: `${enterDelayMs}ms` } as CSSProperties)
+            : undefined
+        }
         title={title}
         aria-label={
           count > 1 ? `${emoji}, ${count} reactions, ${title}` : `${emoji}, ${title}`

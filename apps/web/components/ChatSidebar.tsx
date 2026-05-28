@@ -344,6 +344,7 @@ export function ChatSidebar() {
         className={[
           "chat-sidebar",
           sidebarOpen ? "chat-sidebar-open" : "",
+          !loading ? "chat-sidebar--ready" : "",
           process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim()
             ? "chat-sidebar--has-video"
             : "",

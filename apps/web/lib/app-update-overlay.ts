@@ -2,9 +2,10 @@ export const APP_UPDATE_OVERLAY_LABEL = "Updating CCO…";
 
 /** Critical overlay styles so the update screen renders before app CSS loads. */
 export const APP_UPDATE_OVERLAY_STYLE_CSS = `
-.app-update-overlay{position:fixed;inset:0;z-index:10000;display:flex;background:var(--color-bg,#111620)}
+@keyframes cco-fade-in{from{opacity:0}to{opacity:1}}
+.app-update-overlay{position:fixed;inset:0;z-index:10000;display:flex;background:var(--color-bg,#111620);animation:cco-fade-in .18s cubic-bezier(0,0,.2,1) both}
 .app-update-overlay .loading-screen{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:100vh;background:var(--color-bg,#111620)}
-.app-update-overlay .loading-screen-content{display:flex;flex-direction:column;align-items:center;gap:24px}
+.app-update-overlay .loading-screen-content{display:flex;flex-direction:column;align-items:center;gap:24px;animation:cco-fade-in .18s cubic-bezier(0,0,.2,1) 50ms both}
 .app-update-overlay .spinner{width:64px;height:64px;margin:0;border:5px solid var(--color-border,#2a3344);border-top-color:var(--color-primary,#5b8def);border-radius:50%;animation:cco-app-update-spin .7s linear infinite}
 .app-update-overlay .loading-screen-label{margin:0;font-size:1.5rem;font-weight:600;color:var(--color-muted,#9aa3b2);letter-spacing:.03em}
 @keyframes cco-app-update-spin{to{transform:rotate(360deg)}}
