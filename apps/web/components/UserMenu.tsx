@@ -232,17 +232,26 @@ export function UserMenu({ variant = "default" }: Props) {
             displayName
           )}
         </span>
-        <span className={`user-menu-chevron${open ? " user-menu-chevron-open" : ""}`} aria-hidden>
-          <svg className="user-menu-chevron-icon" viewBox="0 0 24 24" aria-hidden>
-            <path
-              d="M18 15l-6-6-6 6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <span className="user-menu-chevron-wrap">
+          {adminUpdateAvailable ? (
+            <span
+              className="user-menu-update-dot"
+              title="Update available"
+              aria-label="Update available"
             />
-          </svg>
+          ) : null}
+          <span className={`user-menu-chevron${open ? " user-menu-chevron-open" : ""}`} aria-hidden>
+            <svg className="user-menu-chevron-icon" viewBox="0 0 24 24" aria-hidden>
+              <path
+                d="M18 15l-6-6-6 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
         </span>
       </button>
 

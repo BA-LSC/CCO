@@ -496,12 +496,37 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   white-space: nowrap;
 }
 
+.user-menu-chevron-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.user-menu-update-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #a78bfa;
+  box-shadow: 0 0 0 2px var(--color-surface);
+  box-sizing: border-box;
+}
+
+.user-menu-sidebar .user-menu-trigger:hover .user-menu-update-dot {
+  box-shadow: 0 0 0 2px var(--color-surface-2);
+}
+
+.user-menu-sidebar .user-menu-trigger[aria-expanded="true"] .user-menu-update-dot {
+  box-shadow: 0 0 0 2px var(--color-primary-soft);
+}
+
 .user-menu-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-left: 4px;
   color: var(--color-muted);
 }
 
@@ -1087,7 +1112,7 @@ html[data-theme="11"] .user-menu-dropdown {
 }
 
 .user-menu-sidebar .user-menu-avatar-wrap,
-.user-menu-sidebar .user-menu-chevron {
+.user-menu-sidebar .user-menu-chevron-wrap {
   align-self: center;
 }
 
@@ -1980,25 +2005,29 @@ button.sidebar-group-header:focus-visible {
   margin: 2px 0 0;
   border: none;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background: color-mix(in srgb, var(--color-surface-2) 62%, var(--color-surface));
   box-shadow: none;
 }
 
 .sidebar-new-message-btn .sidebar-dm-row {
-  display: grid;
-  grid-template-columns: var(--sidebar-avatar-size) minmax(0, 1fr);
-  column-gap: var(--sidebar-avatar-gap);
+  display: flex;
   align-items: center;
-  padding: var(--sidebar-item-pad-y) var(--sidebar-item-pad-x);
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px var(--sidebar-item-pad-x);
   min-height: 0;
+  box-sizing: border-box;
 }
 
 .sidebar-new-message-icon {
-  grid-column: 1;
-  display: grid;
-  place-items: center;
-  width: var(--sidebar-avatar-size);
-  height: var(--sidebar-avatar-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
   color: var(--color-muted);
 }
 
@@ -2011,17 +2040,17 @@ button.sidebar-group-header:focus-visible {
 }
 
 .sidebar-new-message-btn:hover {
-  background: color-mix(in srgb, var(--color-surface-2) 80%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 88%, var(--color-surface));
 }
 
 .sidebar-new-message-btn:active {
-  background: color-mix(in srgb, var(--color-surface-2) 95%, transparent);
+  background: color-mix(in srgb, var(--color-surface-2) 96%, var(--color-surface));
 }
 
 .sidebar-new-message-label {
   flex: none;
   min-width: 0;
-  text-align: left;
+  text-align: center;
   font-size: var(--sidebar-font-size-xs);
   font-style: normal;
   font-weight: 500;
@@ -4815,6 +4844,8 @@ button.sidebar-group-header:focus-visible {
 
 .chat-thread .message-item--own .message-header {
   justify-content: flex-end;
+  align-self: stretch;
+  padding-right: 0;
 }
 
 .chat-thread .message-item--other .message-header {
@@ -5061,7 +5092,10 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-item--own .message-footer {
+  align-self: stretch;
   align-items: flex-end;
+  padding-right: 0;
+  padding-left: 0;
 }
 
 .chat-thread .message-item--other .message-footer {
