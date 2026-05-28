@@ -288,8 +288,15 @@ export function AdminUpdatesSection({
 
       {isUpdating && (
         <div className="integrations-updates-deploying" role="status" aria-live="polite">
-          <span className="spinner" aria-hidden="true" />
-          <span>Updating CCO…</span>
+          <div className="integrations-updates-deploying-head">
+            <span className="integrations-updates-deploying-label">Updating CCO…</span>
+            <span className="integrations-updates-deploying-detail">
+              Workers are redeploying. This page refreshes when the deploy finishes.
+            </span>
+          </div>
+          <div className="integrations-updates-progress" aria-hidden="true">
+            <div className="integrations-updates-progress-bar" />
+          </div>
         </div>
       )}
 

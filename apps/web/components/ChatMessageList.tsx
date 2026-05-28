@@ -136,6 +136,14 @@ function ChatMessageListInner({
             layoutInfo.clusterTimestamp ||
             Boolean(m.editedAt));
         const hasVisibleTimestamp = showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
+        const isClusterTail =
+          layoutInfo.groupPosition === "last" || layoutInfo.groupPosition === "single";
+        const isSending = Boolean(m.pendingSend || m.pendingUpload);
+        const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
+        const showDeliveryFooter =
+          isOwn &&
+          !isEditing &&
+          (isSending || isClusterTail || isLastPeerRead);
 
         return (
           <Fragment key={m.id}>
@@ -344,15 +352,17 @@ function ChatMessageListInner({
                         {m.body ? (
                           <MessageBody body={m.body} currentUserId={resolvedUserId} />
                         ) : null}
-                        {isOwn && !isEditing ? (
-                          <MessageDeliveryStatus
-                            message={m}
-                            peerUser={peerUser}
-                            showPeerAvatar={isDirectMessage && m.id === lastPeerReadMessageId}
-                          />
-                        ) : null}
                       </div>
                     </MessageBubbleStack>
+                    {showDeliveryFooter ? (
+                      <div className="message-footer">
+                        <MessageDeliveryStatus
+                          message={m}
+                          peerUser={peerUser}
+                          showPeerAvatar={isLastPeerRead}
+                        />
+                      </div>
+                    ) : null}
                   </>
                 )}
               </div>
