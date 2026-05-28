@@ -1,7 +1,6 @@
 import {
   CCO_DEFAULT_GIT_REF,
   CCO_DEFAULT_GIT_REPO_URL,
-  CCO_RELEASE_INDEX_URL,
   CCO_RELEASES_ORIGIN,
   isDefaultGitRepo,
   normalizeGitRepoUrl,
@@ -82,24 +81,6 @@ async function fetchGithubMainCommitSha(owner: string, repo: string): Promise<{
   return { sha: json.sha.trim(), publishedAt };
 }
 
-async function fetchSetupCReleaseIndex(): Promise<ReleaseIndex> {
-  const url = process.env.CCO_RELEASE_INDEX_URL?.trim() || CCO_RELEASE_INDEX_URL;
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": GITHUB_USER_AGENT,
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`Release index unavailable (HTTP ${res.status})`);
-  }
-  const json = (await res.json()) as ReleaseIndex;
-  if (!json.version?.trim()) {
-    throw new Error("Release index missing version");
-  }
-  return json;
-}
-
 async function fetchGithubLatestReleaseAsset(
   owner: string,
   repo: string,
@@ -137,34 +118,6 @@ async function fetchGithubLatestReleaseIndex(owner: string, repo: string): Promi
   };
 }
 
-async function fetchDefaultGitReleaseIndex(repoUrl: string): Promise<ReleaseIndex> {
-  let setupError: string | null = null;
-  try {
-    return await fetchSetupCReleaseIndex();
-  } catch (err) {
-    setupError = err instanceof Error ? err.message : "Release index unavailable";
-  }
-
-  const parsed = parseGitHubRepoUrl(repoUrl);
-  if (!parsed) {
-    throw new Error(setupError ?? "Release index unavailable");
-  }
-
-  try {
-    const { sha, publishedAt } = await fetchGithubMainCommitSha(parsed.owner, parsed.repo);
-    return {
-      version: sha,
-      gitRef: CCO_DEFAULT_GIT_REF,
-      publishedAt,
-      releasesBaseUrl: resolveArtifactReleasesBaseUrl(repoUrl),
-    };
-  } catch (githubErr) {
-    const githubMessage =
-      githubErr instanceof Error ? githubErr.message : "GitHub commit lookup failed";
-    throw new Error(setupError ?? githubMessage);
-  }
-}
-
 async function fetchCustomGitReleaseIndex(
   repoUrl: string,
   owner: string,
@@ -186,19 +139,14 @@ async function fetchCustomGitReleaseIndex(
 }
 
 /**
- * Resolve the release catalog for Admin Updates from a git repository URL.
- * Default BA-LSC/CCO installs read setup-c.co/release-index.json first (no GitHub auth required).
- * Custom forks use GitHub release assets, then main commit SHA with optional GITHUB_TOKEN.
+ * Resolve the release catalog for Admin Updates from the org git repository URL.
+ * Always reads the configured GitHub repo (release assets, then main commit SHA).
  */
 export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
   const repoUrl = normalizeGitRepoUrl(gitRepoUrl);
   const parsed = parseGitHubRepoUrl(repoUrl);
   if (!parsed) {
     throw new Error("Git repository URL must be a GitHub repository");
-  }
-
-  if (isDefaultGitRepo(repoUrl)) {
-    return fetchDefaultGitReleaseIndex(repoUrl);
   }
 
   return fetchCustomGitReleaseIndex(repoUrl, parsed.owner, parsed.repo);

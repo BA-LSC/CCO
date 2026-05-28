@@ -3897,6 +3897,13 @@ button.sidebar-group-header:focus-visible {
 }
 
 .integrations-inline-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.integrations-inline-status p {
   margin: 0;
 }
 

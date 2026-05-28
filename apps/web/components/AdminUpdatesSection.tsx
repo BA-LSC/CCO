@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
+  parseGitHubRepoUrl,
 } from "@cco/shared";
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
@@ -28,6 +29,7 @@ export type UpdatesStatus = {
   applyBlockedReason: string | null;
   cloudflareApiTokenValid?: boolean | null;
   cloudflareApiTokenError?: string | null;
+  gitRepoUrl: string;
 };
 
 function shortenSha(value: string | null): string {
@@ -52,16 +54,30 @@ function UpdatesFeedback({ error, success }: { error?: string | null; success?: 
   );
 }
 
-function formatStatusLine(status: UpdatesStatus): string {
+function formatGitRepoLabel(gitRepoUrl: string): string {
+  const parsed = parseGitHubRepoUrl(gitRepoUrl);
+  return parsed ? `${parsed.owner}/${parsed.repo}` : gitRepoUrl;
+}
+
+function UpdatesStatusMeta({ status }: { status: UpdatesStatus }) {
   const installed = shortenSha(status.currentVersion);
   const checked = formatWhen(status.lastUpdateCheckAt);
 
-  if (status.updateAvailable) {
-    const latest = shortenSha(status.latestVersion);
-    return `Installed ${installed} · Latest ${latest} · Last checked ${checked}`;
-  }
-
-  return `Version ${installed} · Last checked ${checked}`;
+  return (
+    <div className="integrations-inline-status integrations-field-hint">
+      <p>Releases from {formatGitRepoLabel(status.gitRepoUrl)}</p>
+      <p>
+        {status.updateAvailable ? (
+          <>
+            Installed {installed} · Latest {shortenSha(status.latestVersion)}
+          </>
+        ) : (
+          <>Version {installed}</>
+        )}
+      </p>
+      <p>Last checked {checked}</p>
+    </div>
+  );
 }
 
 export function AdminUpdatesSection({
@@ -301,7 +317,6 @@ export function AdminUpdatesSection({
       <div className="integrations-section-top">
         <div className="integrations-section-head">
           <h2 id="updates-status-heading">Updates</h2>
-          <p>Install the latest release from your connected repository.</p>
         </div>
         <div className="integrations-section-badges">
           <span className={`integrations-badge integrations-badge--${statusBadge.variant}`}>
@@ -310,7 +325,7 @@ export function AdminUpdatesSection({
         </div>
       </div>
 
-      <p className="integrations-inline-status integrations-field-hint">{formatStatusLine(status)}</p>
+      <UpdatesStatusMeta status={status} />
 
       {status.cloudflareApiTokenValid === false && status.cloudflareApiTokenError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
