@@ -1,11 +1,22 @@
 type ComposerFieldElement = HTMLTextAreaElement | HTMLElement;
 
+function isComposerEmpty(textarea: ComposerFieldElement): boolean {
+  const raw = textarea.textContent ?? "";
+  return raw.replace(/\u00a0/g, " ").replace(/\u200b/g, "").trim().length === 0;
+}
+
 /** Grow/shrink the chat composer to fit content, capped at max lines (then scroll). */
 export function syncComposerTextareaHeight(
   textarea: ComposerFieldElement | null,
   maxLines = 3,
 ): void {
   if (!textarea) return;
+
+  if (isComposerEmpty(textarea)) {
+    textarea.style.height = "";
+    textarea.style.overflowY = "hidden";
+    return;
+  }
 
   const style = getComputedStyle(textarea);
   const lineHeight = parseFloat(style.lineHeight);

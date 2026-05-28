@@ -340,15 +340,6 @@ export function ChatSidebar() {
 
   return (
     <>
-      {sidebarOpen && (
-        <button
-          type="button"
-          className="chat-sidebar-overlay"
-          aria-label="Close sidebar"
-          onClick={closeSidebar}
-        />
-      )}
-
       <aside
         className={[
           "chat-sidebar",
@@ -549,6 +540,15 @@ export function ChatSidebar() {
           <UserMenu variant="sidebar" />
         </div>
       </aside>
+
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="chat-sidebar-overlay"
+          aria-label="Close sidebar"
+          onClick={closeSidebar}
+        />
+      ) : null}
     </>
   );
 }

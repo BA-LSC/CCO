@@ -25,6 +25,7 @@ type Props = {
   onPick: (theme: UserTheme) => void | Promise<void>;
   /** Sidebar user menu: portal list so it is not clipped by the dropdown scroll container. */
   placement?: "default" | "sidebar";
+  onOpenChange?: (open: boolean) => void;
 };
 
 function ThemeSwatch({ id }: { id: PickerTheme }) {
@@ -53,7 +54,13 @@ function measurePortalListPosition(trigger: HTMLElement) {
   };
 }
 
-export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default" }: Props) {
+export function ThemePicker({
+  theme,
+  chaosUnlocked,
+  onPick,
+  placement = "default",
+  onOpenChange,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [listPosition, setListPosition] = useState<{
@@ -69,6 +76,10 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   useLayoutEffect(() => {
     if (!open || !usePortal) {
@@ -135,8 +146,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
     [onPick],
   );
 
-  function onOptionPointerDown(event: ReactPointerEvent, next: UserTheme) {
-    event.preventDefault();
+  function onOptionActivate(event: ReactPointerEvent | React.MouseEvent, next: UserTheme) {
     event.stopPropagation();
     void selectTheme(next);
   }
@@ -149,6 +159,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
       className={`user-menu-theme-list${usePortal ? " user-menu-theme-list--portal" : ""}`}
       role="listbox"
       aria-label="Theme"
+      onPointerDown={(event) => event.stopPropagation()}
       style={
         usePortal && listPosition
           ? {
@@ -158,6 +169,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
               bottom: listPosition.bottom,
               top: "auto",
               right: "auto",
+              zIndex: 10050,
             }
           : undefined
       }
@@ -169,7 +181,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
             role="option"
             aria-selected={theme === id}
             className={`user-menu-theme-option${theme === id ? " user-menu-theme-option-active" : ""}`}
-            onPointerDown={(event) => onOptionPointerDown(event, id)}
+            onClick={(event) => onOptionActivate(event, id)}
           >
             <ThemeSwatch id={id} />
             <span className="user-menu-theme-option-label">{THEME_LABELS[id]}</span>
@@ -185,7 +197,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
             className={`user-menu-theme-option user-menu-theme-option-chaos${
               theme === CHAOS_THEME ? " user-menu-theme-option-active" : ""
             }`}
-            onPointerDown={(event) => onOptionPointerDown(event, CHAOS_THEME)}
+            onClick={(event) => onOptionActivate(event, CHAOS_THEME)}
           >
             <ChaosSwatch />
             <span className="user-menu-theme-option-label">{THEME_LABELS[CHAOS_THEME]}</span>

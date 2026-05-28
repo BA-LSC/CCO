@@ -1261,12 +1261,29 @@ html[data-theme="11"] .user-menu-dropdown {
   width: auto;
   min-width: 0;
   max-height: min(70vh, 480px);
-  overflow-y: auto;
-  overflow-x: visible;
-  z-index: 50;
+  overflow: visible;
+  z-index: 60;
   padding: 12px 14px 14px;
   transform-origin: bottom center;
   animation: cco-slide-up var(--motion-slow) var(--motion-ease-out);
+}
+
+.user-menu-dropdown-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.user-menu-dropdown-theme {
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.user-menu-dropdown-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .user-menu-sidebar .user-menu-theme,
@@ -7052,9 +7069,9 @@ html.standalone-display .chat-thread-panel {
     height: 100dvh;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
-    padding: 0 9px 0;
+    padding: 0 9px env(safe-area-inset-bottom, 0px);
     box-sizing: border-box;
-    z-index: 40;
+    z-index: 50;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md);
@@ -7067,8 +7084,11 @@ html.standalone-display .chat-thread-panel {
   .chat-sidebar-overlay {
     display: block;
     position: fixed;
-    inset: 0;
-    z-index: 35;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--sidebar-width);
+    z-index: 40;
     background: rgba(15, 23, 42, 0.35);
     border: none;
     cursor: pointer;
@@ -7080,7 +7100,7 @@ html.standalone-display .chat-thread-panel {
   }
 
   .user-menu-sidebar {
-    padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 9px;
   }
 
   .sidebar-brand {

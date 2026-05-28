@@ -59,6 +59,7 @@ export function UserMenu({ variant = "default" }: Props) {
   const [statusMessageDraft, setStatusMessageDraft] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const themePickerOpenRef = useRef(false);
   const themeOneClicks = useRef<number[]>([]);
   const adminUpdateAvailable = useAdminUpdateAvailable(
     !loading && Boolean(user?.siteAdministrator),
@@ -76,6 +77,7 @@ export function UserMenu({ variant = "default" }: Props) {
     if (!open) return;
 
     function shouldKeepMenuOpen(target: Node) {
+      if (themePickerOpenRef.current) return true;
       if (menuRef.current?.contains(target)) return true;
       if (!(target instanceof Element)) return false;
       return Boolean(
@@ -107,6 +109,11 @@ export function UserMenu({ variant = "default" }: Props) {
     if (!open) return;
     setStatusMessageDraft(myStatus.message ?? "");
   }, [myStatus.message, open]);
+
+  useEffect(() => {
+    if (open) return;
+    themePickerOpenRef.current = false;
+  }, [open]);
 
   if (loading) {
     return (
@@ -264,81 +271,93 @@ export function UserMenu({ variant = "default" }: Props) {
       </button>
 
       {open && (
-        <div className="user-menu-dropdown" role="menu">
-          <div className="user-menu-theme" role="group" aria-label="Theme">
-            <span className="user-menu-dropdown-label">Theme</span>
-            <ThemePicker
-              theme={theme}
-              chaosUnlocked={chaosUnlocked}
-              placement={variant === "sidebar" ? "sidebar" : "default"}
-              onPick={(next) => handleThemePick(next)}
-            />
-            {chaosHint && (
-              <p className="user-menu-chaos-toast" role="status">
-                <span className="user-menu-chaos-toast-text">🎉 CHAOS UNLEASHED 🎊</span>
-              </p>
-            )}
-          </div>
-
-          <div className="user-menu-status" role="group" aria-label="Status">
-            <span className="user-menu-dropdown-label">Status</span>
-            <div className="user-menu-status-grid">
-              {USER_STATUS_PICKER_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={`user-menu-status-btn user-menu-status-btn-${preset}${
-                    selectedPreset === preset ? " user-menu-status-btn-active" : ""
-                  }`}
-                  aria-pressed={selectedPreset === preset}
-                  disabled={statusSaving}
-                  onClick={() => void handleStatusPreset(preset)}
-                >
-                  {USER_STATUS_LABELS[preset]}
-                </button>
-              ))}
-            </div>
-            <label className="user-menu-status-message-field">
-              <span className="visually-hidden">Status message</span>
-              <input
-                type="text"
-                className="user-menu-status-message"
-                value={statusMessageDraft}
-                maxLength={80}
-                placeholder="What's going on?"
-                disabled={statusSaving}
-                onChange={(event) => setStatusMessageDraft(event.target.value)}
-                onBlur={() => void saveStatusMessage()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.currentTarget.blur();
-                  }
+        <div
+          className={`user-menu-dropdown${
+            variant === "sidebar" ? " user-menu-dropdown-sidebar" : ""
+          }`}
+          role="menu"
+        >
+          <div className="user-menu-dropdown-theme">
+            <div className="user-menu-theme" role="group" aria-label="Theme">
+              <span className="user-menu-dropdown-label">Theme</span>
+              <ThemePicker
+                theme={theme}
+                chaosUnlocked={chaosUnlocked}
+                placement={variant === "sidebar" ? "sidebar" : "default"}
+                onOpenChange={(next) => {
+                  themePickerOpenRef.current = next;
                 }}
+                onPick={(next) => handleThemePick(next)}
               />
-            </label>
+              {chaosHint && (
+                <p className="user-menu-chaos-toast" role="status">
+                  <span className="user-menu-chaos-toast-text">🎉 CHAOS UNLEASHED 🎊</span>
+                </p>
+              )}
+            </div>
           </div>
 
-          {user.siteAdministrator && (
+          <div className="user-menu-dropdown-scroll">
+            <div className="user-menu-status" role="group" aria-label="Status">
+              <span className="user-menu-dropdown-label">Status</span>
+              <div className="user-menu-status-grid">
+                {USER_STATUS_PICKER_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`user-menu-status-btn user-menu-status-btn-${preset}${
+                      selectedPreset === preset ? " user-menu-status-btn-active" : ""
+                    }`}
+                    aria-pressed={selectedPreset === preset}
+                    disabled={statusSaving}
+                    onClick={() => void handleStatusPreset(preset)}
+                  >
+                    {USER_STATUS_LABELS[preset]}
+                  </button>
+                ))}
+              </div>
+              <label className="user-menu-status-message-field">
+                <span className="visually-hidden">Status message</span>
+                <input
+                  type="text"
+                  className="user-menu-status-message"
+                  value={statusMessageDraft}
+                  maxLength={80}
+                  placeholder="What's going on?"
+                  disabled={statusSaving}
+                  onChange={(event) => setStatusMessageDraft(event.target.value)}
+                  onBlur={() => void saveStatusMessage()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {user.siteAdministrator && (
+              <a
+                href="/settings/admin"
+                className="user-menu-item user-menu-item-admin"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
+                <span>Admin Settings</span>
+                {adminUpdateAvailable ? (
+                  <span className="user-menu-update-badge">Update available</span>
+                ) : null}
+              </a>
+            )}
             <a
-              href="/settings/admin"
-              className="user-menu-item user-menu-item-admin"
+              href="/auth/sign-out?next=/"
+              className="user-menu-item user-menu-item-danger"
               role="menuitem"
               onClick={() => setOpen(false)}
             >
-              <span>Admin Settings</span>
-              {adminUpdateAvailable ? (
-                <span className="user-menu-update-badge">Update available</span>
-              ) : null}
+              Sign out
             </a>
-          )}
-          <a
-            href="/auth/sign-out?next=/"
-            className="user-menu-item user-menu-item-danger"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-          >
-            Sign out
-          </a>
+          </div>
         </div>
       )}
     </div>
