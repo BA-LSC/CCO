@@ -37,12 +37,24 @@ describe("isUpdateAvailable", () => {
 });
 
 describe("formatReleaseShaPair", () => {
-  test("widens labels when 12-char prefixes collide", () => {
+  test("shows 7-character SHAs by default", () => {
+    expect(
+      formatReleaseShaPair(
+        "bae9873c3699123456789012345678901234567890",
+        "dbdd4fe0664d123456789012345678901234567890",
+      ),
+    ).toEqual({
+      installed: "bae9873",
+      latest: "dbdd4fe",
+    });
+  });
+
+  test("widens labels when 7-char prefixes collide", () => {
     const installed = "cd6dfe6124215d3be4a744f6c2f60ff40fd98b3c";
     const latest = "cd6dfe6124215d3be4a744f6c2f60ff40fd98b3d";
     expect(formatReleaseShaPair(installed, latest)).toEqual({
-      installed: "cd6dfe612421…8b3c",
-      latest: "cd6dfe612421…8b3d",
+      installed: "cd6dfe6…8b3c",
+      latest: "cd6dfe6…8b3d",
     });
   });
 });

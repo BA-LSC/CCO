@@ -26,7 +26,10 @@ export function isUpdateAvailable(
   return !releaseShasEqual(currentNorm, latestNorm);
 }
 
-/** Labels for Admin Updates; widens when a 12-char prefix would hide a real mismatch. */
+/** Short SHA length shown in Admin Updates. */
+export const RELEASE_SHA_DISPLAY_LEN = 7;
+
+/** Labels for Admin Updates; widens when a 7-char prefix would hide a real mismatch. */
 export function formatReleaseShaPair(
   installed: string | null | undefined,
   latest: string | null | undefined,
@@ -34,7 +37,7 @@ export function formatReleaseShaPair(
   const left = installed?.trim() || "Unknown";
   const right = latest?.trim() || "Unknown";
   const shortLabel = (value: string) =>
-    value.length > 12 ? `${value.slice(0, 12)}…` : value;
+    value.length > RELEASE_SHA_DISPLAY_LEN ? value.slice(0, RELEASE_SHA_DISPLAY_LEN) : value;
 
   if (
     left !== right &&
@@ -43,8 +46,8 @@ export function formatReleaseShaPair(
     shortLabel(left) === shortLabel(right)
   ) {
     const distinctLabel = (value: string) => {
-      if (value.length <= 16) return value;
-      return `${value.slice(0, 12)}…${value.slice(-4)}`;
+      if (value.length <= RELEASE_SHA_DISPLAY_LEN + 4) return value;
+      return `${value.slice(0, RELEASE_SHA_DISPLAY_LEN)}…${value.slice(-4)}`;
     };
     return { installed: distinctLabel(left), latest: distinctLabel(right) };
   }
