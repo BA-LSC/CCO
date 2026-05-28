@@ -1,6 +1,6 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
-import { isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
+import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 import {
   isDeployOverlaySuppressed,
   markDeployWait,
@@ -174,10 +174,6 @@ async function uploadMediaViaPresign(file: File, contentType: string): Promise<s
   return presign.url;
 }
 
-function isStorageCorsBlockedError(err: unknown): boolean {
-  return err instanceof Error && err.message.includes(STORAGE_CORS_BLOCKED);
-}
-
 function isPresignUnavailableError(err: unknown): boolean {
   const msg = getErrorMessage(err);
   return msg.includes("R2 uploads are not configured") || /\(\s*503\s*\)/.test(msg);
@@ -204,16 +200,9 @@ async function uploadPreparedMedia(
   file: File,
   contentType: string,
 ): Promise<string> {
-  if (isDirectR2UploadsEnabled()) {
-    try {
-      return await uploadMediaViaPresign(file, contentType);
-    } catch (presignErr) {
-      // Presigned R2 PUT needs bucket CORS; proxy multipart through cco-api when blocked.
-      if (isStorageCorsBlockedError(presignErr) || isPresignUnavailableError(presignErr)) {
-        return uploadMediaMultipart(file, contentType);
-      }
-      throw presignErr;
-    }
+  // Cloudflare BYO: multipart POST to cco-api → R2 binding (no browser presign PUT / bucket CORS).
+  if (isCloudflareDeployTarget()) {
+    return uploadMediaMultipart(file, contentType);
   }
   try {
     return await uploadMediaViaPresign(file, contentType);

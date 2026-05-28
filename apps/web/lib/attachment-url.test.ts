@@ -19,6 +19,14 @@ describe("extractUploadFilename", () => {
       extractUploadFilename("https://chat.example.com/api/uploads/abc.jpeg?sig=deadbeef&exp=999"),
     ).toBe("abc.jpeg");
   });
+
+  test("parses presigned R2 object URLs", () => {
+    expect(
+      extractUploadFilename(
+        "https://2e5c1532f81b48b3a2d2763e11b81ed2.r2.cloudflarestorage.com/cco-uploads-2e5c1532/3c55c577-0a76-4390-9763-57156f.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+      ),
+    ).toBe("3c55c577-0a76-4390-9763-57156f.jpeg");
+  });
 });
 
 describe("resolveAttachmentDisplayUrl", () => {
@@ -57,5 +65,13 @@ describe("resolveAttachmentDisplayUrl", () => {
 
   test("returns proxy path without params when signature is absent", () => {
     expect(resolveAttachmentDisplayUrl("/api/v1/uploads/abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg");
+  });
+
+  test("rewrites presigned R2 URLs to same-origin proxy paths", () => {
+    expect(
+      resolveAttachmentDisplayUrl(
+        "https://abc123.r2.cloudflarestorage.com/cco-uploads-test/abc.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+      ),
+    ).toBe("/api/v1/uploads/abc.jpeg");
   });
 });

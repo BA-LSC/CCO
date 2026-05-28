@@ -165,6 +165,14 @@ describe("extractUploadFilename", () => {
       extractUploadFilename("https://cco.example.com/api/uploads/photo.png?sig=x"),
     ).toBe("photo.png");
   });
+
+  test("parses presigned R2 object URLs", () => {
+    expect(
+      extractUploadFilename(
+        "https://2e5c1532f81b48b3a2d2763e11b81ed2.r2.cloudflarestorage.com/cco-uploads-2e5c1532/3c55c577-0a76-4390-9763-57156f.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+      ),
+    ).toBe("3c55c577-0a76-4390-9763-57156f.jpeg");
+  });
 });
 
 describe("refreshAttachmentUrl", () => {
@@ -175,6 +183,22 @@ describe("refreshAttachmentUrl", () => {
     expect(refreshed).toContain("/uploads/valid.png");
     expect(refreshed).toContain("sig=");
     expect(refreshed).toContain("exp=");
+  });
+
+  test("re-signs legacy presigned R2 URLs to API proxy URLs", () => {
+    const prevBucket = process.env.CLOUDFLARE_R2_BUCKET;
+    process.env.CLOUDFLARE_R2_BUCKET = "cco-uploads-test";
+    try {
+      const refreshed = refreshAttachmentUrl(
+        "https://abc123.r2.cloudflarestorage.com/cco-uploads-test/photo.png?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+      );
+      expect(refreshed).toContain("/uploads/photo.png");
+      expect(refreshed).toContain("sig=");
+      expect(refreshed).toContain("exp=");
+    } finally {
+      if (prevBucket === undefined) delete process.env.CLOUDFLARE_R2_BUCKET;
+      else process.env.CLOUDFLARE_R2_BUCKET = prevBucket;
+    }
   });
 });
 

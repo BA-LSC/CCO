@@ -140,7 +140,6 @@ export function ComposerPendingMedia({ items, coarsePointer, onRemove }: Props) 
 
   return (
     <div className="composer-pending-media">
-      <p className="composer-pending-media-hint">Add a message or send</p>
       <div ref={rowRef} className="composer-pending-media-row">
         {visibleItems.map((item) => (
           <PendingMediaCard

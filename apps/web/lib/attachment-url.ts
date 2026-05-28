@@ -3,16 +3,32 @@ const UPLOAD_FILENAME_RE = /\/(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/;
 /** Same-origin proxy base used for <img> attachment URLs. */
 export const UPLOAD_DISPLAY_PATH = "/api/v1/uploads";
 
+function extractR2ObjectKey(urlOrPath: string): string | null {
+  try {
+    const url = new URL(urlOrPath);
+    if (!url.host.includes("r2.cloudflarestorage.com")) return null;
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (segments.length < 2) return null;
+    const key = segments[segments.length - 1]!;
+    if (key === "." || key === "..") return null;
+    return key;
+  } catch {
+    return null;
+  }
+}
+
 /** Extract the stored filename from a public or relative upload URL. */
 export function extractUploadFilename(urlOrPath: string): string | null {
   if (!urlOrPath) return null;
 
   try {
     const match = new URL(urlOrPath).pathname.match(UPLOAD_FILENAME_RE);
-    return match?.[1] ?? null;
+    if (match?.[1]) return match[1];
+    return extractR2ObjectKey(urlOrPath);
   } catch {
     const match = urlOrPath.match(/^\/?(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/);
-    return match?.[1] ?? null;
+    if (match?.[1]) return match[1];
+    return extractR2ObjectKey(urlOrPath);
   }
 }
 

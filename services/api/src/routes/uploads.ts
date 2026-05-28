@@ -6,7 +6,6 @@ import {
   getUploadDir,
   buildSignedUploadUrl,
   safeUploadPath,
-  buildR2SignedUploadUrl,
   isR2StorageEnabled,
 } from "../lib/uploads";
 import {
@@ -14,6 +13,7 @@ import {
   createR2PresignedPutUrl,
   reconcileOrgR2UploadCors,
 } from "../lib/r2-uploads";
+import { isCloudflareRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
 
@@ -102,14 +102,9 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
     ttlSeconds: 3600,
   });
 
-  let publicUrl = await buildR2SignedUploadUrl(filename);
-  if (!publicUrl) {
-    publicUrl = buildSignedUploadUrl(filename);
-  }
-
   return c.json({
     uploadUrl,
-    url: publicUrl,
+    url: buildSignedUploadUrl(filename),
     filename,
     contentType,
     storage: "r2",
@@ -142,11 +137,16 @@ uploadsRouter.post("/", requireAuth, async (c) => {
         body: buffer,
         contentType,
       });
-      let url = await buildR2SignedUploadUrl(filename);
-      if (!url) {
-        url = buildSignedUploadUrl(filename);
-      }
-      return c.json({ url, filename, contentType, storage: "r2" });
+      return c.json({
+        url: buildSignedUploadUrl(filename),
+        filename,
+        contentType,
+        storage: "r2",
+      });
+    }
+
+    if (isCloudflareRuntime()) {
+      return c.json({ error: "R2 uploads are not configured" }, 503);
     }
 
     await mkdir(getUploadDir(), { recursive: true });
