@@ -199,8 +199,8 @@ export default function TeamConversationPage() {
         />
       </ChatPanelHeader>
 
-      {showSettings && detail?.conversation && (
-        <ChannelSettingsPanel>
+      {detail?.conversation && (
+        <ChannelSettingsPanel open={showSettings}>
           <ConversationMuteSetting
             muted={detail.conversation.muted}
             onChange={toggleMute}

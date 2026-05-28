@@ -389,8 +389,8 @@ export default function GroupConversationPage() {
         />
       </ChatPanelHeader>
 
-      {showChannelSettings && activeConversation && detail && (
-        <ChannelSettingsPanel>
+      {activeConversation && detail && (
+        <ChannelSettingsPanel open={showChannelSettings}>
           <ConversationMuteSetting
             muted={activeConversation.muted ?? false}
             onChange={toggleMute}

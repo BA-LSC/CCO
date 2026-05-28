@@ -128,8 +128,8 @@ export default function DmChatPage() {
         />
       </ChatPanelHeader>
 
-      {showOptions && detail && (
-        <ChannelSettingsPanel>
+      {detail && (
+        <ChannelSettingsPanel open={showOptions}>
           <ConversationMuteSetting
             muted={detail.muted}
             onChange={toggleMute}

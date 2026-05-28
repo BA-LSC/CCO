@@ -113,6 +113,30 @@
   }
 }
 
+@keyframes channel-settings-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes channel-settings-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
 @keyframes cco-rise-in {
   from {
     transform: translateY(6px);
@@ -3200,6 +3224,16 @@ button.sidebar-group-header:focus-visible {
   padding: 0;
   max-height: min(68vh, 560px);
   overflow: hidden;
+  transform-origin: top center;
+}
+
+.channel-settings-panel--enter {
+  animation: channel-settings-slide-in 0.24s var(--motion-ease-out) both;
+}
+
+.channel-settings-panel--exit {
+  animation: channel-settings-slide-out 0.24s var(--motion-ease-out) forwards;
+  pointer-events: none;
 }
 
 .channel-settings-body {
@@ -3209,38 +3243,6 @@ button.sidebar-group-header:focus-visible {
   padding: 18px 20px 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-
-.channel-settings-panel.chat-panel-details {
-  animation: cco-fade-in 0.18s var(--motion-ease-out);
-}
-
-.channel-settings-body > .channel-settings-group {
-  animation: cco-rise-in 0.18s var(--motion-ease-out) both;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(1) {
-  animation-delay: 0ms;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(2) {
-  animation-delay: 50ms;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(3) {
-  animation-delay: 100ms;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(4) {
-  animation-delay: 150ms;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(5) {
-  animation-delay: 200ms;
-}
-
-.channel-settings-body > .channel-settings-group:nth-child(n + 6) {
-  animation-delay: 250ms;
 }
 
 .channel-settings-group {
@@ -8204,8 +8206,8 @@ html.standalone-display .chat-thread-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .channel-settings-panel.chat-panel-details,
-  .channel-settings-body > .channel-settings-group,
+  .channel-settings-panel--enter,
+  .channel-settings-panel--exit,
   .channel-settings-invite-feedback,
   .group-members-panel,
   .integrations-settings-header,
