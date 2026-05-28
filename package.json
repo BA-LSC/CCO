@@ -19,7 +19,7 @@
     "audit:ci": "bun audit --audit-level=high"
   },
   "devDependencies": {
-    "turbo": "^2.9.14",
+    "turbo": "^2.9.15",
     "typescript": "^6.0.3"
   },
   "overrides": {
