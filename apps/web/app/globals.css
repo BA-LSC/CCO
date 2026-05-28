@@ -4618,7 +4618,7 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-item--spacing-tight {
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .chat-thread .message-item--spacing-medium {
@@ -4914,7 +4914,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-actions {
   position: absolute;
   top: auto;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + var(--message-actions-offset, 3px));
   display: flex;
   align-items: center;
   gap: 2px;
@@ -4962,7 +4962,8 @@ button.sidebar-group-header:focus-visible {
 
 @media (hover: hover) {
   .chat-thread .message-bubble:hover .message-actions,
-  .chat-thread .message-bubble-stack:hover .message-actions {
+  .chat-thread .message-bubble-stack:hover .message-actions,
+  .chat-thread .message-actions:hover {
     opacity: 1;
     pointer-events: auto;
   }
@@ -5859,6 +5860,36 @@ button.sidebar-group-header:focus-visible {
   max-width: 100%;
   gap: 4px;
   overflow: visible;
+  --message-actions-hover-bridge: 44px;
+  --message-actions-offset: 3px;
+}
+
+/* Invisible hover bridge: flex gaps + space above the bubble to the action bar */
+.chat-thread .message-bubble-stack::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--message-actions-hover-bridge));
+  right: -10px;
+  bottom: 0;
+  left: -10px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (hover: hover) {
+  .chat-thread .message-bubble-stack:hover::before,
+  .chat-thread .message-bubble-stack:has(.message-bubble--actions-visible)::before,
+  .chat-thread .message-bubble-stack:has(.message-actions:hover)::before,
+  .chat-thread .message-bubble-stack:has(.message-actions [aria-expanded="true"])::before,
+  .chat-thread .message-bubble-stack:has(.message-reaction-add[aria-expanded="true"])::before {
+    pointer-events: auto;
+  }
+}
+
+.chat-thread .message-bubble-stack > .message-bubble,
+.chat-thread .message-bubble-stack > .message-reaction-row {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-thread .message-item--own .message-bubble-stack {
@@ -6978,11 +7009,16 @@ html.standalone-display .chat-thread-panel {
     pointer-events: auto;
   }
 
+  .chat-thread .message-bubble-stack {
+    --message-actions-hover-bridge: 52px;
+    --message-actions-offset: 5px;
+  }
+
   .chat-thread .message-actions {
     gap: 4px;
     padding: 3px 6px;
     font-size: 0.9375rem;
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + var(--message-actions-offset, 5px));
   }
 
   .chat-thread .message-actions .link-btn {

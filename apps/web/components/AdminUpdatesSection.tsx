@@ -56,25 +56,14 @@ function UpdatesStatusMeta({ status }: { status: UpdatesStatus }) {
     status.latestVersion,
   );
   const checked = formatWhen(status.lastUpdateCheckAt);
-  const showUpdate =
+  const showLatest =
     status.latestVersion != null &&
     isUpdateAvailable(status.currentVersion, status.latestVersion);
 
   return (
     <div className="integrations-inline-status integrations-field-hint">
-      <p>
-        {showUpdate ? (
-          <>
-            Installed {installed} · Latest {latest}
-          </>
-        ) : status.latestVersion ? (
-          <>
-            Version {installed} · Latest {latest}
-          </>
-        ) : (
-          <>Version {installed}</>
-        )}
-      </p>
+      <p>{showLatest ? <>Installed {installed}</> : <>Version {installed}</>}</p>
+      {showLatest ? <p>Latest {latest}</p> : null}
       <p>Last checked {checked}</p>
     </div>
   );
