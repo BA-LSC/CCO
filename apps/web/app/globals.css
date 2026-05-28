@@ -4868,7 +4868,6 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-item--own .message-header {
   justify-content: flex-end;
   align-self: stretch;
-  padding-right: 0;
 }
 
 .chat-thread .message-item--other .message-header {
