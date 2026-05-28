@@ -560,9 +560,6 @@ export default function IntegrationsSettingsPage() {
           />
           <span className="toggle-switch" aria-hidden="true" />
         </label>
-        <p className="integrations-field-hint">
-          Run automatic nightly sync for all linked Planning Center accounts.
-        </p>
       </IntegrationsSection>
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>

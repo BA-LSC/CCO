@@ -5,17 +5,9 @@ import type { Message, PeerUser } from "@/lib/api";
 
 type Props = {
   message: Message;
-  peerLastReadAt: string | null;
   peerUser: PeerUser | null;
-  showPeerReadReceipt: boolean;
+  showPeerAvatar: boolean;
 };
-
-function isMessageReadByPeer(message: Message, peerLastReadAt: string | null): boolean {
-  if (!peerLastReadAt) return false;
-  const readMs = new Date(peerLastReadAt).getTime();
-  const sentMs = new Date(message.createdAt).getTime();
-  return !Number.isNaN(readMs) && !Number.isNaN(sentMs) && sentMs <= readMs;
-}
 
 function isMessageSending(message: Message): boolean {
   return Boolean(message.pendingSend || message.pendingUpload);
@@ -25,19 +17,41 @@ function isMessageDelivered(message: Message): boolean {
   return !isMessageSending(message) && !message.uploadFailed;
 }
 
+export function findLastPeerReadMessageId(
+  messages: Message[],
+  resolvedUserId: string | undefined,
+  peerLastReadAt: string | null,
+): string | null {
+  if (!peerLastReadAt || !resolvedUserId) return null;
+
+  const readMs = new Date(peerLastReadAt).getTime();
+  if (Number.isNaN(readMs)) return null;
+
+  let lastId: string | null = null;
+
+  for (const message of messages) {
+    if (message.authorId !== resolvedUserId) continue;
+    if (!isMessageDelivered(message)) continue;
+
+    const sentMs = new Date(message.createdAt).getTime();
+    if (Number.isNaN(sentMs) || sentMs > readMs) continue;
+
+    lastId = message.id;
+  }
+
+  return lastId;
+}
+
 export function MessageDeliveryStatus({
   message,
-  peerLastReadAt,
   peerUser,
-  showPeerReadReceipt,
+  showPeerAvatar,
 }: Props) {
   const sending = isMessageSending(message);
   const delivered = isMessageDelivered(message);
-  const readByPeer =
-    showPeerReadReceipt && delivered && isMessageReadByPeer(message, peerLastReadAt);
 
   let label = "Sending";
-  if (delivered && readByPeer) label = "Read";
+  if (delivered && showPeerAvatar) label = "Read";
   else if (delivered) label = "Delivered";
 
   return (
@@ -58,7 +72,7 @@ export function MessageDeliveryStatus({
           >
             <path d="M20 6 9 17l-5-5" />
           </svg>
-          {readByPeer && peerUser ? (
+          {showPeerAvatar && peerUser ? (
             <UserAvatar
               displayName={peerUser.displayName}
               avatarUrl={peerUser.avatarUrl}

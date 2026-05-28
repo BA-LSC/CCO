@@ -6,7 +6,7 @@ import {
   MessageEmojiActions,
 } from "@/components/MessageReactionToolbar";
 import { MessageBody } from "@/components/MessageBody";
-import { MessageDeliveryStatus } from "@/components/MessageDeliveryStatus";
+import { MessageDeliveryStatus, findLastPeerReadMessageId } from "@/components/MessageDeliveryStatus";
 import { UserAvatar } from "@/components/UserAvatar";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
 import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
@@ -83,6 +83,14 @@ function ChatMessageListInner({
   const layoutInfos = useMemo(
     () => buildMessageLayoutInfos(messages, resolvedUserId),
     [messages, resolvedUserId],
+  );
+
+  const lastPeerReadMessageId = useMemo(
+    () =>
+      isDirectMessage
+        ? findLastPeerReadMessageId(messages, resolvedUserId, peerLastReadAt)
+        : null,
+    [isDirectMessage, messages, peerLastReadAt, resolvedUserId],
   );
 
   function isOwnMessage(message: Message): boolean {
@@ -339,9 +347,8 @@ function ChatMessageListInner({
                         {isOwn && !isEditing ? (
                           <MessageDeliveryStatus
                             message={m}
-                            peerLastReadAt={peerLastReadAt}
                             peerUser={peerUser}
-                            showPeerReadReceipt={isDirectMessage}
+                            showPeerAvatar={isDirectMessage && m.id === lastPeerReadMessageId}
                           />
                         ) : null}
                       </div>

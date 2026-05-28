@@ -287,7 +287,7 @@ export function UserMenu({ variant = "default" }: Props) {
             </div>
             {chaosHint && (
               <p className="user-menu-chaos-toast" role="status">
-                CHAOS UNLEASHED
+                <span className="user-menu-chaos-toast-text">🎉 CHAOS UNLEASHED 🎊</span>
               </p>
             )}
           </div>

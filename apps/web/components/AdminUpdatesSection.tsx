@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { dispatchAdminUpdateStatus } from "@/lib/admin-update-events";
 import {
   applyAppUpdate,
   clearDeployWait,
@@ -85,6 +86,11 @@ export function AdminUpdatesSection({
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
+
+  useEffect(() => {
+    if (!status) return;
+    dispatchAdminUpdateStatus({ updateAvailable: status.updateAvailable });
+  }, [status]);
 
   useEffect(() => {
     if (!initialStatus || backgroundRefreshStartedRef.current) return;
@@ -329,9 +335,6 @@ export function AdminUpdatesSection({
             />
             <span className="toggle-switch" aria-hidden="true" />
           </label>
-          <p className="integrations-field-hint">
-            Checked every 6 hours.
-          </p>
         </>
       )}
     </section>

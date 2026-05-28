@@ -391,34 +391,3 @@ html[data-theme] body {
   background: var(--color-bg);
   color: var(--color-text);
 }
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-theme="6"] body,
-  html[data-theme="6"] body::before,
-  html[data-theme="6"] body::after,
-  html[data-theme="6"] .chat-sidebar,
-  html[data-theme="6"] .card,
-  html[data-theme="6"] .chat-thread,
-  html[data-theme="6"] .feature-card,
-  html[data-theme="6"] .loading-screen,
-html[data-theme="6"] .state-card,
-  html[data-theme="6"] .user-menu-dropdown,
-  html[data-theme="6"] .app-brand,
-  html[data-theme="6"] h1,
-  html[data-theme="6"] h2,
-  html[data-theme="6"] h3,
-  html[data-theme="6"] .btn-primary,
-  html[data-theme="6"] a,
-  html[data-theme="6"] .spinner,
-  html[data-theme="6"] .chat-thread .composer,
-  html[data-theme="6"] .chat-thread textarea,
-  html[data-theme="6"] .chat-thread textarea::placeholder,
-  html[data-theme="6"] .chat-thread .composer-attach-trigger,
-  html[data-theme="6"] .chat-thread .composer-send {
-    animation: none;
-  }
-
-  html[data-theme="6"] body {
-    background: #12001a;
-  }
-}
