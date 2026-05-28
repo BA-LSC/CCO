@@ -16,6 +16,7 @@ import {
 import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
 import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
+import { useMessageEnterDelays } from "@/hooks/useMessageEnterDelays";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchConversationUpdated, dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
@@ -194,6 +195,7 @@ export function ChatThread({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
   const [scrollReady, setScrollReady] = useState(false);
+  const messageEnterDelays = useMessageEnterDelays(messages, scrollReady, conversationId);
 
   const {
     composerDragOver,
@@ -994,6 +996,7 @@ export function ChatThread({
       ) : (
         <ChatMessageList
           messages={messages}
+          messageEnterDelays={messageEnterDelays}
           firstUnreadMessageId={firstUnreadMessageId}
           resolvedUserId={resolvedUserId}
           isGroupLeader={isGroupLeader}

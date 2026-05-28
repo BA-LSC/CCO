@@ -31,6 +31,7 @@ type Member = { id?: string; displayName: string; onCco?: boolean };
 
 type Props = {
   messages: Message[];
+  messageEnterDelays?: ReadonlyMap<string, number>;
   firstUnreadMessageId: string | null;
   resolvedUserId?: string;
   isGroupLeader: boolean;
@@ -58,6 +59,7 @@ type Props = {
 
 function ChatMessageListInner({
   messages,
+  messageEnterDelays,
   firstUnreadMessageId,
   resolvedUserId,
   isGroupLeader,
@@ -170,6 +172,7 @@ function ChatMessageListInner({
           isOwn && !isEditing && (isLatestOwn || isLastPeerRead || isSending);
         const showPeerAvatar = isLastPeerRead;
         const showDeliveryCheck = isLatestOwn;
+        const enterDelayMs = messageEnterDelays?.get(m.id);
 
         return (
           <Fragment key={m.clientMessageId ?? m.id}>
@@ -194,6 +197,7 @@ function ChatMessageListInner({
                 isOwn ? "message-item--own" : "message-item--other",
                 `message-item--spacing-${layoutInfo.spacing}`,
                 `message-item--group-${layoutInfo.groupPosition}`,
+                enterDelayMs !== undefined ? "message-item--enter" : "",
                 hasVisibleTimestamp ? "message-item--has-timestamp" : "",
                 showOwnMessageHeader ? "message-item--show-time" : "",
                 layoutInfo.showTimestamp ? "message-item--timestamp-start" : "",
@@ -201,6 +205,11 @@ function ChatMessageListInner({
               ]
                 .filter(Boolean)
                 .join(" ")}
+              style={
+                enterDelayMs !== undefined
+                  ? ({ "--message-enter-delay": `${enterDelayMs}ms` } as React.CSSProperties)
+                  : undefined
+              }
             >
               {!isOwn &&
                 (layoutInfo.showAvatar ? (

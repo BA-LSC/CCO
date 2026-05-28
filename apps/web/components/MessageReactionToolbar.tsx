@@ -334,9 +334,44 @@ type PillsProps = {
   onToggleReaction: (messageId: string, emoji: string) => void;
   /** Own messages: + on the left, emojis grow toward the bubble. */
   reactionAlign?: "own" | "other";
+  onExitingChange?: (exiting: boolean) => void;
 };
 
 const REACTION_PILL_STAGGER_MS = 50;
+const REACTION_PILL_ANIMATION_MS = 180;
+
+function groupReactionsByEmoji(reactions: Reaction[]): Array<[string, Reaction[]]> {
+  const order: string[] = [];
+  const map = new Map<string, Reaction[]>();
+  for (const reaction of reactions) {
+    let list = map.get(reaction.emoji);
+    if (!list) {
+      list = [];
+      map.set(reaction.emoji, list);
+      order.push(reaction.emoji);
+    }
+    list.push(reaction);
+  }
+  return order.map((emoji) => [emoji, map.get(emoji)!]);
+}
+
+function reactionEmojiKeys(reactions: Reaction[]): string {
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (const reaction of reactions) {
+    if (seen.has(reaction.emoji)) continue;
+    seen.add(reaction.emoji);
+    order.push(reaction.emoji);
+  }
+  return order.join("\0");
+}
+
+type ReactionPillRender = {
+  emoji: string;
+  list: Reaction[];
+  phase: "steady" | "enter" | "exit";
+  enterDelayMs: number;
+};
 
 export function MessageReactionPills({
   messageId,
@@ -344,37 +379,121 @@ export function MessageReactionPills({
   currentUserId,
   onToggleReaction,
   reactionAlign = "other",
+  onExitingChange,
 }: PillsProps) {
   const initializedRef = useRef(false);
   const seenEmojisRef = useRef(new Set<string>());
+  const prevGroupedRef = useRef<Array<[string, Reaction[]]>>([]);
+  const displayOrderRef = useRef<string[]>([]);
+  const [exitingEmojis, setExitingEmojis] = useState<Array<{ emoji: string; list: Reaction[] }>>(
+    [],
+  );
 
-  const grouped = Array.from(
-    reactions.reduce((map, reaction) => {
-      const list = map.get(reaction.emoji) ?? [];
-      list.push(reaction);
-      map.set(reaction.emoji, list);
-      return map;
-    }, new Map<string, Reaction[]>()),
+  const grouped = useMemo(() => groupReactionsByEmoji(reactions), [reactions]);
+  const emojiKeys = useMemo(() => reactionEmojiKeys(reactions), [reactions]);
+  const orderedEmojis = useMemo(
+    () =>
+      reactionAlign === "own"
+        ? [...grouped.map(([emoji]) => emoji)].reverse()
+        : grouped.map(([emoji]) => emoji),
+    [grouped, reactionAlign],
   );
 
   const enterDelayByEmoji = useMemo(() => {
     if (!initializedRef.current) return new Map<string, number>();
     const newlyAdded = grouped.filter(([emoji]) => !seenEmojisRef.current.has(emoji));
+    const staggerSource = reactionAlign === "own" ? [...newlyAdded].reverse() : newlyAdded;
     return new Map(
-      newlyAdded.map(([emoji], index) => [emoji, index * REACTION_PILL_STAGGER_MS]),
+      staggerSource.map(([emoji], index) => [emoji, index * REACTION_PILL_STAGGER_MS]),
     );
-  }, [grouped]);
+  }, [emojiKeys, grouped, reactionAlign]);
+
+  useLayoutEffect(() => {
+    const prevGrouped = prevGroupedRef.current;
+    const currentEmojiSet = new Set(grouped.map(([emoji]) => emoji));
+
+    if (initializedRef.current) {
+      const removed = prevGrouped.filter(([emoji]) => !currentEmojiSet.has(emoji));
+      if (removed.length > 0) {
+        setExitingEmojis((current) => {
+          const known = new Set(current.map((entry) => entry.emoji));
+          const added = removed.filter(([emoji]) => !known.has(emoji));
+          if (added.length === 0) return current;
+          return [
+            ...current,
+            ...added.map(([emoji, list]) => ({
+              emoji,
+              list,
+            })),
+          ];
+        });
+      }
+    } else {
+      initializedRef.current = true;
+    }
+
+    grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
+    prevGroupedRef.current = grouped;
+    displayOrderRef.current = orderedEmojis;
+  }, [emojiKeys, grouped, orderedEmojis, reactionAlign]);
 
   useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
-      return;
-    }
-    grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
-  }, [grouped]);
+    onExitingChange?.(exitingEmojis.length > 0);
+  }, [exitingEmojis.length, onExitingChange]);
 
-  if (grouped.length === 0) return null;
+  useEffect(() => {
+    if (exitingEmojis.length === 0) return;
+    const timeout = window.setTimeout(() => {
+      setExitingEmojis((current) => {
+        const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
+        for (const { emoji } of current) {
+          if (!activeEmojis.has(emoji)) {
+            seenEmojisRef.current.delete(emoji);
+          }
+        }
+        return [];
+      });
+    }, REACTION_PILL_ANIMATION_MS);
+    return () => window.clearTimeout(timeout);
+  }, [exitingEmojis, emojiKeys, grouped]);
+
+  const pillRenders = useMemo(() => {
+    const byEmoji = new Map<string, { list: Reaction[]; phase: ReactionPillRender["phase"] }>();
+
+    for (const [emoji, list] of grouped) {
+      const enterDelayMs = enterDelayByEmoji.get(emoji);
+      byEmoji.set(emoji, {
+        list,
+        phase: enterDelayMs !== undefined ? "enter" : "steady",
+      });
+    }
+
+    for (const { emoji, list } of exitingEmojis) {
+      if (!byEmoji.has(emoji)) {
+        byEmoji.set(emoji, { list, phase: "exit" });
+      }
+    }
+
+    const order: string[] = [];
+    for (const emoji of displayOrderRef.current) {
+      if (byEmoji.has(emoji)) order.push(emoji);
+    }
+    for (const emoji of orderedEmojis) {
+      if (!order.includes(emoji)) order.push(emoji);
+    }
+
+    return order.map((emoji) => {
+      const entry = byEmoji.get(emoji)!;
+      return {
+        emoji,
+        list: entry.list,
+        phase: entry.phase,
+        enterDelayMs: enterDelayByEmoji.get(emoji) ?? 0,
+      } satisfies ReactionPillRender;
+    });
+  }, [enterDelayByEmoji, exitingEmojis, grouped, orderedEmojis]);
+
+  if (pillRenders.length === 0) return null;
 
   const addButton = (
     <MessageAddReactionButton
@@ -385,12 +504,10 @@ export function MessageReactionPills({
     />
   );
 
-  const emojiPills = grouped.map(([emoji, list]) => {
+  const emojiPills = pillRenders.map(({ emoji, list, phase, enterDelayMs }) => {
     const mine = list.some((reaction) => reaction.userId === currentUserId);
     const title = list.map((reaction) => reaction.userName).join(", ");
     const count = list.length;
-    const enterDelayMs = enterDelayByEmoji.get(emoji);
-    const isEntering = enterDelayMs !== undefined;
     return (
       <button
         key={emoji}
@@ -398,12 +515,13 @@ export function MessageReactionPills({
         className={[
           "message-reaction-pill",
           mine ? "message-reaction-pill--mine" : "",
-          isEntering ? "message-reaction-pill--enter" : "",
+          phase === "enter" ? "message-reaction-pill--enter" : "",
+          phase === "exit" ? "message-reaction-pill--exit" : "",
         ]
           .filter(Boolean)
           .join(" ")}
         style={
-          isEntering && enterDelayMs > 0
+          phase === "enter" && enterDelayMs > 0
             ? ({ ["--reaction-enter-delay" as string]: `${enterDelayMs}ms` } as CSSProperties)
             : undefined
         }
@@ -412,6 +530,7 @@ export function MessageReactionPills({
           count > 1 ? `${emoji}, ${count} reactions, ${title}` : `${emoji}, ${title}`
         }
         onClick={() => onToggleReaction(messageId, emoji)}
+        disabled={phase === "exit"}
       >
         <span className={getEmojiDisplayClass(emoji, "message-reaction-emoji")} aria-hidden>
           {emoji}
@@ -464,19 +583,21 @@ export function MessageBubbleStack({
   reactionAlign = "other",
   children,
 }: StackProps) {
+  const [reactionsExiting, setReactionsExiting] = useState(false);
   const hasReactions = reactions.length > 0;
+  const showReactionRow = hasReactions || reactionsExiting;
 
   return (
     <div
       className={[
         "message-bubble-stack",
-        hasReactions ? "message-bubble-stack--has-reactions" : "",
+        showReactionRow ? "message-bubble-stack--has-reactions" : "",
       ]
         .filter(Boolean)
         .join(" ")}
     >
       {children}
-      {hasReactions && (
+      {showReactionRow && (
         <div className="message-reaction-row">
           <MessageReactionPills
             messageId={messageId}
@@ -484,6 +605,7 @@ export function MessageBubbleStack({
             currentUserId={currentUserId}
             onToggleReaction={onToggleReaction}
             reactionAlign={reactionAlign}
+            onExitingChange={setReactionsExiting}
           />
         </div>
       )}
