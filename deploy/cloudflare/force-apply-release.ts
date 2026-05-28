@@ -106,9 +106,11 @@ await deployCcoWebWorker({
   chatHostname,
   apiHostname,
   secretsStoreId,
+  kvDeployNamespaceId,
   workerModuleUrl: `${releasesBase}/cco-web.mjs`,
   assetsBaseUrl: `${releasesBase}/assets/`,
   assetsManifest,
+  releaseVersion: targetVersion,
 });
 console.log("Deployed cco-web");
 
