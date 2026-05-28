@@ -1,4 +1,5 @@
-import { CCO_UPDATE_CHECK_CRON } from "@cco/shared";
+/** Keep in sync with @cco/shared and packages/cloudflare-provision worker-definitions. */
+const CCO_UPDATE_CHECK_CRON = "*/10 * * * *";
 
 type SecretsStoreSecretBinding = { get(): Promise<string> };
 
