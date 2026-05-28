@@ -6341,6 +6341,26 @@ button.sidebar-group-header:focus-visible {
   border-radius: 18px;
 }
 
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment-open {
+  display: block;
+  width: max-content;
+  max-width: 432px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  line-height: 0;
+  min-width: 0;
+}
+
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment {
+  display: block;
+  width: auto;
+  max-width: 432px;
+  height: auto;
+  margin: 0;
+  vertical-align: top;
+}
+
 .chat-thread .message-bubble:has(.attachment) .attachment-open {
   display: block;
   width: fit-content;
@@ -6377,6 +6397,11 @@ button.sidebar-group-header:focus-visible {
   cursor: zoom-in;
   width: fit-content;
   max-width: 100%;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
 }
 
 .attachment-open--uploading {

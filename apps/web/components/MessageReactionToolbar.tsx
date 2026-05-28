@@ -474,12 +474,27 @@ export function MessageReactionPills({
       }
     }
 
-    const order: string[] = [];
+    // Active pills use live order so new own-message reactions don't flash on the right
+    // before useLayoutEffect updates displayOrderRef.
+    const order = orderedEmojis.filter((emoji) => {
+      const entry = byEmoji.get(emoji);
+      return entry != null && entry.phase !== "exit";
+    });
+
     for (const emoji of displayOrderRef.current) {
-      if (byEmoji.has(emoji)) order.push(emoji);
-    }
-    for (const emoji of orderedEmojis) {
-      if (!order.includes(emoji)) order.push(emoji);
+      const entry = byEmoji.get(emoji);
+      if (entry?.phase === "exit" && !order.includes(emoji)) {
+        const prevIndex = displayOrderRef.current.indexOf(emoji);
+        let insertAt = order.length;
+        for (let index = 0; index < order.length; index++) {
+          const anchorIndex = displayOrderRef.current.indexOf(order[index]!);
+          if (anchorIndex > prevIndex) {
+            insertAt = index;
+            break;
+          }
+        }
+        order.splice(insertAt, 0, emoji);
+      }
     }
 
     return order.map((emoji) => {
