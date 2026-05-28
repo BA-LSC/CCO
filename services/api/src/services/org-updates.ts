@@ -3,6 +3,7 @@ import {
   CCO_DEFAULT_GIT_REPO_URL,
   isUpdateAvailable,
   normalizeAutoUpdateCheckIntervalMinutes,
+  verifyReleaseArtifactsReady,
   type ReleaseIndex,
 } from "@cco/shared";
 import {
@@ -64,6 +65,34 @@ export type UpdatesStatus = {
   cloudflareApiTokenValid: boolean | null;
   cloudflareApiTokenError: string | null;
 };
+
+/** Hide catalog version until artifacts are ready so Admin stays "up to date". */
+function resolveDisplayedLatestVersion(
+  currentVersion: string | null,
+  catalogVersion: string | null | undefined,
+  updateAvailable: boolean,
+): string | null {
+  if (!catalogVersion?.trim()) return currentVersion;
+  if (updateAvailable) return catalogVersion.trim();
+  return currentVersion;
+}
+
+async function resolveUpdatesReleaseAvailability(
+  currentVersion: string | null,
+  latestIndex: ReleaseIndex | null,
+): Promise<{ updateAvailable: boolean }> {
+  if (!latestIndex?.version?.trim()) {
+    return { updateAvailable: false };
+  }
+
+  const versionAhead = isUpdateAvailable(currentVersion, latestIndex.version);
+  if (!versionAhead) {
+    return { updateAvailable: false };
+  }
+
+  const artifacts = await verifyReleaseArtifactsReady(resolveReleasesBaseUrl(latestIndex));
+  return { updateAvailable: artifacts.ready };
+}
 
 export type CloudflareApplyTokenHealth = {
   valid: boolean;
@@ -152,7 +181,9 @@ function resolveReleasesBaseUrl(index: ReleaseIndex): string {
   return index.releasesBaseUrl.replace(/\/+$/, "");
 }
 
-async function fetchReleaseIndexForOrg(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
+async function fetchReleaseIndexForOrg(
+  gitRepoUrl: string | null | undefined,
+): Promise<ReleaseIndex | null> {
   return fetchGitReleaseIndex(gitRepoUrl);
 }
 
@@ -191,7 +222,9 @@ export function resolveUpdatePlatform(org: {
   return "unknown";
 }
 
-export async function fetchReleaseIndex(gitRepoUrl?: string | null): Promise<ReleaseIndex> {
+export async function fetchReleaseIndex(
+  gitRepoUrl?: string | null,
+): Promise<ReleaseIndex | null> {
   return fetchReleaseIndexForOrg(gitRepoUrl);
 }
 
@@ -257,22 +290,21 @@ export async function getCachedUpdatesStatus(
   const currentVersion = resolveInstalledVersion(org);
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   const lastApplyError = await readDeployLastError();
-  let latestIndex: ReleaseIndex | null = null;
-  let checkError: string | null = null;
-  try {
-    latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
-  } catch (err) {
-    checkError = err instanceof Error ? err.message : "Release check failed";
-  }
-  const latestVersion = latestIndex?.version ?? null;
-  const updateAvailable =
-    latestVersion != null && isUpdateAvailable(currentVersion, latestVersion);
+  const latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl).catch(() => null);
+  const catalogVersion = latestIndex?.version ?? null;
+  const releaseAvailability = await resolveUpdatesReleaseAvailability(currentVersion, latestIndex);
+  const updateAvailable = releaseAvailability.updateAvailable;
+  const latestVersion = resolveDisplayedLatestVersion(
+    currentVersion,
+    catalogVersion,
+    updateAvailable,
+  );
   const gating = resolveUpdatesApplyGating(
     org,
     platform,
     updateAvailable,
     lastApplyError,
-    checkError,
+    null,
     tokenHealth,
   );
 
@@ -306,18 +338,13 @@ export async function getUpdatesStatus(options?: {
   const platform = resolveUpdatePlatform(org);
   const currentVersion = resolveInstalledVersion(org);
   let latestIndex: ReleaseIndex | null = null;
-  let checkError: string | null = null;
 
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   const lastApplyError = await readDeployLastError();
   let lastUpdateCheckAt = org.lastUpdateCheckAt;
 
   if (options?.forceCheck || !org.lastUpdateCheckAt) {
-    try {
-      latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
-    } catch (err) {
-      checkError = err instanceof Error ? err.message : "Release check failed";
-    }
+    latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl).catch(() => null);
     const checkedAt = new Date();
     await db
       .update(organizations)
@@ -326,24 +353,24 @@ export async function getUpdatesStatus(options?: {
     lastUpdateCheckAt = checkedAt;
     invalidateOrgContextCache();
   } else {
-    try {
-      latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
-    } catch {
-      // Stale check data is acceptable when not forcing.
-    }
+    latestIndex = await fetchReleaseIndexForOrg(gitRepoUrl).catch(() => null);
   }
 
-  const latestVersion = latestIndex?.version ?? null;
-  const updateAvailable = latestVersion
-    ? isUpdateAvailable(currentVersion, latestVersion)
-    : false;
+  const catalogVersion = latestIndex?.version ?? null;
+  const releaseAvailability = await resolveUpdatesReleaseAvailability(currentVersion, latestIndex);
+  const updateAvailable = releaseAvailability.updateAvailable;
+  const latestVersion = resolveDisplayedLatestVersion(
+    currentVersion,
+    catalogVersion,
+    updateAvailable,
+  );
 
   const gating = resolveUpdatesApplyGating(
     org,
     platform,
     updateAvailable,
     lastApplyError,
-    checkError,
+    null,
     platform === "cloudflare" && isCloudflareApiTokenConfigured(org)
       ? await checkCloudflareApplyTokenHealth(org)
       : undefined,
@@ -410,7 +437,15 @@ export async function prepareCloudflareReleaseUpdate(options?: {
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   await setDeployPhase("downloading-release");
   const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
+  if (!releaseIndex) {
+    throw new Error("Already on the latest release");
+  }
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
+  const artifacts = await verifyReleaseArtifactsReady(releasesBase);
+  if (!artifacts.ready) {
+    throw new Error("Already on the latest release");
+  }
+
   const currentVersion = resolveInstalledVersion(org);
   const lastApplyError = await readDeployLastError();
   if (

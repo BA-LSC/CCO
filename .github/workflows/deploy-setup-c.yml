@@ -96,6 +96,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Verify published release artifacts
+        run: bun deploy/cloudflare/verify-published-releases.ts
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          CCO_RELEASES_BASE_URL: https://setup-c.co/releases
+
       - name: Build install wizard
         working-directory: apps/install
         run: bun run build:cloudflare

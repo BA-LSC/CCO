@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
   formatReleaseShaPair,
-  isUpdateAvailable,
 } from "@cco/shared";
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
@@ -55,9 +54,7 @@ function UpdatesStatusMeta({ status }: { status: UpdatesStatus }) {
     status.latestVersion,
   );
   const checked = formatWhen(status.lastUpdateCheckAt);
-  const showLatest =
-    status.latestVersion != null &&
-    isUpdateAvailable(status.currentVersion, status.latestVersion);
+  const showLatest = status.updateAvailable;
 
   return (
     <div className="integrations-inline-status integrations-field-hint">
@@ -106,10 +103,7 @@ export function AdminUpdatesSection({
 
   useEffect(() => {
     if (!status) return;
-    const updateAvailable =
-      status.latestVersion != null &&
-      isUpdateAvailable(status.currentVersion, status.latestVersion);
-    dispatchAdminUpdateStatus({ updateAvailable });
+    dispatchAdminUpdateStatus({ updateAvailable: status.updateAvailable });
   }, [status]);
 
   useEffect(() => {
@@ -175,11 +169,8 @@ export function AdminUpdatesSection({
         });
         return;
       }
-      const updateAvailable =
-        next.latestVersion != null &&
-        isUpdateAvailable(next.currentVersion, next.latestVersion);
       setFeedback({
-        success: updateAvailable
+        success: next.updateAvailable
           ? "A new release is available."
           : "You're on the latest release.",
       });
@@ -287,9 +278,7 @@ export function AdminUpdatesSection({
     return null;
   }
 
-  const updateAvailable =
-    status.latestVersion != null &&
-    isUpdateAvailable(status.currentVersion, status.latestVersion);
+  const updateAvailable = status.updateAvailable;
 
   const statusBadge = updateAvailable
     ? { label: "Update available", variant: "update" as const }

@@ -16,36 +16,17 @@ describe("git-release-index", () => {
     expect(resolveOrgGitRepoUrl("")).toBe(CCO_DEFAULT_GIT_REPO_URL);
   });
 
-  test("fetchGitReleaseIndex reads main commit from configured GitHub repo", async () => {
-    let githubCalls = 0;
-
+  test("fetchGitReleaseIndex returns null for default repo when setup-c.co catalog is missing", async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("setup-c.co/releases/release-index.json")) {
         return new Response("not found", { status: 404 });
       }
-      if (url.includes("api.github.com")) {
-        githubCalls += 1;
-        if (url.includes("/releases/latest")) {
-          return new Response("not found", { status: 404 });
-        }
-        if (url.includes("/commits/main")) {
-          return new Response(
-            JSON.stringify({
-              sha: "github-main-sha",
-              commit: { committer: { date: "2026-05-27T13:00:00.000Z" } },
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          );
-        }
-      }
       throw new Error(`Unexpected fetch: ${url}`);
     }) as typeof fetch;
 
     const index = await fetchGitReleaseIndex(null);
-    expect(index.version).toBe("github-main-sha");
-    expect(index.releasesBaseUrl).toBe("https://setup-c.co/releases");
-    expect(githubCalls).toBeGreaterThan(0);
+    expect(index).toBeNull();
   });
 
   test("fetchGitReleaseIndex uses setup-c.co catalog for default repo", async () => {
@@ -77,25 +58,21 @@ describe("git-release-index", () => {
     expect(githubCalls).toBe(0);
   });
 
-  test("fetchGitReleaseIndex sends GitHub token when configured", async () => {
+  test("fetchGitReleaseIndex does not call GitHub for default repo when catalog is available", async () => {
     process.env.GITHUB_TOKEN = "ghp_test_token";
-    let authHeader: string | null = null;
 
-    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("api.github.com")) {
+        throw new Error("GitHub should not be called when setup-c.co catalog is available");
+      }
       if (url.includes("setup-c.co/releases/release-index.json")) {
-        return new Response("not found", { status: 404 });
-      }
-      if (url.includes("/releases/latest")) {
-        return new Response("not found", { status: 404 });
-      }
-      if (url.includes("/commits/main")) {
-        authHeader =
-          (init?.headers as Record<string, string> | undefined)?.Authorization ?? null;
         return new Response(
           JSON.stringify({
-            sha: "authed-sha",
-            commit: { committer: { date: "2026-05-27T13:00:00.000Z" } },
+            version: "catalog-with-token",
+            gitRef: "main",
+            publishedAt: "2026-05-27T14:00:00.000Z",
+            releasesBaseUrl: "https://setup-c.co/releases",
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -104,7 +81,6 @@ describe("git-release-index", () => {
     }) as typeof fetch;
 
     const index = await fetchGitReleaseIndex(CCO_DEFAULT_GIT_REPO_URL);
-    expect(index.version).toBe("authed-sha");
-    expect(authHeader).toBe("Bearer ghp_test_token");
+    expect(index.version).toBe("catalog-with-token");
   });
 });

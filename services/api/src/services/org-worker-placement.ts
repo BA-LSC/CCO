@@ -60,8 +60,11 @@ export function workerPlacementFromOrg(org: ConfiguredOrganizationRow): WorkerPl
 /** Placement redeploy must not pull latest release bundles when an update is pending. */
 export function shouldRedeployPlacementForOrg(
   org: ConfiguredOrganizationRow,
-  releaseIndex: ReleaseIndex,
+  releaseIndex: ReleaseIndex | null,
 ): { shouldRedeploy: boolean; skipReason?: string } {
+  if (!releaseIndex) {
+    return { shouldRedeploy: false };
+  }
   const installedVersion = org.installedReleaseVersion?.trim() || null;
   if (
     installedVersion &&
@@ -136,6 +139,9 @@ export async function redeployWorkersWithOrgPlacement(
 
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
+  if (!releaseIndex) {
+    throw new Error("Release is not ready");
+  }
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
   const accountId = org.cloudflareAccountId.trim();
   const d1 = await ensureD1Database(accountId, apiToken, "cco");

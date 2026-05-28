@@ -342,8 +342,10 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
         const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
         const redeployCheck = shouldRedeployPlacementForOrg(org, releaseIndex);
         if (!redeployCheck.shouldRedeploy) {
-          workerPlacementRedeploySkipped = true;
-          workerPlacementRedeploySkippedReason = redeployCheck.skipReason;
+          if (redeployCheck.skipReason) {
+            workerPlacementRedeploySkipped = true;
+            workerPlacementRedeploySkippedReason = redeployCheck.skipReason;
+          }
         } else {
           workerPlacementRedeployQueued = true;
           scheduleBackgroundWork(async () => {

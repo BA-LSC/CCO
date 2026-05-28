@@ -121,6 +121,12 @@ Saving a placement change in Admin Settings **redeploys those two workers immedi
 
 After deploy, Smart Placement analysis can take up to ~15 minutes. Check status via the Workers API (`GET .../workers/services/{name}`) or the `cf-placement` response header on API requests.
 
+## When Admin Updates shows "Update available"
+
+BYO churches read **`https://setup-c.co/releases/release-index.json`** only (not GitHub `main` SHA). Admin **Update available** stays off until every required artifact responds at that base URL (worker bundles, web worker, manifest, D1 baseline).
+
+The **Deploy setup-c.co** workflow runs `deploy/cloudflare/verify-published-releases.ts` after the install orchestrator deploy so releases match `GITHUB_SHA` before the job succeeds.
+
 ## Apply Update: `cco-giphy-proxy` bundle 404
 
 If Admin **Apply Update** fails with `Failed to fetch cco-giphy-proxy bundle: HTTP 404`, the church still runs an older `cco-api` that deploys six workers while hosted releases only ship five. Giphy lives on `cco-api` at `/v1/giphy` now.
