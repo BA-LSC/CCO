@@ -4,7 +4,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
 import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
-import { PwaSidebarSwipe } from "@/components/PwaSidebarSwipe";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { DeployRouteOverlay } from "@/components/DeployRouteOverlay";
@@ -46,7 +45,6 @@ export function ChatShell({ children }: Props) {
 
   return (
     <ChatLayoutProvider>
-      <PwaSidebarSwipe />
       <WebPushRegistrar />
       <AppUnreadSync />
       <div className={`chat-shell${hideSidebar ? " chat-shell--no-sidebar" : ""}`}>

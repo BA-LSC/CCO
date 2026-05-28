@@ -91,6 +91,30 @@
   }
 }
 
+@keyframes composer-pending-media-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes composer-pending-media-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+
 @keyframes cco-banner-slide-in {
   from {
     opacity: 0;
@@ -121,7 +145,6 @@ html.standalone-display:has(.chat-shell) body {
   height: 100%;
   height: -webkit-fill-available;
   overflow: hidden;
-  overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -132,7 +155,6 @@ html.standalone-display:has(.chat-shell) body {
     height: 100%;
     height: -webkit-fill-available;
     overflow: hidden;
-    overscroll-behavior-x: none;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -2182,7 +2204,9 @@ button.sidebar-group-header:focus-visible {
 }
 
 .sidebar-new-message-btn {
-  margin: 2px 0 0;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px auto 0;
   border: none;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-surface-2) 62%, var(--color-surface));
@@ -2194,9 +2218,9 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  width: 100%;
+  width: auto;
   min-width: 0;
-  padding: 5px var(--sidebar-item-pad-x);
+  padding: 7px 14px;
   min-height: 0;
   box-sizing: border-box;
 }
@@ -5931,9 +5955,30 @@ button.sidebar-group-header:focus-visible {
   background: #000;
 }
 
-.chat-thread .message-bubble:has(.attachment) {
+.chat-thread .message-bubble:has(.attachment):has(.message-body) {
   padding: 6px;
   overflow: visible;
+}
+
+.chat-thread .message-bubble--media-only {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.chat-thread .message-bubble--media-only.message-bubble--own,
+.chat-thread .message-bubble--media-only.message-bubble--other {
+  background: transparent;
+}
+
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment-open,
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment,
+.chat-thread .message-bubble--media-only .attachment-video-preview {
+  border-radius: 18px;
 }
 
 .chat-thread .message-bubble:has(.attachment) .attachment-open {
@@ -6918,6 +6963,16 @@ button.sidebar-group-header:focus-visible {
   width: 72px;
   height: 72px;
   line-height: 0;
+  transform-origin: center;
+}
+
+.composer-pending-media-card--enter {
+  animation: composer-pending-media-pop-in var(--motion-normal) var(--motion-spring);
+}
+
+.composer-pending-media-card--exit {
+  animation: composer-pending-media-pop-out var(--motion-fast) var(--motion-ease) forwards;
+  pointer-events: none;
 }
 
 .composer-pending-media-thumb {
@@ -7168,17 +7223,13 @@ html.standalone-display .chat-thread-panel {
     padding: 0 9px 0;
     box-sizing: border-box;
     z-index: 200;
-    transform: translateX(calc(-100% + var(--sidebar-reveal-px, 0px)));
+    transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md);
   }
 
-  .chat-sidebar--dragging {
-    transition: none;
-  }
-
   .chat-sidebar-open {
-    --sidebar-reveal-px: 100%;
+    transform: translateX(0);
   }
 
   .chat-sidebar-overlay {
@@ -7193,15 +7244,6 @@ html.standalone-display .chat-thread-panel {
     border: none;
     cursor: pointer;
     animation: cco-fade-in var(--motion-normal) var(--motion-ease-out);
-  }
-
-  .chat-sidebar--dragging ~ .chat-sidebar-overlay {
-    animation: none;
-  }
-
-  html.standalone-display .chat-main,
-  html.standalone-display .chat-shell {
-    touch-action: pan-y pinch-zoom;
   }
 
   .sidebar-footer {

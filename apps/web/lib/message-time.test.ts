@@ -30,6 +30,11 @@ describe("formatMessageTime", () => {
 });
 
 describe("formatMessageDayDivider", () => {
+  it("shows Today for the current day", () => {
+    const now = new Date("2026-05-28T18:00:00.000Z");
+    expect(formatMessageDayDivider("2026-05-28T17:24:21.995Z", now)).toBe("Today");
+  });
+
   it("formats a full weekday date label", () => {
     expect(formatMessageDayDivider("2026-05-22T13:25:29.500Z")).toMatch(/Friday, May 22/);
   });

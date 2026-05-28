@@ -159,6 +159,11 @@ function ChatMessageListInner({
             Boolean(m.editedAt));
         const hasVisibleTimestamp = showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
         const isSending = Boolean(m.pendingSend || m.pendingUpload);
+        const isMediaOnly =
+          !m.body.trim() &&
+          Boolean(
+            messageAttachmentSrc(m) && (m.messageType === "image" || m.messageType === "video"),
+          );
         const isLatestOwn = isOwn && m.id === lastOwnMessageId;
         const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
         const showDeliveryFooter =
@@ -271,6 +276,7 @@ function ChatMessageListInner({
                           "message-bubble",
                           isOwn ? "message-bubble--own" : "message-bubble--other",
                           `message-bubble--group-${layoutInfo.groupPosition}`,
+                          isMediaOnly ? "message-bubble--media-only" : "",
                           messageActions.isRevealed(m.id) ? "message-bubble--actions-visible" : "",
                         ]
                           .filter(Boolean)

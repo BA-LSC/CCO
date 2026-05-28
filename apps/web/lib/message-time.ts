@@ -13,7 +13,11 @@ export function messageStartsNewDay(
   return localDayKey(messages[index]!.createdAt) !== localDayKey(messages[index - 1]!.createdAt);
 }
 
-export function formatMessageDayDivider(iso: string): string {
+export function formatMessageDayDivider(iso: string, now: Date = new Date()): string {
+  if (localDayKey(iso) === localDayKey(now.toISOString())) {
+    return "Today";
+  }
+
   return new Date(iso).toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",

@@ -1,3 +1,5 @@
+import { prepareImageForUpload } from "@/lib/prepare-image-upload";
+
 export const COMPOSER_MEDIA_MAX_BYTES = 95 * 1024 * 1024;
 
 export type ComposerMediaKind = "image" | "video";
@@ -49,18 +51,22 @@ export function validateComposerMediaFile(file: File): string | null {
   return null;
 }
 
-export function createPendingComposerMedia(file: File): PendingComposerMedia | null {
+export async function createPendingComposerMedia(
+  file: File,
+): Promise<PendingComposerMedia | null> {
   const error = validateComposerMediaFile(file);
   if (error) return null;
 
   const kind = inferComposerMediaKind(file);
   if (!kind) return null;
 
+  const preparedFile = kind === "image" ? await prepareImageForUpload(file) : file;
+
   return {
     id: crypto.randomUUID(),
-    file,
+    file: preparedFile,
     kind,
-    previewUrl: URL.createObjectURL(file),
+    previewUrl: URL.createObjectURL(preparedFile),
   };
 }
 

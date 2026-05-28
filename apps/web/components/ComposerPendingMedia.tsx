@@ -6,6 +6,7 @@ import type { ComposerMediaKind } from "@/lib/composer-media";
 const CARD_SIZE_PX = 72;
 const CARD_GAP_PX = 8;
 const LONG_PRESS_MS = 450;
+const POP_OUT_MS = 180;
 
 export type ComposerPendingMediaItem = {
   id: string;
@@ -34,6 +35,8 @@ type CardProps = {
 
 function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }: CardProps) {
   const longPressTimerRef = useRef<number | null>(null);
+  const [exiting, setExiting] = useState(false);
+  const removeTimerRef = useRef<number | null>(null);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -42,12 +45,36 @@ function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }:
     }
   }, []);
 
-  useEffect(() => () => clearLongPressTimer(), [clearLongPressTimer]);
+  const clearRemoveTimer = useCallback(() => {
+    if (removeTimerRef.current !== null) {
+      window.clearTimeout(removeTimerRef.current);
+      removeTimerRef.current = null;
+    }
+  }, []);
+
+  const requestRemove = useCallback(() => {
+    if (exiting) return;
+    onHoldChange(null);
+    setExiting(true);
+    clearRemoveTimer();
+    removeTimerRef.current = window.setTimeout(() => {
+      onRemove(item.id);
+    }, POP_OUT_MS);
+  }, [clearRemoveTimer, exiting, item.id, onHoldChange, onRemove]);
+
+  useEffect(
+    () => () => {
+      clearLongPressTimer();
+      clearRemoveTimer();
+    },
+    [clearLongPressTimer, clearRemoveTimer],
+  );
 
   return (
     <div
       className={[
         "composer-pending-media-card",
+        exiting ? "composer-pending-media-card--exit" : "composer-pending-media-card--enter",
         coarsePointer && held ? "composer-pending-media-card--held" : "",
       ]
         .filter(Boolean)
@@ -91,11 +118,9 @@ function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }:
       <button
         type="button"
         className="composer-pending-media-remove"
-        onClick={() => {
-          onHoldChange(null);
-          onRemove(item.id);
-        }}
+        onClick={requestRemove}
         aria-label="Remove attachment"
+        disabled={exiting}
       >
         <svg viewBox="0 0 24 24" aria-hidden focusable="false">
           <path
@@ -152,7 +177,7 @@ export function ComposerPendingMedia({ items, coarsePointer, onRemove }: Props) 
           />
         ))}
         {overflowCount > 0 ? (
-          <div className="composer-pending-media-overflow" aria-hidden>
+          <div className="composer-pending-media-overflow composer-pending-media-card--enter" aria-hidden>
             +{overflowCount}
           </div>
         ) : null}

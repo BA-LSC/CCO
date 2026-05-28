@@ -50,7 +50,7 @@ type Props = {
   onSend: (payload: { text: string; media: PendingComposerMedia[] }) => Promise<void>;
   onSendGiphy: (importUrl: string) => Promise<void>;
   onComposerLayout?: () => void;
-  onMountStageMedia?: (stageMedia: (files: File | File[]) => void) => void;
+  onMountStageMedia?: (stageMedia: (files: File | File[]) => void | Promise<void>) => void;
   appUpdateBlocked: boolean;
 };
 
@@ -152,7 +152,7 @@ export function ChatComposer({
   }, []);
 
   const stageComposerMedia = useCallback(
-    (files: File | File[]) => {
+    async (files: File | File[]) => {
       if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
 
       const fileList = Array.isArray(files) ? files : [files];
@@ -168,13 +168,16 @@ export function ChatComposer({
           continue;
         }
 
-        const next = createPendingComposerMedia(file);
-        if (!next) {
-          lastError = "Unsupported file type. Use an image or video.";
-          continue;
+        try {
+          const next = await createPendingComposerMedia(file);
+          if (!next) {
+            lastError = "Unsupported file type. Use an image or video.";
+            continue;
+          }
+          nextItems.push(next);
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : "Could not process image";
         }
-
-        nextItems.push(next);
       }
 
       if (nextItems.length === 0) {
@@ -372,7 +375,7 @@ export function ChatComposer({
           disabled={composerInputLocked}
           onChange={(e) => {
             const files = e.target.files ? Array.from(e.target.files) : [];
-            if (files.length > 0) stageComposerMedia(files);
+            if (files.length > 0) void stageComposerMedia(files);
             e.target.value = "";
           }}
         />
