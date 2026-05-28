@@ -116,6 +116,10 @@ describe("reconcileOrgR2UploadCors", () => {
   });
 
   test("skips when no chat origins can be resolved", async () => {
+    delete process.env.WEB_URL;
+    delete process.env.NEXT_PUBLIC_WEB_URL;
+    delete process.env.CLOUDFLARE_API_TOKEN;
+
     mockOrg = {
       cloudflareAccountId: "acct-123",
       cloudflareR2BucketName: "cco-uploads-acct",
