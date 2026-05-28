@@ -7,6 +7,7 @@ const CARD_SIZE_PX = 72;
 const CARD_GAP_PX = 8;
 const LONG_PRESS_MS = 450;
 const POP_OUT_MS = 180;
+const POP_STAGGER_MS = 45;
 
 export type ComposerPendingMediaItem = {
   id: string;
@@ -29,11 +30,19 @@ type CardProps = {
   item: ComposerPendingMediaItem;
   coarsePointer: boolean;
   held: boolean;
+  enterDelayMs: number | null;
   onHoldChange: (id: string | null) => void;
   onRemove: (id: string) => void;
 };
 
-function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }: CardProps) {
+function PendingMediaCard({
+  item,
+  coarsePointer,
+  held,
+  enterDelayMs,
+  onHoldChange,
+  onRemove,
+}: CardProps) {
   const longPressTimerRef = useRef<number | null>(null);
   const [exiting, setExiting] = useState(false);
   const removeTimerRef = useRef<number | null>(null);
@@ -70,15 +79,26 @@ function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }:
     [clearLongPressTimer, clearRemoveTimer],
   );
 
+  const isEntering = enterDelayMs !== null && !exiting;
+
   return (
     <div
       className={[
         "composer-pending-media-card",
-        exiting ? "composer-pending-media-card--exit" : "composer-pending-media-card--enter",
+        exiting
+          ? "composer-pending-media-card--exit"
+          : isEntering
+            ? "composer-pending-media-card--enter"
+            : "",
         coarsePointer && held ? "composer-pending-media-card--held" : "",
       ]
         .filter(Boolean)
         .join(" ")}
+      style={
+        isEntering && enterDelayMs > 0
+          ? { animationDelay: `${enterDelayMs}ms` }
+          : undefined
+      }
       onTouchStart={
         coarsePointer
           ? () => {
@@ -135,11 +155,28 @@ function PendingMediaCard({ item, coarsePointer, held, onHoldChange, onRemove }:
 
 export function ComposerPendingMedia({ items, coarsePointer, onRemove }: Props) {
   const rowRef = useRef<HTMLDivElement>(null);
+  const seenIdsRef = useRef(new Set<string>());
   const [maxVisibleSlots, setMaxVisibleSlots] = useState(items.length);
   const [heldCardId, setHeldCardId] = useState<string | null>(null);
 
+  const newlyAddedItems = items.filter((item) => !seenIdsRef.current.has(item.id));
+  const enterDelayById = new Map(
+    newlyAddedItems.map((item, index) => [item.id, index * POP_STAGGER_MS]),
+  );
+
   useEffect(() => {
     setHeldCardId(null);
+  }, [items]);
+
+  useEffect(() => {
+    for (const item of items) {
+      seenIdsRef.current.add(item.id);
+    }
+    for (const id of seenIdsRef.current) {
+      if (!items.some((item) => item.id === id)) {
+        seenIdsRef.current.delete(id);
+      }
+    }
   }, [items]);
 
   useEffect(() => {
@@ -162,6 +199,8 @@ export function ComposerPendingMedia({ items, coarsePointer, onRemove }: Props) 
   const hasOverflow = items.length > maxVisibleSlots;
   const visibleItems = hasOverflow ? items.slice(0, Math.max(1, maxVisibleSlots - 1)) : items;
   const overflowCount = hasOverflow ? items.length - visibleItems.length : 0;
+  const overflowEnterDelayMs =
+    overflowCount > 0 ? Math.max(enterDelayById.size, visibleItems.length) * POP_STAGGER_MS : null;
 
   return (
     <div className="composer-pending-media">
@@ -172,12 +211,23 @@ export function ComposerPendingMedia({ items, coarsePointer, onRemove }: Props) 
             item={item}
             coarsePointer={coarsePointer}
             held={heldCardId === item.id}
+            enterDelayMs={
+              enterDelayById.has(item.id) ? (enterDelayById.get(item.id) ?? 0) : null
+            }
             onHoldChange={setHeldCardId}
             onRemove={onRemove}
           />
         ))}
         {overflowCount > 0 ? (
-          <div className="composer-pending-media-overflow composer-pending-media-card--enter" aria-hidden>
+          <div
+            className="composer-pending-media-overflow composer-pending-media-card--enter"
+            style={
+              overflowEnterDelayMs
+                ? { animationDelay: `${overflowEnterDelayMs}ms` }
+                : undefined
+            }
+            aria-hidden
+          >
             +{overflowCount}
           </div>
         ) : null}

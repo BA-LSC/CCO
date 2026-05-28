@@ -6968,6 +6968,7 @@ button.sidebar-group-header:focus-visible {
 
 .composer-pending-media-card--enter {
   animation: composer-pending-media-pop-in var(--motion-normal) var(--motion-spring);
+  animation-fill-mode: backwards;
 }
 
 .composer-pending-media-card--exit {
