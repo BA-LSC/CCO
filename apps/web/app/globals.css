@@ -3908,19 +3908,6 @@ button.sidebar-group-header:focus-visible {
   padding: 0;
 }
 
-.integrations-radio {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.875rem;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.integrations-radio input {
-  accent-color: var(--color-accent);
-}
-
 .integrations-field {
   display: flex;
   flex-direction: column;

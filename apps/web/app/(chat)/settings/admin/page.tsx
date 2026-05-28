@@ -306,26 +306,21 @@ function CloudflareSection({
             and storage; fixed region pins workers to a data center (US West recommended for most
             US churches).
           </p>
-          <label className="integrations-radio">
+          <label className="integrations-toggle">
+            <span className="integrations-toggle-label">Automatic (recommended)</span>
             <input
-              type="radio"
-              name="worker-placement-mode"
+              type="checkbox"
+              role="switch"
               checked={workerPlacementMode === "smart"}
-              onChange={() => onWorkerPlacementModeChange("smart")}
+              onChange={(event) =>
+                onWorkerPlacementModeChange(event.target.checked ? "smart" : "region")
+              }
+              aria-label="Automatic worker placement"
             />
-            <span>Automatic (recommended)</span>
-          </label>
-          <label className="integrations-radio">
-            <input
-              type="radio"
-              name="worker-placement-mode"
-              checked={workerPlacementMode === "region"}
-              onChange={() => onWorkerPlacementModeChange("region")}
-            />
-            <span>Fixed region</span>
+            <span className="toggle-switch" aria-hidden="true" />
           </label>
           {workerPlacementMode === "region" ? (
-            <label className="integrations-field">
+            <label className="integrations-field integrations-auto-update-fields">
               <span className="integrations-field-label">Region</span>
               <select
                 className="integrations-input"
