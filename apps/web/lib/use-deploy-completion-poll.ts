@@ -6,6 +6,7 @@ import {
   applyAppUpdate,
   clearDeployWait,
   DEPLOY_POLL_MS,
+  isDeployPending,
   probeServerAppVersion,
 } from "@/lib/app-update";
 import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
@@ -20,6 +21,23 @@ export type UseDeployCompletionPollOptions = {
   /** Live step labels — only used on Admin Settings (inline deploying UI). */
   onDeployStatusMessage?: (message: string) => void;
 };
+
+/** True when the server is no longer draining and this tab should reload. */
+export function shouldFinishDeployPoll(options: {
+  updating: boolean;
+  sawDeployUpdating: boolean;
+  deployWaitPending: boolean;
+  serverVersion: string | null;
+  clientVersion: string;
+  unavailable: boolean;
+}): boolean {
+  if (options.updating) return false;
+  if (options.sawDeployUpdating || options.deployWaitPending) return true;
+  if (options.unavailable || !options.serverVersion || options.clientVersion === "dev") {
+    return false;
+  }
+  return options.serverVersion !== options.clientVersion;
+}
 
 export function useDeployCompletionPoll({
   deploying,
@@ -68,19 +86,21 @@ export function useDeployCompletionPoll({
         sawDeployUpdatingRef.current = true;
         return;
       }
-      if (!sawDeployUpdatingRef.current) {
-        const clientVersion = getClientBuildVersion();
-        if (
-          !unavailable &&
-          serverVersion &&
-          clientVersion !== "dev" &&
-          serverVersion !== clientVersion
-        ) {
-          sawDeployUpdatingRef.current = true;
-        } else {
-          return;
-        }
+
+      const clientVersion = getClientBuildVersion();
+      if (
+        !shouldFinishDeployPoll({
+          updating,
+          sawDeployUpdating: sawDeployUpdatingRef.current,
+          deployWaitPending: isDeployPending(),
+          serverVersion,
+          clientVersion,
+          unavailable,
+        })
+      ) {
+        return;
       }
+      sawDeployUpdatingRef.current = true;
 
       if (validateBeforeReload) {
         const result = await validateBeforeReload();
