@@ -207,11 +207,15 @@ async function uploadPreparedMedia(
   try {
     return await uploadMediaViaPresign(file, contentType);
   } catch (presignErr) {
-    if (isPresignUnavailableError(presignErr)) {
+    if (isPresignUnavailableError(presignErr) || isStorageCorsBlockedError(presignErr)) {
       return uploadMediaMultipart(file, contentType);
     }
     throw presignErr;
   }
+}
+
+function isStorageCorsBlockedError(err: unknown): boolean {
+  return getErrorMessage(err).includes(STORAGE_CORS_BLOCKED);
 }
 
 export async function uploadImage(file: File): Promise<string> {
