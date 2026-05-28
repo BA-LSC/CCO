@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { isUpdateAvailable } from "@cco/shared";
 import type { UpdatesStatus } from "@/components/AdminUpdatesSection";
 import {
   dispatchAdminUpdateStatus,
@@ -41,7 +42,10 @@ export function useAdminUpdateAvailable(
         const path =
           mode === "menu" ? "/api/v1/settings/updates/check" : "/api/v1/settings/updates";
         const status = await apiFetch<UpdatesStatus>(path, mode === "menu" ? { method: "POST" } : undefined);
-        applyUpdateAvailable(Boolean(status.updateAvailable), setUpdateAvailable, true);
+        const updateAvailable =
+          status.latestVersion != null &&
+          isUpdateAvailable(status.currentVersion, status.latestVersion);
+        applyUpdateAvailable(updateAvailable, setUpdateAvailable, true);
       } catch {
         // Keep the last known state when refresh fails.
       }

@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES } from "@cco/shared";
+import {
+  AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
+  formatReleaseShaPair,
+  isUpdateAvailable,
+} from "@cco/shared";
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
 import { dispatchAdminUpdateStatus } from "@/lib/admin-update-events";
@@ -29,11 +33,6 @@ export type UpdatesStatus = {
   gitRepoUrl: string;
 };
 
-function shortenSha(value: string | null): string {
-  if (!value) return "Unknown";
-  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
-}
-
 function formatWhen(iso: string | null): string {
   if (!iso) return "Never";
   return new Date(iso).toLocaleString();
@@ -52,19 +51,25 @@ function UpdatesFeedback({ error, success }: { error?: string | null; success?: 
 }
 
 function UpdatesStatusMeta({ status }: { status: UpdatesStatus }) {
-  const installed = shortenSha(status.currentVersion);
+  const { installed, latest } = formatReleaseShaPair(
+    status.currentVersion,
+    status.latestVersion,
+  );
   const checked = formatWhen(status.lastUpdateCheckAt);
+  const showUpdate =
+    status.latestVersion != null &&
+    isUpdateAvailable(status.currentVersion, status.latestVersion);
 
   return (
     <div className="integrations-inline-status integrations-field-hint">
       <p>
-        {status.updateAvailable ? (
+        {showUpdate ? (
           <>
-            Installed {installed} · Latest {shortenSha(status.latestVersion)}
+            Installed {installed} · Latest {latest}
           </>
         ) : status.latestVersion ? (
           <>
-            Version {installed} · Latest {shortenSha(status.latestVersion)}
+            Version {installed} · Latest {latest}
           </>
         ) : (
           <>Version {installed}</>
@@ -114,7 +119,10 @@ export function AdminUpdatesSection({
 
   useEffect(() => {
     if (!status) return;
-    dispatchAdminUpdateStatus({ updateAvailable: status.updateAvailable });
+    const updateAvailable =
+      status.latestVersion != null &&
+      isUpdateAvailable(status.currentVersion, status.latestVersion);
+    dispatchAdminUpdateStatus({ updateAvailable });
   }, [status]);
 
   useEffect(() => {
@@ -147,7 +155,10 @@ export function AdminUpdatesSection({
           setFeedback({ error: `Apply failed: ${next.lastApplyError}` });
           return;
         }
-        if (next.updateAvailable) {
+        if (
+          next.latestVersion != null &&
+          isUpdateAvailable(next.currentVersion, next.latestVersion)
+        ) {
           clearDeployWait();
           setDeploying(false);
           setFeedback({
@@ -191,8 +202,11 @@ export function AdminUpdatesSection({
         });
         return;
       }
+      const updateAvailable =
+        next.latestVersion != null &&
+        isUpdateAvailable(next.currentVersion, next.latestVersion);
       setFeedback({
-        success: next.updateAvailable
+        success: updateAvailable
           ? "A new release is available."
           : "You're on the latest release.",
       });
@@ -234,13 +248,8 @@ export function AdminUpdatesSection({
           : {}),
       });
       setStatus(result.status);
-      const version = shortenSha(result.appliedVersion);
-      const refreshNote =
-        " This page will refresh automatically when the deploy finishes.";
       setFeedback({
-        success: result.accepted
-          ? `Update started (${version}). Workers are redeploying.${refreshNote}`
-          : `Update applied (${version}). Workers are redeploying.${refreshNote}`,
+        success: "This page will refresh when the update finishes.",
       });
     } catch (err) {
       clearDeployWait();
@@ -304,7 +313,11 @@ export function AdminUpdatesSection({
     return null;
   }
 
-  const statusBadge = status.updateAvailable
+  const updateAvailable =
+    status.latestVersion != null &&
+    isUpdateAvailable(status.currentVersion, status.latestVersion);
+
+  const statusBadge = updateAvailable
     ? { label: "Update available", variant: "update" as const }
     : status.latestVersion
       ? { label: "Up to date", variant: "success" as const }
@@ -315,7 +328,7 @@ export function AdminUpdatesSection({
   const isUpdating = deploying;
   const controlsDisabled = busy !== null || isUpdating;
   const showApplyButton =
-    status.updateAvailable || (Boolean(status.lastApplyError) && status.canApply);
+    updateAvailable || (Boolean(status.lastApplyError) && status.canApply);
 
   return (
     <section className="integrations-section" aria-labelledby="updates-status-heading">

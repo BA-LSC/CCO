@@ -136,8 +136,9 @@ describe("prepareCloudflareReleaseUpdate", () => {
       source.indexOf("export async function executeCloudflareReleaseUpdate"),
     );
     expect(fnBody).toContain("const lastApplyError = await readDeployLastError()");
+    expect(fnBody).toContain("resolveInstalledVersion(org)");
     expect(fnBody).toContain(
-      "!isUpdateAvailable(currentVersion, releaseIndex.version, compareAlso)",
+      "!isUpdateAvailable(currentVersion, releaseIndex.version)",
     );
     expect(fnBody).toContain("!lastApplyError");
     expect(fnBody).toMatch(/try \{\s*\n\s*await setDeployLastError\(null\)/);
