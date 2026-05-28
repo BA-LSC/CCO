@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { downloadAttachment } from "@/lib/download-attachment";
+import { useAnimatedDismiss } from "@/hooks/useAnimatedDismiss";
 
 export type AttachmentLightboxImage = {
   src: string;
@@ -58,6 +59,7 @@ function zoomAtFocal(
 }
 
 export function AttachmentLightbox({ src, alt, onClose }: Props) {
+  const { exiting, requestClose } = useAnimatedDismiss(onClose);
   const stageRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, x: 0, y: 0 });
   const [downloading, setDownloading] = useState(false);
@@ -113,7 +115,7 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -122,7 +124,7 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -230,7 +232,14 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
   }, [applyTransform, toggleZoom]);
 
   return (
-    <div className="attachment-lightbox" role="dialog" aria-modal="true" aria-label="Image preview">
+    <div
+      className={["attachment-lightbox", exiting ? "attachment-lightbox--exit" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+    >
       <div className="attachment-lightbox-toolbar">
         <button
           type="button"
@@ -254,7 +263,7 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
             {downloading ? "Saving…" : "Download"}
           </span>
         </button>
-        <button type="button" className="attachment-lightbox-action" onClick={onClose} aria-label="Close">
+        <button type="button" className="attachment-lightbox-action" onClick={requestClose} aria-label="Close">
           <svg
             className="attachment-lightbox-action-icon"
             viewBox="0 0 24 24"
@@ -278,16 +287,20 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
         ref={stageRef}
         className="attachment-lightbox-stage"
         onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) requestClose();
         }}
       >
         <img
           src={src}
           alt={alt}
           className="attachment-lightbox-image"
-          style={{
-            transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
-          }}
+          style={
+            exiting
+              ? undefined
+              : {
+                  transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
+                }
+          }
           draggable={false}
           onDoubleClick={toggleZoom}
         />

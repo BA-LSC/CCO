@@ -91,6 +91,28 @@
   }
 }
 
+@keyframes cco-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cco-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
 @keyframes cco-rise-in {
   from {
     transform: translateY(6px);
@@ -6261,8 +6283,10 @@ button.sidebar-group-header:focus-visible {
 }
 
 .attachment-video-preview-play {
-  position: relative;
-  z-index: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6273,6 +6297,7 @@ button.sidebar-group-header:focus-visible {
   background: transparent;
   border: 2px solid rgba(255, 255, 255, 0.78);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
   transition:
     transform 0.15s ease,
     border-color 0.15s ease,
@@ -6282,7 +6307,7 @@ button.sidebar-group-header:focus-visible {
 
 .attachment-open.attachment-video-preview:hover .attachment-video-preview-play,
 .attachment-open.attachment-video-preview:focus-visible .attachment-video-preview-play {
-  transform: scale(1.06);
+  transform: translate(-50%, -50%) scale(1.06);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.95);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -6347,13 +6372,21 @@ button.sidebar-group-header:focus-visible {
   min-width: 0;
 }
 
-.chat-thread .message-bubble--media-only:has(.attachment) .attachment {
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment:not(.attachment-video-preview-frame) {
   display: block;
   width: auto;
   max-width: 432px;
   height: auto;
   margin: 0;
   vertical-align: top;
+}
+
+.chat-thread .message-bubble--media-only:has(.attachment) .attachment.attachment-video-preview-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 432px);
+  margin: 0;
 }
 
 .chat-thread .message-bubble:has(.attachment) .attachment-open {
@@ -6435,6 +6468,11 @@ button.sidebar-group-header:focus-visible {
     env(safe-area-inset-bottom, 0px)
     env(safe-area-inset-left, 0px);
   animation: cco-fade-in 0.22s var(--motion-ease-out);
+}
+
+.attachment-lightbox--exit {
+  animation: cco-fade-out 0.22s var(--motion-ease-out) forwards;
+  pointer-events: none;
 }
 
 .attachment-lightbox-toolbar {
@@ -6521,6 +6559,11 @@ button.sidebar-group-header:focus-visible {
   transform-origin: center center;
   will-change: transform;
   animation: cco-scale-in 0.28s var(--motion-spring);
+}
+
+.attachment-lightbox--exit .attachment-lightbox-image,
+.attachment-lightbox--exit .attachment-lightbox-video {
+  animation: cco-scale-out 0.28s var(--motion-ease-out) forwards;
 }
 
 .message-body {
@@ -8172,7 +8215,10 @@ html.standalone-display .chat-thread-panel {
   .integrations-updates-deploying,
   .chat-thread .message-item--enter,
   .chat-thread .message-reaction-pill--enter,
-  .chat-thread .message-reaction-pill--exit {
+  .chat-thread .message-reaction-pill--exit,
+  .attachment-lightbox,
+  .attachment-lightbox--exit .attachment-lightbox-image,
+  .attachment-lightbox--exit .attachment-lightbox-video {
     animation: none;
   }
 }

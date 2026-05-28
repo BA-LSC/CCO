@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { downloadAttachment } from "@/lib/download-attachment";
+import { useAnimatedDismiss } from "@/hooks/useAnimatedDismiss";
 
 type Props = {
   src: string;
@@ -13,6 +14,7 @@ const PLAYBACK_ERROR_MESSAGE =
   "This video could not play in your browser. Download it to watch locally, or try re-uploading as MP4 (H.264).";
 
 export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
+  const { exiting, requestClose } = useAnimatedDismiss(onClose);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -49,8 +51,14 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
   }, [src]);
 
   useEffect(() => {
+    if (!exiting) return;
+    const video = videoRef.current;
+    video?.pause();
+  }, [exiting]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
     };
     window.addEventListener("keydown", onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -59,10 +67,17 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
       window.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [onClose]);
+  }, [requestClose]);
 
   return (
-    <div className="attachment-lightbox" role="dialog" aria-modal="true" aria-label="Video player">
+    <div
+      className={["attachment-lightbox", exiting ? "attachment-lightbox--exit" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Video player"
+    >
       <div className="attachment-lightbox-toolbar">
         <button
           type="button"
@@ -83,7 +98,7 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
             {downloading ? "Saving…" : "Download"}
           </span>
         </button>
-        <button type="button" className="attachment-lightbox-action" onClick={onClose} aria-label="Close">
+        <button type="button" className="attachment-lightbox-action" onClick={requestClose} aria-label="Close">
           <svg
             className="attachment-lightbox-action-icon"
             viewBox="0 0 24 24"
@@ -106,7 +121,7 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
       <div
         className="attachment-lightbox-stage attachment-lightbox-stage-video"
         onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) requestClose();
         }}
       >
         <video
