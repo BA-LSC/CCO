@@ -3663,10 +3663,10 @@ button.sidebar-group-header:focus-visible {
 .integrations-section-head h2 {
   margin: 0;
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: color-mix(in srgb, var(--color-text) 78%, var(--color-muted));
 }
 
 .integrations-section-head p {

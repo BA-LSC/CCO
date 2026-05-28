@@ -319,7 +319,6 @@ export default function IntegrationsSettingsPage() {
   const [pcoSyncError, setPcoSyncError] = useState<string | null>(null);
   const [pcoLastSyncedAt, setPcoLastSyncedAt] = useState<string | null>(null);
   const [pcoNightlySyncEnabled, setPcoNightlySyncEnabled] = useState(true);
-  const [pcoNightlySyncSchedule, setPcoNightlySyncSchedule] = useState("Nightly at 3:00 AM UTC");
   const [updatesStatus, setUpdatesStatus] = useState<UpdatesStatus | null>(null);
 
   useEffect(() => {
@@ -335,7 +334,6 @@ export default function IntegrationsSettingsPage() {
         setClientId(settings.clientId);
         setPcoLastSyncedAt(settings.pcoLastSyncedAt ?? null);
         setPcoNightlySyncEnabled(settings.pcoNightlySyncEnabled ?? true);
-        setPcoNightlySyncSchedule(settings.pcoNightlySyncSchedule ?? "Nightly at 3:00 AM UTC");
         setSignInRedirectUri(settings.signInRedirectUri);
         setWebhookUrl(settings.webhookUrl);
         setClientSecretConfigured(settings.clientSecretConfigured);
@@ -492,9 +490,6 @@ export default function IntegrationsSettingsPage() {
       if (updated.pcoLastSyncedAt !== undefined) {
         setPcoLastSyncedAt(updated.pcoLastSyncedAt ?? null);
       }
-      if (updated.pcoNightlySyncSchedule) {
-        setPcoNightlySyncSchedule(updated.pcoNightlySyncSchedule);
-      }
       setPcoSyncResult(
         enabled ? "Nightly Planning Center sync enabled." : "Nightly Planning Center sync disabled.",
       );
@@ -534,7 +529,6 @@ export default function IntegrationsSettingsPage() {
       <IntegrationsSection
         id="pco-sync-heading"
         heading="Planning Center sync"
-        description="Refresh groups, teams, and rosters for your account."
         badge={pcoSyncBadge.label}
         badgeVariant={pcoSyncBadge.variant}
       >
@@ -545,9 +539,8 @@ export default function IntegrationsSettingsPage() {
           disabled={pcoSyncBusy !== null}
           onClick={() => void handlePcoSync()}
         >
-          {pcoSyncing ? "Syncing…" : "Sync from Planning Center"}
+          {pcoSyncing ? "Syncing…" : "Sync Now"}
         </button>
-        <p className="integrations-field-hint">{pcoNightlySyncSchedule}</p>
         <label className="integrations-toggle">
           <span className="integrations-toggle-label">Nightly sync</span>
           <input
