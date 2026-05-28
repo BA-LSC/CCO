@@ -12,7 +12,12 @@ import {
 } from "./worker-definitions";
 
 const CF_API = "https://api.cloudflare.com/client/v4";
-const CCO_COMPATIBILITY_DATE = "2025-05-26";
+
+/** Keep in sync with wrangler.jsonc compatibility_date across CCO workers. */
+export const CCO_WORKER_COMPATIBILITY_DATE = "2026-05-28";
+
+/** Required for cco-api / realtime bundles that import node:* built-ins (postgres, crypto, etc.). */
+export const CCO_WORKER_NODEJS_COMPAT_FLAGS = ["nodejs_compat"] as const;
 
 export type WorkerBinding =
   | { type: "d1"; name: string; id: string }
@@ -91,17 +96,21 @@ export async function deployWorkerScript(
   const metadata: WorkerScriptMetadata = {
     main_module: moduleFileName,
     bindings,
-    compatibility_date: options?.compatibilityDate ?? CCO_COMPATIBILITY_DATE,
+    compatibility_date: options?.compatibilityDate ?? CCO_WORKER_COMPATIBILITY_DATE,
   };
   if (options?.compatibilityFlags?.length) {
-    metadata.compatibility_flags = options.compatibilityFlags;
+    metadata.compatibility_flags = [...options.compatibilityFlags];
   }
   if (options?.migrations) {
     metadata.migrations = options.migrations;
   }
 
   const form = new FormData();
-  form.append("metadata", JSON.stringify(metadata));
+  // Cloudflare requires metadata as application/json (plain strings omit the part content-type).
+  form.append(
+    "metadata",
+    new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+  );
   form.append(moduleFileName, new Blob([moduleBytes], { type: "application/javascript+module" }), moduleFileName);
 
   const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts/${scriptName}`, {
@@ -225,23 +234,21 @@ export type DeployAllProvisionWorkersParams = {
 };
 
 function workerDeployOptions(scriptName: CcoWorkerScriptName): DeployWorkerScriptOptions {
-  if (scriptName === "cco-api") {
+  if (scriptName === "cco-api" || scriptName === "cco-realtime-fanout") {
     return {
-      compatibilityDate: CCO_COMPATIBILITY_DATE,
-      compatibilityFlags: ["nodejs_compat"],
+      compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,
+      compatibilityFlags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
+      ...(scriptName === "cco-realtime-fanout"
+        ? {
+            migrations: {
+              new_tag: "v1",
+              steps: [{ new_sqlite_classes: ["ConversationRoom"] }],
+            },
+          }
+        : {}),
     };
   }
-  if (scriptName === "cco-realtime-fanout") {
-    return {
-      compatibilityDate: CCO_COMPATIBILITY_DATE,
-      compatibilityFlags: ["nodejs_compat"],
-      migrations: {
-        new_tag: "v1",
-        steps: [{ new_sqlite_classes: ["ConversationRoom"] }],
-      },
-    };
-  }
-  return { compatibilityDate: CCO_COMPATIBILITY_DATE };
+  return { compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE };
 }
 
 async function listWorkerMigrationTags(

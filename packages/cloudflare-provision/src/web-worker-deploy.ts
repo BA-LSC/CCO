@@ -1,6 +1,11 @@
 import { CloudflareApiError } from "./cloudflare-api";
 import { buildWebWorkerSecretsStoreBindings } from "./secrets-store";
-import { deployWorkerScript, type WorkerBinding } from "./workers-deploy";
+import {
+  CCO_WORKER_COMPATIBILITY_DATE,
+  CCO_WORKER_NODEJS_COMPAT_FLAGS,
+  deployWorkerScript,
+  type WorkerBinding,
+} from "./workers-deploy";
 import { normalizeWebAssetManifestPath } from "./web-asset-path";
 
 const CF_API = "https://api.cloudflare.com/client/v4";
@@ -229,8 +234,8 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
   const moduleFileName = `${CCO_WEB_SCRIPT_NAME}.mjs`;
   const metadata = {
     main_module: moduleFileName,
-    compatibility_date: "2025-05-26",
-    compatibility_flags: ["nodejs_compat"],
+    compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+    compatibility_flags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
     assets: { jwt: assetsJwt },
     bindings: buildCcoWebBindings(
       params.chatHostname,

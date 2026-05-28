@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildWorkerBindings,
+  CCO_WORKER_COMPATIBILITY_DATE,
+  CCO_WORKER_NODEJS_COMPAT_FLAGS,
   deployWorkerScript,
   type CcoWorkerScriptName,
 } from "@cco/cloudflare-provision";
@@ -54,8 +56,8 @@ const bindings = buildWorkerBindings(scriptName, {
 });
 
 await deployWorkerScript(accountId, apiToken, scriptName, moduleBytes, bindings, {
-  compatibilityDate: "2025-05-26",
-  compatibilityFlags: ["nodejs_compat"],
+  compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,
+  compatibilityFlags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
 });
 
 console.log(`Redeployed ${scriptName} for ${apiHostname} (secrets unchanged)`);

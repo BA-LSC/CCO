@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  CCO_WORKER_COMPATIBILITY_DATE,
+  CCO_WORKER_NODEJS_COMPAT_FLAGS,
   deployAllProvisionWorkers,
   deployWorkerScript,
   ensureCcoApiWorkerRoutes,
   ensureQueueConsumer,
 } from "./workers-deploy";
+
+async function parseUploadMetadata(form: FormData | undefined) {
+  const part = form?.get("metadata");
+  const json =
+    part instanceof Blob ? await part.text() : part == null ? "" : String(part);
+  return JSON.parse(json) as {
+    main_module: string;
+    bindings: Array<{ name: string }>;
+    compatibility_date?: string;
+    compatibility_flags?: string[];
+    migrations?: unknown;
+  };
+}
 
 const originalFetch = globalThis.fetch;
 
@@ -46,12 +61,37 @@ describe("deployWorkerScript", () => {
     expect(capturedAuth).toBe("Bearer cf-token");
     expect(capturedForm).toBeInstanceOf(FormData);
 
-    const metadata = JSON.parse(String(capturedForm?.get("metadata"))) as {
-      main_module: string;
-      bindings: Array<{ name: string }>;
-    };
+    const metadata = await parseUploadMetadata(capturedForm);
     expect(metadata.main_module).toBe("cco-api.mjs");
     expect(metadata.bindings[0]?.name).toBe("UPLOAD_STORAGE");
+
+    const metadataPart = capturedForm?.get("metadata");
+    expect(metadataPart).toBeInstanceOf(Blob);
+    expect((metadataPart as Blob).type).toMatch(/^application\/json/);
+  });
+
+  test("sends nodejs_compat in metadata for cco-api deploy options", async () => {
+    let capturedForm: FormData | undefined;
+    mockFetch((_url, init) => {
+      capturedForm = init?.body as FormData;
+      return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+    });
+
+    await deployWorkerScript(
+      "acct-1",
+      "cf-token",
+      "cco-api",
+      new ArrayBuffer(0),
+      [],
+      {
+        compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,
+        compatibilityFlags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
+      },
+    );
+
+    const metadata = await parseUploadMetadata(capturedForm);
+    expect(metadata.compatibility_date).toBe(CCO_WORKER_COMPATIBILITY_DATE);
+    expect(metadata.compatibility_flags).toEqual(["nodejs_compat"]);
   });
 });
 
@@ -84,11 +124,12 @@ describe("ensureQueueConsumer", () => {
 describe("deployAllProvisionWorkers", () => {
   test("deploys all scripts with store bindings, cron, and queue consumer (no secret PUTs)", async () => {
     const uploadedScripts: string[] = [];
+    const metadataByScript = new Map<string, Awaited<ReturnType<typeof parseUploadMetadata>>>();
     let secretPutCount = 0;
     let cronConfigured = false;
     let queueConsumerConfigured = false;
 
-    mockFetch((url, init) => {
+    mockFetch(async (url, init) => {
       if (url.includes("/workers/scripts/") && url.endsWith("/secrets")) {
         secretPutCount += 1;
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
@@ -98,7 +139,9 @@ describe("deployAllProvisionWorkers", () => {
         !url.endsWith("/secrets") &&
         !url.endsWith("/schedules")
       ) {
-        uploadedScripts.push(url.split("/workers/scripts/")[1] ?? "");
+        const script = url.split("/workers/scripts/")[1] ?? "";
+        uploadedScripts.push(script);
+        metadataByScript.set(script, await parseUploadMetadata(init?.body as FormData));
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
       }
       if (url.endsWith("/schedules")) {
@@ -134,6 +177,17 @@ describe("deployAllProvisionWorkers", () => {
     expect(cronConfigured).toBe(true);
     expect(queueConsumerConfigured).toBe(true);
     expect(secretPutCount).toBe(0);
+
+    const apiMetadata = metadataByScript.get("cco-api");
+    expect(apiMetadata?.compatibility_date).toBe(CCO_WORKER_COMPATIBILITY_DATE);
+    expect(apiMetadata?.compatibility_flags).toEqual(["nodejs_compat"]);
+
+    const fanoutMetadata = metadataByScript.get("cco-realtime-fanout");
+    expect(fanoutMetadata?.compatibility_flags).toEqual(["nodejs_compat"]);
+    expect(fanoutMetadata?.migrations).toEqual({
+      new_tag: "v1",
+      steps: [{ new_sqlite_classes: ["ConversationRoom"] }],
+    });
   });
 });
 

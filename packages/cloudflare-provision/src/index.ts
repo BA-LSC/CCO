@@ -82,6 +82,8 @@ export {
 } from "./d1";
 
 export {
+  CCO_WORKER_COMPATIBILITY_DATE,
+  CCO_WORKER_NODEJS_COMPAT_FLAGS,
   deployWorkerScript,
   putWorkerSecret,
   deployWorkerCronSchedule,
