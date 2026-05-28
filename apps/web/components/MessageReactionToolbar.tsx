@@ -399,6 +399,22 @@ export function MessageReactionPills({
     [grouped, reactionAlign],
   );
 
+  const removedSinceLastCommit = useMemo(() => {
+    if (!initializedRef.current) return [] as Array<[string, Reaction[]]>;
+    const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
+    return prevGroupedRef.current.filter(([emoji]) => !activeEmojis.has(emoji));
+  }, [grouped, emojiKeys]);
+
+  const activeExitingEmojis = useMemo(() => {
+    const merged = new Map(exitingEmojis.map((entry) => [entry.emoji, entry]));
+    for (const [emoji, list] of removedSinceLastCommit) {
+      merged.set(emoji, { emoji, list });
+    }
+    return [...merged.values()];
+  }, [exitingEmojis, removedSinceLastCommit]);
+
+  const hasActiveExitAnimation = activeExitingEmojis.length > 0;
+
   const enterDelayByEmoji = useMemo(() => {
     if (!initializedRef.current) return new Map<string, number>();
     const newlyAdded = grouped.filter(([emoji]) => !seenEmojisRef.current.has(emoji));
@@ -434,15 +450,17 @@ export function MessageReactionPills({
 
     grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
     prevGroupedRef.current = grouped;
-    displayOrderRef.current = orderedEmojis;
-  }, [emojiKeys, grouped, orderedEmojis, reactionAlign]);
+    if (removedSinceLastCommit.length === 0) {
+      displayOrderRef.current = orderedEmojis;
+    }
+  }, [emojiKeys, grouped, orderedEmojis, reactionAlign, removedSinceLastCommit.length]);
+
+  useLayoutEffect(() => {
+    onExitingChange?.(hasActiveExitAnimation);
+  }, [hasActiveExitAnimation, onExitingChange]);
 
   useEffect(() => {
-    onExitingChange?.(exitingEmojis.length > 0);
-  }, [exitingEmojis.length, onExitingChange]);
-
-  useEffect(() => {
-    if (exitingEmojis.length === 0) return;
+    if (!hasActiveExitAnimation) return;
     const timeout = window.setTimeout(() => {
       setExitingEmojis((current) => {
         const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
@@ -455,7 +473,7 @@ export function MessageReactionPills({
       });
     }, REACTION_PILL_ANIMATION_MS);
     return () => window.clearTimeout(timeout);
-  }, [exitingEmojis, emojiKeys, grouped]);
+  }, [grouped, hasActiveExitAnimation]);
 
   const pillRenders = useMemo(() => {
     const byEmoji = new Map<string, { list: Reaction[]; phase: ReactionPillRender["phase"] }>();
@@ -468,7 +486,7 @@ export function MessageReactionPills({
       });
     }
 
-    for (const { emoji, list } of exitingEmojis) {
+    for (const { emoji, list } of activeExitingEmojis) {
       if (!byEmoji.has(emoji)) {
         byEmoji.set(emoji, { list, phase: "exit" });
       }
@@ -506,7 +524,7 @@ export function MessageReactionPills({
         enterDelayMs: enterDelayByEmoji.get(emoji) ?? 0,
       } satisfies ReactionPillRender;
     });
-  }, [enterDelayByEmoji, exitingEmojis, grouped, orderedEmojis]);
+  }, [activeExitingEmojis, enterDelayByEmoji, grouped, orderedEmojis]);
 
   if (pillRenders.length === 0) return null;
 
@@ -599,8 +617,16 @@ export function MessageBubbleStack({
   children,
 }: StackProps) {
   const [reactionsExiting, setReactionsExiting] = useState(false);
+  const prevReactionCountRef = useRef(reactions.length);
   const hasReactions = reactions.length > 0;
-  const showReactionRow = hasReactions || reactionsExiting;
+  const showReactionRow =
+    hasReactions ||
+    reactionsExiting ||
+    (prevReactionCountRef.current > 0 && reactions.length === 0);
+
+  useLayoutEffect(() => {
+    prevReactionCountRef.current = reactions.length;
+  }, [reactions.length]);
 
   return (
     <div

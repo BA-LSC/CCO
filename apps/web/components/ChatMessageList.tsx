@@ -15,7 +15,7 @@ import {
   buildAttachmentDisplaySrcMap,
   resolveAttachmentDisplayUrl,
 } from "@/lib/attachment-url";
-import { buildMessageLayoutInfos } from "@/lib/message-grouping";
+import { buildMessageLayoutInfos, type MessageGroupPosition } from "@/lib/message-grouping";
 import {
   formatMessageDayDivider,
   formatMessageTime,
@@ -28,6 +28,18 @@ import type { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 type MessageActionsReveal = ReturnType<typeof useMessageActionsReveal>;
 
 type Member = { id?: string; displayName: string; onCco?: boolean };
+
+function splitAttachmentBubbleGroupPosition(
+  groupPosition: MessageGroupPosition,
+): MessageGroupPosition {
+  if (groupPosition === "single" || groupPosition === "first") return "first";
+  return "middle";
+}
+
+function splitTextBubbleGroupPosition(groupPosition: MessageGroupPosition): MessageGroupPosition {
+  if (groupPosition === "single") return "last";
+  return groupPosition;
+}
 
 type Props = {
   messages: Message[];
@@ -161,11 +173,12 @@ function ChatMessageListInner({
             Boolean(m.editedAt));
         const hasVisibleTimestamp = showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
         const isSending = Boolean(m.pendingSend || m.pendingUpload);
-        const isMediaOnly =
-          !m.body.trim() &&
-          Boolean(
-            messageAttachmentSrc(m) && (m.messageType === "image" || m.messageType === "video"),
-          );
+        const bodyText = m.body.trim();
+        const hasMediaAttachment = Boolean(
+          messageAttachmentSrc(m) && (m.messageType === "image" || m.messageType === "video"),
+        );
+        const splitMediaAndText = hasMediaAttachment && bodyText.length > 0;
+        const actionsOnTextBubble = Boolean(bodyText) || !hasMediaAttachment;
         const isLatestOwn = isOwn && m.id === lastOwnMessageId;
         const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
         const showDeliveryFooter =
@@ -280,123 +293,184 @@ function ChatMessageListInner({
                       onToggleReaction={onToggleReaction}
                       reactionAlign={isOwn ? "own" : "other"}
                     >
-                      <div
-                        className={[
-                          "message-bubble",
-                          isOwn ? "message-bubble--own" : "message-bubble--other",
-                          `message-bubble--group-${layoutInfo.groupPosition}`,
-                          isMediaOnly ? "message-bubble--media-only" : "",
-                          messageActions.isRevealed(m.id) ? "message-bubble--actions-visible" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        {...messageActions.getBubbleHandlers(m.id)}
-                      >
-                        {!m.pendingUpload && !m.uploadFailed ? (
-                          <span className="message-actions">
-                            <MessageEmojiActions
-                              messageId={m.id}
-                              reactions={m.reactions ?? []}
-                              currentUserId={resolvedUserId}
-                              onToggleReaction={onToggleReaction}
-                            />
-                            {(canEditMessage(m) || canDeleteMessage(m)) && (
-                              <span className="message-actions-divider" aria-hidden />
-                            )}
-                            {canEditMessage(m) && (
-                              <button
-                                type="button"
-                                className="link-btn"
-                                onClick={() => onStartEdit(m.id, m.body)}
-                              >
-                                Edit
-                              </button>
-                            )}
-                            {canDeleteMessage(m) && (
-                              <button
-                                type="button"
-                                className="link-btn danger"
-                                onClick={() => onDeleteTarget(m.id)}
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </span>
-                        ) : null}
-                        {messageAttachmentSrc(m) && m.messageType === "image" && (
-                          <button
-                            type="button"
-                            className={[
-                              "attachment-open",
-                              m.pendingUpload ? "attachment-open--uploading" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                            aria-label={m.pendingUpload ? "Uploading image" : "View full image"}
-                            aria-busy={m.pendingUpload || undefined}
-                            disabled={m.pendingUpload}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (messageActions.isRevealed(m.id) || m.pendingUpload || !m.attachmentUrl) {
-                                return;
-                              }
-                              onOpenImage({
-                                src: messageAttachmentDisplaySrc(m.attachmentUrl),
-                                alt: m.body || "Shared image",
-                              });
-                            }}
-                          >
-                            <img
+                      {hasMediaAttachment ? (
+                        <div
+                          className={[
+                            "message-bubble",
+                            isOwn ? "message-bubble--own" : "message-bubble--other",
+                            `message-bubble--group-${
+                              splitMediaAndText
+                                ? splitAttachmentBubbleGroupPosition(layoutInfo.groupPosition)
+                                : layoutInfo.groupPosition
+                            }`,
+                            "message-bubble--media-only",
+                            !actionsOnTextBubble && messageActions.isRevealed(m.id)
+                              ? "message-bubble--actions-visible"
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          {...(!actionsOnTextBubble ? messageActions.getBubbleHandlers(m.id) : {})}
+                        >
+                          {!actionsOnTextBubble && !m.pendingUpload && !m.uploadFailed ? (
+                            <span className="message-actions">
+                              <MessageEmojiActions
+                                messageId={m.id}
+                                reactions={m.reactions ?? []}
+                                currentUserId={resolvedUserId}
+                                onToggleReaction={onToggleReaction}
+                              />
+                              {(canEditMessage(m) || canDeleteMessage(m)) && (
+                                <span className="message-actions-divider" aria-hidden />
+                              )}
+                              {canEditMessage(m) && (
+                                <button
+                                  type="button"
+                                  className="link-btn"
+                                  onClick={() => onStartEdit(m.id, m.body)}
+                                >
+                                  Edit
+                                </button>
+                              )}
+                              {canDeleteMessage(m) && (
+                                <button
+                                  type="button"
+                                  className="link-btn danger"
+                                  onClick={() => onDeleteTarget(m.id)}
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </span>
+                          ) : null}
+                          {messageAttachmentSrc(m) && m.messageType === "image" && (
+                            <button
+                              type="button"
+                              className={[
+                                "attachment-open",
+                                m.pendingUpload ? "attachment-open--uploading" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              aria-label={m.pendingUpload ? "Uploading image" : "View full image"}
+                              aria-busy={m.pendingUpload || undefined}
+                              disabled={m.pendingUpload}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (
+                                  messageActions.isRevealed(m.id) ||
+                                  m.pendingUpload ||
+                                  !m.attachmentUrl
+                                ) {
+                                  return;
+                                }
+                                onOpenImage({
+                                  src: messageAttachmentDisplaySrc(m.attachmentUrl),
+                                  alt: "Shared image",
+                                });
+                              }}
+                            >
+                              <img
+                                src={messageAttachmentSrc(m)!}
+                                alt="Shared image"
+                                className="attachment"
+                                draggable={false}
+                              />
+                              {m.pendingUpload ? (
+                                <span className="attachment-upload-overlay" aria-hidden="true">
+                                  <span className="spinner" />
+                                </span>
+                              ) : null}
+                            </button>
+                          )}
+                          {messageAttachmentSrc(m) && m.messageType === "video" && !m.pendingUpload && (
+                            <VideoAttachmentPreview
+                              label="Shared video"
                               src={messageAttachmentSrc(m)!}
-                              alt={m.body || "Shared image"}
-                              className="attachment"
-                              draggable={false}
+                              onPlay={() => {
+                                if (messageActions.isRevealed(m.id) || !m.attachmentUrl) return;
+                                onOpenVideo({
+                                  src: messageAttachmentDisplaySrc(m.attachmentUrl),
+                                  alt: "Shared video",
+                                });
+                              }}
                             />
-                            {m.pendingUpload ? (
+                          )}
+                          {m.pendingUpload && m.localPreviewUrl && m.messageType === "video" && (
+                            <button
+                              type="button"
+                              className="attachment-open attachment-open--uploading attachment-video-preview"
+                              aria-label="Uploading video"
+                              aria-busy
+                              disabled
+                            >
+                              <video
+                                className="attachment attachment-video-preview-video attachment-video-preview-video--ready"
+                                src={m.localPreviewUrl}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                aria-hidden="true"
+                              />
                               <span className="attachment-upload-overlay" aria-hidden="true">
                                 <span className="spinner" />
                               </span>
-                            ) : null}
-                          </button>
-                        )}
-                        {messageAttachmentSrc(m) && m.messageType === "video" && !m.pendingUpload && (
-                          <VideoAttachmentPreview
-                            label={m.body || "Shared video"}
-                            src={messageAttachmentSrc(m)!}
-                            onPlay={() => {
-                              if (messageActions.isRevealed(m.id) || !m.attachmentUrl) return;
-                              onOpenVideo({
-                                src: messageAttachmentDisplaySrc(m.attachmentUrl),
-                                alt: m.body || "Shared video",
-                              });
-                            }}
-                          />
-                        )}
-                        {m.pendingUpload && m.localPreviewUrl && m.messageType === "video" && (
-                          <button
-                            type="button"
-                            className="attachment-open attachment-open--uploading attachment-video-preview"
-                            aria-label="Uploading video"
-                            aria-busy
-                            disabled
-                          >
-                            <video
-                              className="attachment attachment-video-preview-video attachment-video-preview-video--ready"
-                              src={m.localPreviewUrl}
-                              muted
-                              playsInline
-                              preload="metadata"
-                              aria-hidden="true"
-                            />
-                            <span className="attachment-upload-overlay" aria-hidden="true">
-                              <span className="spinner" />
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+                      {bodyText ? (
+                        <div
+                          className={[
+                            "message-bubble",
+                            isOwn ? "message-bubble--own" : "message-bubble--other",
+                            `message-bubble--group-${
+                              splitMediaAndText
+                                ? splitTextBubbleGroupPosition(layoutInfo.groupPosition)
+                                : layoutInfo.groupPosition
+                            }`,
+                            actionsOnTextBubble && messageActions.isRevealed(m.id)
+                              ? "message-bubble--actions-visible"
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          {...(actionsOnTextBubble ? messageActions.getBubbleHandlers(m.id) : {})}
+                        >
+                          {actionsOnTextBubble && !m.pendingUpload && !m.uploadFailed ? (
+                            <span className="message-actions">
+                              <MessageEmojiActions
+                                messageId={m.id}
+                                reactions={m.reactions ?? []}
+                                currentUserId={resolvedUserId}
+                                onToggleReaction={onToggleReaction}
+                              />
+                              {(canEditMessage(m) || canDeleteMessage(m)) && (
+                                <span className="message-actions-divider" aria-hidden />
+                              )}
+                              {canEditMessage(m) && (
+                                <button
+                                  type="button"
+                                  className="link-btn"
+                                  onClick={() => onStartEdit(m.id, m.body)}
+                                >
+                                  Edit
+                                </button>
+                              )}
+                              {canDeleteMessage(m) && (
+                                <button
+                                  type="button"
+                                  className="link-btn danger"
+                                  onClick={() => onDeleteTarget(m.id)}
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </span>
-                          </button>
-                        )}
-                        {m.body ? (
-                          <MessageBody body={m.body} currentUserId={resolvedUserId} />
-                        ) : null}
-                      </div>
+                          ) : null}
+                          <MessageBody body={bodyText} currentUserId={resolvedUserId} />
+                        </div>
+                      ) : null}
                     </MessageBubbleStack>
                     {showDeliveryFooter ? (
                       <div className="message-footer">

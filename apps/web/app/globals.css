@@ -128,12 +128,12 @@
 @keyframes message-reaction-pill-pop-out {
   from {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 
   to {
     opacity: 0;
-    transform: scale(0.82);
+    transform: translateY(6px) scale(0.97);
   }
 }
 
@@ -6313,11 +6313,6 @@ button.sidebar-group-header:focus-visible {
   animation: cco-scale-in 0.22s var(--motion-spring) both;
 }
 
-.chat-thread .message-bubble:has(.attachment):has(.message-body) {
-  padding: 6px;
-  overflow: visible;
-}
-
 .chat-thread .message-bubble--media-only {
   padding: 0;
   background: transparent;
@@ -6379,11 +6374,6 @@ button.sidebar-group-header:focus-visible {
   width: auto;
   height: auto;
   vertical-align: top;
-}
-
-.chat-thread .message-bubble:has(.attachment) .message-body {
-  padding: 4px 8px 8px;
-  margin-top: 0;
 }
 
 .chat-thread .message-bubble .attachment:last-child {
@@ -6922,11 +6912,13 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-reaction-pill--enter {
   animation: cco-pop-in 0.18s var(--motion-ease-out) both;
   animation-delay: var(--reaction-enter-delay, 0ms);
+  transition: none;
 }
 
 .chat-thread .message-reaction-pill--exit {
   animation: message-reaction-pill-pop-out 0.18s var(--motion-ease-out) forwards;
   pointer-events: none;
+  transition: none;
 }
 
 .chat-thread .message-reaction-emoji {
