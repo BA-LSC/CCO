@@ -13,6 +13,7 @@ import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
 import {
   useDeployCompletionPoll,
   validateUpdatesReload,
+  waitForUpdatesStatusAfterDeploy,
 } from "@/lib/use-deploy-completion-poll";
 export type UpdatesStatus = {
   platform: "cloudflare" | "unknown";
@@ -85,6 +86,7 @@ export function AdminUpdatesSection({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(initialStatus == null);
   const deployStartedAtRef = useRef<number | null>(null);
+  const pendingAppliedVersionRef = useRef<string | null>(null);
   const mountLoadStartedRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
@@ -156,10 +158,16 @@ export function AdminUpdatesSection({
 
   const validateBeforeReload = useCallback(async () => {
     try {
-      const next = await loadStatus();
+      const next = await waitForUpdatesStatusAfterDeploy(loadStatus, {
+        expectedAppliedVersion: pendingAppliedVersionRef.current,
+      });
+      if (next) setStatus(next);
       return validateUpdatesReload(next, (message) => {
         setDeploying(false);
+        pendingAppliedVersionRef.current = null;
         setFeedback({ error: message });
+      }, {
+        expectedAppliedVersion: pendingAppliedVersionRef.current,
       });
     } catch {
       return "reload" as const;
@@ -216,6 +224,7 @@ export function AdminUpdatesSection({
     setDeployStatusMessage(resolveDeployStatusMessage({ updating: true, elapsedMs: 0 }));
     markDeployWait({ showOverlay: false });
     setDeploying(true);
+    pendingAppliedVersionRef.current = status.latestVersion ?? status.currentVersion;
     try {
       const applyBody = applyCloudflareApiToken
         ? JSON.stringify({ cloudflareApiToken: applyCloudflareApiToken })
@@ -231,6 +240,7 @@ export function AdminUpdatesSection({
           ? { headers: { "Content-Type": "application/json" }, body: applyBody }
           : {}),
       });
+      pendingAppliedVersionRef.current = result.appliedVersion?.trim() || pendingAppliedVersionRef.current;
       setStatus(result.status);
       refreshDeployStatusMessage(true, null);
       setFeedback({});
@@ -238,6 +248,7 @@ export function AdminUpdatesSection({
       clearDeployWait();
       setDeploying(false);
       deployStartedAtRef.current = null;
+      pendingAppliedVersionRef.current = null;
       setFeedback({ error: err instanceof Error ? err.message : "Apply failed" });
       await loadStatus();
     } finally {
