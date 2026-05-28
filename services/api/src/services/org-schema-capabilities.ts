@@ -159,6 +159,16 @@ async function runEnsureD1OrganizationColumns(): Promise<void> {
   }
 }
 
+/** Best-effort ensure for read paths; logs and continues when DDL fails. */
+export async function ensureCloudflareOrganizationColumnsBestEffort(): Promise<void> {
+  try {
+    await ensureCloudflareOrganizationColumns();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[schema ensure] cloudflare org columns skipped:", detail);
+  }
+}
+
 /** Org columns for Cloudflare / RealtimeKit / platform settings (required, small, safe). */
 export async function ensureCloudflareOrganizationColumns(): Promise<void> {
   if (isCloudflareRuntime()) {

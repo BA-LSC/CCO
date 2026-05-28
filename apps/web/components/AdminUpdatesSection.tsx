@@ -82,12 +82,15 @@ export function AdminUpdatesSection({
   const [deploying, setDeploying] = useState(false);
   const [deployStatusMessage, setDeployStatusMessage] = useState("Starting update…");
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(initialStatus == null);
   const deployStartedAtRef = useRef<number | null>(null);
-  const backgroundRefreshStartedRef = useRef(false);
+  const mountLoadStartedRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
     setStatus(next);
+    setLoadError(null);
     return next;
   }, []);
 
@@ -116,12 +119,28 @@ export function AdminUpdatesSection({
   }, [deploying]);
 
   useEffect(() => {
-    if (!initialStatus || backgroundRefreshStartedRef.current) return;
-    backgroundRefreshStartedRef.current = true;
-    void loadStatus().catch(() => {
-      // Keep hydrated snapshot when background refresh fails.
-    });
+    if (mountLoadStartedRef.current) return;
+    mountLoadStartedRef.current = true;
+    if (!initialStatus) setStatusLoading(true);
+    void loadStatus()
+      .catch((err) => {
+        setLoadError(err instanceof Error ? err.message : "Failed to load updates");
+      })
+      .finally(() => setStatusLoading(false));
   }, [initialStatus, loadStatus]);
+
+  async function handleRetryLoad() {
+    setStatusLoading(true);
+    setLoadError(null);
+    setFeedback({});
+    try {
+      await loadStatus();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load updates");
+    } finally {
+      setStatusLoading(false);
+    }
+  }
 
   const refreshDeployStatusMessage = useCallback(
     (updating: boolean, deployPhase: string | null) => {
@@ -274,24 +293,27 @@ export function AdminUpdatesSection({
     }
   }
 
-  if (!status) {
-    return null;
-  }
+  const updateAvailable = status?.updateAvailable ?? false;
 
-  const updateAvailable = status.updateAvailable;
-
-  const statusBadge = updateAvailable
-    ? { label: "Update available", variant: "update" as const }
-    : status.latestVersion
-      ? { label: "Up to date", variant: "success" as const }
-      : status.lastUpdateCheckAt
-        ? { label: "Check failed", variant: "muted" as const }
-        : { label: "Not checked yet", variant: "muted" as const };
+  const statusBadge = !status
+    ? loadError
+      ? { label: "Unavailable", variant: "muted" as const }
+      : statusLoading
+        ? { label: "Loading…", variant: "muted" as const }
+        : { label: "Not checked yet", variant: "muted" as const }
+    : updateAvailable
+      ? { label: "Update available", variant: "update" as const }
+      : status.latestVersion
+        ? { label: "Up to date", variant: "success" as const }
+        : status.lastUpdateCheckAt
+          ? { label: "Check failed", variant: "muted" as const }
+          : { label: "Not checked yet", variant: "muted" as const };
 
   const isUpdating = deploying;
-  const controlsDisabled = busy !== null || isUpdating;
+  const controlsDisabled = busy !== null || isUpdating || !status;
   const showApplyButton =
-    updateAvailable || (Boolean(status.lastApplyError) && status.canApply);
+    status != null &&
+    (updateAvailable || (Boolean(status.lastApplyError) && status.canApply));
 
   return (
     <section className="integrations-section" aria-labelledby="updates-status-heading">
@@ -306,21 +328,33 @@ export function AdminUpdatesSection({
         </div>
       </div>
 
-      <UpdatesStatusMeta status={status} />
+      {statusLoading && !status ? (
+        <p className="integrations-field-hint" role="status">
+          Loading update status…
+        </p>
+      ) : null}
 
-      {status.lastUpdateCheckAt && !status.latestVersion && status.applyBlockedReason ? (
+      {loadError && !status ? (
+        <p className="integrations-feedback integrations-feedback--error" role="alert">
+          {loadError}
+        </p>
+      ) : null}
+
+      {status ? <UpdatesStatusMeta status={status} /> : null}
+
+      {status?.lastUpdateCheckAt && !status.latestVersion && status.applyBlockedReason ? (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
           {status.applyBlockedReason}
         </p>
       ) : null}
 
-      {status.cloudflareApiTokenValid === false && status.cloudflareApiTokenError && (
+      {status?.cloudflareApiTokenValid === false && status.cloudflareApiTokenError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
           Cloudflare token invalid: {status.cloudflareApiTokenError}
         </p>
       )}
 
-      {status.lastApplyError && (
+      {status?.lastApplyError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">
           Last apply failed: {status.lastApplyError}
           {status.canApply
@@ -353,6 +387,16 @@ export function AdminUpdatesSection({
       />
 
       <div className="integrations-actions">
+        {!status ? (
+          <button
+            type="button"
+            className="btn btn-secondary integrations-action-btn"
+            disabled={statusLoading || busy !== null}
+            onClick={() => void handleRetryLoad()}
+          >
+            {statusLoading ? "Loading…" : "Retry"}
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn btn-secondary integrations-action-btn"
@@ -381,7 +425,7 @@ export function AdminUpdatesSection({
         <p className="integrations-field-hint">{status.applyBlockedReason}</p>
       )}
 
-      {status.platform === "cloudflare" && (
+      {status?.platform === "cloudflare" && (
         <>
           <label className="integrations-toggle">
             <span className="integrations-toggle-label">Auto-install updates</span>

@@ -2,7 +2,7 @@ import type { SQL } from "drizzle-orm";
 import { desc } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
-import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
+import { ensureCloudflareOrganizationColumnsBestEffort } from "./org-schema-capabilities";
 import {
   configuredOrganizationColumns,
   type ConfiguredOrganizationRow,
@@ -81,7 +81,7 @@ export function pickConfiguredOrganizationRow(
 export async function selectConfiguredOrganizationRow(
   where: SQL | undefined,
 ): Promise<ConfiguredOrganizationRow | null> {
-  await ensureCloudflareOrganizationColumns();
+  await ensureCloudflareOrganizationColumnsBestEffort();
 
   const rows = await db
     .select(configuredOrganizationColumns)

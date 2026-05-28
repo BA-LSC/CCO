@@ -169,7 +169,6 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     return c.json({ error: "CCO is not configured" }, 409);
   }
 
-  await ensureCloudflareOrganizationColumns();
   const org = await getConfiguredOrganization();
   if (!org) return c.json({ error: "Organization not found" }, 404);
 
@@ -184,7 +183,13 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     refreshed.cloudflareAccountId && isCloudflareApiTokenConfigured(refreshed)
       ? await checkCloudflareApplyTokenHealth(refreshed)
       : { valid: null, error: null };
-  const updates = await getCachedUpdatesStatus(refreshed, tokenHealth);
+  let updates: Awaited<ReturnType<typeof getCachedUpdatesStatus>> | null = null;
+  try {
+    updates = await getCachedUpdatesStatus(refreshed, tokenHealth);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[integrations] updates snapshot failed:", detail);
+  }
   const workerPlacementLastError = await readPlacementRedeployError();
 
   return c.json({

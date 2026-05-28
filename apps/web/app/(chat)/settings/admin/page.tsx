@@ -50,7 +50,7 @@ type IntegrationsSettings = {
   workerPlacementRedeploySkipped?: boolean;
   workerPlacementRedeploySkippedReason?: string;
   workerPlacementLastError?: string | null;
-  updates?: UpdatesStatus;
+  updates?: UpdatesStatus | null;
 };
 
 type PcoSyncResult = {
