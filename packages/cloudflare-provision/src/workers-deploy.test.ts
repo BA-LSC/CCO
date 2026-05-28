@@ -79,14 +79,17 @@ describe("deployWorkerScript", () => {
       if (init?.method === "PUT") {
         capturedForm = init?.body as FormData;
       }
-      if (init?.method === "PUT" || url.endsWith("/workers/scripts/cco-api")) {
+      if (url.endsWith("/workers/scripts") && !init?.method) {
         return new Response(
           JSON.stringify({
             success: true,
-            result: {
-              compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
-              compatibility_flags: ["nodejs_compat"],
-            },
+            result: [
+              {
+                id: "cco-api",
+                compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+                compatibility_flags: ["nodejs_compat"],
+              },
+            ],
           }),
           { status: 200 },
         );
@@ -116,11 +119,17 @@ describe("deployWorkerScript", () => {
       if (init?.method === "PUT") {
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
       }
-      if (url.endsWith("/workers/scripts/cco-api")) {
+      if (url.endsWith("/workers/scripts") && !init?.method) {
         return new Response(
           JSON.stringify({
             success: true,
-            result: { compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+            result: [
+              {
+                id: "cco-api",
+                compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+                compatibility_flags: [],
+              },
+            ],
           }),
           { status: 200 },
         );
@@ -176,22 +185,18 @@ describe("deployAllProvisionWorkers", () => {
         secretPutCount += 1;
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
       }
-      if (
-        url.includes("/workers/scripts/") &&
-        !url.endsWith("/secrets") &&
-        !url.endsWith("/schedules") &&
-        init?.method !== "PUT"
-      ) {
-        const script = url.split("/workers/scripts/")[1] ?? "";
-        const flags =
-          script === "cco-api" || script === "cco-realtime-fanout" ? ["nodejs_compat"] : [];
+      if (url.endsWith("/workers/scripts") && !init?.method) {
         return new Response(
           JSON.stringify({
             success: true,
-            result: {
-              compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
-              compatibility_flags: flags,
-            },
+            result: [
+              { id: "cco-api", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: ["nodejs_compat"] },
+              { id: "cco-realtime-fanout", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: ["nodejs_compat"] },
+              { id: "cco-pco-webhook", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+              { id: "cco-giphy-proxy", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+              { id: "cco-push-consumer", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+              { id: "cco-reconcile-cron", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+            ],
           }),
           { status: 200 },
         );

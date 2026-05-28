@@ -332,22 +332,12 @@ export function AdminUpdatesSection({
       )}
 
       {status.lastApplyError && (
-        <>
-          <p className="integrations-feedback integrations-feedback--error" role="alert">
-            Last apply failed: {status.lastApplyError}
-            {status.canApply && !status.lastApplyError.includes("node:https")
-              ? " Apply update will redeploy the current release to recover."
-              : null}
-          </p>
-          {status.lastApplyError.includes("node:https") ? (
-            <p className="integrations-feedback integrations-feedback--error" role="alert">
-              Admin Apply cannot fix this by itself — the API worker must be redeployed once from a
-              machine with the CCO repo and your Cloudflare API token: run{" "}
-              <code>bun deploy/cloudflare/recover-api-nodejs-compat.ts</code> (see{" "}
-              <code>deploy/cloudflare/README.md</code>), then retry Apply.
-            </p>
-          ) : null}
-        </>
+        <p className="integrations-feedback integrations-feedback--error" role="alert">
+          Last apply failed: {status.lastApplyError}
+          {status.canApply
+            ? " Apply update will redeploy the current release to recover."
+            : null}
+        </p>
       )}
 
       {isUpdating && (

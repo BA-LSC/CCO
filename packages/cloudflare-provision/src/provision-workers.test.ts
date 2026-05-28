@@ -34,18 +34,19 @@ describe("createProvisionWorkerHandlers", () => {
           new Response(JSON.stringify({ success: true, result: null }), { status: 200 }),
         );
       }
-      if (/\/workers\/scripts\/[^/]+$/.test(url) && !init?.method) {
-        const script = url.split("/workers/scripts/")[1] ?? "";
-        const flags =
-          script === "cco-api" || script === "cco-realtime-fanout" ? ["nodejs_compat"] : [];
+      if (url.endsWith("/workers/scripts") && !init?.method) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
               success: true,
-              result: {
-                compatibility_date: "2026-05-28",
-                compatibility_flags: flags,
-              },
+              result: [
+                { id: "cco-api", compatibility_date: "2026-05-28", compatibility_flags: ["nodejs_compat"] },
+                { id: "cco-realtime-fanout", compatibility_date: "2026-05-28", compatibility_flags: ["nodejs_compat"] },
+                { id: "cco-pco-webhook", compatibility_date: "2026-05-28", compatibility_flags: [] },
+                { id: "cco-giphy-proxy", compatibility_date: "2026-05-28", compatibility_flags: [] },
+                { id: "cco-push-consumer", compatibility_date: "2026-05-28", compatibility_flags: [] },
+                { id: "cco-reconcile-cron", compatibility_date: "2026-05-28", compatibility_flags: [] },
+              ],
             }),
             { status: 200 },
           ),

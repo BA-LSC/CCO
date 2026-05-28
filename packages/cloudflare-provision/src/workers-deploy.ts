@@ -133,6 +133,33 @@ export async function deployWorkerScript(
   }
 }
 
+async function fetchWorkerScriptSettings(
+  accountId: string,
+  apiToken: string,
+  scriptName: string,
+): Promise<{ compatibility_flags?: string[]; compatibility_date?: string } | null> {
+  const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+  const json = (await res.json()) as {
+    success?: boolean;
+    result?: Array<{
+      id: string;
+      compatibility_flags?: string[];
+      compatibility_date?: string;
+    }>;
+    errors?: Array<{ message: string }>;
+  };
+  if (!res.ok || json.success === false) {
+    const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
+    throw new CloudflareApiError(
+      detail || `Failed to list worker scripts for ${scriptName}`,
+      res.status,
+    );
+  }
+  return json.result?.find((script) => script.id === scriptName) ?? null;
+}
+
 async function assertWorkerScriptCompatibility(
   accountId: string,
   apiToken: string,
@@ -140,35 +167,23 @@ async function assertWorkerScriptCompatibility(
   expectedFlags: readonly string[],
   expectedDate: string,
 ): Promise<void> {
-  const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts/${scriptName}`, {
-    headers: { Authorization: `Bearer ${apiToken}` },
-  });
-  const json = (await res.json()) as {
-    success?: boolean;
-    result?: { compatibility_flags?: string[]; compatibility_date?: string };
-    errors?: Array<{ message: string }>;
-  };
-  if (!res.ok || json.success === false) {
-    const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
-    throw new CloudflareApiError(
-      detail || `Failed to verify ${scriptName} compatibility settings`,
-      res.status,
-    );
+  const settings = await fetchWorkerScriptSettings(accountId, apiToken, scriptName);
+  if (!settings) {
+    throw new CloudflareApiError(`Worker ${scriptName} not found after deploy`, 404);
   }
 
-  const flags = json.result?.compatibility_flags ?? [];
+  const flags = settings.compatibility_flags ?? [];
   const missingFlags = expectedFlags.filter((flag) => !flags.includes(flag));
   if (missingFlags.length > 0) {
     throw new CloudflareApiError(
-      `Worker ${scriptName} deploy did not apply compatibility flags: ${missingFlags.join(", ")}. ` +
-        "Use deploy/cloudflare/force-apply-release.ts once from the CCO repo to recover, then retry Admin Apply.",
+      `Worker ${scriptName} deploy did not apply compatibility flags: ${missingFlags.join(", ")}`,
       500,
     );
   }
 
-  if (json.result?.compatibility_date && json.result.compatibility_date !== expectedDate) {
+  if (settings.compatibility_date && settings.compatibility_date !== expectedDate) {
     throw new CloudflareApiError(
-      `Worker ${scriptName} compatibility_date is ${json.result.compatibility_date}, expected ${expectedDate}`,
+      `Worker ${scriptName} compatibility_date is ${settings.compatibility_date}, expected ${expectedDate}`,
       500,
     );
   }

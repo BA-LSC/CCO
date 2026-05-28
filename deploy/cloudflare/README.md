@@ -103,26 +103,3 @@ Provision pipeline should map:
 - `api.<domain>/*` → `cco-api` worker
 
 Client calls same-origin `/api/v1/*` on the web hostname; Cloudflare routes or Next handlers forward to the API worker.
-
-## Recover from `No such module "node:https"` on Apply
-
-Admin **Apply** runs worker deploy logic inside the currently live `cco-api` worker. If that worker was deployed without `nodejs_compat`, Apply will keep failing with `node:https` imported from `cco-api.mjs` until you bootstrap once from the repo (Bun), not from the browser.
-
-From the repo root, with the same Cloudflare API token and IDs as Admin Settings:
-
-```bash
-export CLOUDFLARE_API_TOKEN=...
-export CLOUDFLARE_ACCOUNT_ID=...
-export API_HOSTNAME=api.example.com
-export CHAT_HOSTNAME=chat.example.com
-export CCO_D1_DATABASE_ID=...
-export CLOUDFLARE_R2_BUCKET=...
-export CLOUDFLARE_KV_PRESENCE_NAMESPACE_ID=...
-export CLOUDFLARE_KV_DEPLOY_NAMESPACE_ID=...
-export CLOUDFLARE_PUSH_QUEUE_ID=...
-export CCO_SECRETS_STORE_ID=...
-
-bun deploy/cloudflare/recover-api-nodejs-compat.ts
-```
-
-That redeploys only `cco-api` from the latest `https://setup-c.co/releases` bundle with `nodejs_compat`. Then use Admin → Updates → **Apply** again (or run `bun deploy/cloudflare/force-apply-release.ts` for a full release).
