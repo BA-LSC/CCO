@@ -149,7 +149,9 @@ export default function SetupPage() {
           setSignInRedirectUri(installContext.signInRedirectUri);
           setWebhookUrl(installContext.webhookUrl);
           setApiRedirectUri(installContext.apiRedirectUri);
-          setMobileRedirectUri(installContext.mobileRedirectUri);
+          if (installContext.mobileRedirectUri) {
+            setMobileRedirectUri(installContext.mobileRedirectUri);
+          }
           setCloudflarePlatformProvisioned(installContext.cloudflarePlatformProvisioned);
         }
 

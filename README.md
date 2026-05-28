@@ -44,7 +44,7 @@ Cloudflare-native local dev (Wrangler + D1) is planned in a future branch.
 
 ## Features
 
-- PCO OAuth (web + mobile) with encrypted token storage
+- PCO OAuth with encrypted token storage (web PWA; native mobile OAuth endpoints kept but disabled until a native app ships)
 - Group sync with leader/admin roles from PCO; roster sync for leaders
 - Realtime chat (WebSocket) with membership checks
 - Message edit/delete, reactions, @mentions with targeted push

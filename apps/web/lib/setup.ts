@@ -26,7 +26,7 @@ export type InstallSetupContext = {
   signInRedirectUri: string;
   webhookUrl: string;
   apiRedirectUri: string;
-  mobileRedirectUri: string;
+  mobileRedirectUri?: string;
   cloudflarePlatformProvisioned: boolean;
   readOnlyUrls: boolean;
 };

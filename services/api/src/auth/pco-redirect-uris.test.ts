@@ -12,11 +12,7 @@ import {
 
 describe("pco redirect uris", () => {
   test("allows configured default redirect URIs", async () => {
-    const uris = [
-      getDefaultPcoWebRedirectUri(),
-      getDefaultPcoApiRedirectUri(),
-      getDefaultPcoMobileRedirectUri(),
-    ];
+    const uris = [getDefaultPcoWebRedirectUri(), getDefaultPcoApiRedirectUri()];
     for (const uri of uris) {
       expect(await isAllowedPcoRedirectUri(uri)).toBe(true);
     }
@@ -56,6 +52,32 @@ describe("pco redirect uris", () => {
     expect(urls.signInRedirectUri).toBe("https://chat.grace.org/api/auth/pco/callback");
     expect(urls.webhookUrl).toBe("https://api.grace.org/webhooks/pco");
     expect(urls.apiRedirectUri).toBe("https://api.grace.org/auth/pco/callback");
-    expect(urls.mobileRedirectUri).toBe("https://api.grace.org/auth/pco/mobile/callback");
+    expect(urls.mobileRedirectUri).toBeUndefined();
+  });
+
+  test("buildInstallSetupUrls includes mobile redirect when native auth is enabled", () => {
+    const prev = process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED;
+    try {
+      process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED = "1";
+      const urls = buildInstallSetupUrls({
+        chatHostname: "chat.grace.org",
+        apiHostname: "api.grace.org",
+      });
+      expect(urls.mobileRedirectUri).toBe("https://api.grace.org/auth/pco/mobile/callback");
+    } finally {
+      if (prev === undefined) delete process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED;
+      else process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED = prev;
+    }
+  });
+
+  test("allowed redirect URIs omit mobile callback when native auth is disabled", async () => {
+    const prev = process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED;
+    try {
+      delete process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED;
+      expect(await isAllowedPcoRedirectUri(getDefaultPcoMobileRedirectUri())).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED;
+      else process.env.CCO_MOBILE_NATIVE_AUTH_ENABLED = prev;
+    }
   });
 });

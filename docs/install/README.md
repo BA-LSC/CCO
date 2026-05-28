@@ -183,8 +183,9 @@ The wizard notes Workers Paid and possible RealtimeKit charges after beta.
 Register **exact** URIs from `/setup` in your PCO developer app:
 
 - `https://chat.<zone>/api/auth/pco/callback`
-- `https://api.<zone>/auth/pco/mobile/callback`
 - Webhook: `https://api.<zone>/webhooks/pco`
+
+If you deploy a native mobile app later, enable `CCO_MOBILE_NATIVE_AUTH_ENABLED=1` on the API worker and add `https://api.<zone>/auth/pco/mobile/callback` to PCO.
 
 ---
 

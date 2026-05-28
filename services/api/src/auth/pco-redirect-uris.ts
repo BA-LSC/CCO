@@ -1,4 +1,5 @@
 import { getOrganizationWithOAuthCredentials } from "../services/org-oauth";
+import { isMobileNativeAuthEnabled } from "./mobile-native-auth";
 
 function normalizeHostname(value: string): string {
   return value
@@ -31,7 +32,7 @@ export type InstallSetupUrls = {
   signInRedirectUri: string;
   webhookUrl: string;
   apiRedirectUri: string;
-  mobileRedirectUri: string;
+  mobileRedirectUri?: string;
 };
 
 /** Build PCO callback URLs from BYO Cloudflare install hostnames. */
@@ -51,7 +52,9 @@ export function buildInstallSetupUrls(params: {
       signInRedirectUri: getDefaultPcoWebRedirectUri(),
       webhookUrl: getDefaultPcoWebhookUrl(),
       apiRedirectUri: getDefaultPcoApiRedirectUri(),
-      mobileRedirectUri: getDefaultPcoMobileRedirectUri(),
+      ...(isMobileNativeAuthEnabled()
+        ? { mobileRedirectUri: getDefaultPcoMobileRedirectUri() }
+        : {}),
     };
   }
 
@@ -65,7 +68,9 @@ export function buildInstallSetupUrls(params: {
     signInRedirectUri: `https://${resolvedChat}${signInPath}`,
     webhookUrl: webhookUrlForApiHostname(resolvedApi),
     apiRedirectUri: `https://${resolvedApi}/auth/pco/callback`,
-    mobileRedirectUri: `https://${resolvedApi}/auth/pco/mobile/callback`,
+    ...(isMobileNativeAuthEnabled()
+      ? { mobileRedirectUri: `https://${resolvedApi}/auth/pco/mobile/callback` }
+      : {}),
   };
 }
 
@@ -151,8 +156,10 @@ export async function getAllowedPcoRedirectUris(): Promise<string[]> {
     getDefaultPcoWebRedirectUri(),
     getLegacyPcoWebRedirectUri(),
     getDefaultPcoApiRedirectUri(),
-    getDefaultPcoMobileRedirectUri(),
   ]);
+  if (isMobileNativeAuthEnabled()) {
+    uris.add(getDefaultPcoMobileRedirectUri());
+  }
   try {
     uris.add(await getPcoWebRedirectUri());
   } catch {

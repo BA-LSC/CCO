@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { redeemMobileAuthCode } from "../auth/mobile-auth-codes";
+import {
+  isMobileNativeAuthEnabled,
+  MOBILE_NATIVE_AUTH_DISABLED_MESSAGE,
+} from "../auth/mobile-native-auth";
 import { exchangeOAuthCode } from "../auth/pco-exchange";
 
 const ExchangeSchema = z.object({
@@ -39,6 +43,10 @@ authRouter.post("/pco/exchange", async (c) => {
 });
 
 authRouter.post("/mobile/complete", async (c) => {
+  if (!isMobileNativeAuthEnabled()) {
+    return c.json({ error: MOBILE_NATIVE_AUTH_DISABLED_MESSAGE }, 503);
+  }
+
   const parsed = MobileCompleteSchema.safeParse(await c.req.json());
   if (!parsed.success) {
     return c.json({ error: parsed.error.flatten() }, 400);

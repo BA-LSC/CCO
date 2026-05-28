@@ -6,6 +6,10 @@ import { getActiveOrgOAuthCredentials } from "../services/org-oauth";
 import { fetchPcoMe } from "../services/setup";
 import { completeOAuthLogin, setSessionCookies } from "./oauth-complete";
 import { createMobileAuthCode } from "./mobile-auth-codes";
+import {
+  isMobileNativeAuthEnabled,
+  MOBILE_NATIVE_AUTH_DISABLED_MESSAGE,
+} from "./mobile-native-auth";
 
 export { buildAuthorizeUrl };
 
@@ -28,6 +32,9 @@ oauthApp.get("/start", async (c) => {
   }
 
   const platform = c.req.query("platform") === "mobile" ? "mobile" : "web";
+  if (platform === "mobile" && !isMobileNativeAuthEnabled()) {
+    return c.text(MOBILE_NATIVE_AUTH_DISABLED_MESSAGE, 503);
+  }
   const state = crypto.randomUUID();
 
   const url = buildAuthorizeUrl({
@@ -57,6 +64,10 @@ oauthApp.get("/start", async (c) => {
 });
 
 async function handleCallback(c: Context, platform: "web" | "mobile") {
+  if (platform === "mobile" && !isMobileNativeAuthEnabled()) {
+    return c.text(MOBILE_NATIVE_AUTH_DISABLED_MESSAGE, 503);
+  }
+
   const code = c.req.query("code");
   const state = c.req.query("state");
   const savedState = c.req.cookie("pco_oauth_state");

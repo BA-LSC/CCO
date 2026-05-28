@@ -173,8 +173,7 @@ export async function registerSetupApiMocks(context: BrowserContext): Promise<vo
     churchName: TEST_CHURCH,
     signInRedirectUri: `${TEST_CHAT_URL}/api/auth/pco/callback`,
     webhookUrl: TEST_WEBHOOK_URL,
-    apiRedirectUri: `https://${TEST_API_HOST}/auth/pco/mobile/callback`,
-    mobileRedirectUri: `https://${TEST_API_HOST}/auth/pco/mobile/callback`,
+    apiRedirectUri: `https://${TEST_API_HOST}/auth/pco/callback`,
     cloudflarePlatformProvisioned: true,
     readOnlyUrls: true,
   };
@@ -211,7 +210,6 @@ export async function registerSetupApiMocks(context: BrowserContext): Promise<vo
         signInRedirectUri: installContext.signInRedirectUri,
         webhookUrl: installContext.webhookUrl,
         apiRedirectUri: installContext.apiRedirectUri,
-        mobileRedirectUri: installContext.mobileRedirectUri,
       }),
     });
   });

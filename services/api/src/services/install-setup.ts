@@ -41,7 +41,7 @@ export type InstallSetupContext = {
   signInRedirectUri: string;
   webhookUrl: string;
   apiRedirectUri: string;
-  mobileRedirectUri: string;
+  mobileRedirectUri?: string;
   cloudflarePlatformProvisioned: boolean;
   readOnlyUrls: boolean;
 };
@@ -124,7 +124,7 @@ export async function getInstallSetupContext(options: {
     signInRedirectUri: savedSignIn || urls.signInRedirectUri,
     webhookUrl: savedWebhook ? resolvePcoWebhookUrl(savedWebhook) : urls.webhookUrl,
     apiRedirectUri: urls.apiRedirectUri,
-    mobileRedirectUri: urls.mobileRedirectUri,
+    ...(urls.mobileRedirectUri ? { mobileRedirectUri: urls.mobileRedirectUri } : {}),
     cloudflarePlatformProvisioned: Boolean(org?.cloudflarePlatformProvisionedAt),
     readOnlyUrls: true,
   };

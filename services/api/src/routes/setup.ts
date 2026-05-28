@@ -26,6 +26,7 @@ import {
   getPcoWebhookUrl,
   resolvePcoWebhookUrl,
 } from "../auth/pco-redirect-uris";
+import { isMobileNativeAuthEnabled } from "../auth/mobile-native-auth";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import {
   enableOrganizationRealtimeKit,
@@ -286,7 +287,7 @@ setupRouter.get("/redirect-uris", async (c) => {
     signInRedirectUri: await getPcoWebRedirectUri(),
     webhookUrl: await getPcoWebhookUrl(),
     apiRedirectUri: getPcoApiRedirectUri(),
-    mobileRedirectUri: getPcoMobileRedirectUri(),
+    ...(isMobileNativeAuthEnabled() ? { mobileRedirectUri: getPcoMobileRedirectUri() } : {}),
     defaultSignInRedirectUri: getDefaultPcoWebRedirectUri(),
     defaultWebhookUrl: getDefaultPcoWebhookUrl(),
   });
