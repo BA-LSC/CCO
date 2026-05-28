@@ -1,34 +1,46 @@
 import { resolveAppBuildVersion } from "@/lib/build-version.server";
 import { fetchFromApi } from "@/lib/api-fetch-server";
-import { isDeployDraining } from "@/lib/deploy-status.server";
+import { isDeployDraining, readDeployPhase } from "@/lib/deploy-status.server";
 
 export const dynamic = "force-dynamic";
 
-async function readDeployUpdatingFromApi(): Promise<boolean | null> {
+type ApiDeployStatus = {
+  draining: boolean;
+  deployPhase: string | null;
+};
+
+async function readDeployStatusFromApi(): Promise<ApiDeployStatus | null> {
   try {
     const res = await fetchFromApi("/health", {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { draining?: boolean };
-    return Boolean(data.draining);
+    const data = (await res.json()) as { draining?: boolean; deployPhase?: string | null };
+    return {
+      draining: Boolean(data.draining),
+      deployPhase: data.deployPhase?.trim() || null,
+    };
   } catch {
     return null;
   }
 }
 
 export async function GET() {
-  const [apiDraining, version] = await Promise.all([
-    readDeployUpdatingFromApi(),
+  const [apiStatus, version, localDraining, localPhase] = await Promise.all([
+    readDeployStatusFromApi(),
     Promise.resolve(resolveAppBuildVersion(process.env)),
+    isDeployDraining(),
+    readDeployPhase(),
   ]);
 
-  const updating =
-    apiDraining === true || (apiDraining === null && (await isDeployDraining()));
+  const updating = apiStatus?.draining === true || (apiStatus === null && localDraining);
+  const deployPhase = updating
+    ? apiStatus?.deployPhase ?? localPhase
+    : null;
 
   return Response.json(
-    { version, updating },
+    { version, updating, deployPhase },
     { headers: { "Cache-Control": "no-store, max-age=0" } },
   );
 }

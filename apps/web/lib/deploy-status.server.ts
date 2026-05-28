@@ -4,6 +4,7 @@ import { fetchFromApi } from "@/lib/api-fetch-server";
 import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 
 const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
+const DEPLOY_PHASE_KEY = "cco:deploy:phase";
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 
 type DeployKvBinding = {
@@ -81,17 +82,55 @@ async function readKvDeployFlag(key: string): Promise<string | null> {
 }
 
 async function readDeployDrainingFromApi(): Promise<boolean | null> {
+  const status = await readDeployStatusFromApi();
+  if (!status) return null;
+  return status.draining;
+}
+
+async function readDeployStatusFromApi(): Promise<{
+  draining: boolean;
+  deployPhase: string | null;
+} | null> {
   try {
     const res = await fetchFromApi("/health", {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { draining?: boolean };
-    return Boolean(data.draining);
+    const data = (await res.json()) as { draining?: boolean; deployPhase?: string | null };
+    return {
+      draining: Boolean(data.draining),
+      deployPhase: data.deployPhase?.trim() || null,
+    };
   } catch {
     return null;
   }
+}
+
+async function readDeployPhaseFromKvBinding(): Promise<string | null> {
+  const kv = await readDeployKvBinding();
+  if (!kv) return null;
+  try {
+    const raw = await kv.get(DEPLOY_PHASE_KEY);
+    return raw?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function readDeployPhase(): Promise<string | null> {
+  const fromKvBinding = await readDeployPhaseFromKvBinding();
+  if (fromKvBinding != null) return fromKvBinding;
+
+  if (process.env.CF_DEPLOY_KV === "1" || !process.env.REDIS_URL) {
+    const kvValue = await readKvDeployFlag(DEPLOY_PHASE_KEY);
+    if (kvValue != null) return kvValue.trim() || null;
+  }
+
+  const status = await readDeployStatusFromApi();
+  if (status?.deployPhase) return status.deployPhase;
+
+  return null;
 }
 
 /** True while deploy/bootstrap has set the draining flag. */

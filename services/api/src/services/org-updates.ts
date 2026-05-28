@@ -22,7 +22,12 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { isCloudflareRuntime } from "../runtime/worker-context";
-import { readDeployLastError, setDeployDraining, setDeployLastError } from "../lib/deploy-status";
+import {
+  readDeployLastError,
+  setDeployDraining,
+  setDeployLastError,
+  setDeployPhase,
+} from "../lib/deploy-status";
 import { fetchGitReleaseIndex, resolveOrgGitRepoUrl } from "./git-release-index";
 import { getConfiguredOrganization } from "./org-oauth";
 import {
@@ -440,6 +445,7 @@ async function applyIncrementalD1Migrations(job: CloudflareReleaseUpdateJob): Pr
 export async function prepareCloudflareReleaseUpdate(options?: {
   apiTokenOverride?: string;
 }): Promise<CloudflareReleaseUpdateJob> {
+  await setDeployPhase("checking-release");
   await ensureOrgUpdateSettingsColumns();
   const org = await getConfiguredOrganization();
   if (!org) throw new Error("Organization not found");
@@ -456,6 +462,7 @@ export async function prepareCloudflareReleaseUpdate(options?: {
   }
 
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
+  await setDeployPhase("downloading-release");
   const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
   const currentVersion = resolveInstalledVersion(org);
@@ -487,6 +494,7 @@ export async function prepareCloudflareReleaseUpdate(options?: {
     });
   }
 
+  await setDeployPhase("verifying-access");
   await verifyCloudflareUpdateApplyPermissions({
     accountId,
     apiToken,
@@ -494,6 +502,7 @@ export async function prepareCloudflareReleaseUpdate(options?: {
     apiHostname: hostnames.apiHostname,
   });
 
+  await setDeployPhase("preparing-workers");
   const readBundle = createRemoteBundleLoader(releasesBase);
   try {
     await setDeployLastError(null);
@@ -540,6 +549,7 @@ export async function executeCloudflareReleaseUpdate(
 ): Promise<{ appliedVersion: string; deployedWorkers: string[] }> {
   await setDeployDraining(true);
   try {
+    await setDeployPhase("configuring-uploads");
     await ensureR2BucketCors(
       job.accountId,
       job.apiToken,
@@ -555,8 +565,10 @@ export async function executeCloudflareReleaseUpdate(
       );
     });
 
+    await setDeployPhase("running-migrations");
     await applyIncrementalD1Migrations(job);
 
+    await setDeployPhase("deploying-api");
     const deployedWorkers = await deployAllProvisionWorkers({
       accountId: job.accountId,
       apiToken: job.apiToken,
@@ -566,6 +578,7 @@ export async function executeCloudflareReleaseUpdate(
       readBundle: job.readBundle,
     });
 
+    await setDeployPhase("deploying-chat");
     const assetsManifest = await fetchWebReleaseManifest(
       `${job.releasesBase}/cco-web-manifest.json`,
     );
@@ -582,6 +595,7 @@ export async function executeCloudflareReleaseUpdate(
       releaseVersion: job.targetVersion,
     });
 
+    await setDeployPhase("finalizing");
     await db
       .update(organizations)
       .set({
@@ -613,6 +627,7 @@ export async function startCloudflareReleaseUpdate(options?: {
   targetVersion: string;
 }> {
   await setDeployDraining(true);
+  await setDeployPhase("starting");
   try {
     const job = await prepareCloudflareReleaseUpdate(options);
     return { job, targetVersion: job.targetVersion };

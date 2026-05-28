@@ -9,14 +9,12 @@ import {
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
 import { dispatchAdminUpdateStatus } from "@/lib/admin-update-events";
+import { clearDeployWait, isDeployPending, markDeployWait } from "@/lib/app-update";
+import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
 import {
-  applyAppUpdate,
-  clearDeployWait,
-  DEPLOY_POLL_MS,
-  markDeployWait,
-  probeServerAppVersion,
-} from "@/lib/app-update";
-import { getClientBuildVersion } from "@/lib/build-version";
+  useDeployCompletionPoll,
+  validateUpdatesReload,
+} from "@/lib/use-deploy-completion-poll";
 export type UpdatesStatus = {
   platform: "cloudflare" | "vps" | "unknown";
   currentVersion: string | null;
@@ -85,10 +83,9 @@ export function AdminUpdatesSection({
     initialStatus?.autoUpdateCheckIntervalMinutes ?? 360,
   );
   const [deploying, setDeploying] = useState(false);
+  const [deployStatusMessage, setDeployStatusMessage] = useState("Starting update…");
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
-  const deployPollRef = useRef<number | null>(null);
-  /** Avoid reloading before the API marks deploy draining (prepare can take several seconds). */
-  const sawDeployUpdatingRef = useRef(false);
+  const deployStartedAtRef = useRef<number | null>(null);
   const backgroundRefreshStartedRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
@@ -116,6 +113,15 @@ export function AdminUpdatesSection({
   }, [status]);
 
   useEffect(() => {
+    if (deploying || !isDeployPending()) return;
+    deployStartedAtRef.current = Date.now();
+    setDeploying(true);
+    setDeployStatusMessage(
+      resolveDeployStatusMessage({ updating: true, elapsedMs: 0 }),
+    );
+  }, [deploying]);
+
+  useEffect(() => {
     if (!initialStatus || backgroundRefreshStartedRef.current) return;
     backgroundRefreshStartedRef.current = true;
     void loadStatus().catch(() => {
@@ -123,70 +129,35 @@ export function AdminUpdatesSection({
     });
   }, [initialStatus, loadStatus]);
 
-  useEffect(() => {
-    if (!deploying) return;
+  const refreshDeployStatusMessage = useCallback(
+    (updating: boolean, deployPhase: string | null) => {
+      const elapsedMs = deployStartedAtRef.current
+        ? Date.now() - deployStartedAtRef.current
+        : 0;
+      setDeployStatusMessage(
+        resolveDeployStatusMessage({ phase: deployPhase, updating, elapsedMs }),
+      );
+    },
+    [],
+  );
 
-    let cancelled = false;
+  const validateBeforeReload = useCallback(async () => {
+    try {
+      const next = await loadStatus();
+      return validateUpdatesReload(next, (message) => {
+        setDeploying(false);
+        setFeedback({ error: message });
+      });
+    } catch {
+      return "reload" as const;
+    }
+  }, [loadStatus]);
 
-    const pollUntilReady = async () => {
-      const { updating, version: serverVersion, unavailable } = await probeServerAppVersion();
-      if (cancelled) return;
-      if (updating) {
-        sawDeployUpdatingRef.current = true;
-        return;
-      }
-      if (!sawDeployUpdatingRef.current) {
-        const clientVersion = getClientBuildVersion();
-        if (
-          !unavailable &&
-          serverVersion &&
-          clientVersion !== "dev" &&
-          serverVersion !== clientVersion
-        ) {
-          sawDeployUpdatingRef.current = true;
-        } else {
-          return;
-        }
-      }
-
-      try {
-        const next = await loadStatus();
-        if (next.lastApplyError) {
-          clearDeployWait();
-          setDeploying(false);
-          setFeedback({ error: `Apply failed: ${next.lastApplyError}` });
-          return;
-        }
-        if (
-          next.latestVersion != null &&
-          isUpdateAvailable(next.currentVersion, next.latestVersion)
-        ) {
-          clearDeployWait();
-          setDeploying(false);
-          setFeedback({
-            error:
-              "Deploy finished but the release is still pending. Check for updates and try Apply again.",
-          });
-          return;
-        }
-      } catch {
-        // Fall through to reload when status cannot be read.
-      }
-
-      void applyAppUpdate();
-    };
-
-    void pollUntilReady();
-    deployPollRef.current = window.setInterval(() => void pollUntilReady(), DEPLOY_POLL_MS);
-
-    return () => {
-      cancelled = true;
-      if (deployPollRef.current !== null) {
-        window.clearInterval(deployPollRef.current);
-        deployPollRef.current = null;
-      }
-    };
-  }, [deploying, loadStatus]);
+  useDeployCompletionPoll({
+    deploying,
+    validateBeforeReload,
+    onDeployStatusMessage: (message) => setDeployStatusMessage(message),
+  });
 
   async function handleCheck() {
     setBusy("check");
@@ -231,7 +202,8 @@ export function AdminUpdatesSection({
     }
     setBusy("apply");
     setFeedback({});
-    sawDeployUpdatingRef.current = false;
+    deployStartedAtRef.current = Date.now();
+    setDeployStatusMessage(resolveDeployStatusMessage({ updating: true, elapsedMs: 0 }));
     markDeployWait({ showOverlay: false });
     setDeploying(true);
     try {
@@ -250,13 +222,12 @@ export function AdminUpdatesSection({
           : {}),
       });
       setStatus(result.status);
-      sawDeployUpdatingRef.current = true;
-      setFeedback({
-        success: "This page will refresh when the update finishes.",
-      });
+      refreshDeployStatusMessage(true, null);
+      setFeedback({});
     } catch (err) {
       clearDeployWait();
       setDeploying(false);
+      deployStartedAtRef.current = null;
       setFeedback({ error: err instanceof Error ? err.message : "Apply failed" });
       await loadStatus();
     } finally {
@@ -374,7 +345,12 @@ export function AdminUpdatesSection({
           <div className="integrations-updates-deploying-head">
             <span className="integrations-updates-deploying-label">Updating CCO…</span>
           </div>
-          <UpdatesFeedback success={feedback.success} />
+          <p
+            className="integrations-feedback integrations-feedback--success integrations-updates-deploying-detail"
+            role="status"
+          >
+            {deployStatusMessage}
+          </p>
           <div className="integrations-updates-progress" aria-hidden="true">
             <div className="integrations-updates-progress-bar" />
           </div>

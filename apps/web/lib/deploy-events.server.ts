@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { DEPLOY_POLL_MS } from "@/lib/app-update";
 import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 import { DEPLOY_SIGNAL_CHANNEL, isDeployDraining, readDeploySignalValue } from "@/lib/deploy-status.server";
 
@@ -11,8 +12,6 @@ type DeploySignalListener = (signal: DeploySignal) => void;
 const listeners = new Set<DeploySignalListener>();
 
 let subscriber: Redis | null = null;
-
-const DEPLOY_POLL_MS = 750;
 
 function parseDeploySignal(raw: string): DeploySignal {
   if (raw === "updating") return { updating: true };

@@ -6,6 +6,8 @@ import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
+import { AdminUpdateApplyBanner } from "@/components/AdminUpdateApplyBanner";
+import { DeployRouteOverlay } from "@/components/DeployRouteOverlay";
 import { EnableNotificationsBanner } from "@/components/EnableNotificationsBanner";
 import { WebPushRegistrar } from "@/components/WebPushRegistrar";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
@@ -49,8 +51,10 @@ export function ChatShell({ children }: Props) {
       <div className={`chat-shell${hideSidebar ? " chat-shell--no-sidebar" : ""}`}>
         {!hideSidebar ? <ChatSidebar /> : null}
         <main className="chat-main">
+          <DeployRouteOverlay />
           <AddToHomeScreenBanner />
           <EnableNotificationsBanner />
+          <AdminUpdateApplyBanner />
           {children}
         </main>
       </div>

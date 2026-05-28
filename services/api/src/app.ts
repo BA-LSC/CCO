@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveUploadFile } from "./lib/serve-upload";
-import { isDeployDraining } from "./lib/deploy-status";
+import { isDeployDraining, readDeployPhase } from "./lib/deploy-status";
 import { getUploadDir } from "./lib/uploads";
 import { authRouter } from "./routes/auth";
 import { mountPcoOAuth } from "./auth/pco-oauth";
@@ -49,7 +49,8 @@ app.use(
 
 app.get("/health", async (c) => {
   const draining = await isDeployDraining();
-  return c.json({ ok: true, draining });
+  const deployPhase = draining ? await readDeployPhase() : null;
+  return c.json({ ok: true, draining, deployPhase });
 });
 app.get("/uploads/:filename", serveUploadFile);
 app.route("/v1/uploads", uploadsRouter);

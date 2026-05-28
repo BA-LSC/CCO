@@ -8,7 +8,8 @@ const DEPLOY_RELOAD_GRACE_MS = 15_000;
 const DEPLOY_RELOAD_SEND_WAIT_MS = 500;
 export const STANDALONE_UPDATE_CHECK_MS = 5_000;
 export const UPDATE_CHECK_MS = 15_000;
-export const DEPLOY_POLL_MS = 750;
+/** Poll interval while a deploy is in progress (app-version / health). */
+export const DEPLOY_POLL_MS = 300;
 
 const DEPLOY_HTTP_STATUSES = new Set([502, 503, 504]);
 const RELOAD_LOOP_KEY = "cco-reload-loop";
@@ -153,6 +154,11 @@ export function isDeployOverlaySuppressed(): boolean {
   );
 }
 
+export function setDeployOverlaySuppressed(suppressed: boolean): void {
+  if (typeof window === "undefined") return;
+  window.__ccoSuppressDeployOverlay = suppressed;
+}
+
 export function resumeAppUpdateUi(): void {
   if (typeof window === "undefined") return;
   if (!isAppUpdateInProgress() && !isDeployPending()) return;
@@ -271,6 +277,7 @@ export type AppVersionProbe = {
   version: string | null;
   unavailable: boolean;
   updating: boolean;
+  deployPhase: string | null;
 };
 
 export async function probeServerAppVersion(): Promise<AppVersionProbe> {
@@ -280,20 +287,44 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
       headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (DEPLOY_HTTP_STATUSES.has(res.status)) {
-      return { version: null, unavailable: true, updating: isDeployPending() };
+      return {
+        version: null,
+        unavailable: true,
+        updating: isDeployPending(),
+        deployPhase: null,
+      };
     }
     if (!res.ok) {
-      return { version: null, unavailable: true, updating: false };
+      return { version: null, unavailable: true, updating: false, deployPhase: null };
     }
 
-    const data = (await res.json()) as { version?: string; updating?: boolean };
+    const data = (await res.json()) as {
+      version?: string;
+      updating?: boolean;
+      deployPhase?: string | null;
+    };
     if (data.updating) {
-      return { version: data.version ?? null, unavailable: false, updating: true };
+      return {
+        version: data.version ?? null,
+        unavailable: false,
+        updating: true,
+        deployPhase: data.deployPhase ?? null,
+      };
     }
 
-    return { version: data.version ?? null, unavailable: false, updating: false };
+    return {
+      version: data.version ?? null,
+      unavailable: false,
+      updating: false,
+      deployPhase: null,
+    };
   } catch {
-    return { version: null, unavailable: true, updating: isDeployPending() };
+    return {
+      version: null,
+      unavailable: true,
+      updating: isDeployPending(),
+      deployPhase: null,
+    };
   }
 }
 

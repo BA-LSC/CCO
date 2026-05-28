@@ -13,6 +13,7 @@ import { getWorkerBindings } from "../runtime/worker-context";
 export const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 export const DEPLOY_LAST_ERROR_KEY = "cco:deploy:last-error";
+export const DEPLOY_PHASE_KEY = "cco:deploy:phase";
 
 let redis: Redis | null = null;
 
@@ -70,8 +71,89 @@ export async function isDeployDraining(): Promise<boolean> {
   }
 }
 
+export async function readDeployPhase(): Promise<string | null> {
+  try {
+    if (await shouldUseKvDeploy()) {
+      const binding = getWorkerBindings()?.DEPLOY_KV;
+      if (binding) {
+        const raw = await kvGetBinding(binding, DEPLOY_PHASE_KEY);
+        return raw?.trim() || null;
+      }
+      const kv = await resolveDeployKvConfig();
+      if (kv) {
+        const raw = await kvGet(kv, DEPLOY_PHASE_KEY);
+        return raw?.trim() || null;
+      }
+    }
+  } catch {
+    // Fall through to Redis when KV is unavailable.
+  }
+
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    if (client.status !== "ready") {
+      await client.connect().catch(() => null);
+    }
+    if (client.status !== "ready") return null;
+    const raw = await client.get(DEPLOY_PHASE_KEY);
+    return raw?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setDeployPhase(phase: string | null): Promise<void> {
+  if (!(await shouldUseKvDeploy())) {
+    const client = getRedis();
+    if (!client) return;
+    try {
+      if (client.status !== "ready") {
+        await client.connect().catch(() => null);
+      }
+      if (client.status !== "ready") return;
+      if (phase) {
+        await client.set(DEPLOY_PHASE_KEY, phase, "EX", 3600);
+      } else {
+        await client.del(DEPLOY_PHASE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  const binding = getWorkerBindings()?.DEPLOY_KV;
+  if (binding) {
+    if (phase) {
+      await kvPutBinding(binding, DEPLOY_PHASE_KEY, phase, 3600);
+    } else {
+      try {
+        await kvDeleteBinding(binding, DEPLOY_PHASE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    return;
+  }
+  const kv = await resolveDeployKvConfig();
+  if (!kv) return;
+  if (phase) {
+    await kvPut(kv, DEPLOY_PHASE_KEY, phase, 3600);
+  } else {
+    try {
+      await kvDelete(kv, DEPLOY_PHASE_KEY);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export async function setDeployDraining(updating: boolean): Promise<void> {
   const value = updating ? "1" : "0";
+  if (!updating) {
+    await setDeployPhase(null);
+  }
 
   if (await shouldUseKvDeploy()) {
     const binding = getWorkerBindings()?.DEPLOY_KV;

@@ -1,5 +1,7 @@
 export const APP_UPDATE_OVERLAY_LABEL = "Updating CCO…";
 
+const OVERLAY_LABEL_SELECTOR = ".loading-screen-label";
+
 /** Critical overlay styles so the update screen renders before app CSS loads. */
 export const APP_UPDATE_OVERLAY_STYLE_CSS = `
 .app-update-overlay{position:fixed;inset:0;z-index:10000;display:flex;background:var(--color-bg,#111620)}
@@ -57,4 +59,12 @@ export function showAppUpdateOverlay(): void {
 export function hideAppUpdateOverlay(): void {
   if (typeof document === "undefined") return;
   document.getElementById(OVERLAY_ID)?.remove();
+}
+
+/** Update the status line under the spinner while a deploy is in progress. */
+export function setAppUpdateOverlayLabel(message: string): void {
+  if (typeof document === "undefined") return;
+  showAppUpdateOverlay();
+  const label = document.querySelector(`#${OVERLAY_ID} ${OVERLAY_LABEL_SELECTOR}`);
+  if (label) label.textContent = message;
 }
