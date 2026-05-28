@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { getWorkerD1, isCloudflareRuntime } from "../runtime/worker-context";
+import { getWorkerBindings, getWorkerD1, isCloudflareRuntime } from "../runtime/worker-context";
 
 const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_account_id" text`,
@@ -39,9 +39,23 @@ const ORG_COLUMN_STATEMENTS = [
 
 /** SQLite D1 org columns not yet on older installs (baseline adds them for greenfield). */
 const D1_ORG_COLUMN_STATEMENTS = [
-  `ALTER TABLE "organizations" ADD COLUMN "cloudflare_worker_placement_mode" TEXT NOT NULL DEFAULT 'smart'`,
+  `ALTER TABLE "organizations" ADD COLUMN "cloudflare_worker_placement_mode" TEXT DEFAULT 'smart'`,
   `ALTER TABLE "organizations" ADD COLUMN "cloudflare_worker_placement_region" TEXT`,
 ] as const;
+
+const D1_PLACEMENT_MODE_COLUMN = "cloudflare_worker_placement_mode";
+
+function ddlErrorDetail(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = err.cause instanceof Error ? err.cause.message : "";
+    return cause ? `${err.message} ${cause}` : err.message;
+  }
+  return String(err);
+}
+
+function isBenignD1OrgColumnDdlError(err: unknown): boolean {
+  return /duplicate column name|already exists/i.test(ddlErrorDetail(err));
+}
 
 /** Call tables from 0021 — optional; must not block Cloudflare token save. */
 const CALL_SCHEMA_STATEMENTS = [
@@ -97,12 +111,24 @@ let callSchemaPromise: Promise<void> | null = null;
 let callSchemaReady = false;
 
 async function executeDdl(statement: string): Promise<void> {
+  const bindings = getWorkerBindings();
+  if (bindings?.DB) {
+    await bindings.DB.prepare(statement).run();
+    return;
+  }
   const d1 = getWorkerD1();
   if (d1) {
     await d1.run(sql.raw(statement));
     return;
   }
   await db.execute(sql.raw(statement));
+}
+
+async function d1OrganizationsHasColumn(columnName: string): Promise<boolean> {
+  const d1 = getWorkerD1();
+  if (!d1) return false;
+  const rows = await d1.all<{ name: string }>(sql.raw(`PRAGMA table_info("organizations")`));
+  return rows.some((row) => row.name === columnName);
 }
 
 async function executeOptionalDdl(statement: string): Promise<void> {
@@ -147,12 +173,14 @@ async function runEnsureCallSessionSchema(): Promise<void> {
 }
 
 async function runEnsureD1OrganizationColumns(): Promise<void> {
+  if (await d1OrganizationsHasColumn(D1_PLACEMENT_MODE_COLUMN)) {
+    return;
+  }
   for (const statement of D1_ORG_COLUMN_STATEMENTS) {
     try {
       await executeDdl(statement);
     } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      if (!/duplicate column name/i.test(detail)) {
+      if (!isBenignD1OrgColumnDdlError(err)) {
         throw err;
       }
     }
