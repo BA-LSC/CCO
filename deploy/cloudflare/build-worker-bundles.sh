@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build esbuild/wrangler bundles for all CCO Cloudflare Workers (install + VPS deploy).
+# Build esbuild/wrangler bundles for all CCO Cloudflare Workers (install + BYO release apply).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

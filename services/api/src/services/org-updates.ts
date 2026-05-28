@@ -66,7 +66,7 @@ export async function ensureOrgUpdateSettingsColumns(): Promise<void> {
   }
 }
 
-export type UpdatePlatform = "cloudflare" | "vps" | "unknown";
+export type UpdatePlatform = "cloudflare" | "unknown";
 
 export type UpdatesStatus = {
   platform: UpdatePlatform;
@@ -210,7 +210,6 @@ export function resolveUpdatePlatform(org: {
   }
   if (isCloudflareRuntime()) return "cloudflare";
   if (process.env.CCO_DEPLOY_TARGET === "cloudflare") return "cloudflare";
-  if (process.env.DATABASE_URL?.trim()) return "vps";
   return "unknown";
 }
 
@@ -236,11 +235,7 @@ function resolveUpdatesApplyGating(
   let canApply = platform === "cloudflare";
   let applyBlockedReason: string | null = null;
 
-  if (platform === "vps") {
-    canApply = false;
-    applyBlockedReason =
-      "VPS deployments update via git pull on the server (./deploy/update.sh), not from Admin Updates.";
-  } else if (platform !== "cloudflare") {
+  if (platform !== "cloudflare") {
     canApply = false;
     applyBlockedReason = "Update apply is only supported for BYO Cloudflare installs.";
   } else if (!isCloudflareApiTokenConfigured(org)) {

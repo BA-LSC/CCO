@@ -1,6 +1,6 @@
 import { readRuntimeEnv } from "@/lib/runtime-env";
 
-/** True when the web app is built for Cloudflare Pages / OpenNext (not VPS standalone). */
+/** True when the web app is built for Cloudflare Pages / OpenNext. */
 export function isCloudflareDeployTarget(): boolean {
   if (readRuntimeEnv("CCO_DEPLOY_TARGET") === "cloudflare") return true;
   // CCO_DEPLOY_TARGET is server-only; Cloudflare Pages builds inline this public flag for the browser.

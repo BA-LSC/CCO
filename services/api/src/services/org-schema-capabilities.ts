@@ -128,7 +128,7 @@ async function runEnsureCallSessionSchema(): Promise<void> {
   } else {
     callSchemaPromise = null;
     console.warn(
-      "[schema ensure] call_participants table missing — run migrations 0021–0023 (./deploy/compose.sh run --rm migrate)",
+      "[schema ensure] call_participants table missing — apply latest release (Admin → Updates) or re-run D1 migrations",
     );
   }
 }

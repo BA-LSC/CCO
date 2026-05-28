@@ -1,6 +1,6 @@
 import { getWorkerContext } from "./worker-context";
 
-/** Shared internal-route bearer check for VPS and Cloudflare Worker runtimes. */
+/** Shared internal-route bearer check for Cloudflare Worker runtimes. */
 export function getCfInternalSecret(): string | undefined {
   const fromWorker = getWorkerContext()?.vars.CF_INTERNAL_SECRET?.trim();
   if (fromWorker) return fromWorker;

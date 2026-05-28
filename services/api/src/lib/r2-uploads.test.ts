@@ -74,7 +74,7 @@ describe("resolveR2Config", () => {
     });
   });
 
-  test("prefers CLOUDFLARE_R2_* env vars on VPS-style deploys", async () => {
+  test("prefers CLOUDFLARE_R2_* env vars when set", async () => {
     process.env.CLOUDFLARE_ACCOUNT_ID = "acct-1";
     process.env.CLOUDFLARE_R2_BUCKET = "cco-uploads-prod";
     process.env.CLOUDFLARE_R2_ACCESS_KEY_ID = "vps-key-id";

@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { orgUsesSecretsStore } from "./org-secrets";
 import { resolveCloudflareAccountId } from "./cloudflare-realtimekit-provision";
 import {
-  ensureHyperdriveConfig,
   ensureKvNamespace,
   ensureQueue,
   ensureR2Bucket,
@@ -21,7 +20,6 @@ export const CCO_R2_BUCKET_PREFIX = "cco-uploads";
 export const CCO_KV_PRESENCE_TITLE = "cco-presence";
 export const CCO_KV_DEPLOY_TITLE = "cco-deploy";
 export const CCO_PUSH_QUEUE_NAME = "cco-push-notifications";
-export const CCO_HYPERDRIVE_NAME = "cco-postgres";
 
 export type CloudflarePlatformProvisionResult = {
   accountId: string;
@@ -29,10 +27,8 @@ export type CloudflarePlatformProvisionResult = {
   kvPresenceNamespaceId: string;
   kvDeployNamespaceId: string;
   pushQueueId: string;
-  hyperdriveId: string | null;
   workerRoutes: Array<{ pattern: string; script: string; created: boolean }>;
   r2Created: boolean;
-  hyperdriveCreated: boolean;
 };
 
 function defaultR2BucketName(accountId: string): string {
@@ -48,7 +44,6 @@ export async function provisionCloudflarePlatform(params: {
   organizationId: string;
   apiToken: string;
   existingAccountId?: string;
-  databaseUrl?: string;
 }): Promise<CloudflarePlatformProvisionResult> {
   const apiToken = params.apiToken.trim();
   if (!apiToken) throw new Error("Cloudflare API token is required");
@@ -66,22 +61,6 @@ export async function provisionCloudflarePlatform(params: {
   const presenceKv = await ensureKvNamespace(accountId, apiToken, CCO_KV_PRESENCE_TITLE);
   const deployKv = await ensureKvNamespace(accountId, apiToken, CCO_KV_DEPLOY_TITLE);
   const pushQueue = await ensureQueue(accountId, apiToken, CCO_PUSH_QUEUE_NAME);
-
-  let hyperdriveId: string | null = null;
-  let hyperdriveCreated = false;
-  const databaseUrl = params.databaseUrl?.trim() || process.env.DATABASE_URL?.trim();
-  if (databaseUrl) {
-    try {
-      const hyperdrive = await ensureHyperdriveConfig(accountId, apiToken, {
-        name: CCO_HYPERDRIVE_NAME,
-        originConnectionString: databaseUrl,
-      });
-      hyperdriveId = hyperdrive.id;
-      hyperdriveCreated = hyperdrive.created;
-    } catch (err) {
-      console.warn("[cloudflare provision] Hyperdrive skipped:", err);
-    }
-  }
 
   const workerRoutes: CloudflarePlatformProvisionResult["workerRoutes"] = [];
   const apiDomain = readApiDomain();
@@ -121,7 +100,6 @@ export async function provisionCloudflarePlatform(params: {
       cloudflareKvPresenceNamespaceId: presenceKv.id,
       cloudflareKvDeployNamespaceId: deployKv.id,
       cloudflarePushQueueId: pushQueue.queue_id,
-      cloudflareHyperdriveId: hyperdriveId,
       cloudflarePlatformProvisionedAt: new Date(),
     })
     .where(eq(organizations.id, params.organizationId));
@@ -134,10 +112,8 @@ export async function provisionCloudflarePlatform(params: {
     kvPresenceNamespaceId: presenceKv.id,
     kvDeployNamespaceId: deployKv.id,
     pushQueueId: pushQueue.queue_id,
-    hyperdriveId,
     workerRoutes,
     r2Created: r2.created,
-    hyperdriveCreated,
   };
 }
 
@@ -149,7 +125,6 @@ export async function getOrganizationCloudflarePlatformStatus(
     | "cloudflareKvPresenceNamespaceId"
     | "cloudflareKvDeployNamespaceId"
     | "cloudflarePushQueueId"
-    | "cloudflareHyperdriveId"
     | "cloudflarePlatformProvisionedAt"
     | "cloudflareApiTokenEnc"
   >,
@@ -163,7 +138,6 @@ export async function getOrganizationCloudflarePlatformStatus(
       Boolean(org.cloudflareR2BucketName && org.cloudflareKvPresenceNamespaceId) || fromEnv,
     cloudflarePlatformFromEnv: fromEnv && !org.cloudflareR2BucketName,
     cloudflareR2BucketName: org.cloudflareR2BucketName ?? process.env.CLOUDFLARE_R2_BUCKET ?? "",
-    cloudflareHyperdriveId: org.cloudflareHyperdriveId ?? process.env.CLOUDFLARE_HYPERDRIVE_ID ?? "",
     cloudflarePushQueueId: org.cloudflarePushQueueId ?? process.env.CLOUDFLARE_PUSH_QUEUE_ID ?? "",
     cloudflarePlatformProvisionedAt: org.cloudflarePlatformProvisionedAt?.toISOString() ?? null,
     cloudflareKvConfigured: Boolean(org.cloudflareKvPresenceNamespaceId && org.cloudflareKvDeployNamespaceId),

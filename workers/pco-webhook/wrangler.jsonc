@@ -15,7 +15,7 @@
   ],
   "vars": {
     // WEBHOOK_SECRETS — newline-separated HMAC secrets (wrangler secret)
-    // INTERNAL_FORWARD_URL — optional VPS fallback for complex handlers
+    // INTERNAL_FORWARD_URL — optional forward to cco-api for complex handlers
     // INTERNAL_FORWARD_SECRET — bearer token for internal forward
   },
 }

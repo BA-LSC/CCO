@@ -90,7 +90,7 @@ test.describe("Planning Center setup after install", () => {
     } catch {
       webAvailable = false;
     }
-    test.skip(!webAvailable, `Web app not running at ${WEB_URL} — start with bun run dev:web`);
+    test.skip(!webAvailable, `Web app not running at ${WEB_URL} — start with cd apps/web && bun run dev`);
 
     await page.goto(`${WEB_URL}/setup?install=complete`);
     await expect(page.getByRole("heading", { name: "Connect Planning Center" })).toBeVisible({

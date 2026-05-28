@@ -20,7 +20,7 @@ See **[docs/install/README.md](../../docs/install/README.md)** for token permiss
 
 ## Cloudflare Pages (OpenNext) — church web app
 
-The web UI deploys to **Cloudflare Pages** via [@opennextjs/cloudflare](https://opennext.js.org/cloudflare). The VPS Docker path continues to use the Next.js **standalone** output unchanged.
+The web UI deploys to **Cloudflare Pages** via [@opennextjs/cloudflare](https://opennext.js.org/cloudflare).
 
 ## Build
 
@@ -28,7 +28,7 @@ From the repo root:
 
 ```bash
 bun install
-bun run --cwd apps/web build:cloudflare
+bun run --cwd apps/web build
 ```
 
 Output lands in `apps/web/.open-next/`. Deploy with Wrangler from `apps/web` (see `apps/web/wrangler.jsonc`):
@@ -39,7 +39,7 @@ cd apps/web && npx wrangler deploy
 
 Or from `apps/web`: `bun run deploy:cloudflare`.
 
-The build script temporarily moves `proxy.ts` aside (OpenNext does not support Next.js 16 `proxy.ts` yet) and uses `middleware.ts` with the same route-guard logic.
+Route guards run in **`middleware.ts`** (edge middleware for OpenNext).
 
 ## Environment variables (Pages / Worker)
 
@@ -57,21 +57,13 @@ Set these on the **Pages project** or in `apps/web/wrangler.jsonc` `vars` / secr
 | `CF_DEPLOY_KV` | `1` | Deploy overlay reads status via API `/health` (KV on API worker) |
 | `NEXT_PUBLIC_DIRECT_UPLOADS` | `1` | Client uses `POST /api/v1/uploads/presign` + direct R2 PUT |
 
-**Do not set** `API_URL=http://api:3001` on Pages — that is the Docker internal hostname. Use `API_DOMAIN` or derive from `WEB_URL`.
-
-Optional (VPS hybrid only — not needed on pure Cloudflare):
-
-| Variable | Purpose |
-|----------|---------|
-| `CLOUDFLARE_ACCOUNT_ID` | REST read of deploy KV from web container |
-| `CLOUDFLARE_API_TOKEN` | Same |
-| `CLOUDFLARE_KV_DEPLOY_NAMESPACE_ID` | Same |
+**Do not set** `API_URL=http://api:3001` on Pages — that was a Docker internal hostname. Use `API_DOMAIN` or derive from `WEB_URL`.
 
 ## Upload flow (Cloudflare)
 
 1. Browser `POST /api/v1/uploads/presign` (same-origin → API worker via route or Next handler).
 2. API returns `{ uploadUrl, url, filename }` with a presigned R2 PUT URL.
-3. Browser `PUT` file bytes directly to R2 (no 100MB Next.js body proxy).
+3. Browser `PUT` file bytes directly to R2 (no large Next.js body proxy).
 4. Chat message references `url` (signed GET via API or cache rule).
 
 Multipart `POST /api/v1/uploads` is rejected on Cloudflare deploy (`400`) — use presign only.
@@ -96,11 +88,9 @@ On Cloudflare, deploy overlay status is polled from `GET /api/app-version` and `
 
 ## OpenNext limitations (Next.js 16)
 
-- **`proxy.ts` not supported** — use `middleware.ts` for OpenNext builds; VPS keeps `proxy.ts`.
 - **Large multipart uploads** — not supported on Workers/Pages; presigned R2 only.
 - **Node.js middleware** — not supported; edge middleware only.
-- **Worker size** — monitor gzip size after `build:cloudflare` (Paid plan ~10 MiB compressed).
-- **Standalone output** — `build:cloudflare` does not produce Docker standalone; use `bun run build` for VPS.
+- **Worker size** — monitor gzip size after `bun run build` (Paid plan ~10 MiB compressed).
 
 ## Routing at install (Phase 7)
 

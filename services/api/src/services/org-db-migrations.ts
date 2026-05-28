@@ -1,5 +1,5 @@
 export const ORG_MIGRATIONS_0021_0023_MESSAGE =
-  "Database is missing recent API migrations. Run migrations 0021–0023 (./deploy/compose.sh run --rm migrate), then try again.";
+  "Database is missing recent migrations. Apply the latest release from Admin → Updates, or re-run install D1 migrations.";
 
 const EXTENDED_ORG_COLUMN_MARKERS = [
   "cloudflare_account_id",

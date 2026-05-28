@@ -1,6 +1,6 @@
 # Cloudflare Workers (edge compute)
 
-Workers extend CCO beyond the VPS. Resource IDs (R2 bucket, KV, Queues, Hyperdrive) are auto-provisioned when a Cloudflare API token is saved during `/setup` or **Admin → Integrations**.
+Resource IDs (R2 bucket, KV, Queues) are auto-provisioned when a Cloudflare API token is saved during `/setup` or **Admin → Integrations**.
 
 ## Workers
 
@@ -13,17 +13,19 @@ Workers extend CCO beyond the VPS. Resource IDs (R2 bucket, KV, Queues, Hyperdri
 | `cco-giphy-proxy` | _(unused — giphy served by `cco-api`)_ | Legacy edge proxy (not routed after provision) |
 | `cco-reconcile-cron` | Cron `0 3 * * *` | Nightly PCO reconcile (batch user sync) |
 | `cco-push-consumer` | Queue `cco-push-notifications` | Retryable Expo/Web Push delivery |
-| `cco-realtime-fanout` | `{API_DOMAIN}/v1/ws` | Per-conversation Durable Object WebSocket hub (replaces Bun WS + Redis) |
+| `cco-realtime-fanout` | `{API_DOMAIN}/v1/ws` | Per-conversation Durable Object WebSocket hub |
 | `cco-web` | `{WEB_DOMAIN}/*` (Pages) | OpenNext web app — see `deploy/cloudflare/README.md` |
 
 ## Deploy
 
+**Greenfield:** churches use [setup-c.co](https://setup-c.co). **Operators** building release bundles or redeploying setup-c.co:
+
 ```bash
 export CLOUDFLARE_API_TOKEN=...
-export CF_INTERNAL_SECRET=...   # openssl rand -hex 32 — same on VPS + workers
-export API_DOMAIN=api.example.com
-./deploy/provision-cloudflare-workers.sh
+./deploy/cloudflare/deploy-setup-c.sh
 ```
+
+**BYO church updates:** Admin → Updates → Apply (see [deploy/cloudflare/README.md](../deploy/cloudflare/README.md)).
 
 Set worker secrets (examples):
 
@@ -32,10 +34,6 @@ cd workers/pco-webhook && npx wrangler secret put WEBHOOK_SECRETS
 cd workers/pco-webhook && npx wrangler secret put INTERNAL_FORWARD_SECRET
 # INTERNAL_FORWARD_URL = https://api.example.com/internal/webhooks/pco
 ```
-
-## VPS env (after auto-provision)
-
-See `deploy/.env.production.example` for `CF_*` variables. Enable KV-backed presence/deploy with `CF_PRESENCE_KV=1` and `CF_DEPLOY_KV=1` once namespaces are provisioned.
 
 ## Phase 4 — R2 attachment cache
 

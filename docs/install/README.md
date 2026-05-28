@@ -150,7 +150,7 @@ The wizard notes Workers Paid and possible RealtimeKit charges after beta.
 
 - Remove stale test databases named `cco` from previous attempts.
 - Confirm Paid plan, then use **Start deploy** again (or refresh `setup-c.co` and resume if the session is still active).
-- For persistent migration errors, note the step error and check [GitHub issues](https://github.com/BA-LSC/CCO/issues) or use the legacy VPS path below while investigating.
+- For persistent migration errors, note the step error and check [GitHub issues](https://github.com/BA-LSC/CCO/issues).
 
 ### Provision stuck or incomplete
 
@@ -165,16 +165,6 @@ Register **exact** URIs from `/setup` in your PCO developer app:
 - `https://chat.<zone>/api/auth/pco/callback`
 - `https://api.<zone>/auth/pco/mobile/callback`
 - Webhook: `https://api.<zone>/webhooks/pco`
-
----
-
-## Advanced: Self-host on a server
-
-For power users who want Docker, PostgreSQL, Redis, and **Cloudflare Tunnel** on a VPS (e.g. Vultr), use the legacy path:
-
-**[deploy/README.md](../../deploy/README.md)** — full VPS guide under **Advanced: Self-host on a server**.
-
-That path exposes no public HTTP ports; traffic enters via Cloudflare Tunnel. New churches should prefer **setup-c.co** unless you need on-prem control or an existing Postgres deployment.
 
 ---
 

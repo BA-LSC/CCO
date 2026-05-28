@@ -1,6 +1,6 @@
 /**
  * D1 schema is provisioned via baseline migration — no runtime DDL needed.
- * Postgres VPS path uses services/api/src/services/org-schema-capabilities.ts instead.
+ * Legacy Postgres path is on manual-vps; production uses this module on D1.
  */
 
 /** No-op: Cloudflare org columns exist in D1 baseline migration. */

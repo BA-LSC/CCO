@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { handleRouteGuard } from "@/lib/route-guard";
 
-export function proxy(request: NextRequest) {
+/** Edge middleware for OpenNext / Cloudflare Pages. */
+export function middleware(request: NextRequest) {
   return handleRouteGuard(request) ?? NextResponse.next();
 }
 

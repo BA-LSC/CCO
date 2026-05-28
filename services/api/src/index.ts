@@ -1,2 +1,2 @@
-/** Hono app only — use `main.ts` to start the HTTP server. */
+/** Hono app — imported by Cloudflare Workers (`workers/cco-api`). */
 export { default } from "./app";

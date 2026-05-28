@@ -28,7 +28,6 @@ deploy/cloudflare/.tmp-web-worker.mjs
 # Next.js
 .next/
 .open-next/
-apps/web/middleware.ts
 next-env.d.ts
 
 # Expo / React Native

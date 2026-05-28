@@ -89,10 +89,9 @@ describe("resolveUpdatePlatform", () => {
     ).toBe("cloudflare");
   });
 
-  test("detects vps when DATABASE_URL is set", () => {
+  test("returns unknown when Cloudflare is not provisioned", () => {
     delete process.env.CCO_RUNTIME;
     delete process.env.CCO_DEPLOY_TARGET;
-    process.env.DATABASE_URL = "postgres://localhost/cco";
     expect(
       resolveUpdatePlatform({
         cloudflarePlatformProvisionedAt: null,
@@ -100,7 +99,7 @@ describe("resolveUpdatePlatform", () => {
         cloudflareApiTokenConfigured: false,
         cloudflareAccountId: null,
       }),
-    ).toBe("vps");
+    ).toBe("unknown");
   });
 });
 

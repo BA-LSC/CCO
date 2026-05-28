@@ -16,7 +16,7 @@ import {
   validateUpdatesReload,
 } from "@/lib/use-deploy-completion-poll";
 export type UpdatesStatus = {
-  platform: "cloudflare" | "vps" | "unknown";
+  platform: "cloudflare" | "unknown";
   currentVersion: string | null;
   latestVersion: string | null;
   updateAvailable: boolean;

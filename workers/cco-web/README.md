@@ -4,7 +4,7 @@
 From repo root:
 
 ```bash
-bun run --cwd apps/web build:cloudflare
+bun run --cwd apps/web build
 cd apps/web && npx wrangler deploy
 ```
 

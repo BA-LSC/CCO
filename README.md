@@ -19,6 +19,8 @@ Full walkthrough: **[docs/install/README.md](docs/install/README.md)** (token sc
 
 CCO hosts only the install wizard and orchestrator at `setup-c.co`; your chat app runs in your Cloudflare account.
 
+**Legacy VPS / Docker self-host:** preserved on the **`manual-vps`** branch only (not maintained on `main`).
+
 ---
 
 ## Architecture (Cloudflare)
@@ -36,57 +38,7 @@ Wrangler config is **`wrangler.jsonc`** (not `.toml`) in each deployable app/wor
 
 Worker map: **[workers/README.md](workers/README.md)**.
 
----
-
-## Advanced: self-host on a VPS
-
-Docker on Linux + **Cloudflare Tunnel** (no public 80/443 on the server), PostgreSQL, Redis, containerized API and web. Use when you need full control of Postgres or an existing VPS workflow.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/BA-LSC/CCO/main/deploy/install.sh | bash
-```
-
-Guide: **[deploy/README.md](deploy/README.md)** — `./deploy/update.sh`, `./deploy/compose.sh`, `/setup` for OAuth and webhooks.
-
-Optional **Workers at the edge** (R2 cache, webhook verify) alongside the VPS stack is documented in `deploy/cloudflare/`; that is not the default greenfield path.
-
----
-
-## Local development
-
-### Prerequisites
-
-- [Bun](https://bun.sh) **1.3+**
-- [Docker](https://docs.docker.com/get-docker/) Compose v2 — **PostgreSQL + Redis** only (mirrors VPS data layer; Cloudflare path uses D1/R2 in production)
-
-```bash
-curl -fsSL https://bun.sh/install | bash
-git clone https://github.com/BA-LSC/CCO.git cco
-cd cco
-bun install
-```
-
-Hooks install with `bun install` (pre-commit secret scan, pre-push lint + unit tests).
-
-**Mobile** (`apps/mobile`) is outside the root workspace — see [apps/mobile/README.md](apps/mobile/README.md).
-
-### Run locally
-
-```bash
-docker compose up -d
-cp .env.example .env   # set PCO_CLIENT_ID/SECRET, SESSION_SECRET, TOKEN_ENCRYPTION_KEY
-bun run db:migrate
-bun run dev:all        # or dev:api + dev:web in two terminals
-```
-
-| Service | URL |
-|---------|-----|
-| Web | http://localhost:3000 |
-| API | http://localhost:3001 |
-
-Use `localhost` (not `127.0.0.1`) for OAuth. Web redirect: `http://localhost:3000/api/auth/pco/callback`.
-
-Production webhooks: `https://<api-domain>/webhooks/pco` — subscribe to `groups.v2.events.membership.*` and `people.v2.events.person.updated`.
+Cloudflare-native local dev (Wrangler + D1) is planned in a future branch.
 
 ---
 
@@ -121,7 +73,7 @@ Production webhooks: `https://<api-domain>/webhooks/pco` — subscribe to `group
 | PATCH | `/v1/messages/:id` | Edit own message |
 | DELETE | `/v1/messages/:id` | Delete own message (leaders can moderate) |
 | GET/POST/DELETE | `/v1/messages/:id/reactions` | Message reactions |
-| POST | `/v1/uploads` | Image upload (local dev; Cloudflare uses presigned R2) |
+| POST | `/v1/uploads/presign` | Presigned R2 upload (production) |
 | POST | `/v1/push/register` | Register Expo push token |
 | GET | `/v1/services/teams` | List service teams |
 | GET | `/v1/services/teams/:id` | Team detail + conversation |
@@ -131,25 +83,20 @@ Production webhooks: `https://<api-domain>/webhooks/pco` — subscribe to `group
 
 Web sign-in: `/auth/sign-in` → Planning Center → `/api/auth/pco/callback`
 
-## Jobs (VPS / local)
+## Jobs
 
-```bash
-cd services/api && bun run jobs:reconcile
-```
-
-On Cloudflare, reconcile runs on the `cco-reconcile-cron` worker.
+On Cloudflare, nightly PCO reconcile runs on the `cco-reconcile-cron` worker.
 
 ## Tests
 
 ```bash
 bun run test:unit
-cd apps/web && bunx playwright install chromium && bun run test:e2e   # API + web running
+cd apps/web && bunx playwright install chromium && bun run test:e2e
 ```
 
 ## Docs
 
 - Install: [docs/install/README.md](docs/install/README.md)
-- Deploy (VPS): [deploy/README.md](deploy/README.md)
 - Deploy (Cloudflare): [deploy/cloudflare/README.md](deploy/cloudflare/README.md)
 - Design: `docs/superpowers/specs/2026-05-19-pco-chat-groups-design.md`
 

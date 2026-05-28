@@ -65,7 +65,7 @@ async function connectFanoutSubscriber(config: RealtimeFanoutConfig): Promise<vo
   if (!baseUrl) return;
 
   // Per-conversation ConversationRoom DOs serve WebSocket clients directly at
-  // /v1/ws. Legacy VPS Bun WebSockets rely on in-process memory pubsub instead.
+  // /v1/ws — production uses Durable Objects; in-process pubsub is dev/test only.
   console.warn(
     "CF_REALTIME_FANOUT_URL WebSocket relay is deprecated; use Cloudflare-native /v1/ws clients",
   );
