@@ -25,6 +25,7 @@
   --header-height: 56px;
   --sidebar-width: 280px;
   --motion-fast: 0.15s;
+  --motion-menu: 0.12s;
   --motion-normal: 0.2s;
   --motion-slow: 0.32s;
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -120,6 +121,7 @@ html.standalone-display:has(.chat-shell) body {
   height: 100%;
   height: -webkit-fill-available;
   overflow: hidden;
+  overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -130,6 +132,7 @@ html.standalone-display:has(.chat-shell) body {
     height: 100%;
     height: -webkit-fill-available;
     overflow: hidden;
+    overscroll-behavior-x: none;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -456,7 +459,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   font-family: inherit;
   font-size: 0.9rem;
   color: var(--color-text);
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color var(--motion-menu), background var(--motion-menu);
 }
 
 .user-menu-trigger:hover,
@@ -624,7 +627,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   display: block;
   width: 18px;
   height: 18px;
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-menu) var(--motion-ease-out);
 }
 
 .user-menu-sidebar .user-menu-chevron-icon {
@@ -653,8 +656,8 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   transform: translateY(-6px) scale(0.97);
   pointer-events: none;
   transition:
-    opacity var(--motion-normal) var(--motion-ease-out),
-    transform var(--motion-normal) var(--motion-ease-out);
+    opacity var(--motion-menu) var(--motion-ease-out),
+    transform var(--motion-menu) var(--motion-ease-out);
 }
 
 .user-menu-dropdown--open {
@@ -1725,7 +1728,7 @@ html[data-theme="11"] .user-menu-dropdown {
 .messages-day-divider {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: center;
   color: var(--color-muted);
   font-size: 0.75rem;
   font-weight: 500;
@@ -1735,14 +1738,6 @@ html[data-theme="11"] .user-menu-dropdown {
   flex-shrink: 0;
   font: inherit;
   color: inherit;
-}
-
-.messages-day-divider::before,
-.messages-day-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
 }
 
 .sidebar-channel-prefix,
@@ -1929,7 +1924,7 @@ html[data-theme="11"] .user-menu-dropdown {
   width: var(--sidebar-icon-glyph-sm);
   height: var(--sidebar-icon-glyph-sm);
   flex-shrink: 0;
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-menu) var(--motion-ease-out);
 }
 
 button.sidebar-group-header:hover .sidebar-group-menu-trigger,
@@ -1958,8 +1953,8 @@ button.sidebar-group-header.sidebar-group-header-menu-open .sidebar-group-menu-t
   transform: translateY(-6px) scale(0.97);
   pointer-events: none;
   transition:
-    opacity var(--motion-normal) var(--motion-ease-out),
-    transform var(--motion-normal) var(--motion-ease-out);
+    opacity var(--motion-menu) var(--motion-ease-out),
+    transform var(--motion-menu) var(--motion-ease-out);
 }
 
 .sidebar-group-menu-dropdown--open {
@@ -2012,6 +2007,7 @@ button.sidebar-group-header {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  transition: background var(--motion-menu) ease, color var(--motion-menu) ease;
 }
 
 button.sidebar-group-header:focus-visible {
@@ -4233,7 +4229,7 @@ button.sidebar-group-header:focus-visible {
   content: "▾";
   float: right;
   color: var(--color-muted);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-menu) var(--motion-ease-out);
 }
 
 .integrations-details[open] summary::after {
@@ -5501,7 +5497,11 @@ button.sidebar-group-header:focus-visible {
   box-sizing: border-box;
   flex-shrink: 0;
   overflow: visible;
-  transition: transform 0.1s ease, background var(--motion-fast) ease;
+  transition:
+    transform var(--motion-menu) ease,
+    background var(--motion-menu) ease,
+    border-color var(--motion-menu) ease,
+    color var(--motion-menu) ease;
 }
 
 .chat-thread .composer-attach-trigger:active:not(:disabled),
@@ -5565,8 +5565,8 @@ button.sidebar-group-header:focus-visible {
   transform: translateY(6px) scale(0.97);
   pointer-events: none;
   transition:
-    opacity var(--motion-normal) var(--motion-ease-out),
-    transform var(--motion-normal) var(--motion-ease-out);
+    opacity var(--motion-menu) var(--motion-ease-out),
+    transform var(--motion-menu) var(--motion-ease-out);
 }
 
 .chat-thread .composer-attach-menu--open {
@@ -7168,13 +7168,17 @@ html.standalone-display .chat-thread-panel {
     padding: 0 9px 0;
     box-sizing: border-box;
     z-index: 200;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% + var(--sidebar-reveal-px, 0px)));
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md);
   }
 
+  .chat-sidebar--dragging {
+    transition: none;
+  }
+
   .chat-sidebar-open {
-    transform: translateX(0);
+    --sidebar-reveal-px: 100%;
   }
 
   .chat-sidebar-overlay {
@@ -7189,6 +7193,15 @@ html.standalone-display .chat-thread-panel {
     border: none;
     cursor: pointer;
     animation: cco-fade-in var(--motion-normal) var(--motion-ease-out);
+  }
+
+  .chat-sidebar--dragging ~ .chat-sidebar-overlay {
+    animation: none;
+  }
+
+  html.standalone-display .chat-main,
+  html.standalone-display .chat-shell {
+    touch-action: pan-y pinch-zoom;
   }
 
   .sidebar-footer {

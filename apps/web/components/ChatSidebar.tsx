@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
@@ -77,7 +77,7 @@ function applyDmMessagePreview(
 export function ChatSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { sidebarOpen, closeSidebar, subscribeRealtime, session, activeConversationId } =
+  const { sidebarOpen, sidebarRevealPx, closeSidebar, subscribeRealtime, session, activeConversationId } =
     useChatLayout();
 
   const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
@@ -338,18 +338,33 @@ export function ChatSidebar() {
     }
   }
 
+  const sidebarDragging = sidebarRevealPx !== null;
+  const showSidebarOverlay = sidebarOpen || sidebarDragging;
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarStyle: CSSProperties | undefined =
+    sidebarRevealPx !== null
+      ? { ["--sidebar-reveal-px" as string]: `${sidebarRevealPx}px` }
+      : undefined;
+  const overlayOpacity =
+    sidebarDragging && sidebarRef.current
+      ? Math.min(1, Math.max(0, sidebarRevealPx / sidebarRef.current.getBoundingClientRect().width))
+      : 1;
+
   return (
     <>
       <aside
+        ref={sidebarRef}
         className={[
           "chat-sidebar",
-          sidebarOpen ? "chat-sidebar-open" : "",
+          sidebarOpen && !sidebarDragging ? "chat-sidebar-open" : "",
+          sidebarDragging ? "chat-sidebar--dragging" : "",
           process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim()
             ? "chat-sidebar--has-video"
             : "",
         ]
           .filter(Boolean)
           .join(" ")}
+        style={sidebarStyle}
         aria-label="Chat navigation"
       >
         {process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim() ? (
@@ -541,12 +556,20 @@ export function ChatSidebar() {
         </div>
       </aside>
 
-      {sidebarOpen ? (
+      {showSidebarOverlay ? (
         <button
           type="button"
           className="chat-sidebar-overlay"
           aria-label="Close sidebar"
           onClick={closeSidebar}
+          style={
+            sidebarDragging
+              ? {
+                  opacity: overlayOpacity,
+                  left: `${sidebarRevealPx}px`,
+                }
+              : undefined
+          }
         />
       ) : null}
     </>

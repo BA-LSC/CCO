@@ -8,6 +8,13 @@ import {
 describe("formatMessageTime", () => {
   const now = new Date("2026-05-28T18:00:00.000Z");
 
+  it("shows time only for messages from the same day", () => {
+    const iso = "2026-05-28T18:43:37.858Z";
+    const formatted = formatMessageTime(iso, now);
+    expect(formatted).not.toMatch(/^[A-Za-z]{3} /);
+    expect(formatted).toMatch(/\d/);
+  });
+
   it("shows weekday and time within the past week", () => {
     const iso = "2026-05-22T13:25:29.500Z";
     const formatted = formatMessageTime(iso, now);

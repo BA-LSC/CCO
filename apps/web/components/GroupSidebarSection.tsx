@@ -28,7 +28,7 @@ function isLeaderRole(role: string | undefined): boolean {
   return role === "leader" || role === "admin";
 }
 
-const GROUP_MENU_ANIM_MS = 200;
+const GROUP_MENU_ANIM_MS = 120;
 
 function SidebarChannelPrefix({ conv }: { conv: GroupSidebarConversation }) {
   if (conv.hasRestrictedAccess) {

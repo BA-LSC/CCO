@@ -9,7 +9,7 @@ type Props = {
   onPickGiphy?: () => void;
 };
 
-const ATTACH_MENU_ANIM_MS = 200;
+const ATTACH_MENU_ANIM_MS = 120;
 
 export function ComposerAttachMenu({ disabled, giphyEnabled, onPickMedia, onPickGiphy }: Props) {
   const [open, setOpen] = useState(false);

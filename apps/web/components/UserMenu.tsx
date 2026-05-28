@@ -30,7 +30,7 @@ type Props = {
   variant?: "default" | "sidebar";
 };
 
-const USER_MENU_ANIM_MS = 200;
+const USER_MENU_ANIM_MS = 120;
 
 function isPlaceholderDisplayName(name: string | null | undefined): boolean {
   const normalized = name

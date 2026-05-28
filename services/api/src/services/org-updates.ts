@@ -22,7 +22,7 @@ import {
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
-import { isCloudflareRuntime } from "../runtime/worker-context";
+import { getExecutionContext, isCloudflareRuntime } from "../runtime/worker-context";
 import {
   readDeployLastError,
   setDeployDraining,
@@ -64,6 +64,15 @@ export type UpdatesStatus = {
   /** False when the apply token (Secrets Store binding) fails Cloudflare preflight. */
   cloudflareApiTokenValid: boolean | null;
   cloudflareApiTokenError: string | null;
+};
+
+export type AutoUpdateResult = {
+  checked: boolean;
+  updateAvailable: boolean;
+  applied: boolean;
+  accepted?: boolean;
+  version: string | null;
+  error?: string;
 };
 
 /** Hide catalog version until artifacts are ready so Admin stays "up to date". */
@@ -705,13 +714,36 @@ export async function setAutoUpdateSettings(options: {
 }
 
 /** Called from reconcile-cron; auto-applies when enabled and an update is available. */
-export async function runScheduledUpdateCheck(): Promise<{
-  checked: boolean;
-  updateAvailable: boolean;
-  applied: boolean;
-  version: string | null;
-  error?: string;
-}> {
+export async function runScheduledUpdateCheck(): Promise<AutoUpdateResult> {
+  return tryAutoApplyUpdate({ forceCheck: true, background: false });
+}
+
+async function applyUpdateForAutoInstall(options?: {
+  background?: boolean;
+}): Promise<{ applied: boolean; accepted?: boolean; version: string | null }> {
+  if (options?.background && isCloudflareRuntime()) {
+    const executionCtx = getExecutionContext();
+    if (executionCtx) {
+      const { job, targetVersion } = await startCloudflareReleaseUpdate();
+      executionCtx.waitUntil(
+        executeCloudflareReleaseUpdate(job).catch((err) => {
+          console.error("[org-updates] Background auto-apply failed:", err);
+        }),
+      );
+      return { applied: true, accepted: true, version: targetVersion };
+    }
+  }
+
+  const result = await applyCloudflareReleaseUpdate();
+  return { applied: true, version: result.appliedVersion };
+}
+
+/** Check for updates and apply immediately when auto-install is enabled. */
+export async function tryAutoApplyUpdate(options?: {
+  forceCheck?: boolean;
+  background?: boolean;
+  status?: UpdatesStatus;
+}): Promise<AutoUpdateResult> {
   await ensureOrgUpdateSettingsColumns();
   const org = await getConfiguredOrganization();
   if (!org) {
@@ -724,7 +756,8 @@ export async function runScheduledUpdateCheck(): Promise<{
     return { checked: false, updateAvailable: false, applied: false, version: null };
   }
 
-  const status = await getUpdatesStatus({ forceCheck: true });
+  const status =
+    options?.status ?? (await getUpdatesStatus({ forceCheck: options?.forceCheck ?? true }));
   if (!status.updateAvailable || !status.canApply) {
     return {
       checked: true,
@@ -736,12 +769,13 @@ export async function runScheduledUpdateCheck(): Promise<{
   }
 
   try {
-    const result = await applyCloudflareReleaseUpdate();
+    const apply = await applyUpdateForAutoInstall({ background: options?.background });
     return {
       checked: true,
       updateAvailable: true,
-      applied: true,
-      version: result.appliedVersion,
+      applied: apply.applied,
+      accepted: apply.accepted,
+      version: apply.version,
     };
   } catch (err) {
     return {

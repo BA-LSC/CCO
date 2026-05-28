@@ -61,6 +61,7 @@ import {
   setAutoUpdateSettings,
   setGitRepoUrl,
   startCloudflareReleaseUpdate,
+  tryAutoApplyUpdate,
 } from "../services/org-updates";
 import { resolveOrgGitRepoUrl, fetchReleaseIndexForOrg } from "../services/git-release-index";
 import {
@@ -600,7 +601,11 @@ settingsRouter.post("/updates/check", requireAuth, async (c) => {
 
   try {
     const status = await getUpdatesStatus({ forceCheck: true });
-    return c.json(status);
+    const autoApply = status.autoUpdateEnabled
+      ? await tryAutoApplyUpdate({ background: true, status })
+      : undefined;
+    const nextStatus = autoApply?.applied ? await getUpdatesStatus() : status;
+    return c.json({ ...nextStatus, autoApply });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Update check failed";
     return c.json({ error: message }, 502);
@@ -677,6 +682,7 @@ settingsRouter.patch("/updates", requireAuth, async (c) => {
   }
 
   try {
+    let autoApply;
     if (
       parsed.data.autoUpdateEnabled !== undefined ||
       parsed.data.autoUpdateCheckIntervalMinutes !== undefined
@@ -685,12 +691,15 @@ settingsRouter.patch("/updates", requireAuth, async (c) => {
         autoUpdateEnabled: parsed.data.autoUpdateEnabled,
         autoUpdateCheckIntervalMinutes: parsed.data.autoUpdateCheckIntervalMinutes,
       });
+      if (parsed.data.autoUpdateEnabled === true) {
+        autoApply = await tryAutoApplyUpdate({ forceCheck: true, background: true });
+      }
     }
     if (parsed.data.gitRepoUrl !== undefined) {
       await setGitRepoUrl(parsed.data.gitRepoUrl);
     }
     const status = await getUpdatesStatus();
-    return c.json({ ok: true, ...status });
+    return c.json({ ok: true, ...status, autoApply });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to save update settings";
     return c.json({ error: message }, 400);

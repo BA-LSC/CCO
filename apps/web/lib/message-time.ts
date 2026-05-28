@@ -28,6 +28,10 @@ export function formatMessageTime(iso: string, now: Date = new Date()): string {
     minute: "2-digit",
   });
 
+  if (localDayKey(iso) === localDayKey(now.toISOString())) {
+    return time;
+  }
+
   if (now.getTime() - date.getTime() >= SEVEN_DAYS_MS) {
     const monthDay = date.toLocaleDateString(undefined, {
       month: "short",

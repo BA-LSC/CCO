@@ -50,6 +50,8 @@ function writeCachedSession(session: ChatSessionInfo | null) {
 
 type ChatLayoutContextValue = {
   sidebarOpen: boolean;
+  sidebarRevealPx: number | null;
+  setSidebarRevealPx: (px: number | null) => void;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
@@ -67,6 +69,7 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarRevealPx, setSidebarRevealPx] = useState<number | null>(null);
   const [wsToken, setWsToken] = useState<string | null>(null);
   const [session, setSession] = useState<ChatSessionInfo | null>(() => readCachedSession());
   const [sessionLoading, setSessionLoading] = useState(() => readCachedSession() === null);
@@ -77,8 +80,14 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
     [pathname],
   );
 
-  const openSidebar = useCallback(() => setSidebarOpen(true), []);
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const openSidebar = useCallback(() => {
+    setSidebarRevealPx(null);
+    setSidebarOpen(true);
+  }, []);
+  const closeSidebar = useCallback(() => {
+    setSidebarRevealPx(null);
+    setSidebarOpen(false);
+  }, []);
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
 
   const broadcastRealtimeEvent = useCallback((event: RealtimeEvent) => {
@@ -127,6 +136,8 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
     <ChatLayoutContext.Provider
       value={{
         sidebarOpen,
+        sidebarRevealPx,
+        setSidebarRevealPx,
         openSidebar,
         closeSidebar,
         toggleSidebar,

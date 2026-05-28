@@ -29,6 +29,19 @@ export type UpdatesStatus = {
   gitRepoUrl: string;
 };
 
+type AutoUpdateResult = {
+  checked: boolean;
+  updateAvailable: boolean;
+  applied: boolean;
+  accepted?: boolean;
+  version: string | null;
+  error?: string;
+};
+
+type UpdatesActionResponse = UpdatesStatus & {
+  autoApply?: AutoUpdateResult;
+};
+
 function formatWhen(iso: string | null): string {
   if (!iso) return "Never";
   return new Date(iso).toLocaleString();
@@ -168,14 +181,55 @@ export function AdminUpdatesSection({
     onDeployStatusMessage: (message) => setDeployStatusMessage(message),
   });
 
+  const beginAutoApplyDeploy = useCallback(
+    (next: UpdatesActionResponse) => {
+      if (!next.autoApply?.applied) return false;
+      pendingAppliedVersionRef.current =
+        next.autoApply.version?.trim() || next.latestVersion || next.currentVersion;
+      deployStartedAtRef.current = Date.now();
+      setDeployStatusMessage(resolveDeployStatusMessage({ updating: true, elapsedMs: 0 }));
+      markDeployWait({ showOverlay: false });
+      setDeploying(true);
+      setFeedback({});
+      return true;
+    },
+    [],
+  );
+
+  const runAutoInstallCheck = useCallback(async () => {
+    const next = await apiFetch<UpdatesActionResponse>("/api/v1/settings/updates/check", {
+      method: "POST",
+    });
+    setStatus(next);
+    if (beginAutoApplyDeploy(next)) return next;
+    return next;
+  }, [beginAutoApplyDeploy]);
+
+  useEffect(() => {
+    if (!status?.autoUpdateEnabled || deploying || busy !== null) return;
+
+    const intervalMs = CCO_UPDATE_CHECK_INTERVAL_MINUTES * 60 * 1000;
+    const intervalId = window.setInterval(() => {
+      void runAutoInstallCheck().catch(() => {
+        // Keep the last known state when background auto-check fails.
+      });
+    }, intervalMs);
+
+    return () => window.clearInterval(intervalId);
+  }, [status?.autoUpdateEnabled, deploying, busy, runAutoInstallCheck]);
+
   async function handleCheck() {
     setBusy("check");
     setFeedback({});
     try {
-      const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates/check", {
+      const next = await apiFetch<UpdatesActionResponse>("/api/v1/settings/updates/check", {
         method: "POST",
       });
       setStatus(next);
+      if (beginAutoApplyDeploy(next)) {
+        setFeedback({ success: "Update detected — installing automatically." });
+        return;
+      }
       if (!next.latestVersion) {
         setFeedback({
           error:
@@ -248,14 +302,18 @@ export function AdminUpdatesSection({
     setBusy("toggle");
     setFeedback({});
     try {
-      const next = await apiFetch<UpdatesStatus & { ok: boolean }>("/api/v1/settings/updates", {
+      const next = await apiFetch<UpdatesActionResponse & { ok: boolean }>("/api/v1/settings/updates", {
         method: "PATCH",
         body: JSON.stringify({ autoUpdateEnabled: enabled }),
       });
       setStatus(next);
+      if (enabled && beginAutoApplyDeploy(next)) {
+        setFeedback({ success: "Automatic updates enabled — installing the available release." });
+        return;
+      }
       setFeedback({
         success: enabled
-          ? `Automatic updates enabled. CCO checks every ${CCO_UPDATE_CHECK_INTERVAL_MINUTES} minutes and applies releases when available.`
+          ? "Automatic updates enabled. CCO applies new releases as soon as one is detected."
           : "Automatic updates disabled.",
       });
     } catch (err) {
@@ -413,10 +471,6 @@ export function AdminUpdatesSection({
             />
             <span className="toggle-switch" aria-hidden="true" />
           </label>
-          <p className="integrations-field-hint">
-            Uses the same release check as Check for updates every {CCO_UPDATE_CHECK_INTERVAL_MINUTES}{" "}
-            minutes and applies updates as soon as one is available.
-          </p>
         </>
       )}
     </section>
