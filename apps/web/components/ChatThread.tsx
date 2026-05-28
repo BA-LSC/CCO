@@ -884,10 +884,6 @@ export function ChatThread({
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!resolvedUserId) return;
 
-    const message = messages.find((m) => m.id === messageId);
-    const existing = message?.reactions?.find(
-      (r) => r.userId === resolvedUserId && r.emoji === emoji,
-    );
     const optimisticReaction: Reaction = {
       messageId,
       userId: resolvedUserId,
@@ -895,17 +891,24 @@ export function ChatThread({
       emoji,
     };
 
-    setMessages((prev) =>
-      applyReactionChange(
+    let removing = false;
+    setMessages((prev) => {
+      const message = prev.find((m) => m.id === messageId);
+      removing = Boolean(
+        message?.reactions?.some(
+          (r) => r.userId === resolvedUserId && r.emoji === emoji,
+        ),
+      );
+      return applyReactionChange(
         prev,
         messageId,
         optimisticReaction,
-        existing ? "removed" : "added",
-      ),
-    );
+        removing ? "removed" : "added",
+      );
+    });
 
     try {
-      if (existing) {
+      if (removing) {
         await apiFetch(
           `/api/v1/messages/${messageId}/reactions?emoji=${encodeURIComponent(emoji)}`,
           { method: "DELETE" },
@@ -923,11 +926,11 @@ export function ChatThread({
           prev,
           messageId,
           optimisticReaction,
-          existing ? "added" : "removed",
+          removing ? "added" : "removed",
         ),
       );
     }
-  }, [messages, resolvedUserId, session?.displayName]);
+  }, [resolvedUserId, session?.displayName]);
 
   async function saveEdit(messageId: string) {
     if (!editBody.trim()) return;

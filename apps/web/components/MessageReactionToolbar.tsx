@@ -399,19 +399,20 @@ export function MessageReactionPills({
     [grouped, reactionAlign],
   );
 
-  const removedSinceLastCommit = useMemo(() => {
-    if (!initializedRef.current) return [] as Array<[string, Reaction[]]>;
-    const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
-    return prevGroupedRef.current.filter(([emoji]) => !activeEmojis.has(emoji));
-  }, [grouped, emojiKeys]);
+  // Compare against prevGroupedRef during render (before layout effect commits) so exit
+  // pills animate on the first frame. Must not be memoized — ref updates don't invalidate memo.
+  const activeEmojiSet = new Set(grouped.map(([emoji]) => emoji));
+  const removedSinceLastCommit = initializedRef.current
+    ? prevGroupedRef.current.filter(([emoji]) => !activeEmojiSet.has(emoji))
+    : ([] as Array<[string, Reaction[]]>);
 
-  const activeExitingEmojis = useMemo(() => {
+  const activeExitingEmojis = (() => {
     const merged = new Map(exitingEmojis.map((entry) => [entry.emoji, entry]));
     for (const [emoji, list] of removedSinceLastCommit) {
       merged.set(emoji, { emoji, list });
     }
     return [...merged.values()];
-  }, [exitingEmojis, removedSinceLastCommit]);
+  })();
 
   const hasActiveExitAnimation = activeExitingEmojis.length > 0;
 
@@ -427,9 +428,10 @@ export function MessageReactionPills({
   useLayoutEffect(() => {
     const prevGrouped = prevGroupedRef.current;
     const currentEmojiSet = new Set(grouped.map(([emoji]) => emoji));
+    let removed: Array<[string, Reaction[]]> = [];
 
     if (initializedRef.current) {
-      const removed = prevGrouped.filter(([emoji]) => !currentEmojiSet.has(emoji));
+      removed = prevGrouped.filter(([emoji]) => !currentEmojiSet.has(emoji));
       if (removed.length > 0) {
         setExitingEmojis((current) => {
           const known = new Set(current.map((entry) => entry.emoji));
@@ -450,10 +452,10 @@ export function MessageReactionPills({
 
     grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
     prevGroupedRef.current = grouped;
-    if (removedSinceLastCommit.length === 0) {
+    if (removed.length === 0) {
       displayOrderRef.current = orderedEmojis;
     }
-  }, [emojiKeys, grouped, orderedEmojis, reactionAlign, removedSinceLastCommit.length]);
+  }, [emojiKeys, grouped, orderedEmojis, reactionAlign]);
 
   useLayoutEffect(() => {
     onExitingChange?.(hasActiveExitAnimation);
@@ -475,7 +477,7 @@ export function MessageReactionPills({
     return () => window.clearTimeout(timeout);
   }, [grouped, hasActiveExitAnimation]);
 
-  const pillRenders = useMemo(() => {
+  const pillRenders = (() => {
     const byEmoji = new Map<string, { list: Reaction[]; phase: ReactionPillRender["phase"] }>();
 
     for (const [emoji, list] of grouped) {
@@ -524,7 +526,7 @@ export function MessageReactionPills({
         enterDelayMs: enterDelayByEmoji.get(emoji) ?? 0,
       } satisfies ReactionPillRender;
     });
-  }, [activeExitingEmojis, enterDelayByEmoji, grouped, orderedEmojis]);
+  })();
 
   if (pillRenders.length === 0) return null;
 
