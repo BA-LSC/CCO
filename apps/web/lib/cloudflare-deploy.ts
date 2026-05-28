@@ -8,7 +8,7 @@ export function isCloudflareDeployTarget(): boolean {
   return false;
 }
 
-/** True when uploads use R2 via cco-api (Cloudflare BYO). Browser sends multipart to the API worker. */
+/** True when the browser uploads via presigned R2 PUT (Cloudflare BYO). */
 export function isDirectR2UploadsEnabled(): boolean {
   return isCloudflareDeployTarget();
 }

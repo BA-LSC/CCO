@@ -200,13 +200,13 @@ async function uploadPreparedMedia(
   file: File,
   contentType: string,
 ): Promise<string> {
-  // Cloudflare BYO: multipart POST to cco-api → R2 binding (no browser presign PUT / bucket CORS).
-  if (isCloudflareDeployTarget()) {
-    return uploadMediaMultipart(file, contentType);
-  }
   try {
     return await uploadMediaViaPresign(file, contentType);
   } catch (presignErr) {
+    // Cloudflare BYO only supports presigned R2 PUT — multipart POST is rejected by cco-api.
+    if (isCloudflareDeployTarget()) {
+      throw presignErr;
+    }
     if (isPresignUnavailableError(presignErr) || isStorageCorsBlockedError(presignErr)) {
       return uploadMediaMultipart(file, contentType);
     }

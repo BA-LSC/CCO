@@ -34,7 +34,7 @@ describe("isDirectR2UploadsEnabled", () => {
     }
   });
 
-  test("enables R2 worker uploads from CCO_DEPLOY_TARGET on server", () => {
+  test("enables presigned R2 uploads from CCO_DEPLOY_TARGET on server", () => {
     const prevTarget = process.env.CCO_DEPLOY_TARGET;
     process.env.CCO_DEPLOY_TARGET = "cloudflare";
     try {
