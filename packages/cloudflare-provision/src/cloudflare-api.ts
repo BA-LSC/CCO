@@ -41,23 +41,30 @@ function cloudflareErrorDetail(
     .join("; ");
 }
 
-async function readCloudflareJson(res: Response): Promise<unknown> {
-  const text = await res.text();
+/** Parse a Cloudflare (or release artifact) JSON body without leaking raw SyntaxError. */
+export function parseCloudflareJsonText(text: string, status: number): unknown | null {
   const trimmed = text.trim();
-  if (!trimmed) {
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    const preview = trimmed.slice(0, 80).replace(/\s+/g, " ");
+    throw new CloudflareApiError(
+      `Expected JSON response (${status}) but received: ${preview}`,
+      status,
+    );
+  }
+}
+
+export async function readCloudflareJson(res: Response): Promise<unknown> {
+  const parsed = parseCloudflareJsonText(await res.text(), res.status);
+  if (parsed === null) {
     throw new CloudflareApiError(
       `Cloudflare API returned an empty response (${res.status})`,
       res.status,
     );
   }
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    throw new CloudflareApiError(
-      `Cloudflare API returned a non-JSON response (${res.status})`,
-      res.status,
-    );
-  }
+  return parsed;
 }
 
 export async function cfRequest<T>(apiToken: string, path: string, init?: RequestInit): Promise<T> {

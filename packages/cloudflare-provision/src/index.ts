@@ -28,6 +28,8 @@ export {
   cfRequest,
   cfRealtimeKitRequest,
   CloudflareApiError,
+  parseCloudflareJsonText,
+  readCloudflareJson,
   verifyCloudflareApiToken,
   listCloudflareAccounts,
   listCloudflareZones,

@@ -1,3 +1,4 @@
+import { parseCloudflareJsonText } from "@cco/cloudflare-provision";
 import {
   CCO_DEFAULT_GIT_REF,
   CCO_DEFAULT_GIT_REPO_URL,
@@ -49,7 +50,15 @@ async function fetchGithubJson<T>(url: string): Promise<{ ok: true; json: T } | 
   if (!res.ok) {
     return { ok: false, status: res.status };
   }
-  return { ok: true, json: (await res.json()) as T };
+  try {
+    const parsed = parseCloudflareJsonText(await res.text(), res.status);
+    if (parsed === null) {
+      return { ok: false, status: res.status };
+    }
+    return { ok: true, json: parsed as T };
+  } catch {
+    return { ok: false, status: res.status };
+  }
 }
 
 function resolveArtifactReleasesBaseUrl(repoUrl: string): string {
@@ -110,13 +119,19 @@ async function fetchGithubLatestReleaseIndex(owner: string, repo: string): Promi
     },
   });
   if (!res.ok) return null;
-  const json = (await res.json()) as ReleaseIndex;
-  if (!json.version?.trim()) return null;
-  return {
-    ...json,
-    version: json.version.trim(),
-    releasesBaseUrl: json.releasesBaseUrl?.trim() || asset.baseUrl,
-  };
+  try {
+    const parsed = parseCloudflareJsonText(await res.text(), res.status);
+    if (parsed === null || typeof parsed !== "object") return null;
+    const json = parsed as ReleaseIndex;
+    if (!json.version?.trim()) return null;
+    return {
+      ...json,
+      version: json.version.trim(),
+      releasesBaseUrl: json.releasesBaseUrl?.trim() || asset.baseUrl,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchSetupCoReleaseIndex(): Promise<ReleaseIndex | null> {
@@ -129,13 +144,19 @@ async function fetchSetupCoReleaseIndex(): Promise<ReleaseIndex | null> {
     },
   });
   if (!res.ok) return null;
-  const json = (await res.json()) as ReleaseIndex;
-  if (!json.version?.trim()) return null;
-  return {
-    ...json,
-    version: json.version.trim(),
-    releasesBaseUrl: json.releasesBaseUrl?.trim() || `${CCO_RELEASES_ORIGIN}/releases`,
-  };
+  try {
+    const parsed = parseCloudflareJsonText(await res.text(), res.status);
+    if (parsed === null || typeof parsed !== "object") return null;
+    const json = parsed as ReleaseIndex;
+    if (!json.version?.trim()) return null;
+    return {
+      ...json,
+      version: json.version.trim(),
+      releasesBaseUrl: json.releasesBaseUrl?.trim() || `${CCO_RELEASES_ORIGIN}/releases`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchCustomGitReleaseIndex(

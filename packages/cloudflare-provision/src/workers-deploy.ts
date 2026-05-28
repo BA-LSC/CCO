@@ -1,4 +1,4 @@
-import { CloudflareApiError } from "./cloudflare-api";
+import { CloudflareApiError, parseCloudflareJsonText, readCloudflareJson } from "./cloudflare-api";
 import { ensureWorkerRoute } from "./cloudflare-api-resources";
 import type { ProvisionResources } from "./provision-pipeline";
 import { buildWorkerSecretsStoreBindings } from "./secrets-store";
@@ -63,15 +63,20 @@ async function readWorkerDeployResponse(res: Response): Promise<void> {
     }
     return;
   }
-  let json: { success?: boolean; errors?: Array<{ message: string }> };
-  try {
-    json = JSON.parse(text) as { success?: boolean; errors?: Array<{ message: string }> };
-  } catch {
-    throw new CloudflareApiError(
-      `Worker deploy returned non-JSON response (${res.status})`,
-      res.status,
-    );
+  // Successful script uploads may echo the module bundle as multipart instead of JSON.
+  if (res.ok && text.trimStart().startsWith("--")) {
+    return;
   }
+
+  const parsed = parseCloudflareJsonText(text, res.status);
+  if (parsed === null) {
+    if (!res.ok) {
+      throw new CloudflareApiError(`Worker deploy failed (${res.status})`, res.status);
+    }
+    return;
+  }
+
+  const json = parsed as { success?: boolean; errors?: Array<{ message: string }> };
   if (!res.ok || json.success === false) {
     const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
     throw new CloudflareApiError(detail || "Worker deploy failed", res.status);
@@ -141,7 +146,8 @@ async function fetchWorkerScriptSettings(
   const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts`, {
     headers: { Authorization: `Bearer ${apiToken}` },
   });
-  const json = (await res.json()) as {
+  const parsed = await readCloudflareJson(res);
+  const json = parsed as {
     success?: boolean;
     result?: Array<{
       id: string;
@@ -216,7 +222,10 @@ export async function putWorkerSecret(
     return;
   }
 
-  const json = JSON.parse(text) as {
+  const parsed = parseCloudflareJsonText(text, res.status);
+  if (parsed === null) return;
+
+  const json = parsed as {
     success?: boolean;
     errors?: Array<{ message: string }>;
   };
@@ -281,7 +290,10 @@ export async function ensureQueueConsumer(
     }
     return;
   }
-  const json = JSON.parse(text) as { success?: boolean; errors?: Array<{ message: string }> };
+  const parsed = parseCloudflareJsonText(text, res.status);
+  if (parsed === null) return;
+
+  const json = parsed as { success?: boolean; errors?: Array<{ message: string }> };
   if (!res.ok || json.success === false) {
     const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
     if (/already has a consumer/i.test(detail)) {
@@ -329,7 +341,8 @@ async function listWorkerMigrationTags(
     return new Map<string, string>();
   }
 
-  const json = (await res.json()) as {
+  const parsed = await readCloudflareJson(res);
+  const json = parsed as {
     success?: boolean;
     result?: Array<{ id: string; migration_tag?: string }>;
     errors?: Array<{ message: string; code?: number }>;

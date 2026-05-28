@@ -1,4 +1,4 @@
-import { CloudflareApiError } from "./cloudflare-api";
+import { CloudflareApiError, parseCloudflareJsonText, readCloudflareJson } from "./cloudflare-api";
 import { buildWebWorkerSecretsStoreBindings } from "./secrets-store";
 import {
   CCO_WORKER_COMPATIBILITY_DATE,
@@ -39,12 +39,6 @@ type UploadSessionResponse = {
   buckets?: string[][];
 };
 
-async function readCloudflareJson(res: Response): Promise<unknown> {
-  const text = await res.text();
-  if (!text.trim()) return null;
-  return JSON.parse(text) as unknown;
-}
-
 async function createAssetsUploadSession(
   accountId: string,
   apiToken: string,
@@ -67,7 +61,8 @@ async function createAssetsUploadSession(
       body: JSON.stringify({ manifest: uploadManifest }),
     },
   );
-  const json = (await readCloudflareJson(res)) as {
+  const parsed = await readCloudflareJson(res);
+  const json = parsed as {
     success?: boolean;
     result?: UploadSessionResponse;
     errors?: Array<{ message: string }>;
@@ -97,7 +92,8 @@ async function uploadAssetBucket(
       body: form,
     },
   );
-  const json = (await readCloudflareJson(res)) as {
+  const parsed = await readCloudflareJson(res);
+  const json = parsed as {
     success?: boolean;
     result?: { jwt?: string };
     errors?: Array<{ message: string }>;
@@ -281,5 +277,12 @@ export async function fetchWebReleaseManifest(manifestUrl: string): Promise<WebA
   if (!res.ok) {
     throw new CloudflareApiError(`Failed to fetch web manifest: HTTP ${res.status}`, res.status);
   }
-  return (await res.json()) as WebAssetManifest;
+  const parsed = parseCloudflareJsonText(await res.text(), res.status);
+  if (parsed === null || typeof parsed !== "object" || parsed === null) {
+    throw new CloudflareApiError(
+      `Web manifest is empty or invalid JSON (${manifestUrl})`,
+      res.status,
+    );
+  }
+  return parsed as WebAssetManifest;
 }

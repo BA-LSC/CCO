@@ -114,6 +114,37 @@ describe("deployWorkerScript", () => {
     expect(metadata.compatibility_flags).toEqual(["nodejs_compat"]);
   });
 
+  test("accepts multipart success body from worker upload", async () => {
+    mockFetch((url, init) => {
+      if (init?.method === "PUT") {
+        return new Response("--boundary\r\nContent-Disposition: form-data", { status: 200 });
+      }
+      if (url.endsWith("/workers/scripts") && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: [
+              {
+                id: "cco-api",
+                compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+                compatibility_flags: ["nodejs_compat"],
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+    });
+
+    await expect(
+      deployWorkerScript("acct-1", "cf-token", "cco-api", new ArrayBuffer(0), [], {
+        compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,
+        compatibilityFlags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
+      }),
+    ).resolves.toBeUndefined();
+  });
+
   test("fails when deploy omits requested compatibility flags", async () => {
     mockFetch((url, init) => {
       if (init?.method === "PUT") {
