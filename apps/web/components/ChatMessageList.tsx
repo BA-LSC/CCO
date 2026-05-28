@@ -194,7 +194,6 @@ function ChatMessageListInner({
                 isOwn ? "message-item--own" : "message-item--other",
                 `message-item--spacing-${layoutInfo.spacing}`,
                 `message-item--group-${layoutInfo.groupPosition}`,
-                m.pendingSend || m.pendingUpload ? "message-item--snap-in" : "",
                 hasVisibleTimestamp ? "message-item--has-timestamp" : "",
                 showOwnMessageHeader ? "message-item--show-time" : "",
                 layoutInfo.showTimestamp ? "message-item--timestamp-start" : "",

@@ -91,6 +91,18 @@
   }
 }
 
+@keyframes composer-pending-media-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes composer-pending-media-pop-out {
   from {
     opacity: 1;
@@ -100,81 +112,6 @@
   to {
     opacity: 0;
     transform: scale(0.82);
-  }
-}
-
-@keyframes cco-quick-pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.88);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.cco-animate-pop-in {
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
-  transform-origin: center;
-}
-
-/* Snap-in surfaces without their own enter transition */
-.a2hs-banner,
-.chat-thread .edit-form,
-.chat-thread .empty-state,
-.chat-thread .message-item--snap-in,
-.chat-thread .message-reaction-row,
-.composer-drop-overlay-label,
-.composer-giphy-error,
-.composer-send-error,
-.dialog,
-.messages-day-divider-wrap,
-.messages-loading-older,
-.messages-unread-divider-wrap,
-.notifications-banner,
-.sidebar-add-channel-form,
-.sidebar-alert,
-.sidebar-new-dm {
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
-  transform-origin: center;
-}
-
-.dialog-overlay {
-  animation: cco-fade-in var(--motion-fast) var(--motion-ease-out);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cco-animate-pop-in,
-  .a2hs-banner,
-  .chat-thread .edit-form,
-  .chat-thread .empty-state,
-  .chat-thread .message-item--snap-in,
-  .chat-thread .message-reaction-row,
-  .composer-drop-overlay-label,
-  .composer-giphy-error,
-  .composer-pending-media-card--enter,
-  .composer-send-error,
-  .dialog,
-  .mention-suggestions,
-  .message-emoji-picker,
-  .composer-giphy-picker,
-  .chat-thread .composer-attach-menu,
-  .messages-day-divider-wrap,
-  .messages-loading-older,
-  .messages-unread-divider-wrap,
-  .notifications-banner,
-  .sidebar-add-channel-form,
-  .sidebar-alert,
-  .sidebar-new-dm {
-    animation: none;
-  }
-
-  .dialog-overlay {
-    animation: none;
   }
 }
 
@@ -3983,8 +3920,7 @@ button.sidebar-group-header:focus-visible {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
+  animation: cco-pop-in 0.4s var(--motion-ease-out);
 }
 
 .state-card h1 {
@@ -5700,8 +5636,7 @@ button.sidebar-group-header:focus-visible {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   transform-origin: bottom center;
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .composer-giphy-picker-header {
@@ -6307,8 +6242,7 @@ button.sidebar-group-header:focus-visible {
   color: var(--color-text);
   box-sizing: border-box;
   transform-origin: bottom center;
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .message-emoji-picker--floating {
@@ -6683,8 +6617,7 @@ button.sidebar-group-header:focus-visible {
   max-height: 280px;
   overflow-y: auto;
   transform-origin: bottom center;
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
-  animation-fill-mode: backwards;
+  animation: cco-pop-in var(--motion-normal) var(--motion-ease-out);
 }
 
 .mention-suggestions li + li {
@@ -7034,7 +6967,7 @@ button.sidebar-group-header:focus-visible {
 }
 
 .composer-pending-media-card--enter {
-  animation: cco-quick-pop-in var(--motion-normal) var(--motion-spring);
+  animation: composer-pending-media-pop-in var(--motion-normal) var(--motion-spring);
   animation-fill-mode: backwards;
 }
 
