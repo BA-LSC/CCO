@@ -52,6 +52,7 @@ type WorkerScriptMetadata = {
   observability?: { enabled: boolean };
   placement?: { mode: "smart" } | { region: string };
   migrations?: {
+    old_tag?: string;
     new_tag: string;
     steps: Array<{
       new_classes?: string[];
@@ -397,6 +398,7 @@ function resolveWorkerDeployOptions(
       return {
         ...options,
         migrations: {
+          old_tag: "v1",
           new_tag: "v2",
           steps: [{ new_sqlite_classes: ["UserInbox"] }],
         },
