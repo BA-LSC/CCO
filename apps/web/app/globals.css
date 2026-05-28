@@ -793,6 +793,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     border-color 0.15s,
     background 0.15s;
@@ -831,7 +832,11 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
 }
 
 .user-menu-theme-list--portal {
-  z-index: 1300;
+  position: fixed;
+  z-index: 10050;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
 }
 
 .user-menu-theme-list {
@@ -871,6 +876,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
   transition: background 0.12s;
 }
 

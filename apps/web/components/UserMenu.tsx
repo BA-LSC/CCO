@@ -75,11 +75,19 @@ export function UserMenu({ variant = "default" }: Props) {
   useEffect(() => {
     if (!open) return;
 
-    function onPointerDown(e: MouseEvent) {
+    function shouldKeepMenuOpen(target: Node) {
+      if (menuRef.current?.contains(target)) return true;
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest(".user-menu-theme-list") ||
+          target.closest("[data-user-menu-theme-picker-root]"),
+      );
+    }
+
+    function onPointerDown(e: PointerEvent) {
       const target = e.target;
       if (!(target instanceof Node)) return;
-      if (menuRef.current?.contains(target)) return;
-      if (target instanceof Element && target.closest(".user-menu-theme-list")) return;
+      if (shouldKeepMenuOpen(target)) return;
       setOpen(false);
     }
 
@@ -87,10 +95,10 @@ export function UserMenu({ variant = "default" }: Props) {
       if (e.key === "Escape") setOpen(false);
     }
 
-    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);

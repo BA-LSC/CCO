@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   CHAOS_THEME,
@@ -36,6 +44,15 @@ function ChaosSwatch() {
   return <span className="user-menu-theme-swatch user-menu-theme-swatch-chaos" aria-hidden />;
 }
 
+function measurePortalListPosition(trigger: HTMLElement) {
+  const rect = trigger.getBoundingClientRect();
+  return {
+    left: rect.left,
+    width: rect.width,
+    bottom: window.innerHeight - rect.top + 4,
+  };
+}
+
 export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default" }: Props) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -62,20 +79,19 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
     function updatePosition() {
       const trigger = rootRef.current?.querySelector<HTMLButtonElement>(".user-menu-theme-trigger");
       if (!trigger) return;
-      const rect = trigger.getBoundingClientRect();
-      setListPosition({
-        left: rect.left,
-        width: rect.width,
-        bottom: window.innerHeight - rect.top + 4,
-      });
+      setListPosition(measurePortalListPosition(trigger));
     }
 
     updatePosition();
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
     return () => {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
     };
   }, [open, usePortal]);
 
@@ -89,7 +105,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
   useEffect(() => {
     if (!open) return;
 
-    function onClickOutside(e: MouseEvent) {
+    function onPointerOutside(e: PointerEvent) {
       const target = e.target as Node;
       if (rootRef.current?.contains(target) || listRef.current?.contains(target)) return;
       setOpen(false);
@@ -99,21 +115,30 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
       if (e.key === "Escape") setOpen(false);
     }
 
-    // Defer so the opening click does not hit the listener in the same turn.
+    // Defer so the opening tap does not hit the listener in the same turn.
     const timer = window.setTimeout(() => {
-      document.addEventListener("click", onClickOutside);
+      document.addEventListener("pointerdown", onPointerOutside);
     }, 0);
     document.addEventListener("keydown", onKeyDown);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("click", onClickOutside);
+      document.removeEventListener("pointerdown", onPointerOutside);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
-  async function select(next: UserTheme) {
-    setOpen(false);
-    await onPick(next);
+  const selectTheme = useCallback(
+    async (next: UserTheme) => {
+      setOpen(false);
+      await onPick(next);
+    },
+    [onPick],
+  );
+
+  function onOptionPointerDown(event: ReactPointerEvent, next: UserTheme) {
+    event.preventDefault();
+    event.stopPropagation();
+    void selectTheme(next);
   }
 
   const showList = open && (!usePortal || listPosition);
@@ -144,7 +169,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
             role="option"
             aria-selected={theme === id}
             className={`user-menu-theme-option${theme === id ? " user-menu-theme-option-active" : ""}`}
-            onClick={() => void select(id)}
+            onPointerDown={(event) => onOptionPointerDown(event, id)}
           >
             <ThemeSwatch id={id} />
             <span className="user-menu-theme-option-label">{THEME_LABELS[id]}</span>
@@ -160,7 +185,7 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
             className={`user-menu-theme-option user-menu-theme-option-chaos${
               theme === CHAOS_THEME ? " user-menu-theme-option-active" : ""
             }`}
-            onClick={() => void select(CHAOS_THEME)}
+            onPointerDown={(event) => onOptionPointerDown(event, CHAOS_THEME)}
           >
             <ChaosSwatch />
             <span className="user-menu-theme-option-label">{THEME_LABELS[CHAOS_THEME]}</span>
@@ -171,14 +196,14 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
   ) : null;
 
   return (
-    <div className="user-menu-theme-picker" ref={rootRef}>
+    <div className="user-menu-theme-picker" ref={rootRef} data-user-menu-theme-picker-root>
       <button
         type="button"
         className="user-menu-theme-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
-        onMouseDown={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
           toggleOpen();
