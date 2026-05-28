@@ -16,6 +16,9 @@ export async function isR2StorageEnabled(): Promise<boolean> {
 
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
+/** Re-sign only when fewer than this many seconds remain before expiry. */
+export const UPLOAD_SIGNATURE_REFRESH_BUFFER_SECONDS = 24 * 60 * 60;
+
 function uploadSigningSecret(): string {
   const secret = process.env.SESSION_SECRET;
   if (!secret) throw new Error("SESSION_SECRET is required for upload signing");
@@ -61,15 +64,58 @@ export function verifyUploadSignature(
   }
 }
 
+export function buildSignedUploadUrlAt(
+  filename: string,
+  expiresAt: number,
+  publicBase = PUBLIC_UPLOAD_URL,
+): string {
+  const sig = signUploadAccess(filename, expiresAt);
+  const base = publicBase.replace(/\/$/, "");
+  return `${base}/${filename}?sig=${sig}&exp=${expiresAt}`;
+}
+
 export function buildSignedUploadUrl(
   filename: string,
   ttlSeconds = DEFAULT_SIGNED_URL_TTL_SECONDS,
   publicBase = PUBLIC_UPLOAD_URL,
 ): string {
   const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
-  const sig = signUploadAccess(filename, expiresAt);
-  const base = publicBase.replace(/\/$/, "");
-  return `${base}/${filename}?sig=${sig}&exp=${expiresAt}`;
+  return buildSignedUploadUrlAt(filename, expiresAt, publicBase);
+}
+
+function readStoredUploadSignature(
+  urlOrPath: string,
+): { sig?: string; exp?: number } {
+  try {
+    const url = urlOrPath.startsWith("/")
+      ? new URL(urlOrPath, "http://local")
+      : new URL(urlOrPath);
+    const sig = url.searchParams.get("sig") ?? undefined;
+    const expRaw = url.searchParams.get("exp");
+    const exp = expRaw ? Number.parseInt(expRaw, 10) : undefined;
+    return { sig, exp: Number.isFinite(exp) ? exp : undefined };
+  } catch {
+    const queryIndex = urlOrPath.indexOf("?");
+    if (queryIndex >= 0) {
+      const params = new URLSearchParams(urlOrPath.slice(queryIndex + 1));
+      const sig = params.get("sig") ?? undefined;
+      const expRaw = params.get("exp");
+      const exp = expRaw ? Number.parseInt(expRaw, 10) : undefined;
+      return { sig, exp: Number.isFinite(exp) ? exp : undefined };
+    }
+    return {};
+  }
+}
+
+function canReuseStoredUploadSignature(
+  filename: string,
+  sig: string | undefined,
+  exp: number | undefined,
+): boolean {
+  if (!sig || exp === undefined) return false;
+  if (!verifyUploadSignature(filename, sig, exp)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return exp - now > UPLOAD_SIGNATURE_REFRESH_BUFFER_SECONDS;
 }
 
 const UPLOAD_PATH_RE = /\/(?:api\/v1\/|api\/)?uploads\/([^/?#]+)/;
@@ -128,11 +174,19 @@ export function refreshAttachmentUrl(stored: string | null): string | null {
   const filename = extractUploadFilename(stored);
   if (!filename) return stored;
 
-  if (process.env.CLOUDFLARE_R2_BUCKET?.trim() || process.env.UPLOAD_STORAGE === "r2") {
-    return buildSignedUploadUrl(filename);
+  const r2Enabled =
+    Boolean(process.env.CLOUDFLARE_R2_BUCKET?.trim()) ||
+    process.env.UPLOAD_STORAGE === "r2";
+
+  if (!r2Enabled && safeUploadPath(getUploadDir(), filename) === null) {
+    return stored;
   }
 
-  if (safeUploadPath(getUploadDir(), filename) === null) return stored;
+  const { sig, exp } = readStoredUploadSignature(stored);
+  if (canReuseStoredUploadSignature(filename, sig, exp)) {
+    return buildSignedUploadUrlAt(filename, exp!);
+  }
+
   return buildSignedUploadUrl(filename);
 }
 

@@ -10,7 +10,11 @@ import { MessageDeliveryStatus, findLastPeerReadMessageId } from "@/components/M
 import { UserAvatar } from "@/components/UserAvatar";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
 import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
-import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
+import {
+  attachmentCacheKey,
+  buildAttachmentDisplaySrcMap,
+  resolveAttachmentDisplayUrl,
+} from "@/lib/attachment-url";
 import { buildMessageLayoutInfos } from "@/lib/message-grouping";
 import type { Message, PeerUser } from "@/lib/api";
 import type { AttachmentLightboxImage } from "@/components/AttachmentLightbox";
@@ -121,10 +125,21 @@ function ChatMessageListInner({
     return isGroupLeader;
   }
 
+  const attachmentDisplaySrcMap = useMemo(
+    () => buildAttachmentDisplaySrcMap(messages.map((message) => message.attachmentUrl)),
+    [messages],
+  );
+
   function messageAttachmentSrc(message: Message): string | null {
     if (message.pendingUpload && message.localPreviewUrl) return message.localPreviewUrl;
-    if (message.attachmentUrl) return resolveAttachmentDisplayUrl(message.attachmentUrl);
-    return null;
+    if (!message.attachmentUrl) return null;
+    const key = attachmentCacheKey(message.attachmentUrl);
+    return attachmentDisplaySrcMap.get(key) ?? resolveAttachmentDisplayUrl(message.attachmentUrl);
+  }
+
+  function messageAttachmentDisplaySrc(attachmentUrl: string): string {
+    const key = attachmentCacheKey(attachmentUrl);
+    return attachmentDisplaySrcMap.get(key) ?? resolveAttachmentDisplayUrl(attachmentUrl);
   }
 
   return (
@@ -306,7 +321,7 @@ function ChatMessageListInner({
                                 return;
                               }
                               onOpenImage({
-                                src: resolveAttachmentDisplayUrl(m.attachmentUrl),
+                                src: messageAttachmentDisplaySrc(m.attachmentUrl),
                                 alt: m.body || "Shared image",
                               });
                             }}
@@ -331,7 +346,7 @@ function ChatMessageListInner({
                             onPlay={() => {
                               if (messageActions.isRevealed(m.id) || !m.attachmentUrl) return;
                               onOpenVideo({
-                                src: resolveAttachmentDisplayUrl(m.attachmentUrl),
+                                src: messageAttachmentDisplaySrc(m.attachmentUrl),
                                 alt: m.body || "Shared video",
                               });
                             }}

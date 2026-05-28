@@ -88,3 +88,38 @@ export function resolveAttachmentDisplayUrl(attachmentUrl: string): string {
 
   return attachmentUrl;
 }
+
+/** Stable cache key for deduplicating attachment loads within a message chunk. */
+export function attachmentCacheKey(attachmentUrl: string): string {
+  return extractUploadFilename(attachmentUrl) ?? attachmentUrl;
+}
+
+function readUploadSignatureExpiry(attachmentUrl: string): number {
+  const { exp } = readUploadSignatureParams(attachmentUrl);
+  if (!exp) return 0;
+  const parsed = Number.parseInt(exp, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Resolve one display URL per attachment identity in a loaded message chunk. */
+export function buildAttachmentDisplaySrcMap(
+  attachmentUrls: readonly (string | null | undefined)[],
+): Map<string, string> {
+  const resolved = new Map<string, { src: string; exp: number }>();
+
+  for (const attachmentUrl of attachmentUrls) {
+    if (!attachmentUrl) continue;
+
+    const key = attachmentCacheKey(attachmentUrl);
+    const exp = readUploadSignatureExpiry(attachmentUrl);
+    const existing = resolved.get(key);
+    if (existing && existing.exp >= exp) continue;
+
+    resolved.set(key, {
+      src: resolveAttachmentDisplayUrl(attachmentUrl),
+      exp,
+    });
+  }
+
+  return new Map([...resolved.entries()].map(([key, value]) => [key, value.src]));
+}

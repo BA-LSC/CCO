@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { extractUploadFilename, resolveAttachmentDisplayUrl } from "./attachment-url";
+import {
+  attachmentCacheKey,
+  buildAttachmentDisplaySrcMap,
+  extractUploadFilename,
+  resolveAttachmentDisplayUrl,
+} from "./attachment-url";
 
 describe("extractUploadFilename", () => {
   test("parses API upload URLs", () => {
@@ -73,5 +78,40 @@ describe("resolveAttachmentDisplayUrl", () => {
         "https://abc123.r2.cloudflarestorage.com/cco-uploads-test/abc.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
       ),
     ).toBe("/api/v1/uploads/abc.jpeg");
+  });
+});
+
+describe("attachmentCacheKey", () => {
+  test("uses upload filename for CCO uploads", () => {
+    expect(
+      attachmentCacheKey("https://api.example.com/uploads/abc.jpeg?sig=x&exp=1"),
+    ).toBe("abc.jpeg");
+  });
+
+  test("falls back to full URL for external attachments", () => {
+    const url = "https://media.giphy.com/media/abc/giphy.gif";
+    expect(attachmentCacheKey(url)).toBe(url);
+  });
+});
+
+describe("buildAttachmentDisplaySrcMap", () => {
+  test("deduplicates upload attachments by filename", () => {
+    const map = buildAttachmentDisplaySrcMap([
+      "https://api.example.com/uploads/abc.jpeg?sig=old&exp=1",
+      "https://api.example.com/uploads/abc.jpeg?sig=new&exp=999",
+    ]);
+
+    expect(map.size).toBe(1);
+    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=new&exp=999");
+  });
+
+  test("keeps distinct external attachment URLs separate", () => {
+    const first = "https://media.giphy.com/media/one/giphy.gif";
+    const second = "https://media.giphy.com/media/two/giphy.gif";
+    const map = buildAttachmentDisplaySrcMap([first, second]);
+
+    expect(map.size).toBe(2);
+    expect(map.get(first)).toBe(first);
+    expect(map.get(second)).toBe(second);
   });
 });

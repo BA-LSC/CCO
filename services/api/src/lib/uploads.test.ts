@@ -176,13 +176,32 @@ describe("extractUploadFilename", () => {
 });
 
 describe("refreshAttachmentUrl", () => {
-  test("re-signs stored upload URLs", () => {
+  test("re-signs stored upload URLs when signature is expired", () => {
     const refreshed = refreshAttachmentUrl(
       "https://api.example.com/uploads/valid.png?sig=old&exp=1",
     );
     expect(refreshed).toContain("/uploads/valid.png");
     expect(refreshed).toContain("sig=");
     expect(refreshed).toContain("exp=");
+  });
+
+  test("preserves stored upload URLs while signature remains valid", () => {
+    const exp = Math.floor(Date.now() / 1000) + 48 * 60 * 60;
+    const sig = signUploadAccess("valid.png", exp);
+    const stored = `https://api.example.com/uploads/valid.png?sig=${sig}&exp=${exp}`;
+    const refreshed = refreshAttachmentUrl(stored);
+    expect(refreshed).toBe(
+      `http://localhost:3001/uploads/valid.png?sig=${sig}&exp=${exp}`,
+    );
+  });
+
+  test("re-signs when signature expires within refresh buffer", () => {
+    const exp = Math.floor(Date.now() / 1000) + 60 * 60;
+    const sig = signUploadAccess("valid.png", exp);
+    const stored = `https://api.example.com/uploads/valid.png?sig=${sig}&exp=${exp}`;
+    const refreshed = refreshAttachmentUrl(stored);
+    expect(refreshed).toContain("/uploads/valid.png");
+    expect(refreshed).not.toBe(stored);
   });
 
   test("re-signs legacy presigned R2 URLs to API proxy URLs", () => {
