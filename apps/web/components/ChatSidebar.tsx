@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { GroupSidebarSection } from "@/components/GroupSidebarSection";
@@ -24,6 +24,7 @@ import {
   type ServiceTeamSummary,
 } from "@/lib/api";
 import { requestComposerFocus } from "@/lib/composer-events";
+import { isPersistableChatPath, readLastChatPath } from "@/lib/last-chat-path";
 import { formatSidebarMessagePreview } from "@/lib/message-preview";
 import { subscribeUnreadChanged } from "@/lib/sidebar-events";
 import { fetchSetupStatus } from "@/lib/setup";
@@ -74,6 +75,7 @@ function applyDmMessagePreview(
 
 export function ChatSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { sidebarOpen, closeSidebar, subscribeRealtime, session, activeConversationId } =
     useChatLayout();
 
@@ -258,6 +260,21 @@ export function ChatSidebar() {
     );
   }, [activeTeamId]);
 
+  const handleNewMessageClick = useCallback(() => {
+    closeSidebar();
+
+    if (isPersistableChatPath(pathname)) {
+      requestComposerFocus();
+      return;
+    }
+
+    const target = readLastChatPath() ?? (dms[0] ? `/dms/${dms[0].id}` : null);
+    if (target) {
+      router.push(target);
+    }
+    requestComposerFocus();
+  }, [closeSidebar, dms, pathname, router]);
+
   return (
     <>
       {sidebarOpen && (
@@ -334,10 +351,7 @@ export function ChatSidebar() {
                 className="sidebar-item sidebar-dm-item sidebar-new-message-btn"
                 aria-label="Focus message input"
                 title="Focus message input"
-                onClick={() => {
-                  closeSidebar();
-                  requestComposerFocus();
-                }}
+                onClick={handleNewMessageClick}
               >
                 <div className="sidebar-dm-row">
                   <span className="sidebar-item-label sidebar-new-message-label">New message</span>

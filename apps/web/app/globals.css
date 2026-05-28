@@ -566,10 +566,9 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  color: #ddd6fe;
-  background: rgba(139, 92, 246, 0.28);
-  border: 1px solid rgba(167, 139, 250, 0.55);
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.35);
 }
 
 .user-menu-item:hover {
@@ -1859,19 +1858,28 @@ button.sidebar-group-header:focus-visible {
 }
 
 .sidebar-new-message-btn {
-  margin-top: 2px;
+  margin: 2px var(--sidebar-item-pad-x) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface-2) 88%, var(--color-surface));
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-new-message-btn .sidebar-dm-row {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 5px var(--sidebar-item-pad-x);
+  padding: 7px var(--sidebar-item-pad-x);
   min-height: 0;
 }
 
 .sidebar-new-message-btn:hover {
-  background: color-mix(in srgb, var(--color-surface-2) 75%, transparent);
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface-2));
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+}
+
+.sidebar-new-message-btn:active {
+  background: color-mix(in srgb, var(--color-primary-soft) 70%, var(--color-surface-2));
 }
 
 .sidebar-new-message-label {
@@ -1879,9 +1887,9 @@ button.sidebar-group-header:focus-visible {
   width: 100%;
   text-align: center;
   font-size: var(--sidebar-font-size-sm);
-  font-style: italic;
-  font-weight: 450;
-  color: var(--color-muted);
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-text);
   line-height: 1.2;
 }
 

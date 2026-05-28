@@ -133,7 +133,9 @@ export const ComposerMentionInput = forwardRef<ComposerMentionInputHandle, Props
       ref,
       () => ({
         focus: () => {
-          editorRef.current?.focus();
+          const root = editorRef.current;
+          if (!root || disabled || readOnly) return;
+          placeCaretAtEnd(root);
         },
         blur: () => {
           editorRef.current?.blur();
