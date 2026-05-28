@@ -85,6 +85,15 @@ function ChatMessageListInner({
     [messages, resolvedUserId],
   );
 
+  const lastOwnMessageId = useMemo(() => {
+    if (!resolvedUserId) return null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]!;
+      if (message.authorId === resolvedUserId) return message.id;
+    }
+    return null;
+  }, [messages, resolvedUserId]);
+
   const lastPeerReadMessageId = useMemo(
     () =>
       isDirectMessage
@@ -136,14 +145,11 @@ function ChatMessageListInner({
             layoutInfo.clusterTimestamp ||
             Boolean(m.editedAt));
         const hasVisibleTimestamp = showOwnMessageHeader || (!isOwn && layoutInfo.showAuthorName);
-        const isClusterTail =
-          layoutInfo.groupPosition === "last" || layoutInfo.groupPosition === "single";
         const isSending = Boolean(m.pendingSend || m.pendingUpload);
+        const isLatestOwn = isOwn && m.id === lastOwnMessageId;
         const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
-        const showDeliveryFooter =
-          isOwn &&
-          !isEditing &&
-          (isSending || isClusterTail || isLastPeerRead);
+        const showDeliveryFooter = isLatestOwn && !isEditing;
+        const showPeerAvatar = isLastPeerRead && isLatestOwn;
 
         return (
           <Fragment key={m.id}>
@@ -236,6 +242,7 @@ function ChatMessageListInner({
                       reactions={m.reactions ?? []}
                       currentUserId={resolvedUserId}
                       onToggleReaction={onToggleReaction}
+                      reactionAlign={isOwn ? "own" : "other"}
                     >
                       <div
                         className={[
@@ -359,7 +366,7 @@ function ChatMessageListInner({
                         <MessageDeliveryStatus
                           message={m}
                           peerUser={peerUser}
-                          showPeerAvatar={isLastPeerRead}
+                          showPeerAvatar={showPeerAvatar}
                         />
                       </div>
                     ) : null}

@@ -332,6 +332,8 @@ type PillsProps = {
   reactions: Reaction[];
   currentUserId?: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  /** Own messages: + on the left, emojis grow toward the bubble. */
+  reactionAlign?: "own" | "other";
 };
 
 export function MessageReactionPills({
@@ -339,6 +341,7 @@ export function MessageReactionPills({
   reactions,
   currentUserId,
   onToggleReaction,
+  reactionAlign = "other",
 }: PillsProps) {
   const grouped = Array.from(
     reactions.reduce((map, reaction) => {
@@ -351,36 +354,60 @@ export function MessageReactionPills({
 
   if (grouped.length === 0) return null;
 
+  const addButton = (
+    <MessageAddReactionButton
+      messageId={messageId}
+      reactions={reactions}
+      currentUserId={currentUserId}
+      onToggleReaction={onToggleReaction}
+    />
+  );
+
+  const emojiPills = grouped.map(([emoji, list]) => {
+    const mine = list.some((reaction) => reaction.userId === currentUserId);
+    const title = list.map((reaction) => reaction.userName).join(", ");
+    const count = list.length;
+    return (
+      <button
+        key={emoji}
+        type="button"
+        className={`message-reaction-pill${mine ? " message-reaction-pill--mine" : ""}`}
+        title={title}
+        aria-label={
+          count > 1 ? `${emoji}, ${count} reactions, ${title}` : `${emoji}, ${title}`
+        }
+        onClick={() => onToggleReaction(messageId, emoji)}
+      >
+        <span className={getEmojiDisplayClass(emoji, "message-reaction-emoji")} aria-hidden>
+          {emoji}
+        </span>
+        {count >= 2 && <span className="message-reaction-count">{count}</span>}
+      </button>
+    );
+  });
+
   return (
-    <div className="message-reaction-pills" role="group" aria-label="Reactions">
-      {grouped.map(([emoji, list]) => {
-        const mine = list.some((reaction) => reaction.userId === currentUserId);
-        const title = list.map((reaction) => reaction.userName).join(", ");
-        const count = list.length;
-        return (
-          <button
-            key={emoji}
-            type="button"
-            className={`message-reaction-pill${mine ? " message-reaction-pill--mine" : ""}`}
-            title={title}
-            aria-label={
-              count > 1 ? `${emoji}, ${count} reactions, ${title}` : `${emoji}, ${title}`
-            }
-            onClick={() => onToggleReaction(messageId, emoji)}
-          >
-            <span className={getEmojiDisplayClass(emoji, "message-reaction-emoji")} aria-hidden>
-              {emoji}
-            </span>
-            {count >= 2 && <span className="message-reaction-count">{count}</span>}
-          </button>
-        );
-      })}
-      <MessageAddReactionButton
-        messageId={messageId}
-        reactions={reactions}
-        currentUserId={currentUserId}
-        onToggleReaction={onToggleReaction}
-      />
+    <div
+      className={[
+        "message-reaction-pills",
+        reactionAlign === "own" ? "message-reaction-pills--own" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="group"
+      aria-label="Reactions"
+    >
+      {reactionAlign === "own" ? (
+        <>
+          {addButton}
+          {emojiPills}
+        </>
+      ) : (
+        <>
+          {emojiPills}
+          {addButton}
+        </>
+      )}
     </div>
   );
 }
@@ -390,6 +417,7 @@ type StackProps = {
   reactions: Reaction[];
   currentUserId?: string;
   onToggleReaction: (messageId: string, emoji: string) => void;
+  reactionAlign?: "own" | "other";
   children: React.ReactNode;
 };
 
@@ -398,6 +426,7 @@ export function MessageBubbleStack({
   reactions,
   currentUserId,
   onToggleReaction,
+  reactionAlign = "other",
   children,
 }: StackProps) {
   const hasReactions = reactions.length > 0;
@@ -419,6 +448,7 @@ export function MessageBubbleStack({
             reactions={reactions}
             currentUserId={currentUserId}
             onToggleReaction={onToggleReaction}
+            reactionAlign={reactionAlign}
           />
         </div>
       )}

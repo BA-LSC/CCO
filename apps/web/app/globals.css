@@ -4485,8 +4485,8 @@ button.sidebar-group-header:focus-visible {
 
 /* Chat thread */
 .chat-thread {
-  --color-chat-own: color-mix(in srgb, var(--color-primary) 88%, #000);
-  --color-chat-own-hover: color-mix(in srgb, var(--color-primary) 78%, #000);
+  --color-chat-own: color-mix(in srgb, var(--color-primary) 78%, #000);
+  --color-chat-own-hover: color-mix(in srgb, var(--color-primary) 70%, #000);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -4778,6 +4778,13 @@ button.sidebar-group-header:focus-visible {
   max-width: 100%;
   padding: 10px 14px;
   border-radius: 18px;
+  box-sizing: border-box;
+}
+
+.chat-thread .message-bubble--own,
+.chat-thread .message-bubble--other {
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .chat-thread .message-bubble--other {
@@ -6032,6 +6039,10 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   gap: 4px;
   width: 100%;
+}
+
+.chat-thread .message-reaction-pills--own {
+  justify-content: flex-end;
 }
 
 .chat-thread .message-reaction-add-picker {
