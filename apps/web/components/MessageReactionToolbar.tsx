@@ -17,6 +17,19 @@ import { buildEmojiPickerGroups } from "@/lib/emoji-picker-data";
 import { QUICK_REACTION_EMOJIS, RECENT_EMOJI_GROUP_LABEL } from "@/lib/emoji-picker-constants";
 import { getEmojiDisplayClass } from "@/lib/emoji-display";
 import { pushRecentEmoji, readRecentEmojis } from "@/lib/emoji-recents";
+import {
+  appendNewEmojisToDisplayOrder,
+  buildDisplayOrderFromGrouped,
+  buildEnterDelayByEmoji,
+  buildReactionPillRenders,
+  findAddedEmojiTypes,
+  findRemovedEmojiGroups,
+  groupReactionsByEmoji,
+  maxEnterAnimationMs,
+  reactionEmojiKeys,
+  REACTION_PILL_ANIMATION_MS,
+  type ReactionPillRender,
+} from "@/lib/message-reaction-pills";
 import type { Reaction } from "@/lib/api";
 
 export { QUICK_REACTION_EMOJIS } from "@/lib/emoji-picker-constants";
@@ -337,42 +350,6 @@ type PillsProps = {
   onExitingChange?: (exiting: boolean) => void;
 };
 
-const REACTION_PILL_STAGGER_MS = 50;
-const REACTION_PILL_ANIMATION_MS = 180;
-
-function groupReactionsByEmoji(reactions: Reaction[]): Array<[string, Reaction[]]> {
-  const order: string[] = [];
-  const map = new Map<string, Reaction[]>();
-  for (const reaction of reactions) {
-    let list = map.get(reaction.emoji);
-    if (!list) {
-      list = [];
-      map.set(reaction.emoji, list);
-      order.push(reaction.emoji);
-    }
-    list.push(reaction);
-  }
-  return order.map((emoji) => [emoji, map.get(emoji)!]);
-}
-
-function reactionEmojiKeys(reactions: Reaction[]): string {
-  const order: string[] = [];
-  const seen = new Set<string>();
-  for (const reaction of reactions) {
-    if (seen.has(reaction.emoji)) continue;
-    seen.add(reaction.emoji);
-    order.push(reaction.emoji);
-  }
-  return order.join("\0");
-}
-
-type ReactionPillRender = {
-  emoji: string;
-  list: Reaction[];
-  phase: "steady" | "enter" | "exit";
-  enterDelayMs: number;
-};
-
 export function MessageReactionPills({
   messageId,
   reactions,
@@ -382,29 +359,37 @@ export function MessageReactionPills({
   onExitingChange,
 }: PillsProps) {
   const initializedRef = useRef(false);
-  const seenEmojisRef = useRef(new Set<string>());
   const prevGroupedRef = useRef<Array<[string, Reaction[]]>>([]);
   const displayOrderRef = useRef<string[]>([]);
   const [exitingEmojis, setExitingEmojis] = useState<Array<{ emoji: string; list: Reaction[] }>>(
     [],
   );
+  const [enteringEmojis, setEnteringEmojis] = useState<string[]>([]);
 
   const grouped = useMemo(() => groupReactionsByEmoji(reactions), [reactions]);
   const emojiKeys = useMemo(() => reactionEmojiKeys(reactions), [reactions]);
-  const orderedEmojis = useMemo(
-    () =>
-      reactionAlign === "own"
-        ? [...grouped.map(([emoji]) => emoji)].reverse()
-        : grouped.map(([emoji]) => emoji),
-    [grouped, reactionAlign],
-  );
 
-  // Compare against prevGroupedRef during render (before layout effect commits) so exit
-  // pills animate on the first frame. Must not be memoized — ref updates don't invalidate memo.
-  const activeEmojiSet = new Set(grouped.map(([emoji]) => emoji));
+  const addedSinceLastCommit = initializedRef.current
+    ? findAddedEmojiTypes(prevGroupedRef.current, grouped)
+    : [];
+
   const removedSinceLastCommit = initializedRef.current
-    ? prevGroupedRef.current.filter(([emoji]) => !activeEmojiSet.has(emoji))
-    : ([] as Array<[string, Reaction[]]>);
+    ? findRemovedEmojiGroups(prevGroupedRef.current, grouped)
+    : [];
+
+  if (initializedRef.current && addedSinceLastCommit.length > 0) {
+    displayOrderRef.current = appendNewEmojisToDisplayOrder(
+      displayOrderRef.current,
+      addedSinceLastCommit,
+      reactionAlign,
+    );
+  }
+
+  const activeEnteringEmojis = (() => {
+    const merged = new Set(enteringEmojis);
+    for (const emoji of addedSinceLastCommit) merged.add(emoji);
+    return merged;
+  })();
 
   const activeExitingEmojis = (() => {
     const merged = new Map(exitingEmojis.map((entry) => [entry.emoji, entry]));
@@ -415,60 +400,78 @@ export function MessageReactionPills({
   })();
 
   const hasActiveExitAnimation = activeExitingEmojis.length > 0;
+  const hasActiveEnterAnimation = activeEnteringEmojis.size > 0;
 
-  const enterDelayByEmoji = useMemo(() => {
-    if (!initializedRef.current) return new Map<string, number>();
-    const newlyAdded = grouped.filter(([emoji]) => !seenEmojisRef.current.has(emoji));
-    const staggerSource = reactionAlign === "own" ? [...newlyAdded].reverse() : newlyAdded;
-    return new Map(
-      staggerSource.map(([emoji], index) => [emoji, index * REACTION_PILL_STAGGER_MS]),
-    );
-  }, [emojiKeys, grouped, reactionAlign]);
+  const enterDelayByEmoji = buildEnterDelayByEmoji(
+    activeEnteringEmojis,
+    displayOrderRef.current,
+    reactionAlign,
+  );
 
   useLayoutEffect(() => {
     const prevGrouped = prevGroupedRef.current;
-    const currentEmojiSet = new Set(grouped.map(([emoji]) => emoji));
-    let removed: Array<[string, Reaction[]]> = [];
+    const added = findAddedEmojiTypes(prevGrouped, grouped);
+    const removed = findRemovedEmojiGroups(prevGrouped, grouped);
 
-    if (initializedRef.current) {
-      removed = prevGrouped.filter(([emoji]) => !currentEmojiSet.has(emoji));
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      displayOrderRef.current = buildDisplayOrderFromGrouped(grouped, reactionAlign);
+    } else {
+      if (added.length > 0) {
+        setEnteringEmojis((current) => {
+          const known = new Set(current);
+          const next = [...current];
+          for (const emoji of added) {
+            if (!known.has(emoji)) next.push(emoji);
+          }
+          return next;
+        });
+        displayOrderRef.current = appendNewEmojisToDisplayOrder(
+          displayOrderRef.current,
+          added,
+          reactionAlign,
+        );
+      }
+
       if (removed.length > 0) {
         setExitingEmojis((current) => {
           const known = new Set(current.map((entry) => entry.emoji));
-          const added = removed.filter(([emoji]) => !known.has(emoji));
-          if (added.length === 0) return current;
+          const nextRemoved = removed.filter(([emoji]) => !known.has(emoji));
+          if (nextRemoved.length === 0) return current;
           return [
             ...current,
-            ...added.map(([emoji, list]) => ({
+            ...nextRemoved.map(([emoji, list]) => ({
               emoji,
               list,
             })),
           ];
         });
       }
-    } else {
-      initializedRef.current = true;
     }
 
-    grouped.forEach(([emoji]) => seenEmojisRef.current.add(emoji));
     prevGroupedRef.current = grouped;
-    if (removed.length === 0) {
-      displayOrderRef.current = orderedEmojis;
-    }
-  }, [emojiKeys, grouped, orderedEmojis, reactionAlign]);
+  }, [emojiKeys, grouped, reactionAlign]);
 
   useLayoutEffect(() => {
     onExitingChange?.(hasActiveExitAnimation);
   }, [hasActiveExitAnimation, onExitingChange]);
 
   useEffect(() => {
+    if (!hasActiveEnterAnimation) return;
+    const timeout = window.setTimeout(() => {
+      setEnteringEmojis([]);
+    }, maxEnterAnimationMs(enterDelayByEmoji));
+    return () => window.clearTimeout(timeout);
+  }, [emojiKeys, hasActiveEnterAnimation]);
+
+  useEffect(() => {
     if (!hasActiveExitAnimation) return;
     const timeout = window.setTimeout(() => {
+      const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
       setExitingEmojis((current) => {
-        const activeEmojis = new Set(grouped.map(([emoji]) => emoji));
         for (const { emoji } of current) {
           if (!activeEmojis.has(emoji)) {
-            seenEmojisRef.current.delete(emoji);
+            displayOrderRef.current = displayOrderRef.current.filter((entry) => entry !== emoji);
           }
         }
         return [];
@@ -477,56 +480,13 @@ export function MessageReactionPills({
     return () => window.clearTimeout(timeout);
   }, [grouped, hasActiveExitAnimation]);
 
-  const pillRenders = (() => {
-    const byEmoji = new Map<string, { list: Reaction[]; phase: ReactionPillRender["phase"] }>();
-
-    for (const [emoji, list] of grouped) {
-      const enterDelayMs = enterDelayByEmoji.get(emoji);
-      byEmoji.set(emoji, {
-        list,
-        phase: enterDelayMs !== undefined ? "enter" : "steady",
-      });
-    }
-
-    for (const { emoji, list } of activeExitingEmojis) {
-      if (!byEmoji.has(emoji)) {
-        byEmoji.set(emoji, { list, phase: "exit" });
-      }
-    }
-
-    // Active pills use live order so new own-message reactions don't flash on the right
-    // before useLayoutEffect updates displayOrderRef.
-    const order = orderedEmojis.filter((emoji) => {
-      const entry = byEmoji.get(emoji);
-      return entry != null && entry.phase !== "exit";
-    });
-
-    for (const emoji of displayOrderRef.current) {
-      const entry = byEmoji.get(emoji);
-      if (entry?.phase === "exit" && !order.includes(emoji)) {
-        const prevIndex = displayOrderRef.current.indexOf(emoji);
-        let insertAt = order.length;
-        for (let index = 0; index < order.length; index++) {
-          const anchorIndex = displayOrderRef.current.indexOf(order[index]!);
-          if (anchorIndex > prevIndex) {
-            insertAt = index;
-            break;
-          }
-        }
-        order.splice(insertAt, 0, emoji);
-      }
-    }
-
-    return order.map((emoji) => {
-      const entry = byEmoji.get(emoji)!;
-      return {
-        emoji,
-        list: entry.list,
-        phase: entry.phase,
-        enterDelayMs: enterDelayByEmoji.get(emoji) ?? 0,
-      } satisfies ReactionPillRender;
-    });
-  })();
+  const pillRenders = buildReactionPillRenders({
+    grouped,
+    displayOrder: displayOrderRef.current,
+    enteringEmojis: activeEnteringEmojis,
+    exitingEmojis: activeExitingEmojis,
+    enterDelayByEmoji,
+  });
 
   if (pillRenders.length === 0) return null;
 
