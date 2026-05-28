@@ -183,6 +183,14 @@ export function AdminUpdatesSection({
         method: "POST",
       });
       setStatus(next);
+      if (!next.latestVersion) {
+        setFeedback({
+          error:
+            next.applyBlockedReason ??
+            "Could not load the latest release. Try again in a moment.",
+        });
+        return;
+      }
       setFeedback({
         success: next.updateAvailable
           ? "A new release is available."
@@ -323,6 +331,12 @@ export function AdminUpdatesSection({
       </div>
 
       <UpdatesStatusMeta status={status} />
+
+      {status.lastUpdateCheckAt && !status.latestVersion && status.applyBlockedReason ? (
+        <p className="integrations-feedback integrations-feedback--error" role="alert">
+          {status.applyBlockedReason}
+        </p>
+      ) : null}
 
       {status.cloudflareApiTokenValid === false && status.cloudflareApiTokenError && (
         <p className="integrations-feedback integrations-feedback--error" role="alert">

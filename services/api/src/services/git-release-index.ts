@@ -141,18 +141,22 @@ async function fetchCustomGitReleaseIndex(
   owner: string,
   repo: string,
 ): Promise<ReleaseIndex> {
-  const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
-
   if (isDefaultGitRepo(repoUrl)) {
     const catalog = await fetchSetupCoReleaseIndex();
+    if (catalog) {
+      return catalog;
+    }
+
+    const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
     return {
       version: sha,
-      gitRef: catalog?.gitRef?.trim() || CCO_DEFAULT_GIT_REF,
+      gitRef: CCO_DEFAULT_GIT_REF,
       publishedAt,
-      releasesBaseUrl: catalog?.releasesBaseUrl?.trim() || resolveArtifactReleasesBaseUrl(repoUrl),
+      releasesBaseUrl: resolveArtifactReleasesBaseUrl(repoUrl),
     };
   }
 
+  const { sha, publishedAt } = await fetchGithubMainCommitSha(owner, repo);
   const releaseIndex = await fetchGithubLatestReleaseIndex(owner, repo);
   if (releaseIndex) {
     return {
@@ -167,14 +171,15 @@ async function fetchCustomGitReleaseIndex(
     version: sha,
     gitRef: CCO_DEFAULT_GIT_REF,
     publishedAt,
-    releasesBaseUrl: releaseAsset?.baseUrl ?? resolveArtifactReleasesBaseUrl(repoUrl),
+    releasesBaseUrl:
+      releaseAsset?.baseUrl ?? resolveArtifactReleasesBaseUrl(repoUrl),
   };
 }
 
 /**
  * Resolve the release catalog for Admin Updates from the org git repository URL.
- * Version is always the configured git ref HEAD on GitHub; artifact base URL comes from
- * setup-c.co (default repo) or the latest GitHub release assets for custom forks.
+ * Default repo (BA-LSC/CCO) uses the setup-c.co release catalog when available, then GitHub main.
+ * Custom forks use GitHub main for version and release assets for bundle URLs.
  */
 export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined): Promise<ReleaseIndex> {
   const repoUrl = normalizeGitRepoUrl(gitRepoUrl);
