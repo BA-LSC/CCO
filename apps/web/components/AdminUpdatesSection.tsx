@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
-  formatReleaseShaPair,
-} from "@cco/shared";
+import { CCO_UPDATE_CHECK_INTERVAL_MINUTES, formatReleaseShaPair } from "@cco/shared";
 import { IntegrationsFeedbackToast } from "@/components/IntegrationsFeedbackToast";
 import { apiFetch } from "@/lib/api";
 import { dispatchAdminUpdateStatus } from "@/lib/admin-update-events";
@@ -76,10 +73,7 @@ export function AdminUpdatesSection({
   applyCloudflareApiToken?: string;
 }) {
   const [status, setStatus] = useState<UpdatesStatus | null>(initialStatus);
-  const [busy, setBusy] = useState<"check" | "apply" | "toggle" | "interval" | null>(null);
-  const [intervalMinutes, setIntervalMinutes] = useState(
-    initialStatus?.autoUpdateCheckIntervalMinutes ?? 360,
-  );
+  const [busy, setBusy] = useState<"check" | "apply" | "toggle" | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [deployStatusMessage, setDeployStatusMessage] = useState("Starting update…");
   const [feedback, setFeedback] = useState<{ error?: string; success?: string }>({});
@@ -99,12 +93,6 @@ export function AdminUpdatesSection({
   useEffect(() => {
     setStatus(initialStatus);
   }, [initialStatus]);
-
-  useEffect(() => {
-    if (status?.autoUpdateCheckIntervalMinutes != null) {
-      setIntervalMinutes(status.autoUpdateCheckIntervalMinutes);
-    }
-  }, [status?.autoUpdateCheckIntervalMinutes]);
 
   useEffect(() => {
     if (!status) return;
@@ -266,38 +254,13 @@ export function AdminUpdatesSection({
       });
       setStatus(next);
       setFeedback({
-        success: enabled ? "Automatic updates enabled." : "Automatic updates disabled.",
+        success: enabled
+          ? `Automatic updates enabled. CCO checks every ${CCO_UPDATE_CHECK_INTERVAL_MINUTES} minutes and applies releases when available.`
+          : "Automatic updates disabled.",
       });
     } catch (err) {
       setFeedback({
         error: err instanceof Error ? err.message : "Failed to save setting",
-      });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function handleSaveAutoUpdateInterval() {
-    if (!status) return;
-    const clamped = Math.max(
-      AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
-      Math.floor(Number(intervalMinutes)) || AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
-    );
-    if (clamped === status.autoUpdateCheckIntervalMinutes) return;
-
-    setBusy("interval");
-    setFeedback({});
-    try {
-      const next = await apiFetch<UpdatesStatus & { ok: boolean }>("/api/v1/settings/updates", {
-        method: "PATCH",
-        body: JSON.stringify({ autoUpdateCheckIntervalMinutes: clamped }),
-      });
-      setStatus(next);
-      setIntervalMinutes(next.autoUpdateCheckIntervalMinutes);
-      setFeedback({ success: `Auto-install check interval set to ${clamped} minutes.` });
-    } catch (err) {
-      setFeedback({
-        error: err instanceof Error ? err.message : "Failed to save interval",
       });
     } finally {
       setBusy(null);
@@ -450,34 +413,10 @@ export function AdminUpdatesSection({
             />
             <span className="toggle-switch" aria-hidden="true" />
           </label>
-          {status.autoUpdateEnabled ? (
-            <div className="integrations-fields integrations-auto-update-fields">
-              <label className="integrations-field">
-                <span className="integrations-field-label">Check interval (minutes)</span>
-                <input
-                  type="number"
-                  className="integrations-input"
-                  min={AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES}
-                  step={1}
-                  value={intervalMinutes}
-                  disabled={controlsDisabled || busy === "interval"}
-                  onChange={(event) => setIntervalMinutes(Number(event.target.value))}
-                  onBlur={() => void handleSaveAutoUpdateInterval()}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void handleSaveAutoUpdateInterval();
-                    }
-                  }}
-                  aria-describedby="auto-update-interval-hint"
-                />
-                <span id="auto-update-interval-hint" className="integrations-field-hint">
-                  Minimum {AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES} minutes. CCO checks for
-                  releases on this schedule and applies updates when one is available.
-                </span>
-              </label>
-            </div>
-          ) : null}
+          <p className="integrations-field-hint">
+            Uses the same release check as Check for updates every {CCO_UPDATE_CHECK_INTERVAL_MINUTES}{" "}
+            minutes and applies updates as soon as one is available.
+          </p>
         </>
       )}
     </section>

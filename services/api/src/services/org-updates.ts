@@ -724,17 +724,6 @@ export async function runScheduledUpdateCheck(): Promise<{
     return { checked: false, updateAvailable: false, applied: false, version: null };
   }
 
-  const intervalMinutes = normalizeAutoUpdateCheckIntervalMinutes(
-    org.autoUpdateCheckIntervalMinutes,
-  );
-  const intervalMs = intervalMinutes * 60 * 1000;
-  if (org.lastUpdateCheckAt) {
-    const elapsed = Date.now() - org.lastUpdateCheckAt.getTime();
-    if (elapsed < intervalMs) {
-      return { checked: false, updateAvailable: false, applied: false, version: null };
-    }
-  }
-
   const status = await getUpdatesStatus({ forceCheck: true });
   if (!status.updateAvailable || !status.canApply) {
     return {

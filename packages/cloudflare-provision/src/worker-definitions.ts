@@ -54,7 +54,7 @@ export function resolveWorkerPlacement(
 export const CCO_PUSH_QUEUE_NAME = "cco-push-notifications";
 export const CCO_PUSH_DLQ_QUEUE_NAME = "cco-push-notifications-dlq";
 export const CCO_RECONCILE_CRON = "0 3 * * *";
-/** Every 10 minutes; org auto_update_check_interval_minutes gates actual checks. */
+/** Every 10 minutes; auto-install orgs check and apply on this schedule. */
 export const CCO_UPDATE_CHECK_CRON = "*/10 * * * *";
 export const CCO_RECONCILE_WORKER_CRONS = [CCO_RECONCILE_CRON, CCO_UPDATE_CHECK_CRON] as const;
 
