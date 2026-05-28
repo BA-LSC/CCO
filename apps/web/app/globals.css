@@ -6324,30 +6324,6 @@ button.sidebar-group-header:focus-visible {
   border-radius: 18px;
 }
 
-.chat-thread .message-bubble--media-only.message-bubble--own:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--own:has(.attachment) .attachment {
-  border-bottom-right-radius: 6px;
-}
-
-.chat-thread .message-bubble--media-only.message-bubble--other:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--other:has(.attachment) .attachment {
-  border-bottom-left-radius: 6px;
-}
-
-.chat-thread .message-bubble--media-only.message-bubble--own.message-bubble--group-middle:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--own.message-bubble--group-middle:has(.attachment) .attachment,
-.chat-thread .message-bubble--media-only.message-bubble--own.message-bubble--group-last:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--own.message-bubble--group-last:has(.attachment) .attachment {
-  border-top-right-radius: 6px;
-}
-
-.chat-thread .message-bubble--media-only.message-bubble--other.message-bubble--group-middle:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--other.message-bubble--group-middle:has(.attachment) .attachment,
-.chat-thread .message-bubble--media-only.message-bubble--other.message-bubble--group-last:has(.attachment) .attachment-open,
-.chat-thread .message-bubble--media-only.message-bubble--other.message-bubble--group-last:has(.attachment) .attachment {
-  border-top-left-radius: 6px;
-}
-
 .chat-thread .message-bubble:has(.attachment) .attachment-open {
   display: block;
   width: fit-content;
