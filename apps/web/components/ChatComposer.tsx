@@ -20,8 +20,9 @@ import {
 import {
   createPendingComposerMedia,
   dragEventHasMediaFiles,
-  firstMediaFileFromDataTransfer,
+  mediaFilesFromDataTransfer,
   revokePendingComposerMedia,
+  revokePendingComposerMediaList,
   validateComposerMediaFile,
   type PendingComposerMedia,
 } from "@/lib/composer-media";
@@ -45,10 +46,10 @@ type Props = {
   /** Panel layout shows send errors in a floating banner above messages. */
   hideSendErrorBanner?: boolean;
   onSendError: (error: string | null) => void;
-  onSend: (payload: { text: string; media: PendingComposerMedia | null }) => Promise<void>;
+  onSend: (payload: { text: string; media: PendingComposerMedia[] }) => Promise<void>;
   onSendGiphy: (importUrl: string) => Promise<void>;
   onComposerLayout?: () => void;
-  onMountStageMedia?: (stageMedia: (file: File) => void) => void;
+  onMountStageMedia?: (stageMedia: (files: File | File[]) => void) => void;
   appUpdateBlocked: boolean;
 };
 
@@ -57,7 +58,7 @@ export function ChatComposer({
   canPost,
   composerLocked,
   readOnlyReason,
-  coarsePointer: _coarsePointer,
+  coarsePointer,
   composerPlaceholder,
   members,
   resolvedUserId,
@@ -72,7 +73,7 @@ export function ChatComposer({
 }: Props) {
   const [body, setBody] = useState("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia | null>(null);
+  const [pendingMedia, setPendingMedia] = useState<PendingComposerMedia[]>([]);
   const [composerDragOver, setComposerDragOver] = useState(false);
   const [giphyOpen, setGiphyOpen] = useState(false);
   const [giphyEnabled, setGiphyEnabled] = useState(false);
@@ -91,8 +92,8 @@ export function ChatComposer({
     setBody(draft ?? "");
     setMentionQuery(null);
     setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return null;
+      revokePendingComposerMediaList(current);
+      return [];
     });
     setGiphyOpen(false);
     onSendError(null);
@@ -104,7 +105,7 @@ export function ChatComposer({
   }, [appUpdateBlocked, body, conversationId]);
 
   useEffect(() => {
-    return () => revokePendingComposerMedia(pendingMedia);
+    return () => revokePendingComposerMediaList(pendingMedia);
   }, [pendingMedia]);
 
   useEffect(() => {
@@ -129,32 +130,52 @@ export function ChatComposer({
 
   const clearPendingMedia = useCallback(() => {
     setPendingMedia((current) => {
-      revokePendingComposerMedia(current);
-      return null;
+      revokePendingComposerMediaList(current);
+      return [];
+    });
+  }, []);
+
+  const removePendingMedia = useCallback((id: string) => {
+    setPendingMedia((current) => {
+      const removed = current.find((item) => item.id === id);
+      revokePendingComposerMedia(removed ?? null);
+      return current.filter((item) => item.id !== id);
     });
   }, []);
 
   const stageComposerMedia = useCallback(
-    (file: File) => {
+    (files: File | File[]) => {
       if (!canPost || composerLocked || sendInFlightRef.current || isAppUpdateInProgress()) return;
 
-      const validationError = validateComposerMediaFile(file);
-      if (validationError) {
-        onSendError(validationError);
+      const fileList = Array.isArray(files) ? files : [files];
+      if (fileList.length === 0) return;
+
+      const nextItems: PendingComposerMedia[] = [];
+      let lastError: string | null = null;
+
+      for (const file of fileList) {
+        const validationError = validateComposerMediaFile(file);
+        if (validationError) {
+          lastError = validationError;
+          continue;
+        }
+
+        const next = createPendingComposerMedia(file);
+        if (!next) {
+          lastError = "Unsupported file type. Use an image or video.";
+          continue;
+        }
+
+        nextItems.push(next);
+      }
+
+      if (nextItems.length === 0) {
+        if (lastError) onSendError(lastError);
         return;
       }
 
-      const next = createPendingComposerMedia(file);
-      if (!next) {
-        onSendError("Unsupported file type. Use an image or video.");
-        return;
-      }
-
-      onSendError(null);
-      setPendingMedia((current) => {
-        revokePendingComposerMedia(current);
-        return next;
-      });
+      onSendError(lastError);
+      setPendingMedia((current) => [...current, ...nextItems]);
       resetComposerDragState();
       focusComposer();
     },
@@ -179,7 +200,7 @@ export function ChatComposer({
       const media = pendingMedia;
       if (
         !conversationId ||
-        (!text && !media) ||
+        (!text && media.length === 0) ||
         sendInFlightRef.current ||
         !canPost ||
         composerLocked ||
@@ -198,8 +219,8 @@ export function ChatComposer({
         await onSend({ text, media });
         setBody("");
         setPendingMedia((current) => {
-          revokePendingComposerMedia(current);
-          return null;
+          revokePendingComposerMediaList(current);
+          return [];
         });
         if (conversationId) clearComposerDraft(conversationId);
         resetComposerDragState();
@@ -258,7 +279,7 @@ export function ChatComposer({
           setMentionQuery(null);
           return;
         }
-        if (pendingMedia) {
+        if (pendingMedia.length > 0) {
           e.preventDefault();
           clearPendingMedia();
         }
@@ -282,7 +303,7 @@ export function ChatComposer({
   );
 
   const canSendMessage =
-    Boolean(body.trim() || pendingMedia) && canPost && !composerLocked && !isSending;
+    Boolean(body.trim() || pendingMedia.length > 0) && canPost && !composerLocked && !isSending;
 
   return (
     <>
@@ -293,12 +314,15 @@ export function ChatComposer({
         />
       ) : null}
 
-      {pendingMedia ? (
+      {pendingMedia.length > 0 ? (
         <ComposerPendingMedia
-          previewUrl={pendingMedia.previewUrl}
-          kind={pendingMedia.kind}
-          fileName={pendingMedia.file.name}
-          onRemove={clearPendingMedia}
+          items={pendingMedia.map((item) => ({
+            id: item.id,
+            previewUrl: item.previewUrl,
+            kind: item.kind,
+          }))}
+          coarsePointer={coarsePointer}
+          onRemove={removePendingMedia}
         />
       ) : null}
 
@@ -323,7 +347,7 @@ export function ChatComposer({
           "composer",
           composerReadOnly ? "composer--readonly" : "",
           composerLocked ? "composer--locked" : "",
-          pendingMedia ? "composer--has-pending-media" : "",
+          pendingMedia.length > 0 ? "composer--has-pending-media" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -332,12 +356,13 @@ export function ChatComposer({
         <input
           ref={fileRef}
           type="file"
+          multiple
           accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp4,.webm,.mov"
           hidden
           disabled={composerInputLocked}
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) stageComposerMedia(file);
+            const files = e.target.files ? Array.from(e.target.files) : [];
+            if (files.length > 0) stageComposerMedia(files);
             e.target.value = "";
           }}
         />
@@ -387,13 +412,14 @@ export function ChatComposer({
 }
 
 export type { PendingComposerMedia };
+export type { ComposerPendingMediaItem } from "@/components/ComposerPendingMedia";
 
 export function useComposerDragHandlers(params: {
   canPost: boolean;
   composerLocked: boolean;
-  onDropFile: (file: File) => void;
+  onDropFiles: (files: File[]) => void;
 }) {
-  const { canPost, composerLocked, onDropFile } = params;
+  const { canPost, composerLocked, onDropFiles } = params;
   const composerDragDepthRef = useRef(0);
   const [composerDragOver, setComposerDragOver] = useState(false);
 
@@ -437,10 +463,10 @@ export function useComposerDragHandlers(params: {
       e.preventDefault();
       resetComposerDragState();
       if (!canPost || composerLocked || isAppUpdateInProgress()) return;
-      const file = firstMediaFileFromDataTransfer(e.dataTransfer);
-      if (file) onDropFile(file);
+      const files = mediaFilesFromDataTransfer(e.dataTransfer);
+      if (files.length > 0) onDropFiles(files);
     },
-    [canPost, composerLocked, onDropFile, resetComposerDragState],
+    [canPost, composerLocked, onDropFiles, resetComposerDragState],
   );
 
   return {

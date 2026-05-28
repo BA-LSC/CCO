@@ -102,7 +102,10 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
     ttlSeconds: 3600,
   });
 
-  const publicUrl = await buildR2SignedUploadUrl(filename);
+  let publicUrl = await buildR2SignedUploadUrl(filename);
+  if (!publicUrl) {
+    publicUrl = buildSignedUploadUrl(filename);
+  }
 
   return c.json({
     uploadUrl,
@@ -139,7 +142,10 @@ uploadsRouter.post("/", requireAuth, async (c) => {
         body: buffer,
         contentType,
       });
-      const url = await buildR2SignedUploadUrl(filename);
+      let url = await buildR2SignedUploadUrl(filename);
+      if (!url) {
+        url = buildSignedUploadUrl(filename);
+      }
       return c.json({ url, filename, contentType, storage: "r2" });
     }
 

@@ -32,4 +32,20 @@ describe("attachment URL validation", () => {
       false,
     );
   });
+
+  test("accepts presigned R2 attachment URLs", () => {
+    const prevBucket = process.env.CLOUDFLARE_R2_BUCKET;
+    process.env.CLOUDFLARE_R2_BUCKET = "cco-uploads-test";
+    try {
+      expect(
+        isAllowedAttachmentUrl(
+          "https://abc123.r2.cloudflarestorage.com/cco-uploads-test/photo.png?sig=fake",
+          publicBase,
+        ),
+      ).toBe(true);
+    } finally {
+      if (prevBucket === undefined) delete process.env.CLOUDFLARE_R2_BUCKET;
+      else process.env.CLOUDFLARE_R2_BUCKET = prevBucket;
+    }
+  });
 });

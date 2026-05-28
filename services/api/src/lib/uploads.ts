@@ -136,6 +136,17 @@ export async function buildR2SignedUploadUrl(filename: string): Promise<string |
   return buildR2AttachmentUrl(filename);
 }
 
+function isR2UploadStorageEnabled(): boolean {
+  return Boolean(process.env.CLOUDFLARE_R2_BUCKET?.trim()) || process.env.UPLOAD_STORAGE === "r2";
+}
+
+/** R2 presigned URLs use /{bucket}/{objectKey}, not /uploads/{filename}. */
+function isAllowedR2PresignedObjectUrl(candidate: URL): boolean {
+  if (!candidate.host.includes("r2.cloudflarestorage.com")) return false;
+  const segments = candidate.pathname.split("/").filter(Boolean);
+  return segments.length >= 2 && !segments.some((part) => part === "." || part === "..");
+}
+
 export function isAllowedAttachmentUrl(
   attachmentUrl: string,
   publicUploadUrl = PUBLIC_UPLOAD_URL,
@@ -149,12 +160,15 @@ export function isAllowedAttachmentUrl(
     return false;
   }
 
+  if (isR2UploadStorageEnabled() && isAllowedR2PresignedObjectUrl(candidate)) {
+    return true;
+  }
+
   const filename = extractUploadFilename(attachmentUrl);
   if (!filename) return false;
 
-  if (process.env.CLOUDFLARE_R2_BUCKET?.trim() || process.env.UPLOAD_STORAGE === "r2") {
-    if (candidate.host.includes("r2.cloudflarestorage.com")) return true;
-    if (allowed.host === candidate.host) return true;
+  if (isR2UploadStorageEnabled() && allowed.host === candidate.host) {
+    return true;
   }
 
   if (allowed.protocol !== candidate.protocol) return false;

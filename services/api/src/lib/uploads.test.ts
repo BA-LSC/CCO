@@ -206,4 +206,20 @@ describe("isAllowedAttachmentUrl", () => {
       ),
     ).toBe(false);
   });
+
+  test("allows presigned R2 object URLs when R2 storage is enabled", () => {
+    const prevBucket = process.env.CLOUDFLARE_R2_BUCKET;
+    process.env.CLOUDFLARE_R2_BUCKET = "cco-uploads-test";
+    try {
+      expect(
+        isAllowedAttachmentUrl(
+          "https://abc123.r2.cloudflarestorage.com/cco-uploads-test/550e8400-e29b-41d4-a716-446655440000.jpeg?X-Amz-Algorithm=AWS4-HMAC-SHA256",
+          publicBase,
+        ),
+      ).toBe(true);
+    } finally {
+      if (prevBucket === undefined) delete process.env.CLOUDFLARE_R2_BUCKET;
+      else process.env.CLOUDFLARE_R2_BUCKET = prevBucket;
+    }
+  });
 });

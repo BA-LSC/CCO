@@ -6162,16 +6162,31 @@ button.sidebar-group-header:focus-visible {
 
 .composer-pending-media {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px var(--chat-inset-x, 12px) 0;
-  border-top: 1px solid var(--color-border);
   min-width: 0;
 }
 
-.composer-pending-media-preview {
+.composer-pending-media-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.composer-pending-media-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.composer-pending-media-card {
   position: relative;
   flex-shrink: 0;
+  width: 72px;
+  height: 72px;
   line-height: 0;
 }
 
@@ -6198,53 +6213,67 @@ button.sidebar-group-header:focus-visible {
   text-transform: uppercase;
 }
 
-.composer-pending-media-meta {
+.composer-pending-media-overflow {
+  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.composer-pending-media-name {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-pending-media-hint {
-  font-size: 0.78rem;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  background: var(--color-surface-2);
   color: var(--color-text-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .composer-pending-media-remove {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: none;
   border-radius: 999px;
-  background: transparent;
-  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
 }
 
 .composer-pending-media-remove svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
 }
 
-.composer-pending-media-remove:hover,
-.composer-pending-media-remove:focus-visible {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  outline: none;
+@media (pointer: fine) {
+  .composer-pending-media-card:hover .composer-pending-media-remove,
+  .composer-pending-media-card:focus-within .composer-pending-media-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .composer-pending-media-remove:hover,
+  .composer-pending-media-remove:focus-visible {
+    background: rgba(0, 0, 0, 0.88);
+    outline: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .composer-pending-media-card--held .composer-pending-media-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .chat-thread .composer.composer--has-pending-media {

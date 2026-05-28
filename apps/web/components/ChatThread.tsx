@@ -37,6 +37,7 @@ import {
 import { isAppUpdateInProgress } from "@/lib/app-update";
 import {
   revokePendingComposerMedia,
+  revokePendingComposerMediaList,
 } from "@/lib/composer-media";
 
 function detectMobileLikeViewport(): boolean {
@@ -148,7 +149,7 @@ export function ChatThread({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
-  const stageComposerMediaRef = useRef<(file: File) => void>(() => {});
+  const stageComposerMediaRef = useRef<(files: File | File[]) => void>(() => {});
   const messagesEndRef = useRef<HTMLLIElement>(null);
   const messagesListRef = useRef<HTMLUListElement>(null);
   const panelBodyRef = useRef<HTMLDivElement>(null);
@@ -184,7 +185,7 @@ export function ChatThread({
   } = useComposerDragHandlers({
     canPost,
     composerLocked,
-    onDropFile: (file) => stageComposerMediaRef.current(file),
+    onDropFiles: (files) => stageComposerMediaRef.current(files),
   });
 
   function getScrollContainer(): HTMLElement | null {
@@ -707,22 +708,24 @@ export function ChatThread({
   }, [hasMore, loadOlder, layout, messages.length, loadingMore, scrollReady]);
 
   const handleComposerSend = useCallback(
-    async ({ text, media }: { text: string; media: PendingComposerMedia | null }) => {
+    async ({ text, media }: { text: string; media: PendingComposerMedia[] }) => {
       if (!conversationId) return;
 
-      let attachmentSent = false;
+      let attachmentsSent = 0;
 
-      if (media) {
-        const attachmentUrl =
-          media.kind === "video" ? await uploadVideo(media.file) : await uploadImage(media.file);
-        await postMessage({
-          body: "",
-          clientMessageId: crypto.randomUUID(),
-          attachmentUrl,
-          messageType: media.kind,
-        });
-        attachmentSent = true;
-        revokePendingComposerMedia(media);
+      if (media.length > 0) {
+        for (const item of media) {
+          const attachmentUrl =
+            item.kind === "video" ? await uploadVideo(item.file) : await uploadImage(item.file);
+          await postMessage({
+            body: "",
+            clientMessageId: crypto.randomUUID(),
+            attachmentUrl,
+            messageType: item.kind,
+          });
+          revokePendingComposerMedia(item);
+          attachmentsSent += 1;
+        }
       }
 
       if (text) {
@@ -732,8 +735,8 @@ export function ChatThread({
             clientMessageId: crypto.randomUUID(),
           });
         } catch (err) {
-          if (media && !attachmentSent) {
-            revokePendingComposerMedia(media);
+          if (media.length > 0 && attachmentsSent === 0) {
+            revokePendingComposerMediaList(media);
           }
           saveComposerDraft(conversationId, text);
           throw err;

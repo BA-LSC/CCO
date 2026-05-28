@@ -3,6 +3,7 @@ export const COMPOSER_MEDIA_MAX_BYTES = 95 * 1024 * 1024;
 export type ComposerMediaKind = "image" | "video";
 
 export type PendingComposerMedia = {
+  id: string;
   file: File;
   previewUrl: string;
   kind: ComposerMediaKind;
@@ -31,10 +32,11 @@ export function dragEventHasMediaFiles(dataTransfer: DataTransfer | null): boole
 }
 
 export function firstMediaFileFromDataTransfer(dataTransfer: DataTransfer): File | null {
-  for (const file of Array.from(dataTransfer.files)) {
-    if (isComposerMediaFile(file)) return file;
-  }
-  return null;
+  return mediaFilesFromDataTransfer(dataTransfer)[0] ?? null;
+}
+
+export function mediaFilesFromDataTransfer(dataTransfer: DataTransfer): File[] {
+  return Array.from(dataTransfer.files).filter(isComposerMediaFile);
 }
 
 export function validateComposerMediaFile(file: File): string | null {
@@ -55,6 +57,7 @@ export function createPendingComposerMedia(file: File): PendingComposerMedia | n
   if (!kind) return null;
 
   return {
+    id: crypto.randomUUID(),
     file,
     kind,
     previewUrl: URL.createObjectURL(file),
@@ -63,4 +66,10 @@ export function createPendingComposerMedia(file: File): PendingComposerMedia | n
 
 export function revokePendingComposerMedia(media: PendingComposerMedia | null): void {
   if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl);
+}
+
+export function revokePendingComposerMediaList(items: PendingComposerMedia[]): void {
+  for (const item of items) {
+    revokePendingComposerMedia(item);
+  }
 }
