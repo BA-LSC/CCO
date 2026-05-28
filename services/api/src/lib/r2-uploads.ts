@@ -8,6 +8,7 @@ import { decryptSecret } from "../auth/token-crypto";
 import { getWorkerBindings } from "../runtime/worker-context";
 import { getConfiguredOrganization } from "../services/org-oauth";
 import { resolveApplyCloudflareApiToken } from "../services/org-secrets";
+import { parseByteRangeHeader, type ByteRange } from "./upload-range";
 
 const DEFAULT_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -234,23 +235,136 @@ export async function putR2Object(params: {
   }
 }
 
+function r2ObjectUrl(config: R2Config, objectKey: string): string {
+  return `${r2Endpoint(config.accountId)}/${config.bucketName}/${objectKey}`;
+}
+
+function applyR2ObjectHeaders(object: R2Object, headers: Headers): void {
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+}
+
+function rangedResponseHeaders(
+  size: number,
+  byteRange: ByteRange | null,
+  baseHeaders: Headers,
+): { status: number; headers: Headers } {
+  const headers = new Headers(baseHeaders);
+  headers.set("Accept-Ranges", "bytes");
+
+  if (!byteRange) {
+    headers.set("Content-Length", String(size));
+    return { status: 200, headers };
+  }
+
+  const { start, end } = byteRange;
+  const length = end - start + 1;
+  headers.set("Content-Length", String(length));
+  headers.set("Content-Range", `bytes ${start}-${end}/${size}`);
+  return { status: 206, headers };
+}
+
+async function headR2ObjectSize(config: R2Config, objectKey: string): Promise<number | null> {
+  const bucket = getWorkerBindings()?.UPLOADS;
+  if (bucket) {
+    const meta = await bucket.head(objectKey);
+    return meta?.size ?? null;
+  }
+
+  const client = r2Client(config);
+  const headRes = await client.fetch(r2ObjectUrl(config, objectKey), { method: "HEAD" });
+  if (!headRes.ok) return null;
+
+  const length = headRes.headers.get("content-length");
+  if (!length) return null;
+  const size = Number.parseInt(length, 10);
+  return Number.isFinite(size) && size > 0 ? size : null;
+}
+
+/** Serve an R2 upload with byte-range support for HTML5 media playback. */
+export async function serveR2UploadObject(params: {
+  config: R2Config;
+  objectKey: string;
+  method: string;
+  rangeHeader?: string;
+}): Promise<Response | null> {
+  const size = await headR2ObjectSize(params.config, params.objectKey);
+  if (size == null) return null;
+
+  const byteRange = parseByteRangeHeader(params.rangeHeader, size);
+  if (byteRange === "unsatisfiable") {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${size}`,
+        "Accept-Ranges": "bytes",
+      },
+    });
+  }
+
+  const bucket = getWorkerBindings()?.UPLOADS;
+  if (bucket) {
+    const getOptions = byteRange
+      ? {
+          range: {
+            offset: byteRange.start,
+            length: byteRange.end - byteRange.start + 1,
+          },
+        }
+      : undefined;
+    const object = await bucket.get(params.objectKey, getOptions);
+    if (!object) return null;
+
+    const headers = new Headers();
+    applyR2ObjectHeaders(object, headers);
+    const { status, headers: rangedHeaders } = rangedResponseHeaders(size, byteRange, headers);
+
+    if (params.method === "HEAD") {
+      return new Response(null, { status, headers: rangedHeaders });
+    }
+
+    return new Response(object.body, { status, headers: rangedHeaders });
+  }
+
+  const client = r2Client(params.config);
+  const url = r2ObjectUrl(params.config, params.objectKey);
+  const fetchHeaders = new Headers();
+  if (byteRange) {
+    fetchHeaders.set("Range", `bytes=${byteRange.start}-${byteRange.end}`);
+  }
+
+  const upstream = await client.fetch(url, {
+    method: "GET",
+    headers: fetchHeaders,
+  });
+  if (!upstream.ok) return null;
+
+  const headers = new Headers(upstream.headers);
+  if (!headers.has("Accept-Ranges")) headers.set("Accept-Ranges", "bytes");
+  if (byteRange && !headers.has("Content-Range")) {
+    const { headers: rangedHeaders, status } = rangedResponseHeaders(size, byteRange, headers);
+    if (params.method === "HEAD") {
+      return new Response(null, { status, headers: rangedHeaders });
+    }
+    return new Response(upstream.body, { status, headers: rangedHeaders });
+  }
+
+  if (params.method === "HEAD") {
+    return new Response(null, { status: upstream.status, headers });
+  }
+
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
+/** @deprecated Use serveR2UploadObject for ranged media serving. */
 export async function getR2Object(params: {
   config: R2Config;
   objectKey: string;
 }): Promise<Response> {
-  const bucket = getWorkerBindings()?.UPLOADS;
-  if (bucket) {
-    const object = await bucket.get(params.objectKey);
-    if (!object) {
-      return new Response("Not Found", { status: 404 });
-    }
-    const headers = new Headers();
-    object.writeHttpMetadata(headers);
-    headers.set("etag", object.httpEtag);
-    return new Response(object.body, { status: 200, headers });
-  }
-
-  const client = r2Client(params.config);
-  const url = `${r2Endpoint(params.config.accountId)}/${params.config.bucketName}/${params.objectKey}`;
-  return client.fetch(url, { method: "GET" });
+  const served = await serveR2UploadObject({
+    config: params.config,
+    objectKey: params.objectKey,
+    method: "GET",
+  });
+  return served ?? new Response("Not Found", { status: 404 });
 }

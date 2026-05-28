@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseByteRangeHeader } from "./serve-upload";
+import { parseByteRangeHeader } from "./upload-range";
 
 describe("parseByteRangeHeader", () => {
   test("parses an inclusive byte range", () => {

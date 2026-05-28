@@ -9,7 +9,7 @@ import {
   useRef,
 } from "react";
 import { syncComposerTextareaHeight } from "@/lib/composer-textarea";
-import { formatMention, parseMentionSegments } from "@/lib/mentions";
+import { appendMentionChipChildren, formatMention, parseMentionSegments } from "@/lib/mentions";
 
 export function getActiveMentionQuery(value: string): string | null {
   for (let i = value.length - 1; i >= 0; i -= 1) {
@@ -67,7 +67,7 @@ function renderComposerBody(root: HTMLElement, body: string): void {
     chip.contentEditable = "false";
     chip.dataset.mentionId = segment.userId;
     chip.dataset.mentionName = segment.displayName;
-    chip.textContent = `@${segment.displayName}`;
+    appendMentionChipChildren(chip, segment.displayName);
     root.append(chip);
   }
 }
@@ -199,7 +199,7 @@ export const ComposerMentionInput = forwardRef<ComposerMentionInputHandle, Props
           chip.contentEditable = "false";
           chip.dataset.mentionId = userId;
           chip.dataset.mentionName = displayName;
-          chip.textContent = `@${displayName}`;
+          appendMentionChipChildren(chip, displayName);
 
           range.insertNode(chip);
           const space = document.createTextNode(" ");

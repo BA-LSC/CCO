@@ -1,39 +1,16 @@
 import type { Context } from "hono";
 import { tryAuth } from "../middleware/auth";
 import { getWorkerBindings, isCloudflareRuntime } from "../runtime/worker-context";
+import { parseByteRangeHeader } from "./upload-range";
 import {
   getUploadDir,
   safeUploadPath,
   uploadContentTypeForFilename,
   verifyUploadSignature,
 } from "./uploads";
-import { getR2Object, resolveR2Config } from "./r2-uploads";
+import { serveR2UploadObject, resolveR2Config } from "./r2-uploads";
 
-type ByteRange = { start: number; end: number };
-
-export function parseByteRangeHeader(
-  rangeHeader: string | undefined,
-  size: number,
-): ByteRange | "unsatisfiable" | null {
-  if (!rangeHeader || size <= 0) return null;
-
-  const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
-  if (!match) return null;
-
-  let start = match[1] ? Number.parseInt(match[1], 10) : 0;
-  let end = match[2] ? Number.parseInt(match[2], 10) : size - 1;
-
-  if (Number.isNaN(start) || Number.isNaN(end)) return null;
-  if (match[1] === "" && match[2] !== "") {
-    const suffixLength = end;
-    start = Math.max(size - suffixLength, 0);
-    end = size - 1;
-  }
-
-  if (start < 0 || start >= size || end < start) return "unsatisfiable";
-  end = Math.min(end, size - 1);
-  return { start, end };
-}
+export { parseByteRangeHeader } from "./upload-range";
 
 function uploadCacheControl(sig: string | undefined, expRaw: string | undefined): string | undefined {
   if (!sig || !expRaw) return undefined;
@@ -52,14 +29,24 @@ async function serveUploadFromR2(
   method: string,
   sig: string | undefined,
   expRaw: string | undefined,
+  rangeHeader: string | undefined,
 ): Promise<Response | null> {
   const r2 = await resolveR2Config();
   if (!r2) return null;
 
-  const r2Res = await getR2Object({ config: r2, objectKey: filename });
-  if (!r2Res.ok) return null;
+  const r2Res = await serveR2UploadObject({
+    config: r2,
+    objectKey: filename,
+    method,
+    rangeHeader,
+  });
+  if (!r2Res) return null;
 
   const headers = new Headers(r2Res.headers);
+  const contentType = uploadContentTypeForFilename(filename);
+  if (contentType && !headers.has("Content-Type")) {
+    headers.set("Content-Type", contentType);
+  }
   headers.set("Accept-Ranges", "bytes");
   const cacheControl = uploadCacheControl(sig, expRaw);
   if (cacheControl) headers.set("Cache-Control", cacheControl);
@@ -94,14 +81,16 @@ export async function serveUploadFile(c: Context): Promise<Response> {
 
   const method = c.req.method.toUpperCase();
 
+  const rangeHeader = c.req.header("range");
+
   if (usesR2UploadStorage()) {
-    const r2Response = await serveUploadFromR2(filename, method, sig, expRaw);
+    const r2Response = await serveUploadFromR2(filename, method, sig, expRaw, rangeHeader);
     return r2Response ?? c.notFound();
   }
 
   const file = Bun.file(filePath);
   if (!(await file.exists())) {
-    const r2Response = await serveUploadFromR2(filename, method, sig, expRaw);
+    const r2Response = await serveUploadFromR2(filename, method, sig, expRaw, rangeHeader);
     return r2Response ?? c.notFound();
   }
 
@@ -120,7 +109,7 @@ export async function serveUploadFile(c: Context): Promise<Response> {
     headers["Cache-Control"] = cacheControl;
   }
 
-  const byteRange = parseByteRangeHeader(c.req.header("range"), size);
+  const byteRange = parseByteRangeHeader(rangeHeader, size);
 
   if (byteRange === "unsatisfiable") {
     return new Response(null, {

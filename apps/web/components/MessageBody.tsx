@@ -22,7 +22,10 @@ export function MessageBody({
         key={`${index}-${segment.userId}`}
         className={isSelfMention ? "mention mention--self" : "mention"}
       >
-        @{segment.displayName}
+        <span className="mention-at" aria-hidden="true">
+          @
+        </span>
+        <span className="mention-name">{segment.displayName}</span>
       </span>
     );
   });

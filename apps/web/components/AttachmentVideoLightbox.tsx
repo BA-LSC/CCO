@@ -9,10 +9,14 @@ type Props = {
   onClose: () => void;
 };
 
+const PLAYBACK_ERROR_MESSAGE =
+  "This video could not play in your browser. Download it to watch locally, or try re-uploading as MP4 (H.264).";
+
 export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const handleDownload = useCallback(async () => {
     if (downloading) return;
@@ -26,6 +30,10 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
       setDownloading(false);
     }
   }, [alt, downloading, src]);
+
+  useEffect(() => {
+    setPlaybackError(null);
+  }, [src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -90,9 +98,9 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
           <span className="attachment-lightbox-action-label">Close</span>
         </button>
       </div>
-      {downloadError ? (
+      {downloadError || playbackError ? (
         <p className="attachment-lightbox-error" role="status">
-          {downloadError}
+          {downloadError ?? playbackError}
         </p>
       ) : null}
       <div
@@ -103,13 +111,14 @@ export function AttachmentVideoLightbox({ src, alt, onClose }: Props) {
       >
         <video
           ref={videoRef}
+          key={src}
           src={src}
           controls
           playsInline
-          preload="auto"
-          crossOrigin="anonymous"
+          preload="metadata"
           className="attachment-lightbox-video"
           aria-label={alt}
+          onError={() => setPlaybackError(PLAYBACK_ERROR_MESSAGE)}
         />
       </div>
     </div>

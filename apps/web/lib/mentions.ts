@@ -5,6 +5,20 @@ export function formatMention(displayName: string, userId: string): string {
   return `@[${displayName}](${userId})`;
 }
 
+/** DOM children for a mention chip (@ + display name on one baseline). */
+export function appendMentionChipChildren(parent: HTMLElement, displayName: string): void {
+  const at = document.createElement("span");
+  at.className = "mention-at";
+  at.setAttribute("aria-hidden", "true");
+  at.textContent = "@";
+
+  const name = document.createElement("span");
+  name.className = "mention-name";
+  name.textContent = displayName;
+
+  parent.replaceChildren(at, name);
+}
+
 export function renderMentionBody(body: string): string {
   return body.replace(MENTION_PATTERN, "@$1");
 }

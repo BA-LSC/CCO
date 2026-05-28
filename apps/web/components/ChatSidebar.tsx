@@ -286,7 +286,30 @@ export function ChatSidebar() {
         />
       )}
 
-      <aside className={`chat-sidebar ${sidebarOpen ? "chat-sidebar-open" : ""}`} aria-label="Chat navigation">
+      <aside
+        className={[
+          "chat-sidebar",
+          sidebarOpen ? "chat-sidebar-open" : "",
+          process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim()
+            ? "chat-sidebar--has-video"
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label="Chat navigation"
+      >
+        {process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL?.trim() ? (
+          <video
+            className="chat-sidebar-video"
+            src={process.env.NEXT_PUBLIC_SIDEBAR_VIDEO_URL.trim()}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden
+          />
+        ) : null}
         {churchName ? (
           <div className="sidebar-brand">
             <span className="sidebar-brand-name">{churchName}</span>
