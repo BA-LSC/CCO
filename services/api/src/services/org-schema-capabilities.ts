@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { isCloudflareRuntime } from "../runtime/worker-context";
+import { getWorkerD1, isCloudflareRuntime } from "../runtime/worker-context";
 
 const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_account_id" text`,
@@ -97,6 +97,11 @@ let callSchemaPromise: Promise<void> | null = null;
 let callSchemaReady = false;
 
 async function executeDdl(statement: string): Promise<void> {
+  const d1 = getWorkerD1();
+  if (d1) {
+    await d1.run(sql.raw(statement));
+    return;
+  }
   await db.execute(sql.raw(statement));
 }
 
