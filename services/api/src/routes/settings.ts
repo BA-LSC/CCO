@@ -35,6 +35,7 @@ import {
 } from "../services/org-realtimekit";
 import {
   getOrganizationCloudflarePlatformStatus,
+  isCloudflarePlatformFromEnv,
   provisionCloudflarePlatform,
 } from "../services/cloudflare-platform-provision";
 import { selectConfiguredOrganizationRow } from "../services/configured-org-query";
@@ -69,6 +70,7 @@ import {
 } from "../lib/deploy-status";
 import {
   getWorkerPlacementStatus,
+  isWorkerPlacementEditable,
   redeployWorkersWithOrgPlacement,
   shouldRedeployPlacementForOrg,
   updateOrganizationWorkerPlacement,
@@ -211,7 +213,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     updates,
     gitRepoUrl: resolveOrgGitRepoUrl(refreshed.gitRepoUrl),
     defaultGitRepoUrl: CCO_DEFAULT_GIT_REPO_URL,
-    ...getWorkerPlacementStatus(refreshed),
+    ...getWorkerPlacementStatus(refreshed, platformStatus.cloudflarePlatformFromEnv),
     workerPlacementLastError,
   });
 });
@@ -334,10 +336,11 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
         nextSetting.region !== previousSetting.region);
 
     if (placementChanged) {
-      if (!org.cloudflarePlatformProvisionedAt) {
+      const platformFromEnv = isCloudflarePlatformFromEnv(org);
+      if (!isWorkerPlacementEditable(org, platformFromEnv)) {
         workerPlacementRedeploySkipped = true;
         workerPlacementRedeploySkippedReason =
-          "Worker region saved. Redeploy runs after Cloudflare platform provisioning completes.";
+          "Worker region saved. Connect Cloudflare account and API token to apply placement to workers.";
       } else if (!isCloudflareApiTokenConfigured(org)) {
         workerPlacementRedeploySkipped = true;
         workerPlacementRedeploySkippedReason =
@@ -388,6 +391,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
   const vapidStatus = await getOrganizationVapidStatus(statusOrg);
   const giphyStatus = getOrganizationGiphyStatus(statusOrg);
   const realtimeKitStatus = getOrganizationRealtimeKitStatus(statusOrg);
+  const platformStatus = getOrganizationCloudflarePlatformStatus(statusOrg);
   return c.json({
     ok: true,
     name: statusOrg.name,
@@ -406,7 +410,9 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
-    ...(updated ? getWorkerPlacementStatus(updated) : getWorkerPlacementStatus(org)),
+    ...(updated
+      ? getWorkerPlacementStatus(updated, platformStatus.cloudflarePlatformFromEnv)
+      : getWorkerPlacementStatus(org, platformStatus.cloudflarePlatformFromEnv)),
     workerPlacementRedeployQueued,
     workerPlacementRedeploySkipped,
     ...(workerPlacementRedeploySkippedReason

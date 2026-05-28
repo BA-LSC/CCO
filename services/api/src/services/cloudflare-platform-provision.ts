@@ -117,6 +117,16 @@ export async function provisionCloudflarePlatform(params: {
   };
 }
 
+export function isCloudflarePlatformFromEnv(
+  org: Pick<typeof organizations.$inferSelect, "cloudflareR2BucketName">,
+): boolean {
+  const fromEnv = Boolean(
+    process.env.CLOUDFLARE_R2_BUCKET?.trim() &&
+      process.env.CLOUDFLARE_KV_PRESENCE_NAMESPACE_ID?.trim(),
+  );
+  return fromEnv && !org.cloudflareR2BucketName;
+}
+
 export async function getOrganizationCloudflarePlatformStatus(
   org: Pick<
     typeof organizations.$inferSelect,
@@ -136,7 +146,7 @@ export async function getOrganizationCloudflarePlatformStatus(
   return {
     cloudflarePlatformConfigured:
       Boolean(org.cloudflareR2BucketName && org.cloudflareKvPresenceNamespaceId) || fromEnv,
-    cloudflarePlatformFromEnv: fromEnv && !org.cloudflareR2BucketName,
+    cloudflarePlatformFromEnv: isCloudflarePlatformFromEnv(org),
     cloudflareR2BucketName: org.cloudflareR2BucketName ?? process.env.CLOUDFLARE_R2_BUCKET ?? "",
     cloudflarePushQueueId: org.cloudflarePushQueueId ?? process.env.CLOUDFLARE_PUSH_QUEUE_ID ?? "",
     cloudflarePlatformProvisionedAt: org.cloudflarePlatformProvisionedAt?.toISOString() ?? null,

@@ -24,7 +24,21 @@ import {
   isCloudflareApiTokenConfigured,
   resolveApplyCloudflareApiToken,
 } from "./org-secrets";
+import { isCloudflarePlatformFromEnv } from "./cloudflare-platform-provision";
 import { resolveOrgHostnames, resolveUpdatePlatform } from "./org-updates";
+
+export function isWorkerPlacementEditable(
+  org: ConfiguredOrganizationRow,
+  platformFromEnv?: boolean,
+): boolean {
+  if (platformFromEnv ?? isCloudflarePlatformFromEnv(org)) return false;
+  if (!isCloudflareApiTokenConfigured(org) || !org.cloudflareAccountId?.trim()) return false;
+  if (org.cloudflarePlatformProvisionedAt) return true;
+  if (org.cloudflareR2BucketName?.trim() && org.cloudflareKvPresenceNamespaceId?.trim()) {
+    return true;
+  }
+  return resolveUpdatePlatform(org) === "cloudflare";
+}
 
 function createRemoteBundleLoader(baseUrl: string) {
   const base = baseUrl.replace(/\/+$/, "");
@@ -37,7 +51,10 @@ function createRemoteBundleLoader(baseUrl: string) {
   };
 }
 
-export function getWorkerPlacementStatus(org: ConfiguredOrganizationRow) {
+export function getWorkerPlacementStatus(
+  org: ConfiguredOrganizationRow,
+  platformFromEnv?: boolean,
+) {
   const setting = workerPlacementSettingFromOrgRow(org);
   const regionLabel =
     WORKER_PLACEMENT_REGION_OPTIONS.find((option) => option.id === setting.region)?.label ??
@@ -50,6 +67,7 @@ export function getWorkerPlacementStatus(org: ConfiguredOrganizationRow) {
       setting.mode === WORKER_PLACEMENT_MODE_SMART
         ? "Automatic (Smart Placement)"
         : regionLabel ?? "Fixed region",
+    workerPlacementEditable: isWorkerPlacementEditable(org, platformFromEnv),
   };
 }
 

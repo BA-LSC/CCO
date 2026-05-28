@@ -47,6 +47,7 @@ type IntegrationsSettings = {
   workerPlacementRegion?: string | null;
   workerPlacementRegionOptions?: Array<{ id: string; label: string }>;
   workerPlacementSummary?: string;
+  workerPlacementEditable?: boolean;
   workerPlacementRedeployQueued?: boolean;
   workerPlacementRedeploySkipped?: boolean;
   workerPlacementRedeploySkippedReason?: string;
@@ -218,6 +219,7 @@ function CloudflareSection({
   workerPlacementRegion,
   workerPlacementRegionOptions,
   workerPlacementSummary,
+  workerPlacementEditable,
   onWorkerPlacementModeChange,
   onWorkerPlacementRegionChange,
 }: {
@@ -234,6 +236,7 @@ function CloudflareSection({
   workerPlacementRegion: string;
   workerPlacementRegionOptions: Array<{ id: string; label: string }>;
   workerPlacementSummary?: string;
+  workerPlacementEditable: boolean;
   onWorkerPlacementModeChange: (mode: "smart" | "region") => void;
   onWorkerPlacementRegionChange: (region: string) => void;
 }) {
@@ -290,7 +293,7 @@ function CloudflareSection({
           />
         </div>
       ) : null}
-      {platformProvisioned && !fromEnv ? (
+      {workerPlacementEditable ? (
         <fieldset className="integrations-fields integrations-placement">
           <legend className="integrations-field-label">Worker region</legend>
           {workerPlacementSummary ? (
@@ -379,6 +382,7 @@ export default function IntegrationsSettingsPage() {
   const [workerPlacementMode, setWorkerPlacementMode] = useState<"smart" | "region">("smart");
   const [workerPlacementRegion, setWorkerPlacementRegion] = useState("aws:us-west-2");
   const [workerPlacementSummary, setWorkerPlacementSummary] = useState<string | undefined>();
+  const [workerPlacementEditable, setWorkerPlacementEditable] = useState(false);
   const [workerPlacementRegionOptions, setWorkerPlacementRegionOptions] = useState<
     Array<{ id: string; label: string }>
   >([{ id: "aws:us-west-2", label: "US West — AWS Oregon (recommended)" }]);
@@ -429,6 +433,16 @@ export default function IntegrationsSettingsPage() {
         setWorkerPlacementMode(settings.workerPlacementMode ?? "smart");
         setWorkerPlacementRegion(settings.workerPlacementRegion ?? "aws:us-west-2");
         setWorkerPlacementSummary(settings.workerPlacementSummary);
+        setWorkerPlacementEditable(
+          settings.workerPlacementEditable ??
+            Boolean(
+              !(settings.cloudflarePlatformFromEnv ?? false) &&
+                (settings.cloudflareApiTokenConfigured ??
+                  settings.realtimeKitTokenConfigured ??
+                  false) &&
+                Boolean(settings.realtimeKitAccountId?.trim()),
+            ),
+        );
         if (settings.workerPlacementRegionOptions?.length) {
           setWorkerPlacementRegionOptions(settings.workerPlacementRegionOptions);
         }
@@ -476,7 +490,7 @@ export default function IntegrationsSettingsPage() {
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
-    if (cloudflarePlatformProvisioned) {
+    if (workerPlacementEditable) {
       payload.workerPlacementMode = workerPlacementMode;
       if (workerPlacementMode === "region") {
         payload.workerPlacementRegion = workerPlacementRegion;
@@ -545,6 +559,9 @@ export default function IntegrationsSettingsPage() {
       }
       if (updated.workerPlacementSummary) {
         setWorkerPlacementSummary(updated.workerPlacementSummary);
+      }
+      if (updated.workerPlacementEditable !== undefined) {
+        setWorkerPlacementEditable(updated.workerPlacementEditable);
       }
 
       let successMessage = "Settings saved.";
@@ -692,6 +709,7 @@ export default function IntegrationsSettingsPage() {
           workerPlacementRegion={workerPlacementRegion}
           workerPlacementRegionOptions={workerPlacementRegionOptions}
           workerPlacementSummary={workerPlacementSummary}
+          workerPlacementEditable={workerPlacementEditable}
           onWorkerPlacementModeChange={setWorkerPlacementMode}
           onWorkerPlacementRegionChange={setWorkerPlacementRegion}
         />
