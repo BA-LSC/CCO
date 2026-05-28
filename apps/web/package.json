@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "bun --env-file=../../.env next dev -p 3000",
-    "build": "CCO_DEPLOY_TARGET=cloudflare NEXT_PUBLIC_DIRECT_UPLOADS=1 opennextjs-cloudflare build",
-    "build:cloudflare": "bun run build",
+    "build": "CCO_DEPLOY_TARGET=cloudflare NEXT_PUBLIC_DIRECT_UPLOADS=1 next build",
+    "build:cloudflare": "CCO_DEPLOY_TARGET=cloudflare NEXT_PUBLIC_DIRECT_UPLOADS=1 opennextjs-cloudflare build",
     "preview:cloudflare": "CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare preview",
     "deploy:cloudflare": "CCO_DEPLOY_TARGET=cloudflare opennextjs-cloudflare deploy",
     "typecheck": "tsc --noEmit",
@@ -34,6 +34,6 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.6",
     "typescript": "^6.0.3",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.95.0"
   }
 }

@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "cco-realtime-fanout",
   "main": "src/index.ts",
-  "compatibility_date": "2025-05-26",
+  "compatibility_date": "2026-05-28",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {

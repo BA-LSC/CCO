@@ -28,8 +28,10 @@ From the repo root:
 
 ```bash
 bun install
-bun run --cwd apps/web build
+bun run --cwd apps/web build:cloudflare
 ```
+
+`build` runs Next.js only; `build:cloudflare` runs OpenNext (do not point `build` at OpenNext or it will recurse).
 
 Output lands in `apps/web/.open-next/`. Deploy with Wrangler from `apps/web` (see `apps/web/wrangler.jsonc`):
 

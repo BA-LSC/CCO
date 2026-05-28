@@ -25,6 +25,7 @@ jobs:
   deploy:
     name: Build releases and deploy setup-c.co
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -77,6 +78,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Deploy install orchestrator
         working-directory: workers/install-orchestrator
@@ -97,6 +99,8 @@ jobs:
       - name: Build install wizard
         working-directory: apps/install
         run: bun run build:cloudflare
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Deploy install wizard
         working-directory: apps/install

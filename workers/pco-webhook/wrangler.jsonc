@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "cco-pco-webhook",
   "main": "src/index.ts",
-  "compatibility_date": "2025-05-26",
+  "compatibility_date": "2026-05-28",
   "alias": {
     "@cco/shared/webhook-auth": "../../packages/shared/src/webhook-auth.ts",
   },
