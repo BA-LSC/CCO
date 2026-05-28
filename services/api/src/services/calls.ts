@@ -16,9 +16,11 @@ import {
   userPcoCredentials,
   users,
 } from "../db/schema";
-import { publishMessageEvent } from "../realtime/pubsub";
+import { publishMessageEventToMembers } from "../realtime/pubsub";
+import { listConversationMemberUserIds } from "./conversations";
 import type { RealtimeEvent } from "../realtime/events";
 import { notifyIncomingCall } from "./push-notify";
+import { scheduleBackgroundWork } from "../runtime/worker-context";
 import {
   addRealtimeKitParticipant,
   createRealtimeKitMeeting,
@@ -173,7 +175,8 @@ async function publishCallEvent(
   conversationId: string,
   event: Extract<RealtimeEvent, { type: `call.${string}` }>,
 ): Promise<void> {
-  await publishMessageEvent(event);
+  const memberUserIds = await listConversationMemberUserIds(conversationId);
+  await publishMessageEventToMembers(event, memberUserIds);
 }
 
 async function finalizeCallSession(callSessionId: string, conversationId: string): Promise<void> {
@@ -389,12 +392,14 @@ export async function startOrJoinConversationCall(params: {
       call: summary,
     });
 
-    void notifyIncomingCall({
-      callId: callSessionId,
-      conversationId: params.conversationId,
-      hostUserId: params.userId,
-      hostDisplayName: user.displayName,
-    });
+    scheduleBackgroundWork(() =>
+      notifyIncomingCall({
+        callId: callSessionId,
+        conversationId: params.conversationId,
+        hostUserId: params.userId,
+        hostDisplayName: user.displayName,
+      }),
+    );
   } else {
     const summary = (await buildCallSummary(callSessionId))!;
     await publishCallEvent(params.conversationId, {
@@ -565,13 +570,15 @@ export async function inviteToCall(params: {
       .onConflictDoNothing();
 
     const host = await getUserDisplay(session.hostUserId);
-    void notifyIncomingCall({
-      callId: params.callId,
-      conversationId: session.conversationId,
-      hostUserId: session.hostUserId,
-      hostDisplayName: host.displayName,
-      targetUserIds: [params.targetUserId],
-    });
+    scheduleBackgroundWork(() =>
+      notifyIncomingCall({
+        callId: params.callId,
+        conversationId: session.conversationId,
+        hostUserId: session.hostUserId,
+        hostDisplayName: host.displayName,
+        targetUserIds: [params.targetUserId],
+      }),
+    );
 
     return { invitedUserId: params.targetUserId };
   }

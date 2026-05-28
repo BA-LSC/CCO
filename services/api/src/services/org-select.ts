@@ -68,6 +68,8 @@ export const configuredOrganizationColumns = {
   installedReleaseVersion: organizations.installedReleaseVersion,
   autoUpdateEnabled: organizations.autoUpdateEnabled,
   autoUpdateCheckIntervalMinutes: organizations.autoUpdateCheckIntervalMinutes,
+  cloudflareWorkerPlacementMode: organizations.cloudflareWorkerPlacementMode,
+  cloudflareWorkerPlacementRegion: organizations.cloudflareWorkerPlacementRegion,
   lastUpdateCheckAt: organizations.lastUpdateCheckAt,
   gitRepoUrl: organizations.gitRepoUrl,
 };
@@ -99,6 +101,8 @@ export function extendConfiguredOrganizationRow(
     installedReleaseVersion: null,
     autoUpdateEnabled: false,
     autoUpdateCheckIntervalMinutes: 360,
+    cloudflareWorkerPlacementMode: "smart",
+    cloudflareWorkerPlacementRegion: null,
     lastUpdateCheckAt: null,
     gitRepoUrl: null,
   };
@@ -144,6 +148,8 @@ export type ConfiguredOrganizationRow = {
   installedReleaseVersion: string | null;
   autoUpdateEnabled: boolean;
   autoUpdateCheckIntervalMinutes: number;
+  cloudflareWorkerPlacementMode: string;
+  cloudflareWorkerPlacementRegion: string | null;
   lastUpdateCheckAt: Date | null;
   gitRepoUrl: string | null;
   createdAt: Date;

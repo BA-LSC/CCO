@@ -13,8 +13,9 @@ export type PushNotificationJob = {
 };
 
 export interface Env {
-  PUSH_INTERNAL_URL: string;
+  PUSH_INTERNAL_URL?: string;
   PUSH_INTERNAL_SECRET: SecretsStoreSecretBinding | string;
+  CCO_API?: Fetcher;
 }
 
 async function resolveSecret(
@@ -24,18 +25,29 @@ async function resolveSecret(
   return (await binding.get()) ?? "";
 }
 
+async function deliverPush(env: Env, pushSecret: string, body: PushNotificationJob): Promise<Response> {
+  const init: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${pushSecret}`,
+    },
+    body: JSON.stringify(body),
+  };
+  if (env.CCO_API) {
+    return env.CCO_API.fetch(new Request("/internal/push/deliver", init));
+  }
+  if (!env.PUSH_INTERNAL_URL) {
+    throw new Error("PUSH_INTERNAL_URL is required when CCO_API binding is absent");
+  }
+  return fetch(env.PUSH_INTERNAL_URL, init);
+}
+
 export default {
   async queue(batch: MessageBatch<PushNotificationJob>, env: Env): Promise<void> {
     const pushSecret = await resolveSecret(env.PUSH_INTERNAL_SECRET);
     for (const message of batch.messages) {
-      const res = await fetch(env.PUSH_INTERNAL_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${pushSecret}`,
-        },
-        body: JSON.stringify(message.body),
-      });
+      const res = await deliverPush(env, pushSecret, message.body);
       if (!res.ok) {
         console.error("Push delivery failed:", res.status, await res.text());
         message.retry();

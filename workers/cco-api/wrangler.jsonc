@@ -52,6 +52,9 @@
   // Secrets (wrangler secret put): SESSION_SECRET, TOKEN_ENCRYPTION_KEY,
   // CF_INTERNAL_SECRET, CF_REALTIME_INTERNAL_SECRET, WEB_URL, MOBILE_ORIGIN,
   // PUBLIC_UPLOAD_URL
+  "placement": {
+    "mode": "smart",
+  },
   "observability": {
     "enabled": true,
   },

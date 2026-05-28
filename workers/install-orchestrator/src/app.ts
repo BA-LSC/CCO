@@ -6,6 +6,8 @@ import {
   persistProvisionState,
   provisionSessionKey,
   runProvisionPipeline,
+  CloudflareApiError,
+  verifyCloudflareAccountApplyPermissions,
   verifyCloudflareApiToken,
   type ProvisionSessionStore,
 } from "@cco/cloudflare-provision";
@@ -138,6 +140,18 @@ export function createInstallApp() {
     const accountId = body.accountId?.trim() || accounts[0]?.id;
     if (!accountId) {
       return c.json({ error: "No Cloudflare accounts found for this token" }, 400);
+    }
+
+    try {
+      await verifyCloudflareAccountApplyPermissions({ accountId, apiToken });
+    } catch (err) {
+      const message =
+        err instanceof CloudflareApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Cloudflare API token is missing required permissions";
+      return c.json({ error: message }, 400);
     }
 
     const updated = await storeCloudflareToken(

@@ -1,14 +1,13 @@
 #!/usr/bin/env bun
 /** Force-apply the latest setup-c.co release to a BYO church (CLI recovery). */
 import {
-  applyD1MigrationStatements,
   deployAllProvisionWorkers,
   deployCcoWebWorker,
   fetchWebReleaseManifest,
   verifyCloudflareUpdateApplyPermissions,
   type CcoWorkerScriptName,
 } from "../../packages/cloudflare-provision/src/index.ts";
-import { getD1IncrementalMigrationFilenames } from "../../packages/db/src/index.ts";
+import { workerPlacementFromEnv } from "./worker-placement-env.ts";
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -17,13 +16,6 @@ function requireEnv(name: string): string {
     process.exit(1);
   }
   return value;
-}
-
-function splitSqlStatements(sqlText: string): string[] {
-  return sqlText
-    .split(/;\s*\n/)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0 && !chunk.startsWith("--"));
 }
 
 const apiToken = requireEnv("CLOUDFLARE_API_TOKEN");
@@ -75,20 +67,7 @@ const resources = {
   apiHostname,
 };
 
-for (const filename of getD1IncrementalMigrationFilenames()) {
-  const res = await fetch(`${releasesBase}/${filename}`);
-  if (res.status === 404) continue;
-  if (!res.ok) throw new Error(`Failed to fetch ${filename}: HTTP ${res.status}`);
-  const sqlText = await res.text();
-  for (const statement of splitSqlStatements(sqlText)) {
-    try {
-      await applyD1MigrationStatements(accountId, apiToken, d1DatabaseId, [statement]);
-    } catch {
-      // Column may already exist.
-    }
-  }
-}
-
+const workerPlacement = workerPlacementFromEnv();
 const deployedWorkers = await deployAllProvisionWorkers({
   accountId,
   apiToken,
@@ -96,6 +75,7 @@ const deployedWorkers = await deployAllProvisionWorkers({
   secretsStoreId,
   apiHostname,
   readBundle,
+  workerPlacement,
 });
 console.log("Deployed workers:", deployedWorkers.join(", "));
 

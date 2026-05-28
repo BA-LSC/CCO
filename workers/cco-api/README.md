@@ -11,7 +11,9 @@ Main CCO API for Cloudflare-native installs. Reuses route handlers from `service
 | `PRESENCE_KV` | KV | User online presence |
 | `DEPLOY_KV` | KV | Deploy draining / status signals |
 | `PUSH_QUEUE` | Queue producer | Async push notification delivery |
-| `REALTIME_FANOUT` | Service | `cco-realtime` per-conversation Durable Object fanout |
+| `REALTIME_FANOUT` | Service | `cco-realtime-fanout` per-conversation Durable Object fanout |
+
+**Placement:** `mode: smart` — runs near D1/R2/KV after Cloudflare analyzes traffic (~15 min post-deploy).
 
 ## Mounted routes
 
@@ -29,7 +31,7 @@ Main CCO API for Cloudflare-native installs. Reuses route handlers from `service
 
 | Route | Handled by |
 |-------|------------|
-| `GET /v1/ws` | **`cco-realtime`** — ConversationRoom Durable Object per `conversationId` |
+| `GET /v1/ws` | **`cco-realtime-fanout`** — ConversationRoom Durable Object per `conversationId` |
 
 ## Deferred (other workers)
 | `POST /webhooks/pco` | **Edge** — `cco-pco-webhook` → `/internal/webhooks/pco` |

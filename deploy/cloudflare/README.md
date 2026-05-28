@@ -103,3 +103,20 @@ Provision pipeline should map:
 - `api.<domain>/*` → `cco-api` worker
 
 Client calls same-origin `/api/v1/*` on the web hostname; Cloudflare routes or Next handlers forward to the API worker.
+
+## Smart Placement and Worker region
+
+`cco-api` and `cco-realtime-fanout` use **Smart Placement** (`placement.mode: smart`) by default in `wrangler.jsonc` and in BYO deploy metadata (`packages/cloudflare-provision`). Cloudflare analyzes traffic and runs those Workers closer to D1/R2/KV and other upstreams, which reduces round-trip latency for chat API and WebSocket auth paths.
+
+**Admin Settings → Cloudflare → Worker region** (BYO installs only, after platform is provisioned):
+
+| Option | Effect |
+|--------|--------|
+| **Automatic (recommended)** | Smart Placement — Cloudflare colocates `cco-api` and `cco-realtime-fanout` near D1 and storage |
+| **Fixed region** | Pins those two workers to a chosen data center (US West — AWS Oregon recommended for most US churches) |
+
+Placement applies to **`cco-api` and `cco-realtime-fanout` only**. `cco-web`, `cco-pco-webhook`, `cco-push-consumer`, and `cco-reconcile-cron` stay on default edge placement (nearest the user) so static assets, webhook 202 responses, and cron/queue handlers are not penalized.
+
+Saving a placement change in Admin Settings **redeploys those two workers immediately** when the org is provisioned and a Cloudflare API token is configured (`workerPlacementRedeployQueued` in the settings API response).
+
+After deploy, Smart Placement analysis can take up to ~15 minutes. Check status via the Workers API (`GET .../workers/services/{name}`) or the `cf-placement` response header on API requests.

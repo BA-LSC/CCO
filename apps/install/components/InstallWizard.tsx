@@ -224,8 +224,9 @@ export function InstallWizard() {
             <>
               <h2 className="install-step-title">Cloudflare API token</h2>
               <p className="install-step-body">
-                Create a token with Workers, D1, R2, KV, Queues, DNS, and Realtime permissions for your
-                zone.{" "}
+                Create a custom token with account permissions (Workers Scripts, D1, R2, KV, Queues,
+                Secrets Store Write, Realtime) and zone permissions for your domain (DNS, Workers Routes,
+                Cache Rules Edit).{" "}
                 <a href={CLOUDFLARE_TOKEN_TEMPLATE_URL} target="_blank" rel="noopener noreferrer">
                   Open Cloudflare token page
                 </a>

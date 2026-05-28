@@ -107,7 +107,16 @@ describe("install orchestrator routes", () => {
           { status: 200 },
         );
       }
-      if (url.includes("/accounts")) {
+      if (url.includes("/accounts/acc-1/workers/scripts")) {
+        return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
+      }
+      if (url.includes("/accounts/acc-1/r2/buckets")) {
+        return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
+      }
+      if (url.includes("/accounts/acc-1/secrets_store/stores")) {
+        return new Response(JSON.stringify({ success: true, result: [] }), { status: 200 });
+      }
+      if (url.includes("/accounts") && !url.includes("/accounts/acc-1/")) {
         return new Response(
           JSON.stringify({
             success: true,

@@ -3898,6 +3898,29 @@ button.sidebar-group-header:focus-visible {
   gap: 12px;
 }
 
+.integrations-placement {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.integrations-placement legend {
+  padding: 0;
+}
+
+.integrations-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.integrations-radio input {
+  accent-color: var(--color-accent);
+}
+
 .integrations-field {
   display: flex;
   flex-direction: column;

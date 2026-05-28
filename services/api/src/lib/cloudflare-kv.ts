@@ -87,5 +87,9 @@ export async function kvMgetBinding(
   keys: string[],
 ): Promise<Array<string | null>> {
   if (keys.length === 0) return [];
-  return Promise.all(keys.map((key) => namespace.get(key)));
+  const batch = await namespace.get(keys, "text");
+  if (batch instanceof Map) {
+    return keys.map((key) => batch.get(key) ?? null);
+  }
+  return Promise.all(keys.map((key) => namespace.get(key, "text")));
 }

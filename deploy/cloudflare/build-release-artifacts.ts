@@ -45,9 +45,11 @@ rmSync(RELEASES, { recursive: true, force: true });
 mkdirSync(RELEASES, { recursive: true });
 mkdirSync(ASSETS_OUT, { recursive: true });
 
+const RELEASE_BUNDLE_SKIP = new Set(["cco-giphy-proxy.mjs"]);
+
 const bundlesDir = join(ROOT, "deploy/cloudflare/bundles");
 for (const name of readdirSync(bundlesDir)) {
-  if (!name.endsWith(".mjs")) continue;
+  if (!name.endsWith(".mjs") || RELEASE_BUNDLE_SKIP.has(name)) continue;
   cpSync(join(bundlesDir, name), join(RELEASES, name));
 }
 
@@ -63,22 +65,6 @@ cpSync(join(ROOT, "apps/web/.open-next/assets"), ASSETS_OUT, { recursive: true }
 cpSync(
   join(ROOT, "packages/db/drizzle/d1/0000_d1_baseline.sql"),
   join(RELEASES, "0000_d1_baseline.sql"),
-);
-cpSync(
-  join(ROOT, "packages/db/drizzle/d1/0001_org_release_updates.sql"),
-  join(RELEASES, "0001_org_release_updates.sql"),
-);
-cpSync(
-  join(ROOT, "packages/db/drizzle/d1/0002_pco_nightly_sync_enabled.sql"),
-  join(RELEASES, "0002_pco_nightly_sync_enabled.sql"),
-);
-cpSync(
-  join(ROOT, "packages/db/drizzle/d1/0003_org_git_repo_url.sql"),
-  join(RELEASES, "0003_org_git_repo_url.sql"),
-);
-cpSync(
-  join(ROOT, "packages/db/drizzle/d1/0004_secrets_store.sql"),
-  join(RELEASES, "0004_secrets_store.sql"),
 );
 
 const manifest = walkAssets(ASSETS_OUT);
@@ -105,8 +91,7 @@ Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE
 - Web static assets: \`assets/\`
 - Web manifest: \`cco-web-manifest.json\`
 - Release catalog: \`release-index.json\` (version + git ref for Admin Updates)
-- D1 baseline: \`0000_d1_baseline.sql\`
-- D1 incremental migrations: \`0001_org_release_updates.sql\`, \`0002_pco_nightly_sync_enabled.sql\`, \`0003_org_git_repo_url.sql\`, \`0004_secrets_store.sql\` (Admin Updates day-two schema)
+- D1 baseline: \`0000_d1_baseline.sql\` (fresh installs and release bundles use baseline-only migrations; incremental history is reset on main)
 `;
 writeFileSync(join(RELEASES, "README.md"), releaseReadme);
 

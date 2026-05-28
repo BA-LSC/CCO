@@ -8,6 +8,18 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
+  "services": [
+    {
+      "binding": "CCO_API",
+      "service": "cco-api",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "DEPLOY_KV",
+      "id": "PROVISIONED_DEPLOY_KV_ID",
+    },
+  ],
   "vars": {
     "CCO_DEPLOY_TARGET": "cloudflare",
     "CF_DEPLOY_KV": "1",

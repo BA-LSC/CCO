@@ -62,6 +62,7 @@ Cloudflare does not offer third-party OAuth for “deploy into your account.” 
 
 | Permission | Level |
 |------------|-------|
+| Zone | Read |
 | DNS | Edit |
 | Workers Routes | Edit |
 | Cache Rules | Edit |
@@ -72,22 +73,39 @@ Cloudflare does not offer third-party OAuth for “deploy into your account.” 
 |------------|-------|
 | User Details | Read |
 
+**Notes:**
+
+- **Workers Scripts → Edit** is also required for Durable Object migrations on `cco-realtime-fanout` and for Smart Placement / fixed-region placement on `cco-api` and `cco-realtime-fanout`.
+- **Queues → Edit** covers both the push queue (`cco-push-notifications`) and its dead-letter queue (`cco-push-notifications-dlq`).
+
+#### Preflight (what each step actually checks)
+
+| When | Checked |
+|------|---------|
+| **Step 2** (paste token) | Token is **Active** (`/user/tokens/verify`) and can list accounts — not the full deploy permission set |
+| **Step 3** (domains) | Zone list for the token (**Zone → Read**) |
+| **Step 4** (deploy) | Full permission table above (D1, Workers, R2, KV, Queues + DLQ, Secrets Store, Realtime, DNS, routes, cache rules, etc.) |
+| **Admin → Updates → Apply** | Subset only: Active token, **Workers Scripts → Edit**, **R2 → Edit**, **Secrets Store → Write**, **Workers Routes → Edit** on configured chat and API hostnames (no D1/KV/Queues/DNS preflight) |
+
 The wizard links to the token page from step 2. Paste the token once; it is stored in your account **Secrets Store** (not in the app database) and used to provision and update Workers in **your** account. Admin integration secret changes write to the same store and take effect without redeploying Workers.
 
 **Existing BYO churches:** after upgrading, run **Admin → Updates → Apply** once so legacy encrypted D1 secrets are copied into Secrets Store and worker bindings are refreshed.
 
 ### What gets provisioned
 
-Runtime stack (100% Cloudflare-native):
+Runtime stack (100% Cloudflare-native) in your account:
 
-- **D1** — application database (`cco`)
-- **Workers** — API, edge webhooks, Giphy proxy, push consumer, reconcile cron, realtime Durable Object
-- **Pages (OpenNext)** — web UI at `chat.<zone>`
-- **R2** — attachments and media
-- **KV** — presence and deploy status
-- **Queues** — push notification delivery
+- **D1** — `cco` database with baseline schema (single migration)
+- **Five API Workers** — `cco-api` (main API; Giphy at `/v1/giphy` with session auth), `cco-pco-webhook`, `cco-realtime-fanout` (Durable Objects), `cco-push-consumer`, `cco-reconcile-cron`
+- **cco-web** — OpenNext Pages worker on `chat.<zone>`
+- **Routes** — API hostname routes (webhooks, WebSocket, catch-all) plus chat custom domain or zone route
+- **R2** — attachments bucket with CORS for browser uploads
+- **KV** — presence and deploy-status namespaces
+- **Queues** — `cco-push-notifications` with dead-letter queue `cco-push-notifications-dlq`
+- **Secrets Store** — org integration and platform secrets (worker bindings; not stored in D1)
+- **Cache rules** — R2 presigned attachment caching on the zone
 - **DNS** — proxied records for chat and API hostnames
-- **RealtimeKit** — audio/video calls (when enabled)
+- **RealtimeKit** — audio/video (auto-provisioned when the token has Realtime permission)
 
 See [workers/README.md](../../workers/README.md) and [deploy/cloudflare/README.md](../../deploy/cloudflare/README.md) for operator and developer details.
 
@@ -111,15 +129,17 @@ The wizard notes Workers Paid and possible RealtimeKit charges after beta.
 
 **Symptoms:** Step 2 returns an error immediately after paste; deploy steps fail with Cloudflare API 403.
 
+**Step 2 vs deploy:** A successful paste in step 2 only confirms the token is **Active** and can list accounts. It does **not** preflight deploy permissions. Missing scopes usually surface during **step 4 (deploy)** with 403 on a specific provision step.
+
 **Checks:**
 
-1. Token status is **Active** in [API Tokens](https://dash.cloudflare.com/profile/api-tokens).
-2. Every permission in the table above is present — missing **D1 Edit** or **Workers Scripts Edit** is a common cause.
+1. Token status is **Active** in [API Tokens](https://dash.cloudflare.com/profile/api-tokens) (required for step 2).
+2. For deploy failures, every permission in the table above is present — missing **D1 Edit**, **Workers Scripts Edit**, **Zone → Read**, or **Queues Edit** (queue + DLQ) are common causes.
 3. **Zone resources** include the zone you select in step 3 (not “All zones” only on account-scoped permissions).
-4. **Account Settings → Read** is set if the wizard cannot list accounts.
+4. **Account Settings → Read** is set if the wizard cannot list accounts in step 2.
 5. Regenerate the token if it was created before upgrading to Workers Paid.
 
-**Fix:** Create a new custom token with the full permission set, paste it in step 2, and verify again.
+**Fix:** Create a new custom token with the **full** permission set before starting deploy (step 4). Paste it in step 2 to store it; if deploy already failed, paste the corrected token in step 2 again (or update via **Admin → Integrations**) and retry deploy.
 
 ### Zone / SSL errors on domain step
 

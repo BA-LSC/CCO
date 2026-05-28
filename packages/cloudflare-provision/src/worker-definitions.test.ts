@@ -49,12 +49,13 @@ describe("worker definitions", () => {
     );
   });
 
-  test("wires reconcile cron worker internal URL", () => {
+  test("wires reconcile cron worker internal URL and CCO_API service binding", () => {
     const bindings = buildWorkerBindings("cco-reconcile-cron", {
       resources,
       apiHostname: "api.example.com",
     });
     expect(bindings).toEqual([
+      { type: "service", name: "CCO_API", service: "cco-api" },
       {
         type: "plain_text",
         name: "RECONCILE_INTERNAL_URL",
@@ -86,6 +87,7 @@ describe("worker definitions", () => {
       apiHostname: "api.example.com",
     });
     expect(consumerBindings).toEqual([
+      { type: "service", name: "CCO_API", service: "cco-api" },
       {
         type: "plain_text",
         name: "PUSH_INTERNAL_URL",

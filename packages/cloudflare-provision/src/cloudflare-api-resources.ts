@@ -175,6 +175,20 @@ export async function ensureQueue(
   }
 }
 
+/** Ensures the push notification queue and its dead-letter queue exist. */
+export async function ensurePushNotificationQueues(
+  accountId: string,
+  apiToken: string,
+  queueName: string,
+  dlqName: string,
+): Promise<{ pushQueueId: string; dlqQueueId: string }> {
+  const [pushQueue, dlqQueue] = await Promise.all([
+    ensureQueue(accountId, apiToken, queueName),
+    ensureQueue(accountId, apiToken, dlqName),
+  ]);
+  return { pushQueueId: pushQueue.queue_id, dlqQueueId: dlqQueue.queue_id };
+}
+
 export type HyperdriveConfig = {
   id: string;
   name: string;

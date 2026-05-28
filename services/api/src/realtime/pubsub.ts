@@ -10,6 +10,7 @@ import {
   subscribeToConversationRedis,
 } from "./pubsub-redis";
 import {
+  fireAndForgetPublishToUsers,
   initCloudflarePubSub,
   isCloudflarePubSubEnabled,
   publishMessageEventCloudflare,
@@ -55,6 +56,17 @@ export async function publishMessageEvent(event: RealtimeEvent): Promise<void> {
     return;
   }
   publishMessageEventMemory(event);
+}
+
+/** Publish to the active conversation room and each member's user inbox (Cloudflare). */
+export async function publishMessageEventToMembers(
+  event: RealtimeEvent,
+  memberUserIds: string[],
+): Promise<void> {
+  await publishMessageEvent(event);
+  if (backend === "cloudflare") {
+    fireAndForgetPublishToUsers(memberUserIds, event);
+  }
 }
 
 export function resetPubSubForTests(): void {

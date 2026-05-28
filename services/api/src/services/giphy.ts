@@ -4,6 +4,7 @@ import {
   getUploadDir,
   safeUploadPath,
 } from "../lib/uploads";
+import { putR2Object, resolveR2Config } from "../lib/r2-uploads";
 import { getConfiguredOrganization } from "./org-oauth";
 import { isGiphyApiKeyConfigured, orgUsesSecretsStore } from "./org-secrets";
 import { isCloudflareRuntime } from "../runtime/worker-context";
@@ -163,9 +164,25 @@ export async function importGiphyGif(sourceUrl: string): Promise<{ url: string; 
     throw new Error("GIF is too large");
   }
 
-  await mkdir(getUploadDir(), { recursive: true });
-
   const filename = `${crypto.randomUUID()}.gif`;
+  const r2 = await resolveR2Config();
+  if (r2 || isCloudflareRuntime()) {
+    if (!r2) {
+      throw new Error("R2 uploads are not configured");
+    }
+    await putR2Object({
+      config: r2,
+      objectKey: filename,
+      body: buffer,
+      contentType: "image/gif",
+    });
+    return {
+      url: buildSignedUploadUrl(filename),
+      filename,
+    };
+  }
+
+  await mkdir(getUploadDir(), { recursive: true });
   const dest = safeUploadPath(getUploadDir(), filename);
   if (!dest) {
     throw new Error("Invalid filename");

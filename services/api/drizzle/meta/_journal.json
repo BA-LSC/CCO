@@ -183,6 +183,20 @@
       "when": 1747708825000,
       "tag": "0025_org_git_repo_url",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1747708826000,
+      "tag": "0026_secrets_store",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1747708827000,
+      "tag": "0027_worker_placement",
+      "breakpoints": true
     }
   ]
 }

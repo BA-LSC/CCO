@@ -20,8 +20,44 @@ async function resolveSecret(
   return (await binding.get()) ?? "";
 }
 
+async function forwardToApi(params: {
+  forwardUrl: string;
+  forwardSecret: string;
+  eventType: string;
+  handlerKind: string;
+  payload: unknown;
+  deliveryId: string | null;
+}): Promise<void> {
+  const forward = await fetch(params.forwardUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${params.forwardSecret}`,
+      "X-PCO-Webhooks-Name": params.eventType,
+    },
+    body: JSON.stringify({
+      handlerKind: params.handlerKind,
+      payload: params.payload,
+      deliveryId: params.deliveryId,
+      eventType: params.eventType,
+    }),
+  });
+
+  if (!forward.ok) {
+    const detail = await forward.text().catch(() => "");
+    console.error(
+      `[pco-webhook] Forward failed (${forward.status}):`,
+      detail.slice(0, 500),
+    );
+  }
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
@@ -66,21 +102,17 @@ export default {
     const { deliveryId, body: payload } = normalizeWebhookPayload(rawPayload);
     const forwardSecret = await resolveSecret(env.INTERNAL_FORWARD_SECRET);
 
-    const forward = await fetch(env.INTERNAL_FORWARD_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${forwardSecret}`,
-        "X-PCO-Webhooks-Name": eventType,
-      },
-      body: JSON.stringify({ handlerKind, payload, deliveryId, eventType }),
-    });
+    ctx.waitUntil(
+      forwardToApi({
+        forwardUrl: env.INTERNAL_FORWARD_URL,
+        forwardSecret,
+        eventType,
+        handlerKind,
+        payload,
+        deliveryId,
+      }),
+    );
 
-    if (!forward.ok) {
-      return Response.json({ error: "Handler failed" }, { status: 500 });
-    }
-
-    const result = await forward.json();
-    return Response.json(result);
+    return Response.json({ accepted: true, queued: true }, { status: 202 });
   },
 };

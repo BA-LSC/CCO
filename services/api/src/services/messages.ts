@@ -14,11 +14,13 @@ import { isAllowedAttachmentUrl, refreshAttachmentUrl } from "../lib/uploads";
 import { directMessageParticipantsAreSignedUp } from "./dms";
 import { markConversationRead } from "./conversations";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
-import { publishMessageEvent } from "../realtime/pubsub";
+import { publishMessageEvent, publishMessageEventToMembers } from "../realtime/pubsub";
+import { listConversationMemberUserIds } from "./conversations";
 import { notifyConversationOfMessage, notifyMentionedUsers } from "./push-notify";
 import { refreshUserAvatarFromPco, ensureUserDisplayNameResolved } from "./user-profile";
 import { lastReadAtIso } from "./unread";
 import type { ReactionDto } from "./reactions";
+import { scheduleBackgroundWork } from "../runtime/worker-context";
 
 export type MessageDto = {
   id: string;
@@ -418,9 +420,11 @@ export async function createMessage(params: {
       createdAt: messages.createdAt,
     });
 
-  void refreshUserAvatarFromPco(params.userId).catch((err) => {
-    console.warn("Avatar refresh failed:", err instanceof Error ? err.message : err);
-  });
+  scheduleBackgroundWork(() =>
+    refreshUserAvatarFromPco(params.userId).catch((err) => {
+      console.warn("Avatar refresh failed:", err instanceof Error ? err.message : err);
+    }),
+  );
 
   const author = await db
     .select({ displayName: users.displayName, avatarUrl: users.avatarUrl })
@@ -434,24 +438,32 @@ export async function createMessage(params: {
     authorAvatarUrl: author[0]?.avatarUrl ?? null,
   });
 
-  await publishMessageEvent({
-    type: "message.created",
-    conversationId: params.conversationId,
-    message: dto,
-  });
+  const memberUserIds = await listConversationMemberUserIds(params.conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "message.created",
+      conversationId: params.conversationId,
+      message: dto,
+    },
+    memberUserIds,
+  );
 
-  void markConversationRead(params.conversationId, params.userId);
+  scheduleBackgroundWork(() => markConversationRead(params.conversationId, params.userId));
 
   const mentionedIds = extractMentionedUserIds(params.body);
   if (mentionedIds.length > 0) {
-    void notifyMentionedUsers({
-      conversationId: params.conversationId,
-      authorUserId: params.userId,
-      mentionedUserIds: mentionedIds,
-      message: dto,
-    });
+    scheduleBackgroundWork(() =>
+      notifyMentionedUsers({
+        conversationId: params.conversationId,
+        authorUserId: params.userId,
+        mentionedUserIds: mentionedIds,
+        message: dto,
+      }),
+    );
   } else {
-    void notifyConversationOfMessage(params.conversationId, params.userId, dto);
+    scheduleBackgroundWork(() =>
+      notifyConversationOfMessage(params.conversationId, params.userId, dto),
+    );
   }
 
   return { message: dto };
@@ -504,11 +516,15 @@ export async function updateMessage(params: {
     authorAvatarUrl: author[0]?.avatarUrl ?? null,
   });
 
-  await publishMessageEvent({
-    type: "message.updated",
-    conversationId: row[0].conversationId,
-    message: dto,
-  });
+  const memberUserIds = await listConversationMemberUserIds(row[0].conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "message.updated",
+      conversationId: row[0].conversationId,
+      message: dto,
+    },
+    memberUserIds,
+  );
 
   return { message: dto };
 }
@@ -547,11 +563,15 @@ export async function deleteMessage(params: {
     .set({ deletedAt: new Date() })
     .where(eq(messages.id, params.messageId));
 
-  await publishMessageEvent({
-    type: "message.deleted",
-    conversationId: row[0].conversationId,
-    messageId: params.messageId,
-  });
+  const memberUserIds = await listConversationMemberUserIds(row[0].conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "message.deleted",
+      conversationId: row[0].conversationId,
+      messageId: params.messageId,
+    },
+    memberUserIds,
+  );
 
   return { ok: true };
 }

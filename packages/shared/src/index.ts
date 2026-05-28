@@ -6,3 +6,4 @@ export * from "./notification-navigation";
 export * from "./pco-sync";
 export * from "./pco-webhooks";
 export * from "./user-status";
+export * from "./worker-placement";

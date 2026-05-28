@@ -17,15 +17,26 @@
         "name": "CONVERSATION_ROOM",
         "class_name": "ConversationRoom",
       },
+      {
+        "name": "USER_INBOX",
+        "class_name": "UserInbox",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["ConversationRoom"],
+      "new_sqlite_classes": ["ConversationRoom", "UserInbox"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["UserInbox"],
     },
   ],
   // Secrets (wrangler secret put): SESSION_SECRET, CF_INTERNAL_SECRET
+  "placement": {
+    "mode": "smart",
+  },
   "observability": {
     "enabled": true,
   },

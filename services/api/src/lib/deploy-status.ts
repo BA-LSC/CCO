@@ -11,8 +11,11 @@ import {
 import { getWorkerBindings } from "../runtime/worker-context";
 
 export const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
+/** KV TTL for deploy-draining flag (4 hours). */
+export const DEPLOY_DRAINING_TTL_SECONDS = 4 * 60 * 60;
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 export const DEPLOY_LAST_ERROR_KEY = "cco:deploy:last-error";
+export const PLACEMENT_REDEPLOY_ERROR_KEY = "cco:deploy:placement-redeploy-error";
 export const DEPLOY_PHASE_KEY = "cco:deploy:phase";
 
 let redis: Redis | null = null;
@@ -156,15 +159,16 @@ export async function setDeployDraining(updating: boolean): Promise<void> {
   }
 
   if (await shouldUseKvDeploy()) {
+    const drainingTtl = updating ? DEPLOY_DRAINING_TTL_SECONDS : undefined;
     const binding = getWorkerBindings()?.DEPLOY_KV;
     if (binding) {
-      await kvPutBinding(binding, DEPLOY_DRAINING_KEY, value);
+      await kvPutBinding(binding, DEPLOY_DRAINING_KEY, value, drainingTtl);
       await publishDeploySignal(updating);
       return;
     }
     const kv = await resolveDeployKvConfig();
     if (kv) {
-      await kvPut(kv, DEPLOY_DRAINING_KEY, value);
+      await kvPut(kv, DEPLOY_DRAINING_KEY, value, drainingTtl);
       await publishDeploySignal(updating);
       return;
     }
@@ -284,6 +288,88 @@ export async function setDeployLastError(message: string | null): Promise<void> 
       );
     }
   }
+}
+
+export async function readPlacementRedeployError(): Promise<string | null> {
+  try {
+    if (await shouldUseKvDeploy()) {
+      const binding = getWorkerBindings()?.DEPLOY_KV;
+      if (binding) {
+        const raw = await kvGetBinding(binding, PLACEMENT_REDEPLOY_ERROR_KEY);
+        return raw?.trim() || null;
+      }
+      const kv = await resolveDeployKvConfig();
+      if (kv) {
+        const raw = await kvGet(kv, PLACEMENT_REDEPLOY_ERROR_KEY);
+        return raw?.trim() || null;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const client = getRedis();
+  if (!client) return null;
+  try {
+    if (client.status !== "ready") {
+      await client.connect().catch(() => null);
+    }
+    if (client.status !== "ready") return null;
+    const raw = await client.get(PLACEMENT_REDEPLOY_ERROR_KEY);
+    return raw?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setPlacementRedeployError(message: string | null): Promise<void> {
+  if (!(await shouldUseKvDeploy())) {
+    const client = getRedis();
+    if (!client) return;
+    try {
+      if (client.status !== "ready") {
+        await client.connect().catch(() => null);
+      }
+      if (client.status !== "ready") return;
+      if (message) {
+        await client.set(PLACEMENT_REDEPLOY_ERROR_KEY, message, "EX", 86_400);
+      } else {
+        await client.del(PLACEMENT_REDEPLOY_ERROR_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  const binding = getWorkerBindings()?.DEPLOY_KV;
+  if (binding) {
+    if (message) {
+      await kvPutBinding(binding, PLACEMENT_REDEPLOY_ERROR_KEY, message, 86_400);
+    } else {
+      try {
+        await kvDeleteBinding(binding, PLACEMENT_REDEPLOY_ERROR_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    return;
+  }
+  const kv = await resolveDeployKvConfig();
+  if (!kv) return;
+  if (message) {
+    await kvPut(kv, PLACEMENT_REDEPLOY_ERROR_KEY, message, 86_400);
+  } else {
+    try {
+      await kvDelete(kv, PLACEMENT_REDEPLOY_ERROR_KEY);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export async function clearPlacementRedeployError(): Promise<void> {
+  await setPlacementRedeployError(null);
 }
 
 export async function readDeploySignal(): Promise<boolean> {

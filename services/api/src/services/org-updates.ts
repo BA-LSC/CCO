@@ -6,19 +6,19 @@ import {
   type ReleaseIndex,
 } from "@cco/shared";
 import {
-  applyD1MigrationStatements,
   deployAllProvisionWorkers,
   deployCcoWebWorker,
   ensureD1Database,
+  ensureR2AttachmentCacheRule,
   ensureR2BucketCors,
+  getZoneIdForHostname,
   resolveR2UploadChatOrigins,
   fetchWebReleaseManifest,
   verifyCloudflareUpdateApplyPermissions,
   type CcoWorkerScriptName,
   type ProvisionSecrets,
 } from "@cco/cloudflare-provision";
-import { getD1IncrementalMigrationFilenames } from "@cco/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations } from "../db/schema";
 import { isCloudflareRuntime } from "../runtime/worker-context";
@@ -38,32 +38,10 @@ import {
 } from "./org-secrets";
 import { ensureCloudflareOrganizationColumns } from "./org-schema-capabilities";
 import { invalidateOrgContextCache } from "./org-context-cache";
-
-const D1_UPDATE_COLUMN_STATEMENTS = [
-  `ALTER TABLE "organizations" ADD COLUMN "installed_release_version" TEXT`,
-  `ALTER TABLE "organizations" ADD COLUMN "auto_update_enabled" INTEGER NOT NULL DEFAULT 0`,
-  `ALTER TABLE "organizations" ADD COLUMN "last_update_check_at" INTEGER`,
-  `ALTER TABLE "organizations" ADD COLUMN "git_repo_url" TEXT`,
-  `ALTER TABLE "organizations" ADD COLUMN "auto_update_check_interval_minutes" INTEGER NOT NULL DEFAULT 360`,
-] as const;
-
-function splitSqlStatements(sqlText: string): string[] {
-  return sqlText
-    .split(/;\s*\n/)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0 && !chunk.startsWith("--"));
-}
+import { workerPlacementFromOrg } from "./org-worker-placement";
 
 export async function ensureOrgUpdateSettingsColumns(): Promise<void> {
   await ensureCloudflareOrganizationColumns();
-  if (!isCloudflareRuntime()) return;
-  for (const statement of D1_UPDATE_COLUMN_STATEMENTS) {
-    try {
-      await db.execute(sql.raw(statement));
-    } catch {
-      // Column may already exist after 0001 migration.
-    }
-  }
 }
 
 export type UpdatePlatform = "cloudflare" | "unknown";
@@ -410,33 +388,6 @@ function createRemoteBundleLoader(baseUrl: string) {
   };
 }
 
-async function applyIncrementalD1Migrations(job: CloudflareReleaseUpdateJob): Promise<void> {
-  const { accountId, apiToken, resources } = job;
-  for (const filename of getD1IncrementalMigrationFilenames()) {
-    const res = await fetch(`${job.releasesBase}/${filename}`);
-    if (res.status === 404) {
-      // Older release artifacts may predate incremental migration files.
-      continue;
-    }
-    if (!res.ok) {
-      throw new Error(`Failed to fetch D1 migration ${filename}: HTTP ${res.status}`);
-    }
-    const sqlText = await res.text();
-    for (const statement of splitSqlStatements(sqlText)) {
-      try {
-        await applyD1MigrationStatements(
-          accountId,
-          apiToken,
-          resources.d1DatabaseId,
-          [statement],
-        );
-      } catch {
-        // Column may already exist after a prior apply.
-      }
-    }
-  }
-}
-
 export async function prepareCloudflareReleaseUpdate(options?: {
   apiTokenOverride?: string;
 }): Promise<CloudflareReleaseUpdateJob> {
@@ -545,6 +496,15 @@ export async function executeCloudflareReleaseUpdate(
   await setDeployDraining(true);
   try {
     await setDeployPhase("configuring-uploads");
+    const zoneId = await getZoneIdForHostname(job.apiToken, job.resources.apiHostname);
+    if (zoneId) {
+      await ensureR2AttachmentCacheRule(zoneId, job.apiToken).catch((err) => {
+        console.warn(
+          "[org-updates] R2 attachment cache rule skipped:",
+          err instanceof Error ? err.message : err,
+        );
+      });
+    }
     await ensureR2BucketCors(
       job.accountId,
       job.apiToken,
@@ -560,10 +520,8 @@ export async function executeCloudflareReleaseUpdate(
       );
     });
 
-    await setDeployPhase("running-migrations");
-    await applyIncrementalD1Migrations(job);
-
     await setDeployPhase("deploying-api");
+    const placementOrg = await getConfiguredOrganization();
     const deployedWorkers = await deployAllProvisionWorkers({
       accountId: job.accountId,
       apiToken: job.apiToken,
@@ -571,6 +529,12 @@ export async function executeCloudflareReleaseUpdate(
       secretsStoreId: job.secretsStoreId,
       apiHostname: job.resources.apiHostname,
       readBundle: job.readBundle,
+      workerPlacement: placementOrg
+        ? (() => {
+            const p = workerPlacementFromOrg(placementOrg);
+            return { mode: p.mode, region: p.region };
+          })()
+        : null,
     });
 
     await setDeployPhase("deploying-chat");

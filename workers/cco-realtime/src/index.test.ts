@@ -1,17 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import worker from "./worker";
 
+function mockDoNamespace(): DurableObjectNamespace {
+  return {
+    idFromName: () => ({ toString: () => "do-id" }),
+    get: () => ({
+      fetch: async () => Response.json({ ok: true, delivered: 0 }),
+    }),
+  } as unknown as DurableObjectNamespace;
+}
+
 describe("cco-realtime worker routes", () => {
   const env = {
     SESSION_SECRET: "test-secret-must-be-at-least-32-characters-long!!",
     CF_INTERNAL_SECRET: "internal-test-secret",
     DB: {} as D1Database,
-    CONVERSATION_ROOM: {
-      idFromName: () => ({ toString: () => "do-id" }),
-      get: () => ({
-        fetch: async () => Response.json({ ok: true, delivered: 0 }),
-      }),
-    } as unknown as DurableObjectNamespace,
+    CONVERSATION_ROOM: mockDoNamespace(),
+    USER_INBOX: mockDoNamespace(),
   };
 
   test("GET /health returns ok", async () => {
@@ -46,6 +51,7 @@ describe("cco-realtime worker routes", () => {
           },
         }),
       } as unknown as DurableObjectNamespace,
+      USER_INBOX: mockDoNamespace(),
     };
 
     const res = await worker.fetch(

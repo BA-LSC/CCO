@@ -118,7 +118,7 @@ export function hasBootstrapOAuth(): boolean {
 export async function saveSetupDraft(params: {
   name: string;
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   signInRedirectUri: string;
   webhookUrl: string;
   webhookSecret?: string | null;
@@ -128,6 +128,7 @@ export async function saveSetupDraft(params: {
   const clientId = params.clientId.trim();
   const signInRedirectUri = params.signInRedirectUri.trim();
   const webhookUrl = params.webhookUrl.trim();
+  const clientSecret = params.clientSecret?.trim();
 
   const pending = await db
     .select({ id: organizations.id })
@@ -142,33 +143,44 @@ export async function saveSetupDraft(params: {
       .from(organizations)
       .where(eq(organizations.id, orgId))
       .limit(1);
-    if (orgRows[0] && orgUsesSecretsStore(orgRows[0])) {
+    const org = orgRows[0];
+    if (org && orgUsesSecretsStore(org)) {
+      if (!clientSecret && !isPcoClientSecretConfigured(org)) {
+        throw new Error("OAuth client secret is required");
+      }
+
+      const secretStoreUpdates: Record<string, unknown> = {
+        name: params.name.trim(),
+        pcoClientId: clientId,
+        pcoOauthScope: scope,
+        pcoWebRedirectUri: signInRedirectUri,
+        pcoWebhookUrl: webhookUrl,
+        ...(params.webhookSecret !== undefined
+          ? {
+              pcoWebhookSecretsConfigured: Boolean(params.webhookSecret?.trim()),
+              pcoWebhookSecretEnc: null,
+            }
+          : {}),
+      };
+      if (clientSecret) {
+        secretStoreUpdates.pcoClientSecretConfigured = true;
+        secretStoreUpdates.pcoClientSecretEnc = null;
+      }
+
       await db
         .update(organizations)
-        .set({
-          name: params.name.trim(),
-          pcoClientId: clientId,
-          pcoOauthScope: scope,
-          pcoWebRedirectUri: signInRedirectUri,
-          pcoWebhookUrl: webhookUrl,
-          pcoClientSecretConfigured: true,
-          pcoClientSecretEnc: null,
-          ...(params.webhookSecret !== undefined
-            ? {
-                pcoWebhookSecretsConfigured: Boolean(params.webhookSecret?.trim()),
-                pcoWebhookSecretEnc: null,
-              }
-            : {}),
-        })
+        .set(secretStoreUpdates)
         .where(eq(organizations.id, orgId));
 
-      await upsertOrgSecretForOrganization({
-        organizationId: orgId,
-        secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
-        value: params.clientSecret.trim(),
-        apiToken: params.cloudflareApiToken,
-        configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
-      });
+      if (clientSecret) {
+        await upsertOrgSecretForOrganization({
+          organizationId: orgId,
+          secretName: CCO_STORE_SECRET.PCO_CLIENT_SECRET,
+          value: clientSecret,
+          apiToken: params.cloudflareApiToken,
+          configuredPatch: { pcoClientSecretConfigured: true, pcoClientSecretEnc: null },
+        });
+      }
 
       if (params.webhookSecret?.trim()) {
         await upsertOrgSecretForOrganization({
@@ -184,7 +196,21 @@ export async function saveSetupDraft(params: {
     }
   }
 
-  const clientSecretEnc = encryptSecret(params.clientSecret.trim());
+  const existingSecret = orgId
+    ? await db
+        .select({ pcoClientSecretEnc: organizations.pcoClientSecretEnc })
+        .from(organizations)
+        .where(eq(organizations.id, orgId))
+        .limit(1)
+    : [];
+
+  const clientSecretEnc = clientSecret
+    ? encryptSecret(clientSecret)
+    : existingSecret[0]?.pcoClientSecretEnc;
+  if (!clientSecretEnc) {
+    throw new Error("OAuth client secret is required");
+  }
+
   const webhookEnc = encryptWebhookSecretsInput(params.webhookSecret);
 
   if (pending[0]) {

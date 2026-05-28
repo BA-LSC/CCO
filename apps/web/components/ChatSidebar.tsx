@@ -165,11 +165,15 @@ export function ChatSidebar() {
 
   useEffect(() => {
     return subscribeRealtime((event) => {
-      if (!activeConversationId) return;
+      const conversationId =
+        "conversationId" in event && typeof event.conversationId === "string"
+          ? event.conversationId
+          : null;
+      if (!conversationId) return;
 
       if (event.type === "message.created" && event.message) {
         setDms((prev) => {
-          const dm = prev.find((row) => row.id === activeConversationId);
+          const dm = prev.find((row) => row.id === conversationId);
           const preview = previewFromMessage(
             event.message,
             session?.userId,
@@ -177,9 +181,10 @@ export function ChatSidebar() {
           );
           return applyDmMessagePreview(
             prev,
-            activeConversationId,
+            conversationId,
             preview,
             event.message.createdAt,
+            conversationId !== activeConversationId,
           );
         });
         return;
@@ -187,7 +192,7 @@ export function ChatSidebar() {
 
       if (event.type === "message.updated" && event.message) {
         setDms((prev) => {
-          const dm = prev.find((row) => row.id === activeConversationId);
+          const dm = prev.find((row) => row.id === conversationId);
           const preview = previewFromMessage(
             event.message,
             session?.userId,
@@ -195,7 +200,7 @@ export function ChatSidebar() {
           );
           return applyDmMessagePreview(
             prev,
-            activeConversationId,
+            conversationId,
             preview,
             event.message.createdAt,
           );

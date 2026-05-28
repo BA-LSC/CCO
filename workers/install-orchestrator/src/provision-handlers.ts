@@ -113,7 +113,7 @@ export async function createInstallProvisionHandlers(
 
     const baselineSql = options.fetchD1BaselineSql ? await options.fetchD1BaselineSql() : null;
     if (!baselineSql?.trim()) {
-      return;
+      throw new Error("D1 baseline SQL is missing or empty");
     }
 
     await applyD1MigrationStatements(

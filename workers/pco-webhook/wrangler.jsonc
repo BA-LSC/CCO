@@ -6,13 +6,6 @@
   "alias": {
     "@cco/shared/webhook-auth": "../../packages/shared/src/webhook-auth.ts",
   },
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "",
-      // Set after auto-provision or wrangler secret
-    },
-  ],
   "vars": {
     // WEBHOOK_SECRETS — newline-separated HMAC secrets (wrangler secret)
     // INTERNAL_FORWARD_URL — optional forward to cco-api for complex handlers

@@ -70,6 +70,27 @@ export function isCloudflareRuntime(): boolean {
   return storage.getStore() != null || process.env.CCO_RUNTIME === "cloudflare";
 }
 
+/** True when handling a request inside the Cloudflare Worker isolate. */
+export function isCloudflareWorkerRuntime(): boolean {
+  return storage.getStore() != null;
+}
+
+/** Run work after the response via waitUntil when on Workers; otherwise fire-and-forget. */
+export function scheduleBackgroundWork(fn: () => void | Promise<void>): void {
+  const work = Promise.resolve().then(fn);
+  const executionCtx = getExecutionContext();
+  if (executionCtx) {
+    executionCtx.waitUntil(work);
+    return;
+  }
+  void work.catch((err) => {
+    console.warn(
+      "[worker-context] Background work failed:",
+      err instanceof Error ? err.message : err,
+    );
+  });
+}
+
 const ENV_KEYS: Array<keyof WorkerEnvVars> = [
   "SESSION_SECRET",
   "TOKEN_ENCRYPTION_KEY",
@@ -101,10 +122,24 @@ async function resolveBindingValue(
   return resolved || undefined;
 }
 
+const PRELOADED_ENV_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type PreloadedEnvCacheEntry = {
+  vars: WorkerEnvVars;
+  expiresAt: number;
+};
+
+let preloadedEnvCache: PreloadedEnvCacheEntry | null = null;
+
 /** Resolve classic env strings and Secrets Store bindings into WorkerEnvVars. */
 export async function preloadWorkerEnvVars(
   env: Record<string, SecretsStoreSecretBinding | string | undefined>,
 ): Promise<WorkerEnvVars> {
+  const now = Date.now();
+  if (preloadedEnvCache && preloadedEnvCache.expiresAt > now) {
+    return preloadedEnvCache.vars;
+  }
+
   const entries = await Promise.all(
     ENV_KEYS.map(async (key) => [key, await resolveBindingValue(env[key])] as const),
   );
@@ -125,8 +160,38 @@ export async function preloadWorkerEnvVars(
     vars.SETUP_BOOTSTRAP_SECRET = vars.CF_INTERNAL_SECRET;
   }
 
+  preloadedEnvCache = { vars, expiresAt: now + PRELOADED_ENV_CACHE_TTL_MS };
   return vars;
 }
+
+/** Read a worker var from AsyncLocalStorage first, then process.env. */
+export function getWorkerEnvVar<K extends keyof WorkerEnvVars>(
+  key: K,
+): WorkerEnvVars[K] | undefined {
+  const fromContext = storage.getStore()?.vars[key];
+  if (fromContext != null && fromContext !== "") return fromContext;
+  const fromEnv = process.env[key];
+  return fromEnv != null && fromEnv !== "" ? (fromEnv as WorkerEnvVars[K]) : undefined;
+}
+
+const MIRRORED_ENV_KEYS: Array<keyof WorkerEnvVars> = [
+  "SESSION_SECRET",
+  "TOKEN_ENCRYPTION_KEY",
+  "CF_INTERNAL_SECRET",
+  "CF_REALTIME_INTERNAL_SECRET",
+  "WEB_URL",
+  "MOBILE_ORIGIN",
+  "PUBLIC_UPLOAD_URL",
+  "UPLOAD_STORAGE",
+  "PCO_CLIENT_SECRET",
+  "WEBHOOK_SECRETS",
+  "GIPHY_API_KEY",
+  "CLOUDFLARE_API_TOKEN",
+  "VAPID_PRIVATE_KEY",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "SETUP_BOOTSTRAP_SECRET",
+];
 
 function mirrorEnvVars(vars: WorkerEnvVars): void {
   process.env.CCO_RUNTIME = "cloudflare";
@@ -135,7 +200,7 @@ function mirrorEnvVars(vars: WorkerEnvVars): void {
   process.env.CF_DEPLOY_KV = "1";
   process.env.CF_PUSH_QUEUE_ENABLED = "1";
 
-  for (const key of ENV_KEYS) {
+  for (const key of MIRRORED_ENV_KEYS) {
     const value = vars[key];
     if (value != null && value !== "") {
       process.env[key] = value;

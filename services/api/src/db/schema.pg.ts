@@ -57,6 +57,10 @@ export const organizations = pgTable("organizations", {
   autoUpdateCheckIntervalMinutes: integer("auto_update_check_interval_minutes")
     .notNull()
     .default(360),
+  cloudflareWorkerPlacementMode: text("cloudflare_worker_placement_mode")
+    .notNull()
+    .default("smart"),
+  cloudflareWorkerPlacementRegion: text("cloudflare_worker_placement_region"),
   lastUpdateCheckAt: timestamp("last_update_check_at"),
   gitRepoUrl: text("git_repo_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

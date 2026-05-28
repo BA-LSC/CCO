@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { conversationMembers, messageReactions, messages, users } from "../db/schema";
-import { publishMessageEvent } from "../realtime/pubsub";
+import { publishMessageEventToMembers } from "../realtime/pubsub";
+import { listConversationMemberUserIds } from "./conversations";
 
 export type ReactionDto = {
   messageId: string;
@@ -94,13 +95,17 @@ export async function addReaction(params: {
     createdAt: new Date().toISOString(),
   };
 
-  await publishMessageEvent({
-    type: "reaction.changed",
-    conversationId: message[0].conversationId,
-    messageId: params.messageId,
-    action: "added",
-    reaction,
-  });
+  const memberUserIds = await listConversationMemberUserIds(message[0].conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "reaction.changed",
+      conversationId: message[0].conversationId,
+      messageId: params.messageId,
+      action: "added",
+      reaction,
+    },
+    memberUserIds,
+  );
 
   return { reaction };
 }
@@ -131,19 +136,23 @@ export async function removeReaction(params: {
       ),
     );
 
-  await publishMessageEvent({
-    type: "reaction.changed",
-    conversationId: message[0].conversationId,
-    messageId: params.messageId,
-    action: "removed",
-    reaction: {
+  const memberUserIds = await listConversationMemberUserIds(message[0].conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "reaction.changed",
+      conversationId: message[0].conversationId,
       messageId: params.messageId,
-      userId: params.userId,
-      userName: "",
-      emoji: params.emoji,
-      createdAt: new Date().toISOString(),
+      action: "removed",
+      reaction: {
+        messageId: params.messageId,
+        userId: params.userId,
+        userName: "",
+        emoji: params.emoji,
+        createdAt: new Date().toISOString(),
+      },
     },
-  });
+    memberUserIds,
+  );
 
   return { ok: true };
 }

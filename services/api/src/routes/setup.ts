@@ -11,7 +11,8 @@ import {
   isSetupComplete,
   saveSetupDraft,
 } from "../services/org-oauth";
-import { issueSetupSessionToken } from "../services/setup-session";
+import { isPcoClientSecretConfigured, isPcoWebhookSecretsConfigured } from "../services/org-secrets";
+import { issueSetupSessionToken, verifySetupSessionToken } from "../services/setup-session";
 import { decryptSecret } from "../auth/token-crypto";
 import { fetchPcoMe, isPcoSiteAdministrator } from "../services/setup";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -56,15 +57,18 @@ export const setupRouter = new Hono<Env>();
 
 function draftFromOrg(org: typeof organizations.$inferSelect) {
   const webhookSecrets = decryptWebhookSecrets(org.pcoWebhookSecretEnc);
+  const clientSecretConfigured = isPcoClientSecretConfigured(org);
+  const webhookConfigured = isPcoWebhookSecretsConfigured(org);
   return {
     name: org.name === "Pending setup" ? "" : org.name,
     clientId: org.pcoClientId ?? "",
-    hasClientSecret: Boolean(org.pcoClientSecretEnc),
-    webhookConfigured: webhookSecrets.length > 0,
-    webhookSecretCount: webhookSecrets.length,
-    webhooksEnabled: webhookSecrets.length > 0,
+    hasClientSecret: clientSecretConfigured,
+    webhookConfigured,
+    webhookSecretCount:
+      webhookSecrets.length > 0 ? webhookSecrets.length : webhookConfigured ? 1 : 0,
+    webhooksEnabled: webhookConfigured,
     credentialsSaved: Boolean(
-      org.pcoClientId && org.pcoClientSecretEnc && webhookSecrets.length > 0,
+      org.pcoClientId && clientSecretConfigured && webhookConfigured,
     ),
     signInRedirectUri: org.pcoWebRedirectUri ?? null,
     webhookUrl: resolvePcoWebhookUrl(org.pcoWebhookUrl),
@@ -87,7 +91,9 @@ setupRouter.get("/status", async (c) => {
     configured,
     churchName,
     signInAvailable: Boolean(credentials),
-    credentialsInDb: Boolean(orgWithOAuth?.pcoClientId && orgWithOAuth?.pcoClientSecretEnc),
+    credentialsInDb: Boolean(
+      orgWithOAuth?.pcoClientId && isPcoClientSecretConfigured(orgWithOAuth),
+    ),
     webhooksEnabled: webhookSecrets.length > 0,
   });
 });
@@ -110,6 +116,18 @@ setupRouter.post("/draft", async (c) => {
     return c.json({ error: "CCO is already configured" }, 409);
   }
 
+  const existingOrgForAuth = await getOrganizationWithOAuthCredentials();
+  if (existingOrgForAuth?.setupSessionTokenHash) {
+    if (
+      !verifySetupSessionToken(
+        c.req.header("X-Setup-Token"),
+        existingOrgForAuth.setupSessionTokenHash,
+      )
+    ) {
+      return c.json({ error: "Invalid or missing setup session token" }, 401);
+    }
+  }
+
   let body: unknown;
   try {
     body = await c.req.json();
@@ -123,10 +141,13 @@ setupRouter.post("/draft", async (c) => {
   }
 
   const existingOrg = await getOrganizationWithOAuthCredentials();
-  let clientSecret = parsed.data.clientSecret?.trim() ?? "";
+  const clientSecretInput = parsed.data.clientSecret?.trim() ?? "";
+  let clientSecret: string | undefined = clientSecretInput || undefined;
   if (!clientSecret) {
-    if (existingOrg?.pcoClientSecretEnc) {
-      clientSecret = decryptSecret(existingOrg.pcoClientSecretEnc);
+    if (existingOrg && isPcoClientSecretConfigured(existingOrg)) {
+      if (existingOrg.pcoClientSecretEnc) {
+        clientSecret = decryptSecret(existingOrg.pcoClientSecretEnc);
+      }
     } else {
       return c.json({ error: "OAuth client secret is required" }, 400);
     }
@@ -149,7 +170,10 @@ setupRouter.post("/draft", async (c) => {
   if (!webhookSecretRaw) {
     if (existingWebhookSecrets.length > 0) {
       webhookSecretRaw = existingWebhookSecrets.join("\n");
-    } else {
+    } else if (existingOrg && isPcoWebhookSecretsConfigured(existingOrg)) {
+      webhookSecretRaw = process.env.WEBHOOK_SECRETS?.trim() ?? "";
+    }
+    if (!webhookSecretRaw) {
       return c.json({ error: "Webhook secrets are required" }, 400);
     }
   }
@@ -212,7 +236,7 @@ setupRouter.post("/finish", requireAuth, async (c) => {
   }
 
   const org = await getOrganizationWithOAuthCredentials();
-  if (!org?.pcoClientId || !org.pcoClientSecretEnc) {
+  if (!org?.pcoClientId || !isPcoClientSecretConfigured(org)) {
     return c.json({ error: "Save OAuth credentials before finishing setup" }, 400);
   }
 
@@ -364,7 +388,9 @@ setupRouter.get("/oauth-available", async (c) => {
   const orgWithOAuth = await getOrganizationWithOAuthCredentials();
   return c.json({
     configured,
-    credentialsInDb: Boolean(orgWithOAuth?.pcoClientId && orgWithOAuth.pcoClientSecretEnc),
+    credentialsInDb: Boolean(
+      orgWithOAuth?.pcoClientId && isPcoClientSecretConfigured(orgWithOAuth),
+    ),
     signInAvailable: Boolean(credentials),
   });
 });

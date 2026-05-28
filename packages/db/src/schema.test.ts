@@ -5,7 +5,6 @@ import { drizzle } from "drizzle-orm/bun-sqlite";
 import { eq } from "drizzle-orm";
 import {
   D1_TABLE_COUNT,
-  getD1IncrementalMigrationFilenames,
   getD1MigrationSqlFiles,
   getD1MigrationsFolder,
   organizations,
@@ -19,13 +18,6 @@ import { fetchLastMessagesForConversationsD1 } from "./queries/unread.d1.js";
 function applyBaselineSqlite(db: Database): void {
   const path = getD1MigrationSqlFiles()[0]!;
   db.exec(readFileSync(path, "utf8"));
-  const folder = getD1MigrationsFolder();
-  const gitRepoMigration = `${folder}/0003_org_git_repo_url.sql`;
-  db.exec(readFileSync(gitRepoMigration, "utf8"));
-  const secretsStoreMigration = `${folder}/0004_secrets_store.sql`;
-  db.exec(readFileSync(secretsStoreMigration, "utf8"));
-  const autoUpdateIntervalMigration = `${folder}/0005_auto_update_check_interval.sql`;
-  db.exec(readFileSync(autoUpdateIntervalMigration, "utf8"));
 }
 
 describe("D1 schema", () => {

@@ -33,6 +33,14 @@ const ORG_COLUMN_STATEMENTS = [
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_api_token_configured" boolean`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_access_key_configured" boolean`,
   `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_r2_secret_access_key_configured" boolean`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_worker_placement_mode" text NOT NULL DEFAULT 'smart'`,
+  `ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "cloudflare_worker_placement_region" text`,
+] as const;
+
+/** SQLite D1 org columns not yet on older installs (baseline adds them for greenfield). */
+const D1_ORG_COLUMN_STATEMENTS = [
+  `ALTER TABLE "organizations" ADD COLUMN "cloudflare_worker_placement_mode" TEXT NOT NULL DEFAULT 'smart'`,
+  `ALTER TABLE "organizations" ADD COLUMN "cloudflare_worker_placement_region" TEXT`,
 ] as const;
 
 /** Call tables from 0021 — optional; must not block Cloudflare token save. */
@@ -133,10 +141,34 @@ async function runEnsureCallSessionSchema(): Promise<void> {
   }
 }
 
+async function runEnsureD1OrganizationColumns(): Promise<void> {
+  for (const statement of D1_ORG_COLUMN_STATEMENTS) {
+    try {
+      await executeDdl(statement);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      if (!/duplicate column name/i.test(detail)) {
+        throw err;
+      }
+    }
+  }
+}
+
 /** Org columns for Cloudflare / RealtimeKit / platform settings (required, small, safe). */
 export async function ensureCloudflareOrganizationColumns(): Promise<void> {
   if (isCloudflareRuntime()) {
-    orgColumnsReady = true;
+    if (orgColumnsReady) return;
+    if (!orgColumnsPromise) {
+      orgColumnsPromise = runEnsureD1OrganizationColumns()
+        .then(() => {
+          orgColumnsReady = true;
+        })
+        .catch((err) => {
+          orgColumnsPromise = null;
+          throw err;
+        });
+    }
+    await orgColumnsPromise;
     return;
   }
   if (orgColumnsReady) return;

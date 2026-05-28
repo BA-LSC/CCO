@@ -27,6 +27,7 @@ const accountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
 const chatHostname = requireEnv("CHAT_HOSTNAME");
 const apiHostname = requireEnv("API_HOSTNAME");
 const tokenKey = requireEnv("TOKEN_ENCRYPTION_KEY");
+const kvDeployNamespaceId = process.env.CLOUDFLARE_KV_DEPLOY_NAMESPACE_ID?.trim();
 
 function walkAssets(dir: string, base = dir): Record<string, { hash: string; size: number }> {
   const manifest: Record<string, { hash: string; size: number }> = {};
@@ -63,6 +64,7 @@ await deployCcoWebWorker({
   chatHostname,
   apiHostname,
   secretsStoreId: store.id,
+  kvDeployNamespaceId,
   workerModuleUrl: `file://${workerPath}`,
   assetsBaseUrl: `file://${assetsDir}/`,
   assetsManifest: walkAssets(assetsDir),

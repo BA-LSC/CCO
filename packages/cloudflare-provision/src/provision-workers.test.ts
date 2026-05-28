@@ -4,7 +4,7 @@ import { createProvisionWorkerHandlers } from "./provision-workers";
 import type { CcoWorkerScriptName } from "./worker-definitions";
 
 describe("createProvisionWorkerHandlers", () => {
-  test("deploy_workers uploads all six bundles with bindings", async () => {
+  test("deploy_workers uploads all five bundles with bindings", async () => {
     const uploads: string[] = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
@@ -43,7 +43,6 @@ describe("createProvisionWorkerHandlers", () => {
                 { id: "cco-api", compatibility_date: "2026-05-28", compatibility_flags: ["nodejs_compat"] },
                 { id: "cco-realtime-fanout", compatibility_date: "2026-05-28", compatibility_flags: ["nodejs_compat"] },
                 { id: "cco-pco-webhook", compatibility_date: "2026-05-28", compatibility_flags: [] },
-                { id: "cco-giphy-proxy", compatibility_date: "2026-05-28", compatibility_flags: [] },
                 { id: "cco-push-consumer", compatibility_date: "2026-05-28", compatibility_flags: [] },
                 { id: "cco-reconcile-cron", compatibility_date: "2026-05-28", compatibility_flags: [] },
               ],
@@ -60,6 +59,31 @@ describe("createProvisionWorkerHandlers", () => {
       if (url.endsWith("/schedules")) {
         return Promise.resolve(
           new Response(JSON.stringify({ success: true, result: null }), { status: 200 }),
+        );
+      }
+      if (url.endsWith("/queues") && !init?.method) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              success: true,
+              result: [
+                { queue_id: "queue-id", queue_name: "cco-push-notifications" },
+                { queue_id: "dlq-id", queue_name: "cco-push-notifications-dlq" },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      if (url.includes("/queues") && !url.includes("/consumers") && init?.method === "POST") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              success: true,
+              result: { queue_id: "dlq-id", queue_name: "cco-push-notifications-dlq" },
+            }),
+            { status: 200 },
+          ),
         );
       }
       if (url.includes("/queues/") && url.endsWith("/consumers")) {
@@ -98,7 +122,6 @@ describe("createProvisionWorkerHandlers", () => {
       expect(uploads).toEqual([
         "cco-realtime-fanout",
         "cco-pco-webhook",
-        "cco-giphy-proxy",
         "cco-push-consumer",
         "cco-reconcile-cron",
         "cco-api",

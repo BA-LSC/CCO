@@ -17,6 +17,7 @@ async function parseUploadMetadata(form: FormData | undefined) {
     bindings: Array<{ name: string }>;
     compatibility_date?: string;
     compatibility_flags?: string[];
+    observability?: { enabled: boolean };
     migrations?: unknown;
   };
 }
@@ -67,6 +68,7 @@ describe("deployWorkerScript", () => {
     const metadata = await parseUploadMetadata(capturedForm);
     expect(metadata.main_module).toBe("cco-api.mjs");
     expect(metadata.bindings[0]?.name).toBe("UPLOAD_STORAGE");
+    expect(metadata.observability).toEqual({ enabled: true });
 
     const metadataPart = capturedForm?.get("metadata");
     expect(metadataPart).toBeInstanceOf(Blob);
@@ -201,6 +203,33 @@ describe("ensureQueueConsumer", () => {
       },
     });
   });
+
+  test("wires dead-letter queue when configured", async () => {
+    let capturedBody = "";
+    mockFetch((url, init) => {
+      if (url.endsWith("/consumers")) {
+        capturedBody = String(init?.body ?? "");
+        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: false, errors: [{ message: url }] }), {
+        status: 404,
+      });
+    });
+
+    await ensureQueueConsumer("acct-1", "cf-token", "queue-id", "cco-push-consumer", {
+      deadLetterQueue: "cco-push-notifications-dlq",
+    });
+    expect(JSON.parse(capturedBody)).toEqual({
+      type: "worker",
+      script_name: "cco-push-consumer",
+      settings: {
+        batch_size: 10,
+        max_wait_time_ms: 5000,
+        max_retries: 3,
+        dead_letter_queue: "cco-push-notifications-dlq",
+      },
+    });
+  });
 });
 
 describe("deployAllProvisionWorkers", () => {
@@ -224,7 +253,6 @@ describe("deployAllProvisionWorkers", () => {
               { id: "cco-api", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: ["nodejs_compat"] },
               { id: "cco-realtime-fanout", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: ["nodejs_compat"] },
               { id: "cco-pco-webhook", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
-              { id: "cco-giphy-proxy", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
               { id: "cco-push-consumer", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
               { id: "cco-reconcile-cron", compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
             ],
@@ -246,6 +274,27 @@ describe("deployAllProvisionWorkers", () => {
       if (url.endsWith("/schedules")) {
         cronConfigured = true;
         return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
+      if (url.endsWith("/queues") && !init?.method) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: [
+              { queue_id: "queue-id", queue_name: "cco-push-notifications" },
+              { queue_id: "dlq-id", queue_name: "cco-push-notifications-dlq" },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/queues") && !url.includes("/consumers") && init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: { queue_id: "dlq-id", queue_name: "cco-push-notifications-dlq" },
+          }),
+          { status: 200 },
+        );
       }
       if (url.includes("/queues/") && url.endsWith("/consumers")) {
         queueConsumerConfigured = true;
@@ -271,7 +320,7 @@ describe("deployAllProvisionWorkers", () => {
       readBundle: async () => new TextEncoder().encode("export default {}").buffer,
     });
 
-    expect(deployed).toHaveLength(6);
+    expect(deployed).toHaveLength(5);
     expect(uploadedScripts).toContain("cco-reconcile-cron");
     expect(cronConfigured).toBe(true);
     expect(queueConsumerConfigured).toBe(true);
@@ -280,13 +329,88 @@ describe("deployAllProvisionWorkers", () => {
     const apiMetadata = metadataByScript.get("cco-api");
     expect(apiMetadata?.compatibility_date).toBe(CCO_WORKER_COMPATIBILITY_DATE);
     expect(apiMetadata?.compatibility_flags).toEqual(["nodejs_compat"]);
+    expect(apiMetadata?.observability).toEqual({ enabled: true });
+    expect(apiMetadata?.placement).toEqual({ mode: "smart" });
 
     const fanoutMetadata = metadataByScript.get("cco-realtime-fanout");
     expect(fanoutMetadata?.compatibility_flags).toEqual(["nodejs_compat"]);
+    expect(fanoutMetadata?.placement).toEqual({ mode: "smart" });
     expect(fanoutMetadata?.migrations).toEqual({
       new_tag: "v1",
-      steps: [{ new_sqlite_classes: ["ConversationRoom"] }],
+      steps: [{ new_sqlite_classes: ["ConversationRoom", "UserInbox"] }],
     });
+
+    const webhookMetadata = metadataByScript.get("cco-pco-webhook");
+    expect(webhookMetadata?.placement).toBeUndefined();
+  });
+
+  test("deploys placement workers to a fixed region when configured", async () => {
+    const metadataByScript = new Map<string, Awaited<ReturnType<typeof parseUploadMetadata>>>();
+    const deployedScripts: Array<{
+      id: string;
+      compatibility_date: string;
+      compatibility_flags: string[];
+    }> = [];
+    mockFetch(async (url, init) => {
+      if (url.endsWith("/workers/scripts") && !init?.method) {
+        return new Response(JSON.stringify({ success: true, result: deployedScripts }), {
+          status: 200,
+        });
+      }
+      if (
+        url.includes("/workers/scripts/") &&
+        !url.endsWith("/secrets") &&
+        !url.endsWith("/schedules") &&
+        init?.method === "PUT"
+      ) {
+        const script = url.split("/workers/scripts/")[1] ?? "";
+        metadataByScript.set(script, await parseUploadMetadata(init?.body as FormData));
+        if (script === "cco-api" || script === "cco-realtime-fanout") {
+          deployedScripts.push({
+            id: script,
+            compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+            compatibility_flags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
+          });
+        } else {
+          deployedScripts.push({
+            id: script,
+            compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+            compatibility_flags: [],
+          });
+        }
+        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
+      if (url.endsWith("/schedules") || url.includes("/queues") || url.includes("/secrets")) {
+        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ success: false, errors: [{ message: url }] }), {
+        status: 404,
+      });
+    });
+
+    await deployAllProvisionWorkers({
+      accountId: "acct-1",
+      apiToken: "cf-token",
+      apiHostname: "api.example.com",
+      secretsStoreId: "store-1",
+      workerPlacement: { mode: "region", region: "aws:us-west-2" },
+      resources: {
+        d1DatabaseId: "d1-id",
+        r2BucketName: "cco-uploads-test",
+        kvPresenceNamespaceId: "kv-presence",
+        kvDeployNamespaceId: "kv-deploy",
+        pushQueueId: "queue-id",
+      },
+      readBundle: async () => new TextEncoder().encode("export default {}").buffer,
+    });
+
+    const apiMetadata = metadataByScript.get("cco-api") as { placement?: { region: string } };
+    const fanoutMetadata = metadataByScript.get("cco-realtime-fanout") as {
+      placement?: { region: string };
+    };
+    expect(apiMetadata.placement).toEqual({ region: "aws:us-west-2" });
+    expect(fanoutMetadata.placement).toEqual({ region: "aws:us-west-2" });
+    expect(metadataByScript.get("cco-pco-webhook")?.placement).toBeUndefined();
   });
 });
 
@@ -311,6 +435,7 @@ describe("ensureCcoApiWorkerRoutes", () => {
     await ensureCcoApiWorkerRoutes("zone-1", "cf-token", "api.example.com");
     expect(patterns).toEqual([
       "api.example.com/webhooks/pco",
+      "api.example.com/v1/ws/inbox",
       "api.example.com/v1/ws",
       "api.example.com/*",
     ]);

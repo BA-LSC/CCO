@@ -21,7 +21,6 @@ build_worker() {
 build_worker cco-api workers/cco-api
 build_worker cco-realtime-fanout workers/cco-realtime
 build_worker cco-pco-webhook workers/pco-webhook
-build_worker cco-giphy-proxy workers/giphy-proxy
 build_worker cco-push-consumer workers/push-consumer
 build_worker cco-reconcile-cron workers/reconcile-cron
 

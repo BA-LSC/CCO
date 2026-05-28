@@ -4,7 +4,6 @@ import type { WorkerBinding } from "./workers-deploy";
 export const CCO_WORKER_BUILD_SPECS = [
   { scriptName: "cco-realtime-fanout", buildDir: "workers/cco-realtime" },
   { scriptName: "cco-pco-webhook", buildDir: "workers/pco-webhook" },
-  { scriptName: "cco-giphy-proxy", buildDir: "workers/giphy-proxy" },
   { scriptName: "cco-push-consumer", buildDir: "workers/push-consumer" },
   { scriptName: "cco-reconcile-cron", buildDir: "workers/reconcile-cron" },
   { scriptName: "cco-api", buildDir: "workers/cco-api" },
@@ -12,7 +11,48 @@ export const CCO_WORKER_BUILD_SPECS = [
 
 export type CcoWorkerScriptName = (typeof CCO_WORKER_BUILD_SPECS)[number]["scriptName"];
 
+/** Workers that talk to D1/R2/KV/Queues — Smart Placement colocates near upstreams. */
+export const CCO_SMART_PLACEMENT_WORKERS = new Set<CcoWorkerScriptName>([
+  "cco-api",
+  "cco-realtime-fanout",
+]);
+
+export type WorkerPlacementDeploySetting = {
+  mode: "smart" | "region";
+  region?: string | null;
+};
+
+const WORKER_PLACEMENT_DEFAULT_REGION = "aws:us-west-2";
+const WORKER_PLACEMENT_ALLOWED_REGIONS = new Set([
+  "aws:us-west-2",
+  "aws:us-west-1",
+  "gcp:us-west1",
+  "gcp:us-west4",
+  "azure:westus2",
+  "azure:westus3",
+  "aws:us-east-1",
+  "gcp:us-east4",
+]);
+
+export function resolveWorkerPlacement(
+  scriptName: CcoWorkerScriptName,
+  placement?: WorkerPlacementDeploySetting | null,
+): { mode: "smart" } | { region: string } | undefined {
+  if (!CCO_SMART_PLACEMENT_WORKERS.has(scriptName)) return undefined;
+  if (placement?.mode === "region") {
+    const region = placement.region?.trim();
+    return {
+      region:
+        region && WORKER_PLACEMENT_ALLOWED_REGIONS.has(region)
+          ? region
+          : WORKER_PLACEMENT_DEFAULT_REGION,
+    };
+  }
+  return { mode: "smart" };
+}
+
 export const CCO_PUSH_QUEUE_NAME = "cco-push-notifications";
+export const CCO_PUSH_DLQ_QUEUE_NAME = "cco-push-notifications-dlq";
 export const CCO_RECONCILE_CRON = "0 3 * * *";
 /** Every 10 minutes; org auto_update_check_interval_minutes gates actual checks. */
 export const CCO_UPDATE_CHECK_CRON = "*/10 * * * *";
@@ -20,12 +60,13 @@ export const CCO_RECONCILE_WORKER_CRONS = [CCO_RECONCILE_CRON, CCO_UPDATE_CHECK_
 
 export type CcoApiWorkerRoute = {
   patternSuffix: string;
-  script: CcoWorkerScriptName | "cco-pco-webhook" | "cco-giphy-proxy";
+  script: CcoWorkerScriptName;
 };
 
 /** Most-specific routes first; catch-all last. */
 export const CCO_API_WORKER_ROUTES: readonly CcoApiWorkerRoute[] = [
   { patternSuffix: "/webhooks/pco", script: "cco-pco-webhook" },
+  { patternSuffix: "/v1/ws/inbox", script: "cco-realtime-fanout" },
   { patternSuffix: "/v1/ws", script: "cco-realtime-fanout" },
   { patternSuffix: "/*", script: "cco-api" },
 ] as const;
@@ -103,19 +144,25 @@ export function buildWorkerBindings(
           class_name: "ConversationRoom",
           script_name: "cco-realtime-fanout",
         },
+        {
+          type: "durable_object_namespace",
+          name: "USER_INBOX",
+          class_name: "UserInbox",
+          script_name: "cco-realtime-fanout",
+        },
       ];
     case "cco-pco-webhook":
       return [
+        { type: "service", name: "CCO_API", service: "cco-api" },
         {
           type: "plain_text",
           name: "INTERNAL_FORWARD_URL",
           text: apiInternalUrl(apiHostname, "/internal/webhooks/pco"),
         },
       ];
-    case "cco-giphy-proxy":
-      return [];
     case "cco-push-consumer":
       return [
+        { type: "service", name: "CCO_API", service: "cco-api" },
         {
           type: "plain_text",
           name: "PUSH_INTERNAL_URL",
@@ -124,6 +171,7 @@ export function buildWorkerBindings(
       ];
     case "cco-reconcile-cron":
       return [
+        { type: "service", name: "CCO_API", service: "cco-api" },
         {
           type: "plain_text",
           name: "RECONCILE_INTERNAL_URL",

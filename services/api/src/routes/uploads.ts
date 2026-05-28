@@ -13,7 +13,7 @@ import {
   createR2PresignedPutUrl,
   reconcileOrgR2UploadCors,
 } from "../lib/r2-uploads";
-import { isCloudflareRuntime } from "../runtime/worker-context";
+import { isCloudflareRuntime, isCloudflareWorkerRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
 
@@ -112,6 +112,16 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
 });
 
 uploadsRouter.post("/", requireAuth, async (c) => {
+  if (isCloudflareWorkerRuntime() || process.env.UPLOAD_STORAGE === "r2") {
+    return c.json(
+      {
+        error:
+          "Direct multipart upload is not supported on Cloudflare. Use POST /api/v1/uploads/presign and PUT the file to the returned uploadUrl.",
+      },
+      400,
+    );
+  }
+
   try {
     const r2 = await resolveR2Config();
     const body = await c.req.parseBody();

@@ -2,19 +2,24 @@
 
 Resource IDs (R2 bucket, KV, Queues) are auto-provisioned when a Cloudflare API token is saved during `/setup` or **Admin → Integrations**.
 
-## Workers
+## Workers (BYO church deploy)
+
+Built from `CCO_WORKER_BUILD_SPECS` in `packages/cloudflare-provision` — five Workers plus OpenNext Pages:
 
 | Worker | Route / trigger | Purpose |
 |--------|-----------------|--------|
-| `cco-install` | `setup-c.co` | BYO install wizard UI (OpenNext Pages) |
-| `cco-install-orchestrator` | `setup-c.co/api/*` / local `:8787` | Install API (session KV, Cloudflare verify, provision pipeline) |
-| `cco-api` | `{API_DOMAIN}/*` (catch-all) | Main Hono API on D1 + R2 + KV + Queues |
+| `cco-api` | `{API_DOMAIN}/*` (catch-all) | Main Hono API on D1 + R2 + KV + Queues; Giphy at `/v1/giphy` |
 | `cco-pco-webhook` | `{API_DOMAIN}/webhooks/pco` | Edge HMAC verify + forward to internal handler |
-| `cco-giphy-proxy` | _(unused — giphy served by `cco-api`)_ | Legacy edge proxy (not routed after provision) |
-| `cco-reconcile-cron` | Cron `0 3 * * *` | Nightly PCO reconcile (batch user sync) |
+| `cco-reconcile-cron` | Cron `0 3 * * *`, `*/10 * * * *` | Nightly PCO reconcile; org update check |
 | `cco-push-consumer` | Queue `cco-push-notifications` | Retryable Expo/Web Push delivery |
-| `cco-realtime-fanout` | `{API_DOMAIN}/v1/ws` | Per-conversation Durable Object WebSocket hub |
+| `cco-realtime-fanout` | `{API_DOMAIN}/v1/ws`, `/v1/ws/inbox` | Per-conversation Durable Object WebSocket hub |
 | `cco-web` | `{WEB_DOMAIN}/*` (Pages) | OpenNext web app — see `deploy/cloudflare/README.md` |
+
+**Smart Placement:** `cco-api` and `cco-realtime-fanout` default to Automatic (Smart Placement). **Admin → Integrations → Cloudflare** can pin both to a fixed US West region instead.
+
+**Legacy (not deployed):** `workers/giphy-proxy` (`cco-giphy-proxy`) — Giphy is served by `cco-api`; the standalone proxy is unused.
+
+**Setup-c.co only (operator):** `cco-install` (wizard UI), `cco-install-orchestrator` (`setup-c.co/api/*`).
 
 ## Deploy
 

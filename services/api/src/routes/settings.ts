@@ -38,11 +38,13 @@ import {
   provisionCloudflarePlatform,
 } from "../services/cloudflare-platform-provision";
 import { selectConfiguredOrganizationRow } from "../services/configured-org-query";
+import { ensureCloudflareOrganizationColumns } from "../services/org-schema-capabilities";
 import { invalidateOrgContextCache } from "../services/org-context-cache";
 import {
   isPcoClientSecretConfigured,
   isCloudflareApiTokenConfigured,
   isPcoWebhookSecretsConfigured,
+  resolveApplyCloudflareApiToken,
 } from "../services/org-secrets";
 import { decryptWebhookSecrets } from "../webhooks/secrets";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -59,11 +61,26 @@ import {
   setGitRepoUrl,
   startCloudflareReleaseUpdate,
 } from "../services/org-updates";
-import { resolveOrgGitRepoUrl } from "../services/git-release-index";
+import { resolveOrgGitRepoUrl, fetchReleaseIndexForOrg } from "../services/git-release-index";
+import {
+  clearPlacementRedeployError,
+  readPlacementRedeployError,
+  setPlacementRedeployError,
+} from "../lib/deploy-status";
+import {
+  getWorkerPlacementStatus,
+  redeployWorkersWithOrgPlacement,
+  shouldRedeployPlacementForOrg,
+  updateOrganizationWorkerPlacement,
+} from "../services/org-worker-placement";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MIN_MINUTES,
   CCO_DEFAULT_GIT_REPO_URL,
+  WorkerPlacementPatchSchema,
+  WORKER_PLACEMENT_MODE_REGION,
+  workerPlacementSettingFromOrgRow,
 } from "@cco/shared";
+import { scheduleBackgroundWork } from "../runtime/worker-context";
 import { getExecutionContext, isCloudflareRuntime } from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
@@ -80,6 +97,8 @@ const IntegrationsPatchSchema = z.object({
   cloudflareApiToken: z.string().min(1).optional(),
   pcoNightlySyncEnabled: z.boolean().optional(),
   gitRepoUrl: z.string().min(1).optional(),
+  workerPlacementMode: WorkerPlacementPatchSchema.shape.workerPlacementMode.optional(),
+  workerPlacementRegion: WorkerPlacementPatchSchema.shape.workerPlacementRegion.optional(),
 });
 
 const RealtimeKitSetupSchema = z.object({
@@ -150,6 +169,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     return c.json({ error: "CCO is not configured" }, 409);
   }
 
+  await ensureCloudflareOrganizationColumns();
   const org = await getConfiguredOrganization();
   if (!org) return c.json({ error: "Organization not found" }, 404);
 
@@ -165,6 +185,7 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
       ? await checkCloudflareApplyTokenHealth(refreshed)
       : { valid: null, error: null };
   const updates = await getCachedUpdatesStatus(refreshed, tokenHealth);
+  const workerPlacementLastError = await readPlacementRedeployError();
 
   return c.json({
     configured: true,
@@ -185,6 +206,8 @@ settingsRouter.get("/integrations", requireAuth, async (c) => {
     updates,
     gitRepoUrl: resolveOrgGitRepoUrl(refreshed.gitRepoUrl),
     defaultGitRepoUrl: CCO_DEFAULT_GIT_REPO_URL,
+    ...getWorkerPlacementStatus(refreshed),
+    workerPlacementLastError,
   });
 });
 
@@ -196,6 +219,7 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     return c.json({ error: "CCO is not configured" }, 409);
   }
 
+  await ensureCloudflareOrganizationColumns();
   const org = await getConfiguredOrganization();
   if (!org) return c.json({ error: "Organization not found" }, 404);
 
@@ -216,7 +240,20 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     return c.json({ error: "No fields to update" }, 400);
   }
 
+  if (data.workerPlacementMode !== undefined) {
+    const placementParsed = WorkerPlacementPatchSchema.safeParse({
+      workerPlacementMode: data.workerPlacementMode,
+      workerPlacementRegion: data.workerPlacementRegion,
+    });
+    if (!placementParsed.success) {
+      return c.json({ error: placementParsed.error.flatten() }, 400);
+    }
+  }
+
   const cloudflareApiToken = data.cloudflareApiToken?.trim();
+  let workerPlacementRedeployQueued = false;
+  let workerPlacementRedeploySkipped = false;
+  let workerPlacementRedeploySkippedReason: string | undefined;
 
   await updateOrganizationOAuthSettings({
     organizationId: org.id,
@@ -272,6 +309,73 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     invalidateOrgContextCache();
   }
 
+  if (data.workerPlacementMode !== undefined) {
+    const previousSetting = workerPlacementSettingFromOrgRow(org);
+    await updateOrganizationWorkerPlacement(
+      org.id,
+      data.workerPlacementMode,
+      data.workerPlacementRegion,
+    );
+    const nextSetting = workerPlacementSettingFromOrgRow({
+      cloudflareWorkerPlacementMode: data.workerPlacementMode,
+      cloudflareWorkerPlacementRegion:
+        data.workerPlacementMode === WORKER_PLACEMENT_MODE_REGION
+          ? data.workerPlacementRegion ?? null
+          : null,
+    });
+    const placementChanged =
+      nextSetting.mode !== previousSetting.mode ||
+      (nextSetting.mode === WORKER_PLACEMENT_MODE_REGION &&
+        nextSetting.region !== previousSetting.region);
+
+    if (placementChanged) {
+      if (!org.cloudflarePlatformProvisionedAt) {
+        workerPlacementRedeploySkipped = true;
+        workerPlacementRedeploySkippedReason =
+          "Worker region saved. Redeploy runs after Cloudflare platform provisioning completes.";
+      } else if (!isCloudflareApiTokenConfigured(org)) {
+        workerPlacementRedeploySkipped = true;
+        workerPlacementRedeploySkippedReason =
+          "Worker region saved. Add a Cloudflare API token to apply placement to workers.";
+      } else {
+        const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
+        const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
+        const redeployCheck = shouldRedeployPlacementForOrg(org, releaseIndex);
+        if (!redeployCheck.shouldRedeploy) {
+          workerPlacementRedeploySkipped = true;
+          workerPlacementRedeploySkippedReason = redeployCheck.skipReason;
+        } else {
+          workerPlacementRedeployQueued = true;
+          scheduleBackgroundWork(async () => {
+            const current = await getConfiguredOrganization();
+            if (!current) return;
+            try {
+              const hostnames = resolveOrgHostnames(current);
+              const apiToken = resolveApplyCloudflareApiToken(current, cloudflareApiToken);
+              if (apiToken && hostnames && current.cloudflareAccountId?.trim()) {
+                await verifyCloudflareUpdateApplyPermissions({
+                  accountId: current.cloudflareAccountId.trim(),
+                  apiToken,
+                  chatHostname: hostnames.chatHostname,
+                  apiHostname: hostnames.apiHostname,
+                });
+              }
+              await redeployWorkersWithOrgPlacement(current, {
+                apiTokenOverride: cloudflareApiToken,
+              });
+              await clearPlacementRedeployError();
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : "Worker placement redeploy failed";
+              console.warn("[settings] Worker placement redeploy failed:", message);
+              await setPlacementRedeployError(message);
+            }
+          });
+        }
+      }
+    }
+  }
+
   const updated = await getConfiguredOrganization();
   const statusOrg = updated ?? org;
   const vapidStatus = await getOrganizationVapidStatus(statusOrg);
@@ -295,6 +399,12 @@ settingsRouter.patch("/integrations", requireAuth, async (c) => {
     ...vapidStatus,
     ...giphyStatus,
     ...realtimeKitStatus,
+    ...(updated ? getWorkerPlacementStatus(updated) : getWorkerPlacementStatus(org)),
+    workerPlacementRedeployQueued,
+    workerPlacementRedeploySkipped,
+    ...(workerPlacementRedeploySkippedReason
+      ? { workerPlacementRedeploySkippedReason }
+      : {}),
   });
 });
 

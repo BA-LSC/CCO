@@ -3,12 +3,6 @@
   "name": "cco-push-consumer",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-28",
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE",
-      "id": "",
-    },
-  ],
   "queues": {
     "consumers": [
       {
@@ -16,6 +10,7 @@
         "max_batch_size": 10,
         "max_batch_timeout": 5,
         "max_retries": 3,
+        "dead_letter_queue": "cco-push-notifications-dlq",
       },
     ],
   },

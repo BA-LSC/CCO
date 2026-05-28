@@ -231,7 +231,6 @@ const WORKER_STORE_BINDINGS: Record<CcoWorkerScriptName, readonly CcoStoreBindin
   ],
   "cco-realtime-fanout": ["SESSION_SECRET", "CF_INTERNAL_SECRET"],
   "cco-pco-webhook": ["WEBHOOK_SECRETS", "INTERNAL_FORWARD_SECRET"],
-  "cco-giphy-proxy": ["GIPHY_API_KEY", "INTERNAL_AUTH_SECRET"],
   "cco-push-consumer": ["PUSH_INTERNAL_SECRET"],
   "cco-reconcile-cron": ["RECONCILE_INTERNAL_SECRET"],
 };

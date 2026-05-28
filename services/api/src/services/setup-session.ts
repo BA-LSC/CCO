@@ -20,6 +20,16 @@ export function verifySetupToken(token: string, storedHash: string): boolean {
   }
 }
 
+/** Validate X-Setup-Token against the pending org's stored session hash. */
+export function verifySetupSessionToken(
+  token: string | undefined,
+  storedHash: string | null | undefined,
+): boolean {
+  const trimmed = token?.trim();
+  if (!trimmed || !storedHash) return false;
+  return verifySetupToken(trimmed, storedHash);
+}
+
 export async function issueSetupSessionToken(organizationId: string): Promise<string> {
   const token = generateSetupToken();
   const hash = hashSetupToken(token);

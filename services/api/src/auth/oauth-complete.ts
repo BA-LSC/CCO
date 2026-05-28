@@ -18,8 +18,63 @@ import {
   type PcoMeProfile,
 } from "../services/setup";
 import { syncServiceTeamsFromPco } from "../services/service-teams";
+import {
+  clearOAuthSyncError,
+  readOAuthSyncError,
+  setOAuthSyncError,
+} from "../lib/oauth-sync-error";
+import { scheduleBackgroundWork } from "../runtime/worker-context";
 import { savePcoTokens } from "./pco-tokens";
 import { signSession } from "./session";
+
+/** Wait for post-login PCO sync before redirect; background continues on timeout. */
+const OAUTH_GROUP_SYNC_TIMEOUT_MS = 10_000;
+
+type PostLoginSyncParams = {
+  organizationId: string;
+  userId: string;
+  accessToken: string;
+  pcoPersonId: string;
+};
+
+async function runPostLoginSync(params: PostLoginSyncParams): Promise<string | undefined> {
+  try {
+    const client = new PlanningCenterClient({ accessToken: params.accessToken });
+    const listed = await fetchMyGroups(client);
+    const incoming = await enrichGroupsWithImages(client, listed);
+    let memberships: Awaited<ReturnType<typeof fetchMyGroupRoles>> = [];
+    try {
+      memberships = await fetchMyGroupRoles(client, params.pcoPersonId, incoming);
+    } catch {
+      /* roles optional on first login */
+    }
+    await persistGroupSync({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      incoming,
+      memberships,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Group sync failed";
+    console.warn("Group sync after login failed:", message);
+    await setOAuthSyncError(params.userId, message);
+    return message;
+  }
+
+  try {
+    await syncServiceTeamsFromPco({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      accessToken: params.accessToken,
+      pcoPersonId: params.pcoPersonId,
+    });
+  } catch (err) {
+    console.warn("Team sync after login failed:", err instanceof Error ? err.message : err);
+  }
+
+  await clearOAuthSyncError(params.userId);
+  return undefined;
+}
 
 export type { PcoMeProfile as PcoProfileJson } from "../services/setup";
 
@@ -66,32 +121,29 @@ export async function completeOAuthLogin(
   let groupsSyncError: string | undefined;
   const shouldSync = setupComplete && options?.syncGroups !== false;
   if (shouldSync) {
-    try {
-      const client = new PlanningCenterClient({ accessToken: token.access_token });
-      const listed = await fetchMyGroups(client);
-      const incoming = await enrichGroupsWithImages(client, listed);
-      let memberships: Awaited<ReturnType<typeof fetchMyGroupRoles>> = [];
-      try {
-        memberships = await fetchMyGroupRoles(client, profile.data.id, incoming);
-      } catch {
-        /* roles optional on first login */
-      }
-      await persistGroupSync({ organizationId, userId, incoming, memberships });
-    } catch (err) {
-      groupsSyncError = err instanceof Error ? err.message : "Group sync failed";
-      console.warn("Group sync after login failed:", groupsSyncError);
-    }
+    await clearOAuthSyncError(userId);
+    const syncWork = runPostLoginSync({
+      organizationId,
+      userId,
+      accessToken: token.access_token,
+      pcoPersonId: profile.data.id,
+    });
+    scheduleBackgroundWork(() => syncWork);
 
-    try {
-      await syncServiceTeamsFromPco({
-        organizationId,
-        userId,
-        accessToken: token.access_token,
-        pcoPersonId: profile.data.id,
-      });
-    } catch (err) {
-      console.warn("Team sync after login failed:", err instanceof Error ? err.message : err);
+    const raced = await Promise.race([
+      syncWork.then((error) => ({ kind: "done" as const, error })),
+      new Promise<{ kind: "timeout" }>((resolve) => {
+        setTimeout(() => resolve({ kind: "timeout" }), OAUTH_GROUP_SYNC_TIMEOUT_MS);
+      }),
+    ]);
+
+    if (raced.kind === "done" && raced.error) {
+      groupsSyncError = raced.error;
     }
+  }
+
+  if (!groupsSyncError) {
+    groupsSyncError = (await readOAuthSyncError(userId)) ?? undefined;
   }
 
   const sessionToken = await signSession({ userId, organizationId });

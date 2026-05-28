@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { useConversationSocket, type RealtimeEvent } from "@/hooks/useConversationSocket";
+import { useUserInboxSocket } from "@/hooks/useUserInboxSocket";
 import { apiFetch } from "@/lib/api";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { resolveActiveConversationId } from "@/lib/active-conversation-id";
@@ -93,10 +94,15 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const { connected: realtimeConnected } = useConversationSocket(
+  const { connected: roomConnected } = useConversationSocket(
     session?.userId ? activeConversationId : null,
     broadcastRealtimeEvent,
   );
+  const { connected: inboxConnected } = useUserInboxSocket(
+    session?.userId ?? null,
+    broadcastRealtimeEvent,
+  );
+  const realtimeConnected = roomConnected || inboxConnected;
 
   useEffect(() => {
     Promise.all([

@@ -19,6 +19,7 @@ import {
   type CcoWorkerScriptName,
 } from "@cco/cloudflare-provision";
 import { resolveCloudflareAccountId } from "../../services/api/src/services/cloudflare-realtimekit-provision";
+import { workerPlacementFromEnv } from "./worker-placement-env.ts";
 
 const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
 const apiDomain = process.env.API_DOMAIN?.trim();
@@ -93,6 +94,7 @@ const readBundle = async (scriptName: CcoWorkerScriptName) => {
   return file.arrayBuffer();
 };
 
+const workerPlacement = workerPlacementFromEnv();
 console.log(`Deploying worker bundles from ${bundleDir}...`);
 const deployed = await deployAllProvisionWorkers({
   accountId,
@@ -101,6 +103,7 @@ const deployed = await deployAllProvisionWorkers({
   secretsStoreId: store.id,
   apiHostname: apiDomain,
   readBundle,
+  workerPlacement,
 });
 
 console.log("Deployed workers:", deployed.join(", "));

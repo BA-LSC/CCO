@@ -48,6 +48,8 @@ function org(partial: Partial<ConfiguredOrganizationRow>): ConfiguredOrganizatio
     installedReleaseVersion: partial.installedReleaseVersion ?? null,
     autoUpdateEnabled: false,
     autoUpdateCheckIntervalMinutes: 360,
+    cloudflareWorkerPlacementMode: "smart",
+    cloudflareWorkerPlacementRegion: null,
     lastUpdateCheckAt: partial.lastUpdateCheckAt ?? null,
     gitRepoUrl: null,
   };

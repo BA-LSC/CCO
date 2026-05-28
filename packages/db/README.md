@@ -14,10 +14,11 @@
 
 ## Migrations
 
-Greenfield D1 installs use a single baseline: `drizzle/d1/0000_d1_baseline.sql` (consolidates Postgres migrations 0000–0023). No Postgres→D1 data migration in v1.
+Greenfield D1 installs use a single baseline only: `drizzle/d1/0000_d1_baseline.sql` (consolidates Postgres migrations 0000–0023). No incremental D1 migrations and no Postgres→D1 data migration in v1.
 
-- **Workers:** `runMigrations(createD1Client(env.DB))` via Drizzle migrator
-- **Provision pipeline:** `getD1MigrationSqlFiles()` → `@cco/cloudflare-provision` `applyD1Migrations`
+- **Install / Apply Update:** release bundle fetches baseline SQL → `@cco/cloudflare-provision` `applyD1MigrationStatements`
+- **Provision pipeline (local FS):** `getD1MigrationSqlFiles()` → `applyD1Migrations` (same baseline file)
+- **Workers:** `runMigrations(createD1Client(env.DB))` via Drizzle migrator — `drizzle/d1/meta/_journal.json` lists baseline only
 - **Workers (no FS):** `applyBaselineMigration(env.DB)` after bundling SQL or use migrator with copied folder
 
 ## D1-specific query modules

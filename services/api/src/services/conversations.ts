@@ -8,8 +8,16 @@ import {
   users,
 } from "../db/schema";
 import { canPostInConversation, isLeaderRole } from "../permissions";
-import { publishMessageEvent } from "../realtime/pubsub";
+import { publishMessageEvent, publishMessageEventToMembers } from "../realtime/pubsub";
 import { unreadFlagsForConversations } from "./unread";
+
+export async function listConversationMemberUserIds(conversationId: string): Promise<string[]> {
+  const rows = await db
+    .select({ userId: conversationMembers.userId })
+    .from(conversationMembers)
+    .where(eq(conversationMembers.conversationId, conversationId));
+  return rows.map((row) => row.userId);
+}
 
 export async function markConversationRead(
   conversationId: string,
@@ -163,12 +171,16 @@ export async function updateConversation(params: {
     .set(updates)
     .where(eq(conversations.id, params.conversationId));
 
-  await publishMessageEvent({
-    type: "conversation.updated",
-    conversationId: params.conversationId,
-    ...(updates.leaderOnly !== undefined ? { leaderOnly: updates.leaderOnly } : {}),
-    ...(updates.title !== undefined ? { title: updates.title } : {}),
-  });
+  const memberUserIds = await listConversationMemberUserIds(params.conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "conversation.updated",
+      conversationId: params.conversationId,
+      ...(updates.leaderOnly !== undefined ? { leaderOnly: updates.leaderOnly } : {}),
+      ...(updates.title !== undefined ? { title: updates.title } : {}),
+    },
+    memberUserIds,
+  );
 
   return true;
 }

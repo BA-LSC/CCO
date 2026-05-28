@@ -27,10 +27,10 @@ CCO hosts only the install wizard and orchestrator at `setup-c.co`; your chat ap
 
 | Layer | Technology |
 |-------|------------|
-| API | Hono on **Cloudflare Workers** (`workers/cco-api`), **D1**, **R2**, **KV**, **Queues** |
+| API | Hono on **Cloudflare Workers** (`workers/cco-api`), **D1**, **R2**, **KV**, **Queues**; Giphy at `/v1/giphy` |
 | Web | **Next.js 16** on **Cloudflare Pages** via OpenNext (`apps/web`) |
-| Realtime | **Durable Objects** WebSocket hub (`workers/cco-realtime`) |
-| Edge | PCO webhooks, Giphy proxy, push consumer, reconcile cron |
+| Realtime | **Durable Objects** WebSocket hub (`workers/cco-realtime` → `cco-realtime-fanout`) |
+| Edge | PCO webhooks, push consumer, reconcile cron |
 | Calls | **Cloudflare RealtimeKit** (configured in Integrations) |
 | Install | OpenNext wizard + orchestrator worker (`apps/install`, `workers/install-orchestrator`) |
 

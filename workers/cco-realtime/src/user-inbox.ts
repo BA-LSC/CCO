@@ -1,12 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 
-export type RealtimeEvent = {
-  type: string;
-  conversationId: string;
-  [key: string]: unknown;
-};
+import type { RealtimeEvent } from "./conversation-room";
 
-export class ConversationRoom extends DurableObject {
+/** Per-user fanout for sidebar previews, unread, and call toasts across conversations. */
+export class UserInbox extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
@@ -29,7 +26,7 @@ export class ConversationRoom extends DurableObject {
   }
 
   async webSocketMessage(_ws: WebSocket, _message: ArrayBuffer | string): Promise<void> {
-    // Conversation fanout clients are receive-only; ignore inbound messages.
+    // Inbox clients are receive-only.
   }
 
   async webSocketClose(
@@ -53,7 +50,6 @@ export class ConversationRoom extends DurableObject {
     return { ok: true, delivered: this.ctx.getWebSockets().length };
   }
 
-  /** Test helper — subscriber count without WebSocket I/O. */
   subscriberCount(): number {
     return this.ctx.getWebSockets().length;
   }

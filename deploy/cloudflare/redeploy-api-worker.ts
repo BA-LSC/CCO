@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildWorkerBindings,
+  buildWorkerSecretsStoreBindings,
   CCO_WORKER_COMPATIBILITY_DATE,
   CCO_WORKER_NODEJS_COMPAT_FLAGS,
   deployWorkerScript,
+  ensureSecretsStore,
   type CcoWorkerScriptName,
 } from "@cco/cloudflare-provision";
 
@@ -35,25 +37,25 @@ const scriptName: CcoWorkerScriptName = "cco-api";
 const bundlePath = join(ROOT, "deploy/cloudflare/bundles/cco-api.mjs");
 const moduleBytes = readFileSync(bundlePath).buffer;
 
-const bindings = buildWorkerBindings(scriptName, {
-  resources: {
-    accountId,
-    d1DatabaseId,
-    r2BucketName,
-    kvPresenceNamespaceId,
-    kvDeployNamespaceId,
-    pushQueueId,
+const store = await ensureSecretsStore(accountId, apiToken);
+
+const bindings = [
+  ...buildWorkerBindings(scriptName, {
+    resources: {
+      accountId,
+      d1DatabaseId,
+      r2BucketName,
+      kvPresenceNamespaceId,
+      kvDeployNamespaceId,
+      pushQueueId,
+      apiHostname,
+      chatHostname,
+    },
     apiHostname,
     chatHostname,
-  },
-  secrets: {
-    SESSION_SECRET: "",
-    TOKEN_ENCRYPTION_KEY: "",
-    CF_INTERNAL_SECRET: "",
-  },
-  apiHostname,
-  chatHostname,
-});
+  }),
+  ...buildWorkerSecretsStoreBindings(scriptName, store.id),
+];
 
 await deployWorkerScript(accountId, apiToken, scriptName, moduleBytes, bindings, {
   compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,

@@ -1,6 +1,10 @@
 import type { RealtimeEvent } from "./events";
 import { redisChannelForConversation } from "./events";
-import { getWorkerBindings, getWorkerContext } from "../runtime/worker-context";
+import {
+  getExecutionContext,
+  getWorkerBindings,
+  getWorkerContext,
+} from "../runtime/worker-context";
 import {
   publishMessageEventMemory,
   subscribeToConversationMemory,
@@ -83,9 +87,64 @@ export function subscribeToConversationCloudflare(
   return subscribeToConversationMemory(conversationId, listener);
 }
 
-export async function publishMessageEventCloudflare(event: RealtimeEvent): Promise<void> {
+/** Publish to in-process memory immediately; fanout runs in the background. */
+async function publishToUserInbox(userId: string, event: RealtimeEvent): Promise<void> {
+  const config = readFanoutConfig();
+  if (!config) return;
+
+  const requestInit: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.internalSecret}`,
+    },
+    body: JSON.stringify({ userId, ...event }),
+  };
+
+  const res = config.service
+    ? await config.service.fetch("https://realtime/internal/publish-user", requestInit)
+    : await fetch(`${config.baseUrl}/internal/publish-user`, requestInit);
+
+  if (!res.ok) {
+    console.warn("Cloudflare user inbox publish failed:", res.status, await res.text());
+  }
+}
+
+export function fireAndForgetPublish(event: RealtimeEvent): void {
   publishMessageEventMemory(event);
-  await publishToFanout(event);
+  const config = readFanoutConfig();
+  if (!config) return;
+
+  const execCtx = getExecutionContext();
+  if (execCtx) {
+    execCtx.waitUntil(publishToFanout(event));
+  } else {
+    void publishToFanout(event);
+  }
+}
+
+/** Fan out to each member's UserInbox DO (sidebar / cross-conversation realtime). */
+export function fireAndForgetPublishToUsers(userIds: string[], event: RealtimeEvent): void {
+  const unique = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return;
+
+  const config = readFanoutConfig();
+  if (!config) return;
+
+  const publishAll = async () => {
+    await Promise.all(unique.map((userId) => publishToUserInbox(userId, event)));
+  };
+
+  const execCtx = getExecutionContext();
+  if (execCtx) {
+    execCtx.waitUntil(publishAll());
+  } else {
+    void publishAll();
+  }
+}
+
+export async function publishMessageEventCloudflare(event: RealtimeEvent): Promise<void> {
+  fireAndForgetPublish(event);
 }
 
 export function isCloudflarePubSubEnabled(): boolean {

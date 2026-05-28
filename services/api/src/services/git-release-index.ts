@@ -217,3 +217,14 @@ export async function fetchGitReleaseIndex(gitRepoUrl: string | null | undefined
 export function resolveOrgGitRepoUrl(gitRepoUrl: string | null | undefined): string {
   return normalizeGitRepoUrl(gitRepoUrl ?? CCO_DEFAULT_GIT_REPO_URL);
 }
+
+/** Alias used by org updates and worker placement redeploy. */
+export async function fetchReleaseIndexForOrg(
+  gitRepoUrl: string | null | undefined,
+): Promise<ReleaseIndex> {
+  return fetchGitReleaseIndex(gitRepoUrl);
+}
+
+export function resolveReleasesBaseUrl(index: ReleaseIndex): string {
+  return index.releasesBaseUrl.replace(/\/+$/, "");
+}

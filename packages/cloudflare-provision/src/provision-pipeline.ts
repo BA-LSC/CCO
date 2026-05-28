@@ -1,4 +1,8 @@
 import { verifyCloudflareApiToken } from "./cloudflare-api";
+import {
+  verifyCloudflareAccountApplyPermissions,
+  verifyCloudflareUpdateApplyPermissions,
+} from "./update-token-verify";
 
 export type ProvisionStep =
   | "verify_token"
@@ -197,7 +201,29 @@ export type ProvisionStepHandler = (
 
 export type ProvisionStepHandlers = Partial<Record<ProvisionStep, ProvisionStepHandler>>;
 
-const defaultVerifyTokenStep: ProvisionStepHandler = async (_state, context) => {
+const defaultVerifyTokenStep: ProvisionStepHandler = async (state, context) => {
+  const accountId = context.accountId?.trim() || state.resources.accountId?.trim();
+  const chatHostname = context.chatHostname?.trim() || state.resources.chatHostname?.trim();
+  const apiHostname = context.apiHostname?.trim() || state.resources.apiHostname?.trim();
+
+  if (accountId && chatHostname && apiHostname) {
+    await verifyCloudflareUpdateApplyPermissions({
+      accountId,
+      apiToken: context.apiToken,
+      chatHostname,
+      apiHostname,
+    });
+    return;
+  }
+
+  if (accountId) {
+    await verifyCloudflareAccountApplyPermissions({
+      accountId,
+      apiToken: context.apiToken,
+    });
+    return;
+  }
+
   const verified = await verifyCloudflareApiToken(context.apiToken);
   if (verified.status !== "active") {
     throw new Error("Cloudflare API token is not active");

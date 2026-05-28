@@ -1,14 +1,18 @@
 import { CloudflareApiError, parseCloudflareJsonText, readCloudflareJson } from "./cloudflare-api";
-import { ensureWorkerRoute } from "./cloudflare-api-resources";
+import { ensurePushNotificationQueues, ensureWorkerRoute } from "./cloudflare-api-resources";
 import type { ProvisionResources } from "./provision-pipeline";
 import { buildWorkerSecretsStoreBindings } from "./secrets-store";
 import {
   buildWorkerBindings,
   CCO_API_WORKER_ROUTES,
+  CCO_PUSH_DLQ_QUEUE_NAME,
+  CCO_PUSH_QUEUE_NAME,
   CCO_RECONCILE_WORKER_CRONS,
   CCO_WORKER_BUILD_SPECS,
   resolveApiRoutePattern,
+  resolveWorkerPlacement,
   type CcoWorkerScriptName,
+  type WorkerPlacementDeploySetting,
 } from "./worker-definitions";
 
 const CF_API = "https://api.cloudflare.com/client/v4";
@@ -45,6 +49,8 @@ type WorkerScriptMetadata = {
   bindings: WorkerBinding[];
   compatibility_date: string;
   compatibility_flags?: string[];
+  observability?: { enabled: boolean };
+  placement?: { mode: "smart" } | { region: string };
   migrations?: {
     new_tag: string;
     steps: Array<{
@@ -87,6 +93,7 @@ export type DeployWorkerScriptOptions = {
   compatibilityDate?: string;
   compatibilityFlags?: string[];
   migrations?: WorkerScriptMetadata["migrations"];
+  placement?: WorkerScriptMetadata["placement"];
 };
 
 export async function deployWorkerScript(
@@ -98,10 +105,15 @@ export async function deployWorkerScript(
   options?: DeployWorkerScriptOptions,
 ): Promise<void> {
   const moduleFileName = `${scriptName}.mjs`;
+  const placement =
+    options?.placement ??
+    resolveWorkerPlacement(scriptName as CcoWorkerScriptName, null);
   const metadata: WorkerScriptMetadata = {
     main_module: moduleFileName,
     bindings,
     compatibility_date: options?.compatibilityDate ?? CCO_WORKER_COMPATIBILITY_DATE,
+    observability: { enabled: true },
+    ...(placement ? { placement } : {}),
   };
   if (options?.compatibilityFlags?.length) {
     metadata.compatibility_flags = [...options.compatibilityFlags];
@@ -261,8 +273,22 @@ export async function ensureQueueConsumer(
   apiToken: string,
   queueId: string,
   scriptName: string,
-  settings?: { batchSize?: number; maxWaitTimeMs?: number; maxRetries?: number },
+  settings?: {
+    batchSize?: number;
+    maxWaitTimeMs?: number;
+    maxRetries?: number;
+    deadLetterQueue?: string;
+  },
 ): Promise<void> {
+  const consumerSettings: Record<string, number | string> = {
+    batch_size: settings?.batchSize ?? 10,
+    max_wait_time_ms: settings?.maxWaitTimeMs ?? 5000,
+    max_retries: settings?.maxRetries ?? 3,
+  };
+  if (settings?.deadLetterQueue) {
+    consumerSettings.dead_letter_queue = settings.deadLetterQueue;
+  }
+
   const res = await fetch(`${CF_API}/accounts/${accountId}/queues/${queueId}/consumers`, {
     method: "POST",
     headers: {
@@ -272,11 +298,7 @@ export async function ensureQueueConsumer(
     body: JSON.stringify({
       type: "worker",
       script_name: scriptName,
-      settings: {
-        batch_size: settings?.batchSize ?? 10,
-        max_wait_time_ms: settings?.maxWaitTimeMs ?? 5000,
-        max_retries: settings?.maxRetries ?? 3,
-      },
+      settings: consumerSettings,
     }),
   });
 
@@ -310,6 +332,8 @@ export type DeployAllProvisionWorkersParams = {
   secretsStoreId: string;
   apiHostname: string;
   readBundle: (scriptName: CcoWorkerScriptName) => Promise<ArrayBuffer>;
+  /** Defaults to Smart Placement when omitted. */
+  workerPlacement?: WorkerPlacementDeploySetting | null;
 };
 
 function workerDeployOptions(scriptName: CcoWorkerScriptName): DeployWorkerScriptOptions {
@@ -321,7 +345,7 @@ function workerDeployOptions(scriptName: CcoWorkerScriptName): DeployWorkerScrip
         ? {
             migrations: {
               new_tag: "v1",
-              steps: [{ new_sqlite_classes: ["ConversationRoom"] }],
+              steps: [{ new_sqlite_classes: ["ConversationRoom", "UserInbox"] }],
             },
           }
         : {}),
@@ -369,6 +393,15 @@ function resolveWorkerDeployOptions(
 ): DeployWorkerScriptOptions {
   const options = workerDeployOptions(scriptName);
   if (scriptName === "cco-realtime-fanout" && existingMigrationTag) {
+    if (existingMigrationTag === "v1") {
+      return {
+        ...options,
+        migrations: {
+          new_tag: "v2",
+          steps: [{ new_sqlite_classes: ["UserInbox"] }],
+        },
+      };
+    }
     const { migrations: _migrations, ...rest } = options;
     return rest;
   }
@@ -378,7 +411,8 @@ function resolveWorkerDeployOptions(
 export async function deployAllProvisionWorkers(
   params: DeployAllProvisionWorkersParams,
 ): Promise<string[]> {
-  const { accountId, apiToken, resources, secretsStoreId, apiHostname, readBundle } = params;
+  const { accountId, apiToken, resources, secretsStoreId, apiHostname, readBundle, workerPlacement } =
+    params;
 
   if (!apiHostname.trim()) {
     throw new Error("apiHostname is required to deploy workers");
@@ -408,7 +442,10 @@ export async function deployAllProvisionWorkers(
       spec.scriptName,
       moduleBytes,
       bindings,
-      resolveWorkerDeployOptions(spec.scriptName, migrationTags.get(spec.scriptName)),
+      {
+        ...resolveWorkerDeployOptions(spec.scriptName, migrationTags.get(spec.scriptName)),
+        placement: resolveWorkerPlacement(spec.scriptName, workerPlacement),
+      },
     );
 
     if (spec.scriptName === "cco-reconcile-cron") {
@@ -421,7 +458,15 @@ export async function deployAllProvisionWorkers(
     }
 
     if (spec.scriptName === "cco-push-consumer" && resources.pushQueueId) {
-      await ensureQueueConsumer(accountId, apiToken, resources.pushQueueId, spec.scriptName);
+      await ensurePushNotificationQueues(
+        accountId,
+        apiToken,
+        CCO_PUSH_QUEUE_NAME,
+        CCO_PUSH_DLQ_QUEUE_NAME,
+      );
+      await ensureQueueConsumer(accountId, apiToken, resources.pushQueueId, spec.scriptName, {
+        deadLetterQueue: CCO_PUSH_DLQ_QUEUE_NAME,
+      });
     }
 
     deployed.push(spec.scriptName);

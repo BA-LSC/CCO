@@ -100,9 +100,14 @@ async function handleCallback(c: Context, platform: "web" | "mobile") {
 
   setSessionCookies(c, result.sessionToken);
   const webUrl = process.env.WEB_URL ?? "http://localhost:3000";
-  const redirectPath = result.redirectTo.startsWith("/groups")
-    ? `${result.redirectTo}${result.redirectTo.includes("?") ? "&" : "?"}synced=1`
-    : result.redirectTo;
+  let redirectPath = result.redirectTo;
+  if (redirectPath.startsWith("/groups")) {
+    const separator = redirectPath.includes("?") ? "&" : "?";
+    redirectPath = `${redirectPath}${separator}synced=1`;
+    if (result.groupsSyncError) {
+      redirectPath += `&sync_error=${encodeURIComponent(result.groupsSyncError)}`;
+    }
+  }
   return c.redirect(`${webUrl}${redirectPath}`);
 }
 

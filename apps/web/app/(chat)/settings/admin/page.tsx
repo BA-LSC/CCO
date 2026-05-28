@@ -42,6 +42,14 @@ type IntegrationsSettings = {
   realtimeKitPresetGuest?: string;
   cloudflarePlatformProvisionedAt?: string | null;
   cloudflarePlatformConfigured?: boolean;
+  workerPlacementMode?: "smart" | "region";
+  workerPlacementRegion?: string | null;
+  workerPlacementRegionOptions?: Array<{ id: string; label: string }>;
+  workerPlacementSummary?: string;
+  workerPlacementRedeployQueued?: boolean;
+  workerPlacementRedeploySkipped?: boolean;
+  workerPlacementRedeploySkippedReason?: string;
+  workerPlacementLastError?: string | null;
   updates?: UpdatesStatus;
 };
 
@@ -205,6 +213,12 @@ function CloudflareSection({
   accountId,
   apiToken,
   onApiTokenChange,
+  workerPlacementMode,
+  workerPlacementRegion,
+  workerPlacementRegionOptions,
+  workerPlacementSummary,
+  onWorkerPlacementModeChange,
+  onWorkerPlacementRegionChange,
 }: {
   platformProvisioned: boolean;
   configured: boolean;
@@ -215,6 +229,12 @@ function CloudflareSection({
   accountId: string;
   apiToken: string;
   onApiTokenChange: (value: string) => void;
+  workerPlacementMode: "smart" | "region";
+  workerPlacementRegion: string;
+  workerPlacementRegionOptions: Array<{ id: string; label: string }>;
+  workerPlacementSummary?: string;
+  onWorkerPlacementModeChange: (mode: "smart" | "region") => void;
+  onWorkerPlacementRegionChange: (region: string) => void;
 }) {
   const hasCloudflare =
     platformProvisioned || configured || fromEnv || tokenConfigured;
@@ -269,6 +289,55 @@ function CloudflareSection({
           />
         </div>
       ) : null}
+      {platformProvisioned && !fromEnv ? (
+        <fieldset className="integrations-fields integrations-placement">
+          <legend className="integrations-field-label">Worker region</legend>
+          {workerPlacementSummary ? (
+            <p className="integrations-field-hint">
+              Current: <strong>{workerPlacementSummary}</strong>
+            </p>
+          ) : null}
+          <p className="integrations-field-hint">
+            Controls where API and realtime workers run. Automatic uses Smart Placement near your D1
+            and storage; fixed region pins workers to a data center (US West recommended for most
+            US churches).
+          </p>
+          <label className="integrations-radio">
+            <input
+              type="radio"
+              name="worker-placement-mode"
+              checked={workerPlacementMode === "smart"}
+              onChange={() => onWorkerPlacementModeChange("smart")}
+            />
+            <span>Automatic (recommended)</span>
+          </label>
+          <label className="integrations-radio">
+            <input
+              type="radio"
+              name="worker-placement-mode"
+              checked={workerPlacementMode === "region"}
+              onChange={() => onWorkerPlacementModeChange("region")}
+            />
+            <span>Fixed region</span>
+          </label>
+          {workerPlacementMode === "region" ? (
+            <label className="integrations-field">
+              <span className="integrations-field-label">Region</span>
+              <select
+                className="integrations-input"
+                value={workerPlacementRegion}
+                onChange={(e) => onWorkerPlacementRegionChange(e.target.value)}
+              >
+                {workerPlacementRegionOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </fieldset>
+      ) : null}
     </IntegrationsSection>
   );
 }
@@ -277,8 +346,8 @@ export default function IntegrationsSettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [uris, setUris] = useState<SetupRedirectUris | null>(null);
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
@@ -301,7 +370,16 @@ export default function IntegrationsSettingsPage() {
   const [cloudflareApiTokenValid, setCloudflareApiTokenValid] = useState<boolean | null>(null);
   const [cloudflareApiTokenError, setCloudflareApiTokenError] = useState<string | null>(null);
   const [realtimeKitAccountId, setRealtimeKitAccountId] = useState("");
+  const [cloudflarePlatformProvisionedAt, setCloudflarePlatformProvisionedAt] = useState<
+    string | null
+  >(null);
   const [cloudflarePlatformProvisioned, setCloudflarePlatformProvisioned] = useState(false);
+  const [workerPlacementMode, setWorkerPlacementMode] = useState<"smart" | "region">("smart");
+  const [workerPlacementRegion, setWorkerPlacementRegion] = useState("aws:us-west-2");
+  const [workerPlacementSummary, setWorkerPlacementSummary] = useState<string | undefined>();
+  const [workerPlacementRegionOptions, setWorkerPlacementRegionOptions] = useState<
+    Array<{ id: string; label: string }>
+  >([{ id: "aws:us-west-2", label: "US West — AWS Oregon (recommended)" }]);
   const [pcoSyncing, setPcoSyncing] = useState(false);
   const [pcoSyncBusy, setPcoSyncBusy] = useState<"sync" | "toggle" | null>(null);
   const [pcoSyncResult, setPcoSyncResult] = useState<string | null>(null);
@@ -340,10 +418,20 @@ export default function IntegrationsSettingsPage() {
         );
         setCloudflareApiTokenValid(settings.cloudflareApiTokenValid ?? null);
         setCloudflareApiTokenError(settings.cloudflareApiTokenError ?? null);
+        setCloudflarePlatformProvisionedAt(settings.cloudflarePlatformProvisionedAt ?? null);
         setCloudflarePlatformProvisioned(
           Boolean(settings.cloudflarePlatformProvisionedAt) ||
             Boolean(settings.cloudflarePlatformConfigured),
         );
+        setWorkerPlacementMode(settings.workerPlacementMode ?? "smart");
+        setWorkerPlacementRegion(settings.workerPlacementRegion ?? "aws:us-west-2");
+        setWorkerPlacementSummary(settings.workerPlacementSummary);
+        if (settings.workerPlacementRegionOptions?.length) {
+          setWorkerPlacementRegionOptions(settings.workerPlacementRegionOptions);
+        }
+        if (settings.workerPlacementLastError) {
+          setError(settings.workerPlacementLastError);
+        }
         setUris(redirectUris);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load settings";
@@ -368,11 +456,14 @@ export default function IntegrationsSettingsPage() {
     event.preventDefault();
     setSaving(true);
     setError(null);
-    setSaved(false);
+    setSuccess(null);
 
     const trimmedCloudflareToken = cloudflareApiToken.trim();
 
-    const payload: Record<string, string> = {
+    const payload: Record<string, string> & {
+      workerPlacementMode?: "smart" | "region";
+      workerPlacementRegion?: string;
+    } = {
       name,
       clientId,
       signInRedirectUri,
@@ -382,6 +473,12 @@ export default function IntegrationsSettingsPage() {
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
+    if (cloudflarePlatformProvisionedAt) {
+      payload.workerPlacementMode = workerPlacementMode;
+      if (workerPlacementMode === "region") {
+        payload.workerPlacementRegion = workerPlacementRegion;
+      }
+    }
 
     try {
       if (trimmedCloudflareToken) {
@@ -401,6 +498,9 @@ export default function IntegrationsSettingsPage() {
           setRealtimeKitAccountId(cloudflareUpdated.realtimeKitAccountId);
         }
         setRealtimeKitConfigured(cloudflareUpdated.realtimeKitConfigured ?? realtimeKitConfigured);
+        setCloudflarePlatformProvisionedAt(
+          cloudflareUpdated.cloudflarePlatformProvisionedAt ?? cloudflarePlatformProvisionedAt,
+        );
         setCloudflarePlatformProvisioned(
           Boolean(cloudflareUpdated.cloudflarePlatformProvisionedAt) ||
             Boolean(cloudflareUpdated.cloudflarePlatformConfigured) ||
@@ -431,7 +531,30 @@ export default function IntegrationsSettingsPage() {
       setClientSecret("");
       setWebhookSecret("");
       setGiphyApiKey("");
-      setSaved(true);
+      if (updated.workerPlacementMode) {
+        setWorkerPlacementMode(updated.workerPlacementMode);
+      }
+      if (updated.workerPlacementRegion) {
+        setWorkerPlacementRegion(updated.workerPlacementRegion);
+      }
+      if (updated.workerPlacementRegionOptions?.length) {
+        setWorkerPlacementRegionOptions(updated.workerPlacementRegionOptions);
+      }
+      if (updated.workerPlacementSummary) {
+        setWorkerPlacementSummary(updated.workerPlacementSummary);
+      }
+
+      let successMessage = "Settings saved.";
+      if (updated.workerPlacementRedeployQueued) {
+        successMessage =
+          "Settings saved. Worker redeploy started in the background — this may take a minute.";
+      } else if (
+        updated.workerPlacementRedeploySkipped &&
+        updated.workerPlacementRedeploySkippedReason
+      ) {
+        successMessage = updated.workerPlacementRedeploySkippedReason;
+      }
+      setSuccess(successMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -553,7 +676,7 @@ export default function IntegrationsSettingsPage() {
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
         <CloudflareSection
-          platformProvisioned={cloudflarePlatformProvisioned}
+          platformProvisioned={Boolean(cloudflarePlatformProvisionedAt)}
           configured={realtimeKitConfigured}
           fromEnv={realtimeKitFromEnv}
           tokenConfigured={cloudflareApiTokenConfigured}
@@ -562,6 +685,12 @@ export default function IntegrationsSettingsPage() {
           accountId={realtimeKitAccountId}
           apiToken={cloudflareApiToken}
           onApiTokenChange={setCloudflareApiToken}
+          workerPlacementMode={workerPlacementMode}
+          workerPlacementRegion={workerPlacementRegion}
+          workerPlacementRegionOptions={workerPlacementRegionOptions}
+          workerPlacementSummary={workerPlacementSummary}
+          onWorkerPlacementModeChange={setWorkerPlacementMode}
+          onWorkerPlacementRegionChange={setWorkerPlacementRegion}
         />
 
         <IntegrationsSection
@@ -676,10 +805,10 @@ export default function IntegrationsSettingsPage() {
         <footer className="integrations-form-footer">
           <IntegrationsFeedbackToast
             error={error}
-            success={saved ? "Settings saved." : null}
+            success={success}
             onDismiss={() => {
               setError(null);
-              setSaved(false);
+              setSuccess(null);
             }}
           />
           <button type="submit" className="btn btn-primary integrations-save-btn" disabled={saving}>
