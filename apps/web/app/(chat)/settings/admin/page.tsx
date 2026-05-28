@@ -42,6 +42,7 @@ type IntegrationsSettings = {
   realtimeKitPresetGuest?: string;
   cloudflarePlatformProvisionedAt?: string | null;
   cloudflarePlatformConfigured?: boolean;
+  cloudflarePlatformFromEnv?: boolean;
   workerPlacementMode?: "smart" | "region";
   workerPlacementRegion?: string | null;
   workerPlacementRegionOptions?: Array<{ id: string; label: string }>;
@@ -374,6 +375,7 @@ export default function IntegrationsSettingsPage() {
     string | null
   >(null);
   const [cloudflarePlatformProvisioned, setCloudflarePlatformProvisioned] = useState(false);
+  const [cloudflarePlatformFromEnv, setCloudflarePlatformFromEnv] = useState(false);
   const [workerPlacementMode, setWorkerPlacementMode] = useState<"smart" | "region">("smart");
   const [workerPlacementRegion, setWorkerPlacementRegion] = useState("aws:us-west-2");
   const [workerPlacementSummary, setWorkerPlacementSummary] = useState<string | undefined>();
@@ -423,6 +425,7 @@ export default function IntegrationsSettingsPage() {
           Boolean(settings.cloudflarePlatformProvisionedAt) ||
             Boolean(settings.cloudflarePlatformConfigured),
         );
+        setCloudflarePlatformFromEnv(settings.cloudflarePlatformFromEnv ?? false);
         setWorkerPlacementMode(settings.workerPlacementMode ?? "smart");
         setWorkerPlacementRegion(settings.workerPlacementRegion ?? "aws:us-west-2");
         setWorkerPlacementSummary(settings.workerPlacementSummary);
@@ -473,7 +476,7 @@ export default function IntegrationsSettingsPage() {
     if (webhookSecret.trim()) payload.webhookSecret = webhookSecret;
     if (vapidSubjectEmail.trim()) payload.vapidSubjectEmail = vapidSubjectEmail.trim();
     if (giphyApiKey.trim()) payload.giphyApiKey = giphyApiKey.trim();
-    if (cloudflarePlatformProvisionedAt) {
+    if (cloudflarePlatformProvisioned) {
       payload.workerPlacementMode = workerPlacementMode;
       if (workerPlacementMode === "region") {
         payload.workerPlacementRegion = workerPlacementRegion;
@@ -676,9 +679,9 @@ export default function IntegrationsSettingsPage() {
 
       <form className="integrations-form" onSubmit={(e) => void handleSubmit(e)}>
         <CloudflareSection
-          platformProvisioned={Boolean(cloudflarePlatformProvisionedAt)}
+          platformProvisioned={cloudflarePlatformProvisioned}
           configured={realtimeKitConfigured}
-          fromEnv={realtimeKitFromEnv}
+          fromEnv={cloudflarePlatformFromEnv}
           tokenConfigured={cloudflareApiTokenConfigured}
           tokenValid={cloudflareApiTokenValid}
           tokenError={cloudflareApiTokenError}
