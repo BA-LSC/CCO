@@ -23,6 +23,8 @@ export type DeployCcoWebWorkerParams = {
   workerModuleUrl: string;
   assetsBaseUrl: string;
   assetsManifest: WebAssetManifest;
+  /** Git SHA stamped into the worker so /api/app-version reflects the deployed release. */
+  releaseVersion?: string;
 };
 
 type UploadSessionResponse = {
@@ -163,9 +165,11 @@ function buildCcoWebBindings(
   chatHostname: string,
   apiHostname: string,
   secretsStoreId: string,
+  releaseVersion?: string,
 ): WorkerBinding[] {
   const chatHost = normalizeHostname(chatHostname);
   const apiHost = normalizeHostname(apiHostname);
+  const release = releaseVersion?.trim();
   return [
     { type: "assets", name: "ASSETS" },
     { type: "service", name: "CCO_API", service: "cco-api" },
@@ -187,6 +191,12 @@ function buildCcoWebBindings(
       name: "PCO_WEB_REDIRECT_URI",
       text: `https://${chatHost}/api/auth/pco/callback`,
     },
+    ...(release
+      ? [
+          { type: "plain_text" as const, name: "CCO_BUILD_ID", text: release },
+          { type: "plain_text" as const, name: "GITHUB_SHA", text: release },
+        ]
+      : []),
     ...buildWebWorkerSecretsStoreBindings(secretsStoreId),
   ];
 }
@@ -215,7 +225,12 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
     compatibility_date: "2025-05-26",
     compatibility_flags: ["nodejs_compat"],
     assets: { jwt: assetsJwt },
-    bindings: buildCcoWebBindings(params.chatHostname, params.apiHostname, params.secretsStoreId),
+    bindings: buildCcoWebBindings(
+      params.chatHostname,
+      params.apiHostname,
+      params.secretsStoreId,
+      params.releaseVersion,
+    ),
   };
 
   const form = new FormData();

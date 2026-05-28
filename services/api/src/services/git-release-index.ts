@@ -121,9 +121,11 @@ async function fetchGithubLatestReleaseIndex(owner: string, repo: string): Promi
 
 async function fetchSetupCoReleaseIndex(): Promise<ReleaseIndex | null> {
   const res = await fetch(CCO_RELEASE_INDEX_URL, {
+    cache: "no-store",
     headers: {
       Accept: "application/json",
       "User-Agent": GITHUB_USER_AGENT,
+      "Cache-Control": "no-cache",
     },
   });
   if (!res.ok) return null;

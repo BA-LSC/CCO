@@ -158,6 +158,104 @@ function resolveRunningBuildVersion(): string | null {
   return fromEnv && fromEnv !== "dev" ? fromEnv : null;
 }
 
+export function normalizeReleaseSha(value: string | null | undefined): string | null {
+  const trimmed = value?.trim().toLowerCase();
+  return trimmed || null;
+}
+
+/** True when two SHAs refer to the same commit (full or short GitHub form). */
+export function releaseShasEqual(a: string, b: string): boolean {
+  const left = normalizeReleaseSha(a);
+  const right = normalizeReleaseSha(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const short = left.length <= right.length ? left : right;
+  const long = left.length <= right.length ? right : left;
+  return short.length >= 7 && long.startsWith(short);
+}
+
+export function isUpdateAvailable(
+  current: string | null | undefined,
+  latest: string,
+  alsoCompare: Array<string | null | undefined> = [],
+): boolean {
+  const latestNorm = normalizeReleaseSha(latest);
+  if (!latestNorm) return false;
+
+  const versions = [current, ...alsoCompare]
+    .map(normalizeReleaseSha)
+    .filter((value): value is string => Boolean(value));
+
+  if (versions.length === 0) return true;
+  return versions.some((value) => !releaseShasEqual(value, latestNorm));
+}
+
+async function fetchLiveWebBuildVersion(org: {
+  pcoWebRedirectUri: string | null;
+  pcoWebhookUrl: string | null;
+}): Promise<string | null> {
+  const hostnames = resolveOrgHostnames(org);
+  if (!hostnames) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(`https://${hostnames.chatHostname}/api/app-version`, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { version?: string };
+    const version = data.version?.trim();
+    return version && version !== "dev" ? version : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function resolveCurrentInstalledVersion(
+  org: NonNullable<Awaited<ReturnType<typeof getConfiguredOrganization>>>,
+  platform: UpdatePlatform,
+): Promise<{
+  currentVersion: string | null;
+  compareAlso: string[];
+  liveWebVersion: string | null;
+  recordedVersion: string | null;
+}> {
+  const recordedVersion = org.installedReleaseVersion?.trim() || null;
+  const fromApi = resolveRunningBuildVersion();
+  const liveWebVersion = platform === "cloudflare" ? await fetchLiveWebBuildVersion(org) : null;
+  const currentVersion = liveWebVersion ?? recordedVersion ?? fromApi;
+
+  return {
+    currentVersion,
+    liveWebVersion,
+    recordedVersion,
+    compareAlso: [recordedVersion, fromApi].filter(
+      (value): value is string => Boolean(value) && value !== currentVersion,
+    ),
+  };
+}
+
+/** Web worker may not expose a build id until Apply stamps CCO_BUILD_ID on deploy. */
+function needsWebDeployVerification(
+  platform: UpdatePlatform,
+  liveWebVersion: string | null,
+  recordedVersion: string | null,
+  latestVersion: string,
+): boolean {
+  if (platform !== "cloudflare" || liveWebVersion) return false;
+  if (!recordedVersion) return false;
+  return releaseShasEqual(recordedVersion, latestVersion);
+}
+
 function resolveReleasesBaseUrl(index: ReleaseIndex): string {
   return index.releasesBaseUrl.replace(/\/+$/, "");
 }
@@ -204,11 +302,6 @@ export function resolveUpdatePlatform(org: {
 
 export async function fetchReleaseIndex(gitRepoUrl?: string | null): Promise<ReleaseIndex> {
   return fetchReleaseIndexForOrg(gitRepoUrl);
-}
-
-function isUpdateAvailable(current: string | null, latest: string): boolean {
-  if (!current) return true;
-  return current !== latest;
 }
 
 type UpdatesApplyGating = {
@@ -315,8 +408,8 @@ export async function getUpdatesStatus(options?: {
   }
 
   const platform = resolveUpdatePlatform(org);
-  const currentVersion =
-    org.installedReleaseVersion?.trim() || resolveRunningBuildVersion();
+  const { currentVersion, compareAlso, liveWebVersion, recordedVersion } =
+    await resolveCurrentInstalledVersion(org, platform);
   let latestIndex: ReleaseIndex | null = null;
   let checkError: string | null = null;
 
@@ -346,9 +439,17 @@ export async function getUpdatesStatus(options?: {
   }
 
   const latestVersion = latestIndex?.version ?? null;
-  const updateAvailable = latestVersion
-    ? isUpdateAvailable(currentVersion, latestVersion)
+  let updateAvailable = latestVersion
+    ? isUpdateAvailable(currentVersion, latestVersion, compareAlso)
     : false;
+
+  if (
+    !updateAvailable &&
+    latestVersion &&
+    needsWebDeployVerification(platform, liveWebVersion, recordedVersion, latestVersion)
+  ) {
+    updateAvailable = true;
+  }
 
   const gating = resolveUpdatesApplyGating(
     org,
@@ -448,10 +549,13 @@ export async function prepareCloudflareReleaseUpdate(options?: {
   const gitRepoUrl = resolveOrgGitRepoUrl(org.gitRepoUrl);
   const releaseIndex = await fetchReleaseIndexForOrg(gitRepoUrl);
   const releasesBase = resolveReleasesBaseUrl(releaseIndex);
-  const currentVersion =
-    org.installedReleaseVersion?.trim() || resolveRunningBuildVersion();
+  const platform = resolveUpdatePlatform(org);
+  const { currentVersion, compareAlso } = await resolveCurrentInstalledVersion(org, platform);
   const lastApplyError = await readDeployLastError();
-  if (!isUpdateAvailable(currentVersion, releaseIndex.version) && !lastApplyError) {
+  if (
+    !isUpdateAvailable(currentVersion, releaseIndex.version, compareAlso) &&
+    !lastApplyError
+  ) {
     throw new Error("Already on the latest release");
   }
 
@@ -566,6 +670,7 @@ export async function executeCloudflareReleaseUpdate(
       workerModuleUrl: `${job.releasesBase}/cco-web.mjs`,
       assetsBaseUrl: `${job.releasesBase}/assets/`,
       assetsManifest,
+      releaseVersion: job.targetVersion,
     });
 
     await db
