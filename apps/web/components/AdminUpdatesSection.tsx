@@ -252,6 +252,8 @@ export function AdminUpdatesSection({
 
   const isUpdating = deploying;
   const controlsDisabled = busy !== null || isUpdating;
+  const showApplyButton =
+    status.updateAvailable || (Boolean(status.lastApplyError) && status.canApply);
 
   return (
     <section className="integrations-section" aria-labelledby="updates-status-heading">
@@ -309,22 +311,23 @@ export function AdminUpdatesSection({
         >
           {busy === "check" ? "Checking…" : "Check for updates"}
         </button>
-        <button
-          type="button"
-          className="btn btn-primary integrations-action-btn"
-          disabled={controlsDisabled}
-          aria-disabled={!status.canApply}
-          onClick={() => void handleApply()}
-        >
-          {busy === "apply" || isUpdating
-            ? "Applying…"
-            : status.lastApplyError && status.canApply
-              ? "Retry apply"
-              : "Apply update"}
-        </button>
+        {showApplyButton ? (
+          <button
+            type="button"
+            className="btn btn-primary integrations-action-btn"
+            disabled={controlsDisabled || !status.canApply}
+            onClick={() => void handleApply()}
+          >
+            {busy === "apply" || isUpdating
+              ? "Applying…"
+              : status.lastApplyError && status.canApply
+                ? "Retry apply"
+                : "Apply update"}
+          </button>
+        ) : null}
       </div>
 
-      {!status.canApply && status.applyBlockedReason && (
+      {showApplyButton && !status.canApply && status.applyBlockedReason && (
         <p className="integrations-field-hint">{status.applyBlockedReason}</p>
       )}
 
