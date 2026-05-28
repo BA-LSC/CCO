@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations, users } from "../db/schema";
+import { isPlaceholderDisplayName } from "./cco-member-status";
 
 export type PcoProfile = {
   personId: string;
@@ -35,17 +36,21 @@ export async function upsertUserFromPco(
   profile: PcoProfile,
 ): Promise<string> {
   const existing = await db
-    .select({ id: users.id })
+    .select({ id: users.id, displayName: users.displayName })
     .from(users)
     .where(eq(users.pcoPersonId, profile.personId))
     .limit(1);
 
   if (existing[0]) {
+    const keepExistingName =
+      isPlaceholderDisplayName(profile.displayName) &&
+      !isPlaceholderDisplayName(existing[0].displayName);
+
     await db
       .update(users)
       .set({
         email: profile.email,
-        displayName: profile.displayName,
+        ...(keepExistingName ? {} : { displayName: profile.displayName }),
         ...(profile.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}),
       })
       .where(eq(users.id, existing[0].id));

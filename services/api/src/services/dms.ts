@@ -19,6 +19,8 @@ import {
 } from "./cco-member-status";
 import { formatSidebarMessagePreview } from "@cco/shared/message-preview";
 import { fetchLastMessagesForConversations } from "./unread";
+import { isPlaceholderDisplayName } from "./cco-member-status";
+import { resolveDisplayNamesForUsers } from "./user-profile";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
   return [userIdA, userIdB].sort().join(":");
@@ -382,7 +384,10 @@ export async function getOrCreateDirectMessage(params: {
   return { id: conversationId, participant };
 }
 
-export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
+export async function listDirectMessages(
+  userId: string,
+  organizationId?: string,
+): Promise<DmSummary[]> {
   const rows = await db
     .select({
       id: conversations.id,
@@ -425,6 +430,17 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
       { id: m.id, displayName: m.displayName, avatarUrl: m.avatarUrl ?? null },
     ]),
   );
+
+  const placeholderParticipantIds = otherMembers
+    .filter((member) => isPlaceholderDisplayName(member.displayName))
+    .map((member) => member.id);
+  const resolvedNames = await resolveDisplayNamesForUsers(placeholderParticipantIds, organizationId);
+  for (const [conversationId, participant] of participantByConv) {
+    const resolved = resolvedNames.get(participant.id);
+    if (resolved) {
+      participantByConv.set(conversationId, { ...participant, displayName: resolved });
+    }
+  }
 
   const signedUpParticipantIds = await listSignedUpUserIds(otherMembers.map((member) => member.id));
 
@@ -485,6 +501,7 @@ export async function listDirectMessages(userId: string): Promise<DmSummary[]> {
 export async function getDirectMessage(params: {
   conversationId: string;
   userId: string;
+  organizationId?: string;
 }): Promise<{ id: string; participant: DmParticipant; muted: boolean } | null> {
   const row = await db
     .select({
@@ -524,9 +541,22 @@ export async function getDirectMessage(params: {
 
   if (!(await isUserSignedUpOnCco(other[0].id))) return null;
 
+  let participant: DmParticipant = {
+    id: other[0].id,
+    displayName: other[0].displayName,
+    avatarUrl: other[0].avatarUrl ?? null,
+  };
+  if (isPlaceholderDisplayName(participant.displayName)) {
+    const resolved = await resolveDisplayNamesForUsers([participant.id], params.organizationId);
+    const displayName = resolved.get(participant.id);
+    if (displayName) {
+      participant = { ...participant, displayName };
+    }
+  }
+
   return {
     id: row[0].id,
-    participant: other[0],
+    participant,
     muted: row[0].muted,
   };
 }

@@ -16,7 +16,7 @@ import { markConversationRead } from "./conversations";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
 import { publishMessageEvent } from "../realtime/pubsub";
 import { notifyConversationOfMessage, notifyMentionedUsers } from "./push-notify";
-import { refreshUserAvatarFromPco } from "./user-profile";
+import { refreshUserAvatarFromPco, ensureUserDisplayNameResolved } from "./user-profile";
 import { lastReadAtIso } from "./unread";
 import type { ReactionDto } from "./reactions";
 
@@ -193,11 +193,14 @@ async function getDmPeerReadReceipt(
     return { peerLastReadAt: null, peerUser: null };
   }
 
+  const displayName =
+    (await ensureUserDisplayNameResolved(peer[0].id)) ?? peer[0].displayName;
+
   return {
     peerLastReadAt: lastReadAtIso(peer[0].lastReadAt),
     peerUser: {
       id: peer[0].id,
-      displayName: peer[0].displayName,
+      displayName,
       avatarUrl: peer[0].avatarUrl ?? null,
     },
   };

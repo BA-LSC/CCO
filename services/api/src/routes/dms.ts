@@ -17,7 +17,7 @@ dmsRouter.use("*", requireAuth);
 
 dmsRouter.get("/", async (c) => {
   const session = c.get("session");
-  const conversations = await listDirectMessages(session.userId);
+  const conversations = await listDirectMessages(session.userId, session.organizationId);
   return c.json({ conversations });
 });
 
@@ -67,6 +67,7 @@ dmsRouter.get("/:id", async (c) => {
   const result = await getDirectMessage({
     conversationId: c.req.param("id"),
     userId: session.userId,
+    organizationId: session.organizationId,
   });
   if (!result) return c.json({ error: "Not found" }, 404);
   return c.json(result);
@@ -82,6 +83,7 @@ dmsRouter.patch("/:id/mute", async (c) => {
   const dm = await getDirectMessage({
     conversationId: c.req.param("id"),
     userId: session.userId,
+    organizationId: session.organizationId,
   });
   if (!dm) return c.json({ error: "Not found" }, 404);
 

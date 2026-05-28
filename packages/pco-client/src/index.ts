@@ -49,4 +49,9 @@ export {
   type ServiceTeamWithRole,
   type SimpleServiceTeam,
 } from "./services";
-export { fetchPersonAvatarUrl, parsePersonAvatarUrl } from "./people";
+export {
+  fetchPersonAvatarUrl,
+  fetchPersonDisplayName,
+  parsePersonAvatarUrl,
+  parsePersonDisplayName,
+} from "./people";

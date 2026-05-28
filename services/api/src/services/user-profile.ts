@@ -1,20 +1,18 @@
-import { parsePersonAvatarUrl } from "@cco/pco-client";
+import { parsePersonAvatarUrl, PlanningCenterClient, fetchPersonDisplayName } from "@cco/pco-client";
 import { eq } from "drizzle-orm";
 import { getPcoAccessToken } from "../auth/pco-tokens";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { normalizeMemberDisplayName } from "./cco-member-status";
+import { isPlaceholderDisplayName } from "./cco-member-status";
+import { getOrgPcoAccessToken } from "./org-config";
+
+export { isPlaceholderDisplayName };
 
 type PcoMeResponse = {
   data?: {
     attributes?: Record<string, unknown>;
   };
 };
-
-export function isPlaceholderDisplayName(displayName: string | null | undefined): boolean {
-  const normalized = normalizeMemberDisplayName(displayName);
-  return !normalized || normalized === "member" || normalized === "user";
-}
 
 function displayNameFromPcoAttributes(attributes: Record<string, unknown> | undefined): string | null {
   const firstName = typeof attributes?.first_name === "string" ? attributes.first_name.trim() : "";
@@ -79,4 +77,58 @@ export async function refreshUserDisplayNameFromPco(userId: string): Promise<str
 
   await db.update(users).set({ displayName }).where(eq(users.id, userId));
   return displayName;
+}
+
+/** Resolve placeholder roster names from PCO (user token, then org token). */
+export async function ensureUserDisplayNameResolved(
+  userId: string,
+  organizationId?: string,
+): Promise<string | null> {
+  const existing = await db
+    .select({
+      displayName: users.displayName,
+      pcoPersonId: users.pcoPersonId,
+      organizationId: users.organizationId,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!existing[0]) return null;
+  if (!isPlaceholderDisplayName(existing[0].displayName)) {
+    return existing[0].displayName;
+  }
+
+  const fromUserToken = await refreshUserDisplayNameFromPco(userId);
+  if (fromUserToken && !isPlaceholderDisplayName(fromUserToken)) {
+    return fromUserToken;
+  }
+
+  const orgId = organizationId ?? existing[0].organizationId;
+  const accessToken = orgId ? await getOrgPcoAccessToken(orgId) : null;
+  if (!accessToken) return existing[0].displayName;
+
+  const client = new PlanningCenterClient({ accessToken });
+  const displayName = await fetchPersonDisplayName(client, existing[0].pcoPersonId);
+  if (!displayName || isPlaceholderDisplayName(displayName)) {
+    return existing[0].displayName;
+  }
+
+  await db.update(users).set({ displayName }).where(eq(users.id, userId));
+  return displayName;
+}
+
+export async function resolveDisplayNamesForUsers(
+  userIds: string[],
+  organizationId?: string,
+): Promise<Map<string, string>> {
+  const uniqueIds = [...new Set(userIds)];
+  const resolved = new Map<string, string>();
+  await Promise.all(
+    uniqueIds.map(async (userId) => {
+      const displayName = await ensureUserDisplayNameResolved(userId, organizationId);
+      if (displayName) resolved.set(userId, displayName);
+    }),
+  );
+  return resolved;
 }

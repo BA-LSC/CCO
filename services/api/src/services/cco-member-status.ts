@@ -31,6 +31,11 @@ export function normalizeMemberDisplayName(displayName: string | null | undefine
   return normalized || null;
 }
 
+export function isPlaceholderDisplayName(displayName: string | null | undefined): boolean {
+  const normalized = normalizeMemberDisplayName(displayName);
+  return !normalized || normalized === "member" || normalized === "user";
+}
+
 export type MemberMatchPerson = {
   pcoPersonId: string;
   email?: string | null;
