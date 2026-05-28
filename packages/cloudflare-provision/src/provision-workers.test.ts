@@ -34,6 +34,23 @@ describe("createProvisionWorkerHandlers", () => {
           new Response(JSON.stringify({ success: true, result: null }), { status: 200 }),
         );
       }
+      if (/\/workers\/scripts\/[^/]+$/.test(url) && !init?.method) {
+        const script = url.split("/workers/scripts/")[1] ?? "";
+        const flags =
+          script === "cco-api" || script === "cco-realtime-fanout" ? ["nodejs_compat"] : [];
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              success: true,
+              result: {
+                compatibility_date: "2026-05-28",
+                compatibility_flags: flags,
+              },
+            }),
+            { status: 200 },
+          ),
+        );
+      }
       if (url.endsWith("/secrets")) {
         return Promise.resolve(
           new Response(JSON.stringify({ success: true, result: null }), { status: 200 }),

@@ -42,10 +42,13 @@ describe("deployWorkerScript", () => {
     let capturedForm: FormData | undefined;
 
     mockFetch((url, init) => {
-      capturedUrl = url;
-      capturedMethod = init?.method ?? "";
-      capturedAuth = (init?.headers as Record<string, string>)?.Authorization ?? "";
-      capturedForm = init?.body as FormData;
+      if (init?.method === "PUT" && url.includes("/workers/scripts/cco-api")) {
+        capturedUrl = url;
+        capturedMethod = init?.method ?? "";
+        capturedAuth = (init?.headers as Record<string, string>)?.Authorization ?? "";
+        capturedForm = init?.body as FormData;
+        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
       return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
     });
 
@@ -72,8 +75,22 @@ describe("deployWorkerScript", () => {
 
   test("sends nodejs_compat in metadata for cco-api deploy options", async () => {
     let capturedForm: FormData | undefined;
-    mockFetch((_url, init) => {
-      capturedForm = init?.body as FormData;
+    mockFetch((url, init) => {
+      if (init?.method === "PUT") {
+        capturedForm = init?.body as FormData;
+      }
+      if (init?.method === "PUT" || url.endsWith("/workers/scripts/cco-api")) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: {
+              compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+              compatibility_flags: ["nodejs_compat"],
+            },
+          }),
+          { status: 200 },
+        );
+      }
       return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
     });
 
@@ -92,6 +109,31 @@ describe("deployWorkerScript", () => {
     const metadata = await parseUploadMetadata(capturedForm);
     expect(metadata.compatibility_date).toBe(CCO_WORKER_COMPATIBILITY_DATE);
     expect(metadata.compatibility_flags).toEqual(["nodejs_compat"]);
+  });
+
+  test("fails when deploy omits requested compatibility flags", async () => {
+    mockFetch((url, init) => {
+      if (init?.method === "PUT") {
+        return new Response(JSON.stringify({ success: true, result: null }), { status: 200 });
+      }
+      if (url.endsWith("/workers/scripts/cco-api")) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: { compatibility_date: CCO_WORKER_COMPATIBILITY_DATE, compatibility_flags: [] },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ success: false }), { status: 404 });
+    });
+
+    await expect(
+      deployWorkerScript("acct-1", "cf-token", "cco-api", new ArrayBuffer(0), [], {
+        compatibilityDate: CCO_WORKER_COMPATIBILITY_DATE,
+        compatibilityFlags: [...CCO_WORKER_NODEJS_COMPAT_FLAGS],
+      }),
+    ).rejects.toThrow(/nodejs_compat/);
   });
 });
 
@@ -137,7 +179,28 @@ describe("deployAllProvisionWorkers", () => {
       if (
         url.includes("/workers/scripts/") &&
         !url.endsWith("/secrets") &&
-        !url.endsWith("/schedules")
+        !url.endsWith("/schedules") &&
+        init?.method !== "PUT"
+      ) {
+        const script = url.split("/workers/scripts/")[1] ?? "";
+        const flags =
+          script === "cco-api" || script === "cco-realtime-fanout" ? ["nodejs_compat"] : [];
+        return new Response(
+          JSON.stringify({
+            success: true,
+            result: {
+              compatibility_date: CCO_WORKER_COMPATIBILITY_DATE,
+              compatibility_flags: flags,
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      if (
+        url.includes("/workers/scripts/") &&
+        !url.endsWith("/secrets") &&
+        !url.endsWith("/schedules") &&
+        init?.method === "PUT"
       ) {
         const script = url.split("/workers/scripts/")[1] ?? "";
         uploadedScripts.push(script);

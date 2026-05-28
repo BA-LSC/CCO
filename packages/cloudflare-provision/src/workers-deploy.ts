@@ -106,10 +106,11 @@ export async function deployWorkerScript(
   }
 
   const form = new FormData();
-  // Cloudflare requires metadata as application/json (plain strings omit the part content-type).
+  // Multipart metadata must be a file part with application/json (plain strings drop compatibility_flags).
   form.append(
     "metadata",
     new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    "metadata.json",
   );
   form.append(moduleFileName, new Blob([moduleBytes], { type: "application/javascript+module" }), moduleFileName);
 
@@ -120,6 +121,57 @@ export async function deployWorkerScript(
   });
 
   await readWorkerDeployResponse(res);
+
+  if (options?.compatibilityFlags?.length) {
+    await assertWorkerScriptCompatibility(
+      accountId,
+      apiToken,
+      scriptName,
+      options.compatibilityFlags,
+      options.compatibilityDate ?? CCO_WORKER_COMPATIBILITY_DATE,
+    );
+  }
+}
+
+async function assertWorkerScriptCompatibility(
+  accountId: string,
+  apiToken: string,
+  scriptName: string,
+  expectedFlags: readonly string[],
+  expectedDate: string,
+): Promise<void> {
+  const res = await fetch(`${CF_API}/accounts/${accountId}/workers/scripts/${scriptName}`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+  const json = (await res.json()) as {
+    success?: boolean;
+    result?: { compatibility_flags?: string[]; compatibility_date?: string };
+    errors?: Array<{ message: string }>;
+  };
+  if (!res.ok || json.success === false) {
+    const detail = json.errors?.map((e) => e.message).join("; ") || res.statusText;
+    throw new CloudflareApiError(
+      detail || `Failed to verify ${scriptName} compatibility settings`,
+      res.status,
+    );
+  }
+
+  const flags = json.result?.compatibility_flags ?? [];
+  const missingFlags = expectedFlags.filter((flag) => !flags.includes(flag));
+  if (missingFlags.length > 0) {
+    throw new CloudflareApiError(
+      `Worker ${scriptName} deploy did not apply compatibility flags: ${missingFlags.join(", ")}. ` +
+        "Use deploy/cloudflare/force-apply-release.ts once from the CCO repo to recover, then retry Admin Apply.",
+      500,
+    );
+  }
+
+  if (json.result?.compatibility_date && json.result.compatibility_date !== expectedDate) {
+    throw new CloudflareApiError(
+      `Worker ${scriptName} compatibility_date is ${json.result.compatibility_date}, expected ${expectedDate}`,
+      500,
+    );
+  }
 }
 
 export async function putWorkerSecret(

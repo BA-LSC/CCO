@@ -247,7 +247,11 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
   };
 
   const form = new FormData();
-  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+  form.append(
+    "metadata",
+    new Blob([JSON.stringify(metadata)], { type: "application/json" }),
+    "metadata.json",
+  );
   form.append(
     moduleFileName,
     new Blob([workerModule], { type: "application/javascript+module" }),
