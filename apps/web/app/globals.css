@@ -5077,6 +5077,7 @@ button.sidebar-group-header:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 3px;
+  min-width: 14px;
   min-height: 14px;
   pointer-events: none;
 }
@@ -5084,6 +5085,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .message-delivery-spinner {
   width: 12px;
   height: 12px;
+  margin: 0;
   border-width: 2px;
   flex-shrink: 0;
 }

@@ -154,7 +154,7 @@ function ChatMessageListInner({
         const showDeliveryCheck = isLatestOwn;
 
         return (
-          <Fragment key={m.id}>
+          <Fragment key={m.clientMessageId ?? m.id}>
             {firstUnreadMessageId === m.id && (
               <li className="messages-unread-divider-wrap" aria-hidden={false}>
                 <div ref={unreadDividerRef} className="messages-unread-divider" role="separator">

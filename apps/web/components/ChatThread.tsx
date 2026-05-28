@@ -47,6 +47,12 @@ import {
   removePendingSendByClientMessageId,
 } from "@/lib/optimistic-text-message";
 
+/** Stable scroll/list key while an optimistic send is confirmed (id changes, clientMessageId does not). */
+function messageListTailKey(message: Message | undefined): string {
+  if (!message) return "";
+  return message.clientMessageId ?? message.id;
+}
+
 function detectMobileLikeViewport(): boolean {
   return (
     window.matchMedia("(pointer: coarse)").matches ||
@@ -341,19 +347,19 @@ export function ChatThread({
     pendingScrollRestoreRef.current = null;
   }, [messages, layout]);
 
-  const lastMessageId = messages[messages.length - 1]?.id;
+  const lastMessageTailKey = messageListTailKey(messages[messages.length - 1]);
 
   useLayoutEffect(() => {
     if (messagesLoading || messages.length === 0) return;
     if (pendingScrollRestoreRef.current) return;
     if (loadingMoreRef.current) return;
 
-    const lastId = messages.at(-1)?.id ?? "";
-    const snapshot = `${messages.length}:${messages[0]?.id ?? ""}:${lastId}`;
+    const lastKey = messageListTailKey(messages.at(-1));
+    const snapshot = `${messages.length}:${messages[0]?.id ?? ""}:${lastKey}`;
     if (snapshot === messageSnapshotRef.current && initialScrollDoneRef.current) return;
 
-    const prevLastId = messageSnapshotRef.current.split(":")[2] ?? "";
-    const latestChanged = lastId !== prevLastId;
+    const prevLastKey = messageSnapshotRef.current.split(":")[2] ?? "";
+    const latestChanged = lastKey !== prevLastKey;
     const firstPaint = !initialScrollDoneRef.current;
 
     if (
@@ -458,7 +464,7 @@ export function ChatThread({
       cancelScheduled();
       resizeObserver.disconnect();
     };
-  }, [firstUnreadMessageId, lastMessageId, messages.length, messagesLoading, layout, markBottomSeen]);
+  }, [firstUnreadMessageId, lastMessageTailKey, messages.length, messagesLoading, layout, markBottomSeen]);
 
   useEffect(() => {
     const latestId = messages.at(-1)?.id;
@@ -468,7 +474,7 @@ export function ChatThread({
     if (seenId && latestId !== seenId) {
       setHasNewMessagesBelow(true);
     }
-  }, [lastMessageId, messages]);
+  }, [lastMessageTailKey, messages]);
 
   const prevConversationIdRef = useRef(conversationId);
 
