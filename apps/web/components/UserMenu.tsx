@@ -76,9 +76,11 @@ export function UserMenu({ variant = "default" }: Props) {
     if (!open) return;
 
     function onPointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest(".user-menu-theme-list")) return;
+      setOpen(false);
     }
 
     function onKeyDown(e: KeyboardEvent) {
@@ -251,7 +253,7 @@ export function UserMenu({ variant = "default" }: Props) {
             <ThemePicker
               theme={theme}
               chaosUnlocked={chaosUnlocked}
-              placement={variant}
+              placement={variant === "sidebar" ? "sidebar" : "default"}
               onPick={(next) => handleThemePick(next)}
             />
             {chaosHint && (

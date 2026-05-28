@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   CHAOS_THEME,
@@ -82,10 +82,14 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
   const activeLabel =
     theme === CHAOS_THEME ? THEME_LABELS[CHAOS_THEME] : THEME_LABELS[theme as PickerTheme];
 
+  const toggleOpen = useCallback(() => {
+    setOpen((prev) => !prev);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
 
-    function onPointerDown(e: MouseEvent) {
+    function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
       if (rootRef.current?.contains(target) || listRef.current?.contains(target)) return;
       setOpen(false);
@@ -95,10 +99,14 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
       if (e.key === "Escape") setOpen(false);
     }
 
-    document.addEventListener("mousedown", onPointerDown);
+    // Defer so the opening click does not hit the listener in the same turn.
+    const timer = window.setTimeout(() => {
+      document.addEventListener("click", onClickOutside);
+    }, 0);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      window.clearTimeout(timer);
+      document.removeEventListener("click", onClickOutside);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
@@ -108,59 +116,59 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
     await onPick(next);
   }
 
-  const themeList =
-    open ? (
-      <ul
-        ref={listRef}
-        id={listboxId}
-        className={`user-menu-theme-list${usePortal ? " user-menu-theme-list--portal" : ""}`}
-        role="listbox"
-        aria-label="Theme"
-        style={
-          usePortal && listPosition
-            ? {
-                position: "fixed",
-                left: listPosition.left,
-                width: listPosition.width,
-                bottom: listPosition.bottom,
-                top: "auto",
-                right: "auto",
-              }
-            : undefined
-        }
-      >
-        {PICKER_THEMES.map((id) => (
-          <li key={id} role="presentation">
-            <button
-              type="button"
-              role="option"
-              aria-selected={theme === id}
-              className={`user-menu-theme-option${theme === id ? " user-menu-theme-option-active" : ""}`}
-              onClick={() => void select(id)}
-            >
-              <ThemeSwatch id={id} />
-              <span className="user-menu-theme-option-label">{THEME_LABELS[id]}</span>
-            </button>
-          </li>
-        ))}
-        {chaosUnlocked && (
-          <li role="presentation">
-            <button
-              type="button"
-              role="option"
-              aria-selected={theme === CHAOS_THEME}
-              className={`user-menu-theme-option user-menu-theme-option-chaos${
-                theme === CHAOS_THEME ? " user-menu-theme-option-active" : ""
-              }`}
-              onClick={() => void select(CHAOS_THEME)}
-            >
-              <ChaosSwatch />
-              <span className="user-menu-theme-option-label">{THEME_LABELS[CHAOS_THEME]}</span>
-            </button>
-          </li>
-        )}
-      </ul>
-    ) : null;
+  const showList = open && (!usePortal || listPosition);
+  const themeList = showList ? (
+    <ul
+      ref={listRef}
+      id={listboxId}
+      className={`user-menu-theme-list${usePortal ? " user-menu-theme-list--portal" : ""}`}
+      role="listbox"
+      aria-label="Theme"
+      style={
+        usePortal && listPosition
+          ? {
+              position: "fixed",
+              left: listPosition.left,
+              width: listPosition.width,
+              bottom: listPosition.bottom,
+              top: "auto",
+              right: "auto",
+            }
+          : undefined
+      }
+    >
+      {PICKER_THEMES.map((id) => (
+        <li key={id} role="presentation">
+          <button
+            type="button"
+            role="option"
+            aria-selected={theme === id}
+            className={`user-menu-theme-option${theme === id ? " user-menu-theme-option-active" : ""}`}
+            onClick={() => void select(id)}
+          >
+            <ThemeSwatch id={id} />
+            <span className="user-menu-theme-option-label">{THEME_LABELS[id]}</span>
+          </button>
+        </li>
+      ))}
+      {chaosUnlocked && (
+        <li role="presentation">
+          <button
+            type="button"
+            role="option"
+            aria-selected={theme === CHAOS_THEME}
+            className={`user-menu-theme-option user-menu-theme-option-chaos${
+              theme === CHAOS_THEME ? " user-menu-theme-option-active" : ""
+            }`}
+            onClick={() => void select(CHAOS_THEME)}
+          >
+            <ChaosSwatch />
+            <span className="user-menu-theme-option-label">{THEME_LABELS[CHAOS_THEME]}</span>
+          </button>
+        </li>
+      )}
+    </ul>
+  ) : null;
 
   return (
     <div className="user-menu-theme-picker" ref={rootRef}>
@@ -169,8 +177,12 @@ export function ThemePicker({ theme, chaosUnlocked, onPick, placement = "default
         className="user-menu-theme-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={listboxId}
-        onClick={() => setOpen((prev) => !prev)}
+        aria-controls={open ? listboxId : undefined}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleOpen();
+        }}
       >
         {theme === CHAOS_THEME ? <ChaosSwatch /> : <ThemeSwatch id={theme as PickerTheme} />}
         <span className="user-menu-theme-trigger-label">{activeLabel}</span>
