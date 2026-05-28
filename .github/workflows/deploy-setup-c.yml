@@ -55,13 +55,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
-      - name: Cache Next.js build
+      # Next.js warns in CI when apps/web/.next/cache is missing at build start (monorepo path, not repo root).
+      - name: Restore Next.js build cache
+        id: next-build-cache
         uses: actions/cache@v4
         with:
-          path: apps/web/.next/cache
-          key: ${{ runner.os }}-next-${{ hashFiles('bun.lock', 'apps/web/package.json', 'apps/web/next.config.ts', 'apps/web/middleware.ts') }}
+          path: |
+            apps/web/.next/cache
+            apps/install/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-${{ hashFiles('apps/web/**', 'apps/install/**', 'packages/**', 'services/**') }}
           restore-keys: |
-            ${{ runner.os }}-next-
+            ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
+            ${{ runner.os }}-nextjs-
+
+      - name: Log Next.js cache restore
+        run: |
+          for dir in apps/web/.next/cache apps/install/.next/cache; do
+            if [ -d "$dir" ]; then
+              echo "$dir restored ($(find "$dir" -type f 2>/dev/null | wc -l | tr -d ' ') files)"
+            else
+              echo "$dir not present yet (expected on first successful CI run)"
+            fi
+          done
 
       - name: Verify Cloudflare token (setup-c.co routes)
         run: |
