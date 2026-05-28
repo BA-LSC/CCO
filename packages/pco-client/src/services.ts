@@ -272,6 +272,7 @@ type PcoTeamAssignmentResource = {
 type PcoTeamAssignmentListResponse = {
   data: PcoTeamAssignmentResource[];
   included?: PcoPersonResource[];
+  links?: { next?: string | null };
 };
 
 type PcoServiceTeamLeaderResource = {
@@ -285,6 +286,7 @@ type PcoServiceTeamLeaderResource = {
 type PcoServiceTeamLeaderListResponse = {
   data: PcoServiceTeamLeaderResource[];
   included?: PcoPersonResource[];
+  links?: { next?: string | null };
 };
 
 export function parseServiceTeamAssignmentsRoster(
@@ -336,48 +338,124 @@ export function parseServiceTeamLeadersRoster(
 }
 
 export function mergeServiceTeamRoster(
-  assigned: ServiceTeamRosterMember[],
-  leading: ServiceTeamRosterMember[],
+  ...lists: ServiceTeamRosterMember[][]
 ): ServiceTeamRosterMember[] {
   const byId = new Map<string, ServiceTeamRosterMember>();
 
-  for (const member of assigned) {
-    byId.set(member.pcoPersonId, member);
-  }
-
-  for (const member of leading) {
-    const existing = byId.get(member.pcoPersonId);
-    if (existing) {
-      byId.set(member.pcoPersonId, { ...existing, role: "leader" });
-    } else {
-      byId.set(member.pcoPersonId, member);
+  for (const list of lists) {
+    for (const member of list) {
+      const existing = byId.get(member.pcoPersonId);
+      if (!existing) {
+        byId.set(member.pcoPersonId, member);
+        continue;
+      }
+      if (member.role === "leader" || existing.role === "leader") {
+        byId.set(member.pcoPersonId, { ...existing, ...member, role: "leader" });
+      } else {
+        byId.set(member.pcoPersonId, { ...existing, ...member });
+      }
     }
   }
 
   return [...byId.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
+export function parseServiceTeamPeopleRoster(
+  people: PcoPersonResource[],
+): ServiceTeamRosterMember[] {
+  const roster: ServiceTeamRosterMember[] = [];
+  const seen = new Set<string>();
+
+  for (const person of people) {
+    if (person.type !== "Person" || seen.has(person.id)) continue;
+    seen.add(person.id);
+    roster.push({
+      pcoPersonId: person.id,
+      displayName: displayNameFromPerson(person),
+      email: person.attributes.email ?? null,
+      avatarUrl: parsePersonAvatarUrl(person.attributes as Record<string, unknown>),
+      role: "member",
+    });
+  }
+
+  return roster;
+}
+
+async function fetchServiceTeamAssignments(
+  client: PlanningCenterClient,
+  pcoTeamId: string,
+): Promise<PcoTeamAssignmentListResponse> {
+  const data: PcoTeamAssignmentResource[] = [];
+  const peopleById = new Map<string, PcoPersonResource>();
+  const perPage = 100;
+  let offset = 0;
+  const basePath = `/services/v2/teams/${pcoTeamId}/person_team_position_assignments?include=person,team_position`;
+
+  for (;;) {
+    const page = await client.get<PcoTeamAssignmentListResponse>(
+      `${basePath}&per_page=${perPage}&offset=${offset}`,
+    );
+    data.push(...(page.data ?? []));
+    for (const item of page.included ?? []) {
+      if (item.type === "Person") peopleById.set(item.id, item);
+    }
+    if ((page.data?.length ?? 0) < perPage && !page.links?.next) break;
+    offset += perPage;
+    if ((page.data?.length ?? 0) === 0) break;
+  }
+
+  return { data, included: [...peopleById.values()] };
+}
+
+async function fetchServiceTeamLeaders(
+  client: PlanningCenterClient,
+  pcoTeamId: string,
+): Promise<ServiceTeamRosterMember[]> {
+  const data: PcoServiceTeamLeaderResource[] = [];
+  const peopleById = new Map<string, PcoPersonResource>();
+  const perPage = 100;
+  let offset = 0;
+  const basePath = `/services/v2/teams/${pcoTeamId}/team_leaders?include=person`;
+
+  for (;;) {
+    const page = await client.get<PcoServiceTeamLeaderListResponse>(
+      `${basePath}&per_page=${perPage}&offset=${offset}`,
+    );
+    data.push(...(page.data ?? []));
+    for (const item of page.included ?? []) {
+      if (item.type === "Person") peopleById.set(item.id, item);
+    }
+    if ((page.data?.length ?? 0) < perPage && !page.links?.next) break;
+    offset += perPage;
+    if ((page.data?.length ?? 0) === 0) break;
+  }
+
+  return parseServiceTeamLeadersRoster({ data, included: [...peopleById.values()] });
+}
+
 export async function fetchServiceTeamRoster(
   client: PlanningCenterClient,
   pcoTeamId: string,
 ): Promise<ServiceTeamRosterMember[]> {
-  const assignmentsJson = await client.get<PcoTeamAssignmentListResponse>(
-    `/services/v2/teams/${pcoTeamId}/person_team_position_assignments?include=person,team_position`,
+  const assignmentsJson = await fetchServiceTeamAssignments(client, pcoTeamId);
+  const assigned = parseServiceTeamAssignmentsRoster(assignmentsJson);
+
+  const teamPeople = parseServiceTeamPeopleRoster(
+    await client.getAllPages<PcoPersonResource>(
+      `/services/v2/teams/${pcoTeamId}/people`,
+    ),
   );
 
   let leading: ServiceTeamRosterMember[] = [];
   try {
-    const leadersJson = await client.get<PcoServiceTeamLeaderListResponse>(
-      `/services/v2/teams/${pcoTeamId}/team_leaders?include=person`,
-    );
-    leading = parseServiceTeamLeadersRoster(leadersJson);
+    leading = await fetchServiceTeamLeaders(client, pcoTeamId);
   } catch (err) {
     if (!(err instanceof PcoApiError) || (err.status !== 403 && err.status !== 404)) {
       throw err;
     }
   }
 
-  return mergeServiceTeamRoster(parseServiceTeamAssignmentsRoster(assignmentsJson), leading);
+  return mergeServiceTeamRoster(assigned, teamPeople, leading);
 }
 
 /** Remove a person's position assignments for a PCO team (best-effort). */
@@ -392,9 +470,7 @@ export async function removePersonFromServiceTeam(
   const serviceTypeId = teamJson.data.relationships?.service_type?.data?.id;
   if (!serviceTypeId) return { removedAssignments: 0 };
 
-  const assignmentsJson = await client.get<PcoTeamAssignmentListResponse>(
-    `/services/v2/teams/${pcoTeamId}/person_team_position_assignments?include=person,team_position`,
-  );
+  const assignmentsJson = await fetchServiceTeamAssignments(client, pcoTeamId);
 
   let removed = 0;
   for (const row of assignmentsJson.data) {

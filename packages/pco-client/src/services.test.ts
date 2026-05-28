@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  mergeServiceTeamRoster,
   mergeServiceTeams,
   parseMyServiceTeamsResponse,
   parseServiceTeamAssignmentsRoster,
+  parseServiceTeamPeopleRoster,
   parseTeamLeadersResponse,
   parseTeamServiceTypesResponse,
 } from "./services";
@@ -108,6 +110,55 @@ describe("parseServiceTeamAssignmentsRoster", () => {
         role: "member",
       },
     ]);
+  });
+});
+
+describe("parseServiceTeamPeopleRoster", () => {
+  it("includes team people without position assignments", () => {
+    const roster = parseServiceTeamPeopleRoster([
+      {
+        type: "Person",
+        id: "p9",
+        attributes: { first_name: "Jonah", last_name: "Lewis", email: "jonah@example.com" },
+      },
+    ]);
+
+    expect(roster).toEqual([
+      {
+        pcoPersonId: "p9",
+        displayName: "Jonah Lewis",
+        email: "jonah@example.com",
+        avatarUrl: null,
+        role: "member",
+      },
+    ]);
+  });
+});
+
+describe("mergeServiceTeamRoster", () => {
+  it("merges direct team people with position assignments", () => {
+    const merged = mergeServiceTeamRoster(
+      [
+        {
+          pcoPersonId: "p1",
+          displayName: "Jamie Lee",
+          email: "jamie@example.com",
+          avatarUrl: null,
+          role: "member",
+        },
+      ],
+      [
+        {
+          pcoPersonId: "p9",
+          displayName: "Jonah Lewis",
+          email: "jonah@example.com",
+          avatarUrl: null,
+          role: "member",
+        },
+      ],
+    );
+
+    expect(merged.map((member) => member.displayName).sort()).toEqual(["Jamie Lee", "Jonah Lewis"]);
   });
 });
 

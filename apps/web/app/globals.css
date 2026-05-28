@@ -4860,29 +4860,6 @@ button.sidebar-group-header:focus-visible {
   border-top-left-radius: 6px;
 }
 
-/* Reactions on the message above sit between grouped bubbles — round the top corner */
-.chat-thread
-  .message-item:has(.message-bubble-stack--has-reactions)
-  + .message-item--spacing-tight
-  .message-bubble--own.message-bubble--group-middle,
-.chat-thread
-  .message-item:has(.message-bubble-stack--has-reactions)
-  + .message-item--spacing-tight
-  .message-bubble--own.message-bubble--group-last {
-  border-top-right-radius: 18px;
-}
-
-.chat-thread
-  .message-item:has(.message-bubble-stack--has-reactions)
-  + .message-item--spacing-tight
-  .message-bubble--other.message-bubble--group-middle,
-.chat-thread
-  .message-item:has(.message-bubble-stack--has-reactions)
-  + .message-item--spacing-tight
-  .message-bubble--other.message-bubble--group-last {
-  border-top-left-radius: 18px;
-}
-
 .chat-thread .message-bubble--own .message-body {
   color: var(--color-chat-own-text);
 }

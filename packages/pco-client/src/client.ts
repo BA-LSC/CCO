@@ -6,6 +6,13 @@ export type PlanningCenterClientOptions = {
   accessToken: string;
 };
 
+type PcoPaginatedResponse<T> = {
+  data: T[];
+  links?: { next?: string | null };
+};
+
+const PCO_MAX_PER_PAGE = 100;
+
 export class PlanningCenterClient {
   private requestTimes: number[] = [];
 
@@ -17,6 +24,26 @@ export class PlanningCenterClient {
 
   async get<T>(path: string): Promise<T> {
     return this.request<T>("GET", path);
+  }
+
+  /** Follow offset pagination until a PCO collection is fully loaded. */
+  async getAllPages<T>(path: string): Promise<T[]> {
+    const results: T[] = [];
+    let offset = 0;
+
+    for (;;) {
+      const separator = path.includes("?") ? "&" : "?";
+      const page = await this.get<PcoPaginatedResponse<T>>(
+        `${path}${separator}per_page=${PCO_MAX_PER_PAGE}&offset=${offset}`,
+      );
+      const batch = page.data ?? [];
+      results.push(...batch);
+      if (batch.length < PCO_MAX_PER_PAGE && !page.links?.next) break;
+      offset += PCO_MAX_PER_PAGE;
+      if (batch.length === 0) break;
+    }
+
+    return results;
   }
 
   async delete(path: string): Promise<void> {

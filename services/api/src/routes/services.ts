@@ -99,7 +99,7 @@ servicesRouter.get("/teams/:id", async (c) => {
       const updated = await getServiceTeamDetail(teamId, session.userId, {
         accessToken,
         organizationId: session.organizationId,
-        liveRoster: false,
+        liveRoster: true,
       });
       if (updated) detail = updated;
     }
