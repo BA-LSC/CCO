@@ -39,6 +39,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2.2.0
         with:
@@ -48,7 +53,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Cache Turbo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ hashFiles('bun.lock', 'turbo.json') }}
@@ -58,7 +63,7 @@ jobs:
       # Next.js warns in CI when apps/web/.next/cache is missing at build start (monorepo path, not repo root).
       - name: Restore Next.js build cache
         id: next-build-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             apps/web/.next/cache
