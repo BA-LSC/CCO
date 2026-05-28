@@ -6,7 +6,6 @@ import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
-import { AdminUpdateApplyBanner } from "@/components/AdminUpdateApplyBanner";
 import { DeployRouteOverlay } from "@/components/DeployRouteOverlay";
 import { EnableNotificationsBanner } from "@/components/EnableNotificationsBanner";
 import { WebPushRegistrar } from "@/components/WebPushRegistrar";
@@ -54,7 +53,6 @@ export function ChatShell({ children }: Props) {
           <DeployRouteOverlay />
           <AddToHomeScreenBanner />
           <EnableNotificationsBanner />
-          <AdminUpdateApplyBanner />
           {children}
         </main>
       </div>
