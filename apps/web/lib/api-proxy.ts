@@ -1,5 +1,5 @@
 import { fetchFromApi } from "@/lib/api-fetch-server";
-import { isCloudflareDeployTarget, isDirectR2UploadsEnabled } from "@/lib/cloudflare-deploy";
+import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 import { isDeployDraining } from "@/lib/deploy-status.server";
 import { buildUpstreamAuthHeaders } from "@/lib/upstream-auth";
 
@@ -82,16 +82,6 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
 
   const uploadPost = isUploadPost(request.method, path);
   const uploadMedia = isUploadMediaRequest(request.method, path);
-
-  if (uploadPost && isDirectR2UploadsEnabled()) {
-    return Response.json(
-      {
-        error:
-          "Multipart upload is not supported on Cloudflare Pages. Use POST /api/v1/uploads/presign and PUT directly to R2.",
-      },
-      { status: 400 },
-    );
-  }
 
   const range = request.headers.get("range");
   if (range && uploadMedia) headers.set("range", range);

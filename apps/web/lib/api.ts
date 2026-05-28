@@ -113,10 +113,13 @@ type PresignResponse = {
   contentType: string;
 };
 
+const STORAGE_CORS_BLOCKED =
+  "Upload to storage was blocked by the browser. Your admin may need to configure R2 bucket CORS for your chat site.";
+
 function uploadFetchErrorMessage(stage: "presign" | "storage", err: unknown): string {
   if (err instanceof TypeError && err.message.trim() === "Failed to fetch") {
     if (stage === "storage") {
-      return "Upload to storage was blocked by the browser. Your admin may need to configure R2 bucket CORS for your chat site.";
+      return STORAGE_CORS_BLOCKED;
     }
     return "Could not reach the upload service. Check your connection and try again.";
   }
@@ -171,8 +174,9 @@ async function uploadMediaViaPresign(file: File, contentType: string): Promise<s
   return presign.url;
 }
 
-const MULTIPART_BLOCKED_ON_CLOUDFLARE =
-  "Multipart upload is not supported on Cloudflare Pages";
+function isStorageCorsBlockedError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes(STORAGE_CORS_BLOCKED);
+}
 
 function isPresignUnavailableError(err: unknown): boolean {
   const msg = getErrorMessage(err);
@@ -190,10 +194,6 @@ async function uploadMediaMultipart(file: File, contentType: string): Promise<st
   if (!res.ok) {
     const text = await res.text();
     const error = parseApiError(text, res.status);
-    // Older Cloudflare builds may miss NEXT_PUBLIC_DIRECT_UPLOADS — recover via presign.
-    if (res.status === 400 && error.includes(MULTIPART_BLOCKED_ON_CLOUDFLARE)) {
-      return uploadMediaViaPresign(file, contentType);
-    }
     throw new Error(error);
   }
   const data = (await res.json()) as { url: string };
@@ -205,7 +205,15 @@ async function uploadPreparedMedia(
   contentType: string,
 ): Promise<string> {
   if (isDirectR2UploadsEnabled()) {
-    return uploadMediaViaPresign(file, contentType);
+    try {
+      return await uploadMediaViaPresign(file, contentType);
+    } catch (presignErr) {
+      // Presigned R2 PUT needs bucket CORS; proxy multipart through cco-api when blocked.
+      if (isStorageCorsBlockedError(presignErr) || isPresignUnavailableError(presignErr)) {
+        return uploadMediaMultipart(file, contentType);
+      }
+      throw presignErr;
+    }
   }
   try {
     return await uploadMediaViaPresign(file, contentType);
