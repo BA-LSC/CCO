@@ -16,6 +16,7 @@ import {
   markDeployWait,
   probeServerAppVersion,
 } from "@/lib/app-update";
+import { getClientBuildVersion } from "@/lib/build-version";
 export type UpdatesStatus = {
   platform: "cloudflare" | "vps" | "unknown";
   currentVersion: string | null;
@@ -128,13 +129,25 @@ export function AdminUpdatesSection({
     let cancelled = false;
 
     const pollUntilReady = async () => {
-      const { updating } = await probeServerAppVersion();
+      const { updating, version: serverVersion, unavailable } = await probeServerAppVersion();
       if (cancelled) return;
       if (updating) {
         sawDeployUpdatingRef.current = true;
         return;
       }
-      if (!sawDeployUpdatingRef.current) return;
+      if (!sawDeployUpdatingRef.current) {
+        const clientVersion = getClientBuildVersion();
+        if (
+          !unavailable &&
+          serverVersion &&
+          clientVersion !== "dev" &&
+          serverVersion !== clientVersion
+        ) {
+          sawDeployUpdatingRef.current = true;
+        } else {
+          return;
+        }
+      }
 
       try {
         const next = await loadStatus();
@@ -237,6 +250,7 @@ export function AdminUpdatesSection({
           : {}),
       });
       setStatus(result.status);
+      sawDeployUpdatingRef.current = true;
       setFeedback({
         success: "This page will refresh when the update finishes.",
       });

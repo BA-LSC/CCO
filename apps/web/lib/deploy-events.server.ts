@@ -12,7 +12,7 @@ const listeners = new Set<DeploySignalListener>();
 
 let subscriber: Redis | null = null;
 
-const CF_POLL_MS = 5_000;
+const DEPLOY_POLL_MS = 750;
 
 function parseDeploySignal(raw: string): DeploySignal {
   if (raw === "updating") return { updating: true };
@@ -37,7 +37,7 @@ function startApiPollingSubscriber(): void {
       }
     };
     await poll();
-    setInterval(poll, CF_POLL_MS);
+    setInterval(poll, DEPLOY_POLL_MS);
   })();
 }
 

@@ -9,6 +9,7 @@ import {
   probeServerAppVersion,
   shouldRunAppUpdateChecks,
 } from "@/lib/app-update";
+import { getClientBuildVersion } from "@/lib/build-version";
 
 const RECONNECT_MS = 5_000;
 
@@ -67,12 +68,23 @@ export function listenForDeployEvents(): () => void {
   };
 
   const pollDeployState = async () => {
-    const { updating } = await probeServerAppVersion();
+    const { updating, version: serverVersion, unavailable } = await probeServerAppVersion();
     if (updating) {
       markDeployUpdating();
       return;
     }
     if (isDeployPending()) {
+      await finishDeployUpdateSafely();
+      return;
+    }
+    // Auto-update can finish before this tab observed draining — still refresh on new build.
+    const clientVersion = getClientBuildVersion();
+    if (
+      !unavailable &&
+      serverVersion &&
+      clientVersion !== "dev" &&
+      serverVersion !== clientVersion
+    ) {
       await finishDeployUpdateSafely();
     }
   };

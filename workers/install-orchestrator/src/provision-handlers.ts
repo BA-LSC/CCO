@@ -199,6 +199,7 @@ export async function createInstallProvisionHandlers(
       chatHostname,
       apiHostname,
       secretsStoreId,
+      kvDeployNamespaceId: state.resources.kvDeployNamespaceId,
       workerModuleUrl: `${releasesBase}/cco-web.mjs`,
       assetsBaseUrl: `${releasesBase}/assets`,
       assetsManifest,

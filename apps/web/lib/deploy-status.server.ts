@@ -1,11 +1,44 @@
 import Redis from "ioredis";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { fetchFromApi } from "@/lib/api-fetch-server";
 import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 
 const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 
+type DeployKvBinding = Pick<KVNamespace, "get">;
+
 let redis: Redis | null = null;
+
+async function readDeployKvBinding(): Promise<DeployKvBinding | null> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    const kv = (env as { DEPLOY_KV?: DeployKvBinding }).DEPLOY_KV;
+    return kv ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function readDeployDrainingFromKvBinding(): Promise<boolean | null> {
+  const kv = await readDeployKvBinding();
+  if (!kv) return null;
+  try {
+    return (await kv.get(DEPLOY_DRAINING_KEY)) === "1";
+  } catch {
+    return null;
+  }
+}
+
+async function readDeploySignalFromKvBinding(): Promise<string | null> {
+  const kv = await readDeployKvBinding();
+  if (!kv) return null;
+  try {
+    return await kv.get(DEPLOY_SIGNAL_CHANNEL);
+  } catch {
+    return null;
+  }
+}
 
 function getRedis(): Redis | null {
   if (process.env.CF_DEPLOY_KV === "1" && isCloudflareDeployTarget()) return null;
@@ -61,6 +94,9 @@ async function readDeployDrainingFromApi(): Promise<boolean | null> {
 
 /** True while deploy/bootstrap has set the draining flag. */
 export async function isDeployDraining(): Promise<boolean> {
+  const fromKvBinding = await readDeployDrainingFromKvBinding();
+  if (fromKvBinding != null) return fromKvBinding;
+
   if (isCloudflareDeployTarget()) {
     const fromApi = await readDeployDrainingFromApi();
     if (fromApi != null) return fromApi;
@@ -89,6 +125,9 @@ export async function isDeployDraining(): Promise<boolean> {
 }
 
 export async function readDeploySignalValue(): Promise<string | null> {
+  const fromKvBinding = await readDeploySignalFromKvBinding();
+  if (fromKvBinding != null) return fromKvBinding;
+
   if (isCloudflareDeployTarget()) {
     const draining = await readDeployDrainingFromApi();
     if (draining == null) return null;

@@ -25,6 +25,8 @@ export type DeployCcoWebWorkerParams = {
   assetsManifest: WebAssetManifest;
   /** Git SHA stamped into the worker so /api/app-version reflects the deployed release. */
   releaseVersion?: string;
+  /** Deploy KV namespace — lets cco-web read drain/signal flags without calling cco-api. */
+  kvDeployNamespaceId?: string;
 };
 
 type UploadSessionResponse = {
@@ -166,13 +168,18 @@ function buildCcoWebBindings(
   apiHostname: string,
   secretsStoreId: string,
   releaseVersion?: string,
+  kvDeployNamespaceId?: string,
 ): WorkerBinding[] {
   const chatHost = normalizeHostname(chatHostname);
   const apiHost = normalizeHostname(apiHostname);
   const release = releaseVersion?.trim();
+  const deployKv = kvDeployNamespaceId?.trim();
   return [
     { type: "assets", name: "ASSETS" },
     { type: "service", name: "CCO_API", service: "cco-api" },
+    ...(deployKv
+      ? [{ type: "kv_namespace" as const, name: "DEPLOY_KV", namespace_id: deployKv }]
+      : []),
     { type: "plain_text", name: "CCO_DEPLOY_TARGET", text: "cloudflare" },
     { type: "plain_text", name: "CF_DEPLOY_KV", text: "1" },
     { type: "plain_text", name: "NEXT_PUBLIC_DIRECT_UPLOADS", text: "1" },
@@ -230,6 +237,7 @@ export async function deployCcoWebWorker(params: DeployCcoWebWorkerParams): Prom
       params.apiHostname,
       params.secretsStoreId,
       params.releaseVersion,
+      params.kvDeployNamespaceId,
     ),
   };
 

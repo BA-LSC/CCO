@@ -575,6 +575,7 @@ export async function executeCloudflareReleaseUpdate(
       chatHostname: job.resources.chatHostname,
       apiHostname: job.resources.apiHostname,
       secretsStoreId: job.secretsStoreId,
+      kvDeployNamespaceId: job.resources.kvDeployNamespaceId,
       workerModuleUrl: `${job.releasesBase}/cco-web.mjs`,
       assetsBaseUrl: `${job.releasesBase}/assets/`,
       assetsManifest,
