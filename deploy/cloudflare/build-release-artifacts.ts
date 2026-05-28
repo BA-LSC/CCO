@@ -5,6 +5,7 @@
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { $ } from "bun";
+import { writeLegacyReleaseWorkerBundles } from "./legacy-worker-bundles.ts";
 
 const ROOT = join(import.meta.dir, "../..");
 const RELEASES = join(ROOT, "deploy/cloudflare/releases");
@@ -45,12 +46,19 @@ rmSync(RELEASES, { recursive: true, force: true });
 mkdirSync(RELEASES, { recursive: true });
 mkdirSync(ASSETS_OUT, { recursive: true });
 
-const RELEASE_BUNDLE_SKIP = new Set(["cco-giphy-proxy.mjs"]);
-
 const bundlesDir = join(ROOT, "deploy/cloudflare/bundles");
 for (const name of readdirSync(bundlesDir)) {
-  if (!name.endsWith(".mjs") || RELEASE_BUNDLE_SKIP.has(name)) continue;
+  if (!name.endsWith(".mjs")) continue;
   cpSync(join(bundlesDir, name), join(RELEASES, name));
+}
+
+writeLegacyReleaseWorkerBundles(RELEASES);
+
+const ccoApiBundle = readFileSync(join(RELEASES, "cco-api.mjs"), "utf8");
+if (ccoApiBundle.includes('"cco-giphy-proxy"')) {
+  throw new Error(
+    "cco-api.mjs still references cco-giphy-proxy — rebuild packages/cloudflare-provision before worker bundles",
+  );
 }
 
 console.log("Building web worker bundle (wrangler dry-run bundles OpenNext stub + deps)...");
@@ -86,7 +94,7 @@ const releaseReadme = `# CCO Cloudflare release artifacts
 
 Host this directory at \`https://setup-c.co/releases\` (or set CCO_RELEASES_BASE_URL / CCO_WORKER_BUNDLES_BASE_URL).
 
-- Worker bundles: \`cco-*.mjs\`
+- Worker bundles: \`cco-*.mjs\` (includes legacy \`cco-giphy-proxy.mjs\` stub for older Apply Update clients)
 - Web worker: \`cco-web.mjs\`
 - Web static assets: \`assets/\`
 - Web manifest: \`cco-web-manifest.json\`

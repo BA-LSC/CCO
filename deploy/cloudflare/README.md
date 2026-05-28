@@ -120,3 +120,11 @@ Placement applies to **`cco-api` and `cco-realtime-fanout` only**. `cco-web`, `c
 Saving a placement change in Admin Settings **redeploys those two workers immediately** when the org is provisioned and a Cloudflare API token is configured (`workerPlacementRedeployQueued` in the settings API response).
 
 After deploy, Smart Placement analysis can take up to ~15 minutes. Check status via the Workers API (`GET .../workers/services/{name}`) or the `cf-placement` response header on API requests.
+
+## Apply Update: `cco-giphy-proxy` bundle 404
+
+If Admin **Apply Update** fails with `Failed to fetch cco-giphy-proxy bundle: HTTP 404`, the church still runs an older `cco-api` that deploys six workers while hosted releases only ship five. Giphy lives on `cco-api` at `/v1/giphy` now.
+
+1. Ensure **setup-c.co** releases are rebuilt (push to `main` triggers `.github/workflows/deploy-setup-c.yml`, or run `bun deploy/cloudflare/build-release-artifacts.ts` and redeploy `workers/install-orchestrator`).
+2. Retry **Apply Update** — releases include a legacy `cco-giphy-proxy.mjs` stub so the old orchestrator can finish and deploy the new five-worker `cco-api`.
+3. **CLI recovery** (no Admin UI): from the repo root, build bundles then run `deploy/cloudflare/force-apply-release.ts` with church env vars (uses current provision code and remote bundles).

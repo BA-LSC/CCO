@@ -6,6 +6,9 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${ROOT}/deploy/cloudflare/bundles"
 mkdir -p "$OUT"
 
+echo "Building @cco/cloudflare-provision..."
+(cd "${ROOT}/packages/cloudflare-provision" && bun run build)
+
 build_worker() {
   local script_name="$1"
   local worker_dir="$2"
