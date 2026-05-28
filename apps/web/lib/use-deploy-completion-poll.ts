@@ -163,12 +163,12 @@ export function shouldAcceptUpdatesReload(
 }
 
 /** Poll updates status until the DB/catalog catches up after a background apply (202). */
-export async function waitForUpdatesStatusAfterDeploy(
-  loadStatus: () => Promise<UpdatesReloadStatus>,
+export async function waitForUpdatesStatusAfterDeploy<T extends UpdatesReloadStatus>(
+  loadStatus: () => Promise<T>,
   options?: ValidateUpdatesReloadOptions,
-): Promise<UpdatesReloadStatus | null> {
+): Promise<T | null> {
   const expected = options?.expectedAppliedVersion?.trim() || null;
-  let last: UpdatesReloadStatus | null = null;
+  let last: T | null = null;
 
   for (let attempt = 0; attempt < DEPLOY_STATUS_MAX_ATTEMPTS; attempt++) {
     last = await loadStatus();
