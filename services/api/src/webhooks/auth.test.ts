@@ -158,6 +158,7 @@ describe("resolveWebhookHandler", () => {
     expect(resolveWebhookHandler(WEBHOOK_EVENT_TYPES.MEMBERSHIP_UPDATED)).toBe(
       "membership_upsert",
     );
+    expect(resolveWebhookHandler(WEBHOOK_EVENT_TYPES.PERSON_CREATED)).toBe("person_created");
     expect(resolveWebhookHandler(WEBHOOK_EVENT_TYPES.PERSON_UPDATED)).toBe("person_updated");
   });
 

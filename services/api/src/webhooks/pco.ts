@@ -10,6 +10,7 @@ import {
 import {
   handleMembershipDestroyed,
   handleMembershipUpsert,
+  handlePersonCreated,
   handlePersonUpdated,
 } from "./handlers/membership";
 
@@ -64,6 +65,8 @@ webhooksRouter.post("/pco", async (c) => {
       await handleMembershipDestroyed(payload);
     } else if (handlerKind === "membership_upsert") {
       await handleMembershipUpsert(payload);
+    } else if (handlerKind === "person_created") {
+      await handlePersonCreated(payload);
     } else if (handlerKind === "person_updated") {
       await handlePersonUpdated(payload);
     }

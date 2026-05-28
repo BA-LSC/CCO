@@ -1,19 +1,23 @@
 import {
+  mapPcoMembershipRole,
   parseMembershipWebhookPayload,
   parsePersonAvatarUrl,
   type MembershipWebhookPayload,
 } from "@cco/pco-client";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
-import { groupMemberships, groups, users } from "../../db/schema";
+import { groups, users } from "../../db/schema";
 import { upsertUserFromPco } from "../../services/bootstrap";
-import { ensureConversationMembers, ensureGeneralConversation } from "../../services/conversations";
+import {
+  ensureConversationMember,
+  ensureGeneralConversation,
+} from "../../services/conversations";
 import {
   refreshUserGroupRoleFromPco,
   removeGroupMembership,
-  syncGroupRoster,
+  upsertGroupMembership,
 } from "../../services/group-sync";
-import { findLeaderAccessTokenForGroup, getOrgPcoAccessToken } from "../../services/org-config";
+import { getOrgPcoAccessToken } from "../../services/org-config";
 import { getConfiguredOrganization } from "../../services/org-oauth";
 
 export type { MembershipWebhookPayload };
@@ -29,40 +33,6 @@ export async function handleMembershipDestroyed(
   return removeGroupMembership({
     pcoPersonId: parsed.pcoPersonId,
     pcoGroupId: parsed.pcoGroupId,
-  });
-}
-
-async function syncMembershipRoleFromPco(params: {
-  organizationId: string;
-  groupId: string;
-  pcoGroupId: string;
-  userId: string;
-  pcoPersonId: string;
-}): Promise<void> {
-  const leaderToken = await findLeaderAccessTokenForGroup(params.groupId);
-  if (leaderToken) {
-    try {
-      await syncGroupRoster({
-        organizationId: params.organizationId,
-        groupId: params.groupId,
-        pcoGroupId: params.pcoGroupId,
-        accessToken: leaderToken,
-      });
-      return;
-    } catch (err) {
-      console.warn(`Webhook roster sync failed for group ${params.groupId}:`, err);
-    }
-  }
-
-  const accessToken = await getOrgPcoAccessToken(params.organizationId);
-  if (!accessToken) return;
-
-  await refreshUserGroupRoleFromPco({
-    groupId: params.groupId,
-    pcoGroupId: params.pcoGroupId,
-    userId: params.userId,
-    pcoPersonId: params.pcoPersonId,
-    accessToken,
   });
 }
 
@@ -100,28 +70,68 @@ export async function handleMembershipUpsert(
     displayName: displayName ?? "Member",
   });
 
-  await db
-    .insert(groupMemberships)
-    .values({
+  const rawRole = payload.data?.attributes?.role;
+  if (typeof rawRole === "string" && rawRole.length > 0) {
+    await upsertGroupMembership({
+      groupId: groupRow[0].id,
+      userId,
+      role: mapPcoMembershipRole(rawRole),
+    });
+  } else {
+    await upsertGroupMembership({
       groupId: groupRow[0].id,
       userId,
       role: "member",
-      syncedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [groupMemberships.groupId, groupMemberships.userId],
-      set: { syncedAt: new Date() },
     });
 
-  const conversationId = await ensureGeneralConversation(groupRow[0].id);
-  await ensureConversationMembers(conversationId, groupRow[0].id);
+    const accessToken = await getOrgPcoAccessToken(organizationId);
+    if (accessToken) {
+      await refreshUserGroupRoleFromPco({
+        groupId: groupRow[0].id,
+        pcoGroupId,
+        userId,
+        pcoPersonId,
+        accessToken,
+      });
+    }
+  }
 
-  await syncMembershipRoleFromPco({
-    organizationId,
-    groupId: groupRow[0].id,
-    pcoGroupId,
-    userId,
-    pcoPersonId,
+  const conversationId = await ensureGeneralConversation(groupRow[0].id);
+  await ensureConversationMember(conversationId, userId);
+
+  return true;
+}
+
+export async function handlePersonCreated(payload: {
+  data: {
+    id: string;
+    attributes: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      avatar_url?: string;
+      demographic_avatar_url?: string;
+    };
+  };
+}): Promise<boolean> {
+  const organizationId = (await getConfiguredOrganization())?.id ?? null;
+  if (!organizationId) return false;
+
+  const personId = payload.data.id;
+  const displayName =
+    [payload.data.attributes.first_name, payload.data.attributes.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim() || "User";
+
+  const email = payload.data.attributes.email ?? `${personId}@placeholder.local`;
+  const avatarUrl = parsePersonAvatarUrl(payload.data.attributes);
+
+  await upsertUserFromPco(organizationId, {
+    personId,
+    email,
+    displayName,
+    ...(avatarUrl ? { avatarUrl } : {}),
   });
 
   return true;
@@ -162,10 +172,4 @@ export async function handlePersonUpdated(payload: {
     .returning({ id: users.id });
 
   return Boolean(updated[0]);
-}
-
-/** @internal Test helper — webhook path must not promote payload role to leader/admin. */
-export function resolveWebhookMembershipRole(payloadRole: string | undefined): "member" {
-  void payloadRole;
-  return "member";
 }

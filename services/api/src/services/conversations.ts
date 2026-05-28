@@ -60,6 +60,16 @@ export async function ensureGeneralConversation(groupId: string): Promise<string
   return created.id;
 }
 
+export async function ensureConversationMember(
+  conversationId: string,
+  userId: string,
+): Promise<void> {
+  await db
+    .insert(conversationMembers)
+    .values({ conversationId, userId })
+    .onConflictDoNothing();
+}
+
 export async function ensureConversationMembers(
   conversationId: string,
   groupId: string,

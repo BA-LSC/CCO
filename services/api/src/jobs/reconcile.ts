@@ -6,11 +6,21 @@ import {
   fetchMyGroups,
 } from "@cco/pco-client";
 import { db } from "../db";
-import { groupMemberships, organizations, userPcoCredentials, users } from "../db/schema";
+import {
+  groupMemberships,
+  organizations,
+  serviceTeamMemberships,
+  userPcoCredentials,
+  users,
+} from "../db/schema";
 import { getPcoAccessToken } from "../auth/pco-tokens";
 import { persistGroupSync } from "../services/group-sync";
 import { getConfiguredOrganization } from "../services/org-oauth";
 import { invalidateOrgContextCache } from "../services/org-context-cache";
+import {
+  syncLeaderTeamRostersIfStale,
+  syncServiceTeamsFromPco,
+} from "../services/service-teams";
 
 const STALE_DAYS = 7;
 export const RECONCILE_BATCH_SIZE = 8;
@@ -55,7 +65,9 @@ export async function loadReconcileUserContexts(): Promise<ReconcileUserContext[
   return contexts;
 }
 
-export async function reconcileUserContext(context: ReconcileUserContext): Promise<boolean> {
+export async function reconcileGroupMembershipsForUser(
+  context: ReconcileUserContext,
+): Promise<boolean> {
   try {
     const client = new PlanningCenterClient({ accessToken: context.accessToken });
     const listed = await fetchMyGroups(client);
@@ -69,9 +81,37 @@ export async function reconcileUserContext(context: ReconcileUserContext): Promi
     });
     return true;
   } catch (err) {
-    console.warn(`Reconcile sync failed for user ${context.userId}:`, err);
+    console.warn(`Reconcile group sync failed for user ${context.userId}:`, err);
     return false;
   }
+}
+
+export async function reconcileTeamMembershipsForUser(
+  context: ReconcileUserContext,
+): Promise<boolean> {
+  try {
+    await syncServiceTeamsFromPco({
+      organizationId: context.organizationId,
+      userId: context.userId,
+      accessToken: context.accessToken,
+      pcoPersonId: context.pcoPersonId,
+    });
+    await syncLeaderTeamRostersIfStale({
+      organizationId: context.organizationId,
+      userId: context.userId,
+      accessToken: context.accessToken,
+    });
+    return true;
+  } catch (err) {
+    console.warn(`Reconcile team sync failed for user ${context.userId}:`, err);
+    return false;
+  }
+}
+
+export async function reconcileUserContext(context: ReconcileUserContext): Promise<boolean> {
+  const groupsOk = await reconcileGroupMembershipsForUser(context);
+  const teamsOk = await reconcileTeamMembershipsForUser(context);
+  return groupsOk && teamsOk;
 }
 
 export async function reconcileUserContextsBatch(
@@ -88,15 +128,16 @@ export async function reconcileUserContextsBatch(
   return resynced;
 }
 
-/** Re-sync groups for users with stored PCO tokens; remove memberships stale >7 days with no token refresh. */
+/** Re-sync groups and teams for users with stored PCO tokens; remove memberships stale >7 days. */
 export async function reconcileStaleMemberships(): Promise<{
   removed: number;
+  teamRemoved: number;
   resynced: number;
   skipped?: boolean;
 }> {
   const org = await getConfiguredOrganization();
   if (org?.pcoNightlySyncEnabled === false) {
-    return { removed: 0, resynced: 0, skipped: true };
+    return { removed: 0, teamRemoved: 0, resynced: 0, skipped: true };
   }
 
   const cutoff = new Date();
@@ -105,18 +146,32 @@ export async function reconcileStaleMemberships(): Promise<{
   const contexts = await loadReconcileUserContexts();
   const resynced = await reconcileUserContextsBatch(contexts);
 
-  const stale = await db
+  const staleGroups = await db
     .select({ id: groupMemberships.id })
     .from(groupMemberships)
     .where(lt(groupMemberships.syncedAt, cutoff));
 
   let removed = 0;
-  if (stale.length > 0) {
-    const staleIds = stale.map((row) => row.id);
+  if (staleGroups.length > 0) {
+    const staleIds = staleGroups.map((row) => row.id);
     await db.transaction(async (tx) => {
       await tx.delete(groupMemberships).where(inArray(groupMemberships.id, staleIds));
     });
     removed = staleIds.length;
+  }
+
+  const staleTeams = await db
+    .select({ id: serviceTeamMemberships.id })
+    .from(serviceTeamMemberships)
+    .where(lt(serviceTeamMemberships.syncedAt, cutoff));
+
+  let teamRemoved = 0;
+  if (staleTeams.length > 0) {
+    const staleTeamIds = staleTeams.map((row) => row.id);
+    await db.transaction(async (tx) => {
+      await tx.delete(serviceTeamMemberships).where(inArray(serviceTeamMemberships.id, staleTeamIds));
+    });
+    teamRemoved = staleTeamIds.length;
   }
 
   if (org) {
@@ -127,5 +182,5 @@ export async function reconcileStaleMemberships(): Promise<{
     invalidateOrgContextCache();
   }
 
-  return { removed, resynced };
+  return { removed, teamRemoved, resynced };
 }

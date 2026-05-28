@@ -23,6 +23,8 @@ type GroupImageTarget = {
   imageUrl?: string | null;
 };
 
+export const IMAGE_REFRESH_BATCH_SIZE = 4;
+
 export async function refreshMissingGroupImages<T extends GroupImageTarget>(
   groupsToRefresh: T[],
   accessToken: string,
@@ -31,20 +33,29 @@ export async function refreshMissingGroupImages<T extends GroupImageTarget>(
   if (missing.length === 0) return groupsToRefresh;
 
   const imageById = new Map<string, string | null>();
-  await Promise.all(
-    missing.map(async (group) => {
-      try {
-        const imageUrl = await refreshGroupImageFromPco({
+  for (let index = 0; index < missing.length; index += IMAGE_REFRESH_BATCH_SIZE) {
+    const batch = missing.slice(index, index + IMAGE_REFRESH_BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((group) =>
+        refreshGroupImageFromPco({
           groupId: group.id,
           pcoGroupId: group.pcoGroupId,
           accessToken,
-        });
-        imageById.set(group.id, imageUrl);
-      } catch (err) {
-        console.warn(`Could not refresh group image for ${group.pcoGroupId}:`, err);
+        }).then((imageUrl) => ({ groupId: group.id, imageUrl })),
+      ),
+    );
+    for (let batchIndex = 0; batchIndex < results.length; batchIndex++) {
+      const result = results[batchIndex];
+      if (result.status === "fulfilled") {
+        imageById.set(result.value.groupId, result.value.imageUrl);
+      } else {
+        console.warn(
+          `Could not refresh group image for ${batch[batchIndex].pcoGroupId}:`,
+          result.reason,
+        );
       }
-    }),
-  );
+    }
+  }
 
   if (imageById.size === 0) return groupsToRefresh;
 

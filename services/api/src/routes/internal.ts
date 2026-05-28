@@ -14,6 +14,7 @@ import { recordWebhookDelivery } from "../webhooks/delivery";
 import {
   handleMembershipDestroyed,
   handleMembershipUpsert,
+  handlePersonCreated,
   handlePersonUpdated,
 } from "../webhooks/handlers/membership";
 import {
@@ -38,7 +39,12 @@ internalRouter.post("/jobs/reconcile", async (c) => {
 });
 
 const WebhookForwardSchema = z.object({
-  handlerKind: z.enum(["membership_destroyed", "membership_upsert", "person_updated"]),
+  handlerKind: z.enum([
+    "membership_destroyed",
+    "membership_upsert",
+    "person_created",
+    "person_updated",
+  ]),
   payload: z.unknown(),
   deliveryId: z.string().nullable().optional(),
   eventType: z.string().optional(),
@@ -64,6 +70,8 @@ internalRouter.post("/webhooks/pco", async (c) => {
       await handleMembershipDestroyed(payload as never);
     } else if (handlerKind === "membership_upsert") {
       await handleMembershipUpsert(payload as never);
+    } else if (handlerKind === "person_created") {
+      await handlePersonCreated(payload as never);
     } else if (handlerKind === "person_updated") {
       await handlePersonUpdated(payload as never);
     }

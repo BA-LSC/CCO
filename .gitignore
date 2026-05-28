@@ -86,3 +86,4 @@ AGENTS.md
 docs/*
 !docs/install/
 !docs/install/**
+!docs/pco-webhook-events.md

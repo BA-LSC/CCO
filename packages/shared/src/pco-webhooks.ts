@@ -12,6 +12,10 @@ export const PCO_WEBHOOK_SUBSCRIPTIONS = [
     label: "Group membership removed",
   },
   {
+    eventType: "people.v2.events.person.created",
+    label: "Person created",
+  },
+  {
     eventType: "people.v2.events.person.updated",
     label: "Person profile updated",
   },

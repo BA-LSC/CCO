@@ -265,6 +265,55 @@ export async function syncServiceTeamRoster(params: {
   return { upserted, removed };
 }
 
+const LEADER_ROSTER_STALE_HOURS = 24;
+
+/** Pull full PCO roster for leader teams whose team record was not synced within 24 hours. */
+export async function syncLeaderTeamRostersIfStale(params: {
+  organizationId: string;
+  userId: string;
+  accessToken: string;
+}): Promise<{ teamsSynced: number; upserted: number }> {
+  const staleCutoff = new Date();
+  staleCutoff.setHours(staleCutoff.getHours() - LEADER_ROSTER_STALE_HOURS);
+
+  const leaderTeams = await db
+    .select({
+      teamId: serviceTeamMemberships.teamId,
+      pcoTeamId: serviceTeams.pcoTeamId,
+      syncedAt: serviceTeams.syncedAt,
+    })
+    .from(serviceTeamMemberships)
+    .innerJoin(serviceTeams, eq(serviceTeams.id, serviceTeamMemberships.teamId))
+    .where(
+      and(
+        eq(serviceTeamMemberships.userId, params.userId),
+        inArray(serviceTeamMemberships.role, ["leader", "admin"]),
+      ),
+    );
+
+  let teamsSynced = 0;
+  let upserted = 0;
+
+  for (const team of leaderTeams) {
+    if (team.syncedAt && team.syncedAt >= staleCutoff) continue;
+
+    try {
+      const result = await syncServiceTeamRoster({
+        organizationId: params.organizationId,
+        teamId: team.teamId,
+        pcoTeamId: team.pcoTeamId,
+        accessToken: params.accessToken,
+      });
+      teamsSynced += 1;
+      upserted += result.upserted;
+    } catch (err) {
+      console.warn(`Roster sync failed for team ${team.teamId}:`, err);
+    }
+  }
+
+  return { teamsSynced, upserted };
+}
+
 /** Pull full PCO roster for service teams where the user is a leader. */
 export async function syncLeaderTeamRosters(params: {
   organizationId: string;
@@ -492,7 +541,8 @@ export async function listTeamMembersForDetail(params: {
   const signedUpRecords = mergeSignedUpMemberRecords(orgRecords, teamRecords);
   const signedUp = buildSignedUpMemberIndexFromRecords(signedUpRecords);
   const isLeader = isLeaderRole(params.membershipRole);
-  // Service teams have no PCO webhook roster feed — rely on live PCO when sync is requested.
+  // Services has no roster webhook events — see docs/pco-webhook-events.md (team.updated,
+  // team_leader.*, person_team_position_assignment.* unavailable). Rely on live PCO when sync is requested.
   const useCachedRoster = !params.liveRoster;
 
   if (useCachedRoster || !isLeader || !params.accessToken) {

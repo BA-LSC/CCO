@@ -108,7 +108,7 @@ export async function persistGroupSync(params: {
   return { created: toCreate.length, updated: toUpdate.length };
 }
 
-async function upsertGroupMembership(params: {
+export async function upsertGroupMembership(params: {
   groupId: string;
   userId: string;
   role: string;

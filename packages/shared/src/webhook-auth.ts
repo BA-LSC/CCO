@@ -2,12 +2,14 @@ export const WEBHOOK_EVENT_TYPES = {
   MEMBERSHIP_DESTROYED: "groups.v2.events.membership.destroyed",
   MEMBERSHIP_CREATED: "groups.v2.events.membership.created",
   MEMBERSHIP_UPDATED: "groups.v2.events.membership.updated",
+  PERSON_CREATED: "people.v2.events.person.created",
   PERSON_UPDATED: "people.v2.events.person.updated",
 } as const;
 
 export type WebhookHandlerKind =
   | "membership_destroyed"
   | "membership_upsert"
+  | "person_created"
   | "person_updated";
 
 export function resolveWebhookHandler(eventType: string): WebhookHandlerKind | null {
@@ -17,6 +19,8 @@ export function resolveWebhookHandler(eventType: string): WebhookHandlerKind | n
     case WEBHOOK_EVENT_TYPES.MEMBERSHIP_CREATED:
     case WEBHOOK_EVENT_TYPES.MEMBERSHIP_UPDATED:
       return "membership_upsert";
+    case WEBHOOK_EVENT_TYPES.PERSON_CREATED:
+      return "person_created";
     case WEBHOOK_EVENT_TYPES.PERSON_UPDATED:
       return "person_updated";
     default:
