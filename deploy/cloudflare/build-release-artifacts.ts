@@ -14,6 +14,15 @@ const ASSETS_OUT = join(RELEASES, "assets");
 console.log("Building packages...");
 await $`bun run build:packages`.cwd(ROOT);
 
+const { CCO_WORKER_BUILD_SPECS } = await import(
+  "../../packages/cloudflare-provision/src/worker-definitions.ts"
+);
+if (CCO_WORKER_BUILD_SPECS.some((spec) => spec.scriptName === "cco-giphy-proxy")) {
+  throw new Error(
+    "CCO_WORKER_BUILD_SPECS still lists cco-giphy-proxy — remove it from worker-definitions.ts",
+  );
+}
+
 const { hashWebAssetFile } = await import(
   "../../packages/cloudflare-provision/src/web-asset-hash.ts"
 );
@@ -53,13 +62,6 @@ for (const name of readdirSync(bundlesDir)) {
 }
 
 writeLegacyReleaseWorkerBundles(RELEASES);
-
-const ccoApiBundle = readFileSync(join(RELEASES, "cco-api.mjs"), "utf8");
-if (ccoApiBundle.includes('"cco-giphy-proxy"')) {
-  throw new Error(
-    "cco-api.mjs still references cco-giphy-proxy — rebuild packages/cloudflare-provision before worker bundles",
-  );
-}
 
 console.log("Building web worker bundle (wrangler dry-run bundles OpenNext stub + deps)...");
 const webTmp = `${ROOT}/deploy/cloudflare/.tmp-web-bundle`;

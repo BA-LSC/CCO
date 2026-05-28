@@ -5,12 +5,14 @@ export const RELEASE_WORKER_BUNDLE_NAMES = [
   "cco-pco-webhook",
   "cco-push-consumer",
   "cco-reconcile-cron",
-  /** Legacy stub so older Apply Update clients can finish one transition release. */
-  "cco-giphy-proxy",
 ] as const;
+
+/** Legacy stub artifact only (not a deployed worker in current provision). */
+export const LEGACY_RELEASE_ARTIFACT_FILES = ["cco-giphy-proxy.mjs"] as const;
 
 export const RELEASE_REQUIRED_ARTIFACTS = [
   ...RELEASE_WORKER_BUNDLE_NAMES.map((name) => `${name}.mjs`),
+  ...LEGACY_RELEASE_ARTIFACT_FILES,
   "cco-web.mjs",
   "cco-web-manifest.json",
   "release-index.json",

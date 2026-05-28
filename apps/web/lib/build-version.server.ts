@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveAppBuildVersionFromEnv } from "@/lib/build-version";
 
+const WEB_APP_ROOT = join(__dirname, "..");
+
 let cachedBakedBuildId: string | undefined;
 
 /** Read BUILD_ID written during `next build` / Docker image build (matches client bundles). */
@@ -10,12 +12,14 @@ function readBakedBuildId(): string | null {
     return cachedBakedBuildId || null;
   }
 
-  const cwd = process.cwd();
-  for (const relativePath of ["BUILD_ID", join(".next", "BUILD_ID")]) {
+  for (const relativePath of ["BUILD_ID", ".next/BUILD_ID"] as const) {
     try {
-      const path = join(cwd, relativePath);
-      if (!existsSync(path)) continue;
-      const id = readFileSync(path, "utf8").trim();
+      const buildIdPath = join(
+        /* turbopackIgnore: true */ WEB_APP_ROOT,
+        ...relativePath.split("/"),
+      );
+      if (!existsSync(buildIdPath)) continue;
+      const id = readFileSync(buildIdPath, "utf8").trim();
       if (id && id !== "dev") {
         cachedBakedBuildId = id;
         return id;
