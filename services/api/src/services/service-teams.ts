@@ -257,6 +257,11 @@ export async function syncServiceTeamRoster(params: {
     removed += 1;
   }
 
+  await db
+    .update(serviceTeams)
+    .set({ syncedAt: new Date() })
+    .where(eq(serviceTeams.id, params.teamId));
+
   return { upserted, removed };
 }
 
@@ -456,7 +461,7 @@ function mapCcoTeamMembers(
   }));
 }
 
-async function listTeamMembersForDetail(params: {
+export async function listTeamMembersForDetail(params: {
   teamId: string;
   organizationId: string;
   membershipRole: string;
@@ -566,7 +571,7 @@ async function listTeamMembersForDetail(params: {
 export async function getServiceTeamDetail(
   teamId: string,
   userId: string,
-  options?: { accessToken?: string; organizationId?: string; liveRoster?: boolean },
+  options?: { accessToken?: string; organizationId?: string },
 ) {
   const membership = await db
     .select({ id: serviceTeamMemberships.id, role: serviceTeamMemberships.role })
@@ -619,15 +624,6 @@ export async function getServiceTeamDetail(
 
   await refreshUserAvatarFromPco(userId).catch(() => null);
 
-  const members = await listTeamMembersForDetail({
-    teamId,
-    organizationId,
-    membershipRole: membership[0].role,
-    pcoTeamId: team[0].pcoTeamId,
-    accessToken: options?.accessToken,
-    liveRoster: options?.liveRoster,
-  });
-
   return {
     team: {
       id: team[0].id,
@@ -643,7 +639,6 @@ export async function getServiceTeamDetail(
           muted: conv[0].muted ?? false,
         }
       : null,
-    members,
     membershipRole: membership[0].role,
   };
 }

@@ -232,10 +232,15 @@ export function ChatSidebar() {
     [teamGroups],
   );
 
+  function teamChatHref(team: ServiceTeamSummary): string {
+    if (team.conversationId) return `/teams/${team.id}/c/${team.conversationId}`;
+    return `/teams/${team.id}`;
+  }
+
   function renderTeamItem(team: ServiceTeamSummary) {
     return (
       <Link
-        href={`/teams/${team.id}`}
+        href={teamChatHref(team)}
         className={`sidebar-item sidebar-team-item ${
           activeTeamId === team.id ? "sidebar-item-active" : ""
         }`}

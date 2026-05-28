@@ -10,6 +10,7 @@ import { isLeaderRole } from "../permissions";
 import {
   getServiceTeamDetail,
   listServiceTeamsForUser,
+  listTeamMembersForDetail,
   maybeRefreshServiceTeamsFromPco,
   removeMemberFromServiceTeamWithPco,
   syncServiceTeamRoster,
@@ -82,12 +83,11 @@ servicesRouter.get("/teams/:id", async (c) => {
   let detail = await getServiceTeamDetail(teamId, session.userId, {
     accessToken: accessToken ?? undefined,
     organizationId: session.organizationId,
-    liveRoster: requestLiveSync,
   });
   if (!detail) return c.json({ error: "Not found" }, 404);
 
   if (accessToken && requestLiveSync) {
-    const synced = await trySyncServiceTeamRosterForLeader({
+    await trySyncServiceTeamRosterForLeader({
       organizationId: session.organizationId,
       teamId,
       pcoTeamId: detail.team.pcoTeamId,
@@ -95,17 +95,23 @@ servicesRouter.get("/teams/:id", async (c) => {
       membershipRole: detail.membershipRole,
       accessToken,
     });
-    if (synced) {
-      const updated = await getServiceTeamDetail(teamId, session.userId, {
-        accessToken,
-        organizationId: session.organizationId,
-        liveRoster: true,
-      });
-      if (updated) detail = updated;
-    }
+    const updated = await getServiceTeamDetail(teamId, session.userId, {
+      accessToken,
+      organizationId: session.organizationId,
+    });
+    if (updated) detail = updated;
   }
 
-  return c.json(detail);
+  const members = await listTeamMembersForDetail({
+    teamId,
+    organizationId: session.organizationId,
+    membershipRole: detail.membershipRole,
+    pcoTeamId: detail.team.pcoTeamId,
+    accessToken: accessToken ?? undefined,
+    liveRoster: requestLiveSync,
+  });
+
+  return c.json({ ...detail, members });
 });
 
 servicesRouter.post("/teams/sync", async (c) => {

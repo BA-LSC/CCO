@@ -101,7 +101,7 @@ async function resolveConversationNotificationMeta(
 
   if (conv.serviceTeamId) {
     return {
-      url: `/teams/${conv.serviceTeamId}`,
+      url: `/teams/${conv.serviceTeamId}/c/${conversationId}`,
       title: conv.teamName?.trim() || "Team",
       kind: "team",
     };

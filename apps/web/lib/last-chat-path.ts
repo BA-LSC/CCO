@@ -1,7 +1,7 @@
 export const LAST_CHAT_PATH_KEY = "cco:last-chat-path";
 
 const PERSISTABLE_CHAT_PATH =
-  /^\/(?:dms\/[^/?#]+|groups\/[^/?#]+\/c\/[^/?#]+|teams\/[^/?#]+)$/;
+  /^\/(?:dms\/[^/?#]+|groups\/[^/?#]+\/c\/[^/?#]+|teams\/[^/?#]+(?:\/c\/[^/?#]+)?)$/;
 
 export function isPersistableChatPath(pathname: string): boolean {
   return PERSISTABLE_CHAT_PATH.test(pathname);
@@ -37,8 +37,8 @@ export function conversationIdFromChatPath(pathname: string): string | null {
   const group = pathname.match(/^\/groups\/[^/?#]+\/c\/([^/?#]+)/)?.[1];
   if (group) return group;
 
-  const team = pathname.match(/^\/teams\/([^/?#]+)/)?.[1];
-  if (team) return team;
+  const teamConv = pathname.match(/^\/teams\/[^/?#]+\/c\/([^/?#]+)/)?.[1];
+  if (teamConv) return teamConv;
 
   return null;
 }

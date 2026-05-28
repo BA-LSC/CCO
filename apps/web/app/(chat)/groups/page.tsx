@@ -50,7 +50,12 @@ export default function GroupsHomePage() {
         }
 
         if (teamsData.teams[0]) {
-          router.replace(`/teams/${teamsData.teams[0].id}`);
+          const firstTeam = teamsData.teams[0];
+          if (firstTeam.conversationId) {
+            router.replace(`/teams/${firstTeam.id}/c/${firstTeam.conversationId}`);
+          } else {
+            router.replace(`/teams/${firstTeam.id}`);
+          }
         }
       } catch {
         /* stay on empty pane */
