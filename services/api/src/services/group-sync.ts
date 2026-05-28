@@ -32,6 +32,7 @@ import {
   reconcileOrgPlaceholderUsers,
 } from "./user-account-merge";
 import { areOrgWebhooksEnabled } from "./pco-cache";
+import { applyResolvedDisplayNames, preferResolvedMemberDisplayName } from "./user-profile";
 
 export async function persistGroupSync(params: {
   organizationId: string;
@@ -403,7 +404,7 @@ export async function listGroupMembersForDetail(params: {
     await reconcileOrgPlaceholderUsers(params.organizationId);
   }
 
-  const ccoMembers = await db
+  const ccoMembersRaw = await db
     .select({
       id: users.id,
       pcoPersonId: users.pcoPersonId,
@@ -415,6 +416,8 @@ export async function listGroupMembersForDetail(params: {
     .from(groupMemberships)
     .innerJoin(users, eq(users.id, groupMemberships.userId))
     .where(eq(groupMemberships.groupId, params.groupId));
+
+  const ccoMembers = await applyResolvedDisplayNames(ccoMembersRaw, params.organizationId);
 
   const [orgRecords, groupRecords] = await Promise.all([
     buildSignedUpMemberRecords(params.organizationId),
@@ -470,7 +473,7 @@ export async function listGroupMembersForDetail(params: {
         return {
           id: link.userId,
           pcoPersonId: person.pcoPersonId,
-          displayName: rosterName,
+          displayName: preferResolvedMemberDisplayName(rosterName, local),
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
           onCco: link.onCco,

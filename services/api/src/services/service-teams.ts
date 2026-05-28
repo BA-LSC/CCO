@@ -30,7 +30,11 @@ import {
   normalizeMemberEmail,
   resolveRosterMemberLink,
 } from "./cco-member-status";
-import { refreshUserAvatarFromPco } from "./user-profile";
+import {
+  applyResolvedDisplayNames,
+  preferResolvedMemberDisplayName,
+  refreshUserAvatarFromPco,
+} from "./user-profile";
 import {
   reconcileOrgPlaceholderUsers,
   reconcileTeamPlaceholderUsers,
@@ -521,7 +525,7 @@ export async function listTeamMembersForDetail(params: {
   await reconcileTeamPlaceholderUsers(params.teamId);
   await reconcileOrgPlaceholderUsers(params.organizationId);
 
-  const ccoMembers = await db
+  const ccoMembersRaw = await db
     .select({
       id: users.id,
       pcoPersonId: users.pcoPersonId,
@@ -533,6 +537,8 @@ export async function listTeamMembersForDetail(params: {
     .from(serviceTeamMemberships)
     .innerJoin(users, eq(users.id, serviceTeamMemberships.userId))
     .where(eq(serviceTeamMemberships.teamId, params.teamId));
+
+  const ccoMembers = await applyResolvedDisplayNames(ccoMembersRaw, params.organizationId);
 
   const [orgRecords, teamRecords] = await Promise.all([
     buildSignedUpMemberRecords(params.organizationId),
@@ -588,7 +594,7 @@ export async function listTeamMembersForDetail(params: {
         return {
           id: link.userId,
           pcoPersonId: person.pcoPersonId,
-          displayName: rosterName,
+          displayName: preferResolvedMemberDisplayName(rosterName, local),
           avatarUrl: local?.avatarUrl ?? person.avatarUrl,
           role: local?.role ?? person.role,
           onCco: link.onCco,

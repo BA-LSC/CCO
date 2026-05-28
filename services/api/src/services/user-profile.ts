@@ -132,3 +132,36 @@ export async function resolveDisplayNamesForUsers(
   );
   return resolved;
 }
+
+/** Backfill placeholder roster names in D1 and return members with resolved display names. */
+export async function applyResolvedDisplayNames<
+  T extends { id: string; displayName: string },
+>(members: T[], organizationId?: string): Promise<T[]> {
+  const placeholderIds = members
+    .filter((member) => isPlaceholderDisplayName(member.displayName))
+    .map((member) => member.id);
+  if (placeholderIds.length === 0) return members;
+
+  const resolvedNames = await resolveDisplayNamesForUsers(placeholderIds, organizationId);
+  if (resolvedNames.size === 0) return members;
+
+  return members.map((member) => {
+    const resolved = resolvedNames.get(member.id);
+    if (!resolved || isPlaceholderDisplayName(resolved)) return member;
+    return { ...member, displayName: resolved };
+  });
+}
+
+export function preferResolvedMemberDisplayName(
+  rosterName: string,
+  local?: { displayName?: string | null },
+): string {
+  if (
+    isPlaceholderDisplayName(rosterName) &&
+    local?.displayName &&
+    !isPlaceholderDisplayName(local.displayName)
+  ) {
+    return local.displayName;
+  }
+  return rosterName;
+}
