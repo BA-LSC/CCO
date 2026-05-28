@@ -6,7 +6,9 @@ import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
 const DEPLOY_DRAINING_KEY = "cco:deploy:draining";
 export const DEPLOY_SIGNAL_CHANNEL = "cco:deploy:signal";
 
-type DeployKvBinding = Pick<KVNamespace, "get">;
+type DeployKvBinding = {
+  get(key: string): Promise<string | null>;
+};
 
 let redis: Redis | null = null;
 
