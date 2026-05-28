@@ -65,14 +65,14 @@ describe("resolveR2UploadChatOrigins", () => {
 });
 
 describe("buildR2UploadCorsRules", () => {
-  test("allows PUT from chat origin with wildcard request headers", () => {
+  test("allows PUT from chat origin with Content-Type request header", () => {
     const rules = buildR2UploadCorsRules(["https://cco.example.com"]);
     expect(rules).toEqual([
       {
         allowed: {
           origins: ["https://cco.example.com", "https://www.cco.example.com"],
           methods: ["PUT", "GET", "HEAD"],
-          headers: ["*"],
+          headers: ["Content-Type"],
         },
         exposeHeaders: ["ETag"],
         maxAgeSeconds: 3600,

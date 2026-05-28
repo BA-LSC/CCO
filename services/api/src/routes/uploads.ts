@@ -13,7 +13,11 @@ import {
   createR2PresignedPutUrl,
   reconcileOrgR2UploadCors,
 } from "../lib/r2-uploads";
-import { isCloudflareRuntime, isCloudflareWorkerRuntime } from "../runtime/worker-context";
+import {
+  getWorkerBindings,
+  isCloudflareRuntime,
+  isCloudflareWorkerRuntime,
+} from "../runtime/worker-context";
 
 type Env = { Variables: AuthVariables };
 
@@ -118,7 +122,8 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
 });
 
 uploadsRouter.post("/", requireAuth, async (c) => {
-  if (isCloudflareWorkerRuntime() || process.env.UPLOAD_STORAGE === "r2") {
+  const hasR2Binding = Boolean(getWorkerBindings()?.UPLOADS);
+  if ((isCloudflareWorkerRuntime() || process.env.UPLOAD_STORAGE === "r2") && !hasR2Binding) {
     return c.json(
       {
         error:

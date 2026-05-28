@@ -1,9 +1,6 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
-import {
-  isDirectR2UploadsEnabled,
-  shouldUseMultipartUploadFallback,
-} from "@/lib/cloudflare-deploy";
+import { shouldUseMultipartUploadFallback } from "@/lib/cloudflare-deploy";
 import {
   isDeployOverlaySuppressed,
   markDeployWait,
@@ -204,17 +201,13 @@ async function uploadPreparedMedia(
   file: File,
   contentType: string,
 ): Promise<string> {
-  if (isDirectR2UploadsEnabled()) {
-    return uploadMediaViaPresign(file, contentType);
-  }
-
   try {
     return await uploadMediaViaPresign(file, contentType);
   } catch (presignErr) {
-    if (!shouldUseMultipartUploadFallback()) {
-      throw presignErr;
+    if (isStorageCorsBlockedError(presignErr)) {
+      return uploadMediaMultipart(file, contentType);
     }
-    if (isPresignUnavailableError(presignErr) || isStorageCorsBlockedError(presignErr)) {
+    if (shouldUseMultipartUploadFallback() && isPresignUnavailableError(presignErr)) {
       return uploadMediaMultipart(file, contentType);
     }
     throw presignErr;

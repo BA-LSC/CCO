@@ -81,6 +81,9 @@ export function resolveR2UploadChatOrigins(sources: R2UploadChatOriginSources): 
   return expandWwwOriginVariants([...origins]);
 }
 
+/** Headers browsers send on presigned PUT (wildcard AllowedHeaders breaks R2 PUT). */
+export const R2_UPLOAD_CORS_ALLOWED_HEADERS = ["Content-Type"] as const;
+
 /** CORS rules for browser presigned PUT/GET uploads from the chat web origin. */
 export function buildR2UploadCorsRules(chatOrigins: string[]): R2CorsRule[] {
   const origins = resolveR2UploadChatOrigins({ extraOrigins: chatOrigins });
@@ -91,7 +94,7 @@ export function buildR2UploadCorsRules(chatOrigins: string[]): R2CorsRule[] {
       allowed: {
         origins,
         methods: ["PUT", "GET", "HEAD"],
-        headers: ["*"],
+        headers: [...R2_UPLOAD_CORS_ALLOWED_HEADERS],
       },
       exposeHeaders: ["ETag"],
       maxAgeSeconds: 3600,
