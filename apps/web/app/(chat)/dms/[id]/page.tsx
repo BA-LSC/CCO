@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Suspense } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
@@ -31,6 +30,8 @@ export default function DmChatPage() {
     firstUnreadMessageId,
     messagesLoading,
     loadError,
+    peerLastReadAt,
+    peerUser,
   } = useLoadConversationMessages(conversationId);
 
   useEffect(() => {
@@ -118,9 +119,7 @@ export default function DmChatPage() {
         avatarUrl={detail?.participant.avatarUrl ?? null}
         loading={detailLoading}
       >
-        <Suspense fallback={null}>
-          <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
-        </Suspense>
+        <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
         <PanelSettingsButton
           expanded={showOptions}
           label="Conversation settings"
@@ -164,6 +163,13 @@ export default function DmChatPage() {
           composerPlaceholder="Message…"
           messagesLoading={messagesLoading || detailLoading}
           composerDisabled={detailLoading || messagesLoading}
+          isDirectMessage
+          initialPeerLastReadAt={peerLastReadAt}
+          peerUser={peerUser ?? (detail ? {
+            id: detail.participant.id,
+            displayName: detail.participant.displayName,
+            avatarUrl: detail.participant.avatarUrl,
+          } : null)}
         />
       </div>
     </div>

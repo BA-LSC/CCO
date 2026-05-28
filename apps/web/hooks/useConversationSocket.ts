@@ -16,6 +16,12 @@ type RealtimeEvent =
       title?: string;
     }
   | {
+      type: "conversation.read";
+      conversationId: string;
+      userId: string;
+      readAt: string;
+    }
+  | {
       type: "call.started";
       conversationId: string;
       call: import("@cco/shared/calls").CallSummaryDto;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, Suspense } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
@@ -381,9 +381,7 @@ export default function GroupConversationPage() {
         avatarUrl={detail?.group.imageUrl ?? null}
         loading={detailLoading}
       >
-        <Suspense fallback={null}>
-          <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
-        </Suspense>
+        <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
         <PanelSettingsButton
           expanded={showChannelSettings}
           disabled={detailLoading || !activeConversation}

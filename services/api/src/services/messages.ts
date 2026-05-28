@@ -154,6 +154,55 @@ async function attachReactions(messageIds: string[]): Promise<Map<string, Reacti
   return map;
 }
 
+export type PeerUserDto = {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+
+async function getDmPeerReadReceipt(
+  conversationId: string,
+  userId: string,
+): Promise<{ peerLastReadAt: string | null; peerUser: PeerUserDto | null } | null> {
+  const conv = await db
+    .select({ dmPairKey: conversations.dmPairKey })
+    .from(conversations)
+    .where(eq(conversations.id, conversationId))
+    .limit(1);
+
+  if (!conv[0]?.dmPairKey) return null;
+
+  const peer = await db
+    .select({
+      lastReadAt: conversationMembers.lastReadAt,
+      id: users.id,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(conversationMembers)
+    .innerJoin(users, eq(users.id, conversationMembers.userId))
+    .where(
+      and(
+        eq(conversationMembers.conversationId, conversationId),
+        ne(conversationMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!peer[0]) {
+    return { peerLastReadAt: null, peerUser: null };
+  }
+
+  return {
+    peerLastReadAt: lastReadAtIso(peer[0].lastReadAt),
+    peerUser: {
+      id: peer[0].id,
+      displayName: peer[0].displayName,
+      avatarUrl: peer[0].avatarUrl ?? null,
+    },
+  };
+}
+
 export async function listMessages(
   conversationId: string,
   userId: string,
@@ -164,9 +213,13 @@ export async function listMessages(
   firstUnreadMessageId: string | null;
   lastReadAt: string | null;
   canPost: boolean;
+  peerLastReadAt?: string | null;
+  peerUser?: PeerUserDto | null;
 } | null> {
   const membership = await getMembershipForConversation(conversationId, userId);
   if (!membership) return null;
+
+  const dmPeer = await getDmPeerReadReceipt(conversationId, userId);
 
   const lastReadAt = membership.lastReadAt;
   const limit = Math.min(options?.limit ?? 50, 100);
@@ -287,6 +340,9 @@ export async function listMessages(
     firstUnreadMessageId,
     lastReadAt: lastReadAtIso(lastReadAt),
     canPost,
+    ...(dmPeer
+      ? { peerLastReadAt: dmPeer.peerLastReadAt, peerUser: dmPeer.peerUser }
+      : {}),
   };
 }
 

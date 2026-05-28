@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -15,8 +15,32 @@ type Props = {
   disabled?: boolean;
 };
 
-export function ConversationCallKit({ conversationId, disabled = false }: Props) {
+function ConversationCallUrlJoin({
+  inCall,
+  loading,
+  joinExisting,
+  endedCallIdsRef,
+}: {
+  inCall: boolean;
+  loading: boolean;
+  joinExisting: (callId: string) => Promise<void>;
+  endedCallIdsRef: MutableRefObject<Set<string>>;
+}) {
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const callParam = searchParams.get("call");
+    if (!callParam || inCall || loading) return;
+    if (endedCallIdsRef.current.has(callParam)) return;
+    void joinExisting(callParam).catch(() => {
+      endedCallIdsRef.current.add(callParam);
+    });
+  }, [endedCallIdsRef, inCall, joinExisting, loading, searchParams]);
+
+  return null;
+}
+
+function ConversationCallKitInner({ conversationId, disabled = false }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { subscribeRealtime, session } = useChatLayout();
@@ -41,12 +65,13 @@ export function ConversationCallKit({ conversationId, disabled = false }: Props)
   inCallRef.current = inCall;
 
   const clearCallQueryParam = useCallback(() => {
-    if (!searchParams.get("call")) return;
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.delete("call");
-    const query = nextParams.toString();
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("call")) return;
+    params.delete("call");
+    const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname);
-  }, [pathname, router, searchParams]);
+  }, [pathname, router]);
 
   const handleLeave = useCallback(() => {
     clearCallQueryParam();
@@ -93,15 +118,6 @@ export function ConversationCallKit({ conversationId, disabled = false }: Props)
   ]);
 
   useEffect(() => {
-    const callParam = searchParams.get("call");
-    if (!callParam || inCall || loading) return;
-    if (endedCallIdsRef.current.has(callParam)) return;
-    void joinExisting(callParam).catch(() => {
-      endedCallIdsRef.current.add(callParam);
-    });
-  }, [searchParams, inCall, loading, joinExisting]);
-
-  useEffect(() => {
     if (!inCall || !activeCall) return;
     const interval = setInterval(() => {
       void fetch("/api/v1/presence/heartbeat", {
@@ -116,6 +132,15 @@ export function ConversationCallKit({ conversationId, disabled = false }: Props)
 
   return (
     <>
+      <Suspense fallback={null}>
+        <ConversationCallUrlJoin
+          inCall={inCall}
+          loading={loading}
+          joinExisting={joinExisting}
+          endedCallIdsRef={endedCallIdsRef}
+        />
+      </Suspense>
+
       {incoming ? (
         <IncomingCallToast
           hostName={incoming.hostDisplayName}
@@ -151,4 +176,8 @@ export function ConversationCallKit({ conversationId, disabled = false }: Props)
       />
     </>
   );
+}
+
+export function ConversationCallKit(props: Props) {
+  return <ConversationCallKitInner {...props} />;
 }

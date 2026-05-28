@@ -46,13 +46,14 @@ export function CallActionButton({
   onJoin,
 }: Props) {
   const state = getCallIconState(activeCall, inCall);
-  const label = getCallLabel(state, activeCall);
+  const label = loading && !inCall ? "Starting call…" : getCallLabel(state, activeCall);
   const isDisabled = loading || inCall || disabled;
+  const visualState = loading && !inCall ? "loading" : state;
 
   return (
     <button
       type="button"
-      className={`panel-header-icon-btn call-header-btn call-header-btn--${state}`}
+      className={`panel-header-icon-btn call-header-btn call-header-btn--${visualState}`}
       disabled={isDisabled}
       aria-busy={loading || undefined}
       onClick={() => (activeCall && !inCall ? onJoin() : onStart())}
@@ -62,6 +63,20 @@ export function CallActionButton({
     >
       <PanelHeaderPhoneIcon />
     </button>
+  );
+}
+
+/** Visible gray phone icon for header loading placeholders. */
+export function CallActionButtonPlaceholder() {
+  return (
+    <CallActionButton
+      activeCall={null}
+      inCall={false}
+      loading={false}
+      disabled
+      onStart={() => {}}
+      onJoin={() => {}}
+    />
   );
 }
 

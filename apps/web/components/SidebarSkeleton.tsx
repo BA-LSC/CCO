@@ -58,7 +58,6 @@ export function SidebarSkeleton() {
         </ul>
         <div className="sidebar-item sidebar-dm-item sidebar-new-message-btn sidebar-skeleton-dm-row" aria-hidden>
           <div className="sidebar-dm-row">
-            <span className="sidebar-new-message-icon sidebar-skeleton-compose-avatar" aria-hidden />
             <span className="sidebar-skeleton-label sidebar-skeleton-label-dm sidebar-new-message-label" />
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   uploadImage,
   uploadVideo,
   type Message,
+  type PeerUser,
   type Reaction,
 } from "@/lib/api";
 import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
@@ -35,10 +36,16 @@ import {
   setSendInFlight,
 } from "@/lib/app-update-composer";
 import { isAppUpdateInProgress } from "@/lib/app-update";
+import { revokePendingComposerMedia } from "@/lib/composer-media";
 import {
-  revokePendingComposerMedia,
-  revokePendingComposerMediaList,
-} from "@/lib/composer-media";
+  createPendingUploadMessage,
+  removePendingUploadByClientMessageId,
+  replacePendingUploadMessage,
+} from "@/lib/optimistic-media-message";
+import {
+  createPendingSendMessage,
+  removePendingSendByClientMessageId,
+} from "@/lib/optimistic-text-message";
 
 function detectMobileLikeViewport(): boolean {
   return (
@@ -106,6 +113,9 @@ type Props = {
   composerPlaceholder?: string;
   messagesLoading?: boolean;
   composerDisabled?: boolean;
+  isDirectMessage?: boolean;
+  initialPeerLastReadAt?: string | null;
+  peerUser?: PeerUser | null;
 };
 
 const RECENT_MESSAGE_MS = 15_000;
@@ -125,6 +135,9 @@ export function ChatThread({
   composerPlaceholder = "Message your group… (@ to mention)",
   messagesLoading = false,
   composerDisabled = false,
+  isDirectMessage = false,
+  initialPeerLastReadAt = null,
+  peerUser = null,
 }: Props) {
   const coarsePointer = useCoarsePointer();
   const appUpdateBlocked = useAppUpdateGuard();
@@ -138,6 +151,7 @@ export function ChatThread({
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(
     initialFirstUnreadMessageId,
   );
+  const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(initialPeerLastReadAt);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const hasMarkedReadRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -475,6 +489,7 @@ export function ChatThread({
       setEditingId(null);
       setEditBody("");
       setFirstUnreadMessageId(initialFirstUnreadMessageId);
+      setPeerLastReadAt(initialPeerLastReadAt);
       hasMarkedReadRef.current = false;
       setMessages(sortMessagesByCreatedAt(initialMessages));
       setHasMore(initialHasMore);
@@ -493,8 +508,17 @@ export function ChatThread({
     initialMessages,
     initialHasMore,
     initialFirstUnreadMessageId,
+    initialPeerLastReadAt,
     messagesLoading,
   ]);
+
+  useEffect(() => {
+    if (!isDirectMessage) {
+      setPeerLastReadAt(null);
+      return;
+    }
+    setPeerLastReadAt(initialPeerLastReadAt);
+  }, [initialPeerLastReadAt, isDirectMessage]);
 
   useEffect(() => {
     if (!firstUnreadMessageId || messagesLoading) return;
@@ -560,17 +584,22 @@ export function ChatThread({
       action?: string;
       leaderOnly?: boolean;
       title?: string;
+      userId?: string;
+      readAt?: string;
     }) => {
       if (event.type === "message.created" && event.message) {
         markMessageLive(event.message.id);
         setMessages((prev) => {
-          if (prev.some((m) => m.id === event.message!.id)) return prev;
+          const incoming = event.message!;
+          let next = removePendingSendByClientMessageId(prev, incoming.clientMessageId);
+          next = removePendingUploadByClientMessageId(next, incoming.clientMessageId);
+          if (next.some((m) => m.id === incoming.id)) return next;
           const shouldFollow =
-            pinnedToBottomRef.current || event.message!.authorId === resolvedUserId;
+            pinnedToBottomRef.current || incoming.authorId === resolvedUserId;
           if (shouldFollow) {
             autoScrollToBottomRef.current = true;
           }
-          return sortMessagesByCreatedAt([...prev, event.message!]);
+          return sortMessagesByCreatedAt([...next, incoming]);
         });
         if (event.message.authorId !== resolvedUserId && conversationId && pinnedToBottomRef.current) {
           markConversationRead();
@@ -595,6 +624,14 @@ export function ChatThread({
             action === "removed" ? "removed" : "added",
           ),
         );
+      }
+      if (
+        event.type === "conversation.read" &&
+        event.readAt &&
+        event.userId &&
+        event.userId !== resolvedUserId
+      ) {
+        setPeerLastReadAt(event.readAt);
       }
       if (event.type === "conversation.updated" && conversationId) {
         dispatchConversationUpdated({
@@ -635,9 +672,11 @@ export function ChatThread({
       { method: "POST", body: JSON.stringify(payload) },
     );
     setMessages((prev) => {
-      if (prev.some((m) => m.id === message.id)) return prev;
+      let next = removePendingSendByClientMessageId(prev, payload.clientMessageId);
+      next = removePendingUploadByClientMessageId(next, payload.clientMessageId);
+      if (next.some((m) => m.id === message.id)) return next;
       autoScrollToBottomRef.current = true;
-      return sortMessagesByCreatedAt([...prev, message]);
+      return sortMessagesByCreatedAt([...next, message]);
     });
     markMessageLive(message.id);
   }
@@ -709,41 +748,100 @@ export function ChatThread({
 
   const handleComposerSend = useCallback(
     async ({ text, media }: { text: string; media: PendingComposerMedia[] }) => {
-      if (!conversationId) return;
+      if (!conversationId || !resolvedUserId) return;
+
+      const uploadJobs = media.map((item) => ({
+        item,
+        clientMessageId: crypto.randomUUID(),
+      }));
+
+      if (uploadJobs.length > 0) {
+        setMessages((prev) => {
+          autoScrollToBottomRef.current = true;
+          const optimistic = uploadJobs.map(({ item, clientMessageId }) =>
+            createPendingUploadMessage({
+              clientMessageId,
+              authorId: resolvedUserId,
+              authorName: session?.displayName ?? "You",
+              authorAvatarUrl: session?.avatarUrl,
+              item,
+            }),
+          );
+          return sortMessagesByCreatedAt([...prev, ...optimistic]);
+        });
+      }
 
       let attachmentsSent = 0;
+      let uploadError: Error | null = null;
 
-      if (media.length > 0) {
-        for (const item of media) {
+      for (const { item, clientMessageId } of uploadJobs) {
+        try {
           const attachmentUrl =
             item.kind === "video" ? await uploadVideo(item.file) : await uploadImage(item.file);
-          await postMessage({
-            body: "",
-            clientMessageId: crypto.randomUUID(),
-            attachmentUrl,
-            messageType: item.kind,
-          });
+          const { message } = await apiFetch<{ message: Message }>(
+            `/api/v1/messages?conversationId=${conversationId}`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                body: "",
+                clientMessageId,
+                attachmentUrl,
+                messageType: item.kind,
+              }),
+            },
+          );
+          setMessages((prev) => replacePendingUploadMessage(prev, clientMessageId, message));
+          markMessageLive(message.id);
           revokePendingComposerMedia(item);
           attachmentsSent += 1;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Upload failed";
+          setMessages((prev) =>
+            prev.map((entry) =>
+              entry.clientMessageId === clientMessageId
+                ? { ...entry, pendingUpload: false, uploadFailed: true }
+                : entry,
+            ),
+          );
+          uploadError ??= err instanceof Error ? err : new Error(message);
         }
       }
 
       if (text) {
+        const clientMessageId = crypto.randomUUID();
+        setMessages((prev) => {
+          autoScrollToBottomRef.current = true;
+          return sortMessagesByCreatedAt([
+            ...prev,
+            createPendingSendMessage({
+              clientMessageId,
+              authorId: resolvedUserId,
+              authorName: session?.displayName ?? "You",
+              authorAvatarUrl: session?.avatarUrl,
+              body: text,
+            }),
+          ]);
+        });
         try {
           await postMessage({
             body: text,
-            clientMessageId: crypto.randomUUID(),
+            clientMessageId,
           });
         } catch (err) {
-          if (media.length > 0 && attachmentsSent === 0) {
-            revokePendingComposerMediaList(media);
+          setMessages((prev) => removePendingSendByClientMessageId(prev, clientMessageId));
+          if (media.length > 0 && attachmentsSent === 0 && !uploadError) {
+            // Text failed before any attachment was sent; composer already cleared media.
           }
           saveComposerDraft(conversationId, text);
           throw err;
         }
       }
+
+      if (uploadError) {
+        throw uploadError;
+      }
     },
-    [conversationId],
+    [conversationId, resolvedUserId, session?.avatarUrl, session?.displayName],
   );
 
   const handleComposerGiphy = useCallback(
@@ -916,6 +1014,9 @@ export function ChatThread({
           onDeleteTarget={setDeleteTarget}
           onOpenImage={setLightboxImage}
           onOpenVideo={setLightboxVideo}
+          isDirectMessage={isDirectMessage}
+          peerLastReadAt={peerLastReadAt}
+          peerUser={peerUser}
         />
       )}
     </>

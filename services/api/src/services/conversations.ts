@@ -15,9 +15,10 @@ export async function markConversationRead(
   conversationId: string,
   userId: string,
 ): Promise<boolean> {
+  const readAt = new Date();
   const updated = await db
     .update(conversationMembers)
-    .set({ lastReadAt: new Date() })
+    .set({ lastReadAt: readAt })
     .where(
       and(
         eq(conversationMembers.conversationId, conversationId),
@@ -25,6 +26,15 @@ export async function markConversationRead(
       ),
     )
     .returning({ id: conversationMembers.id });
+
+  if (updated[0]) {
+    await publishMessageEvent({
+      type: "conversation.read",
+      conversationId,
+      userId,
+      readAt: readAt.toISOString(),
+    });
+  }
 
   return Boolean(updated[0]);
 }

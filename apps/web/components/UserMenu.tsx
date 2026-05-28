@@ -20,6 +20,7 @@ import {
   THEME_LABELS,
   type UserTheme,
 } from "@/lib/themes";
+import { useAdminUpdateAvailable } from "@/lib/use-admin-update-available";
 
 type SessionUser = {
   userId: string;
@@ -65,6 +66,10 @@ export function UserMenu({ variant = "default" }: Props) {
   const [statusSaving, setStatusSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const themeOneClicks = useRef<number[]>([]);
+  const adminUpdateAvailable = useAdminUpdateAvailable(
+    !loading && Boolean(user?.siteAdministrator),
+    { refreshWhen: open },
+  );
 
   useEffect(() => {
     apiFetch<SessionUser>("/api/v1/session/me")
@@ -328,11 +333,14 @@ export function UserMenu({ variant = "default" }: Props) {
           {user.siteAdministrator && (
             <a
               href="/settings/admin"
-              className="user-menu-item"
+              className="user-menu-item user-menu-item-admin"
               role="menuitem"
               onClick={() => setOpen(false)}
             >
-              Admin Settings
+              <span>Admin Settings</span>
+              {adminUpdateAvailable ? (
+                <span className="user-menu-update-badge">Update available</span>
+              ) : null}
             </a>
           )}
           <a

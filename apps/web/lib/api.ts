@@ -337,12 +337,20 @@ export async function fetchGiphyEnabled(): Promise<boolean> {
   }
 }
 
+export type PeerUser = {
+  id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+};
+
 export type MessageListResponse = {
   messages: Message[];
   hasMore: boolean;
   firstUnreadMessageId: string | null;
   lastReadAt: string | null;
   canPost?: boolean;
+  peerLastReadAt?: string | null;
+  peerUser?: PeerUser | null;
 };
 
 export type Message = {
@@ -356,6 +364,13 @@ export type Message = {
   createdAt: string;
   editedAt?: string | null;
   reactions?: Reaction[];
+  clientMessageId?: string;
+  /** Client-only blob preview while an attachment upload is in progress. */
+  localPreviewUrl?: string;
+  pendingUpload?: boolean;
+  uploadFailed?: boolean;
+  /** Client-only while a text message is awaiting server confirmation. */
+  pendingSend?: boolean;
 };
 
 export function formatMention(displayName: string, userId: string): string {

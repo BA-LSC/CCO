@@ -11,6 +11,7 @@ import {
 import { MentionSuggestions, type MentionMember } from "@/components/MentionSuggestions";
 import { fetchGiphyEnabled } from "@/lib/api";
 import { isAppUpdateInProgress } from "@/lib/app-update";
+import { subscribeComposerFocusRequest } from "@/lib/composer-events";
 import {
   clearComposerDraft,
   readComposerDraft,
@@ -82,6 +83,7 @@ export function ChatComposer({
   const composerDragDepthRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<ComposerMentionInputHandle>(null);
+  const transferredPreviewIdsRef = useRef<Set<string>>(new Set());
 
   const composerReadOnly = !canPost;
   const composerInputLocked = composerLocked || composerReadOnly;
@@ -105,7 +107,11 @@ export function ChatComposer({
   }, [appUpdateBlocked, body, conversationId]);
 
   useEffect(() => {
-    return () => revokePendingComposerMediaList(pendingMedia);
+    return () => {
+      revokePendingComposerMediaList(
+        pendingMedia.filter((item) => !transferredPreviewIdsRef.current.has(item.id)),
+      );
+    };
   }, [pendingMedia]);
 
   useEffect(() => {
@@ -127,6 +133,8 @@ export function ChatComposer({
       composerRef.current?.focus();
     });
   }, []);
+
+  useEffect(() => subscribeComposerFocusRequest(focusComposer), [focusComposer]);
 
   const clearPendingMedia = useCallback(() => {
     setPendingMedia((current) => {
@@ -211,17 +219,19 @@ export function ChatComposer({
 
       setMentionQuery(null);
       onSendError(null);
+      const textToSend = body.trim();
+      const mediaToSend = pendingMedia;
+      for (const item of mediaToSend) {
+        transferredPreviewIdsRef.current.add(item.id);
+      }
+      setBody("");
+      setPendingMedia([]);
       sendInFlightRef.current = true;
       setSendInFlight(true);
       setIsSending(true);
 
       try {
-        await onSend({ text, media });
-        setBody("");
-        setPendingMedia((current) => {
-          revokePendingComposerMediaList(current);
-          return [];
-        });
+        await onSend({ text: textToSend, media: mediaToSend });
         if (conversationId) clearComposerDraft(conversationId);
         resetComposerDragState();
       } catch (err) {

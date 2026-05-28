@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { apiFetch, type Message, type MessageListResponse } from "@/lib/api";
+import { apiFetch, type Message, type MessageListResponse, type PeerUser } from "@/lib/api";
 import {
   getCachedMessages,
   invalidateConversation,
@@ -29,6 +29,8 @@ export function useLoadConversationMessages(conversationId: string | null) {
   const [messagesLoading, setMessagesLoading] = useState(Boolean(conversationId));
   const [canPost, setCanPost] = useState<boolean | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
+  const [peerUser, setPeerUser] = useState<PeerUser | null>(null);
 
   useEffect(() => {
     if (!conversationId) {
@@ -39,6 +41,8 @@ export function useLoadConversationMessages(conversationId: string | null) {
       setMessagesLoading(false);
       setCanPost(null);
       setLoadError(null);
+      setPeerLastReadAt(null);
+      setPeerUser(null);
       return;
     }
 
@@ -82,6 +86,8 @@ export function useLoadConversationMessages(conversationId: string | null) {
         setHasMore(data.hasMore);
         setFirstUnreadMessageId(data.firstUnreadMessageId);
         setMessagesForConversationId(conversationId);
+        setPeerLastReadAt(data.peerLastReadAt ?? null);
+        setPeerUser(data.peerUser ?? null);
         if (typeof data.canPost === "boolean") {
           setCanPost(data.canPost);
         }
@@ -127,5 +133,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
     messagesLoading,
     canPost,
     loadError,
+    peerLastReadAt: messagesForConversationId === conversationId ? peerLastReadAt : null,
+    peerUser: messagesForConversationId === conversationId ? peerUser : null,
   };
 }

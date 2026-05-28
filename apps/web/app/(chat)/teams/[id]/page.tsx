@@ -2,10 +2,10 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Suspense } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
+import { CallActionButtonPlaceholder } from "@/components/calls/CallControls";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
 import { ChannelMembersSection, type ChannelMember } from "@/components/ChannelMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -178,14 +178,14 @@ export default function TeamChatPage() {
         subtitle={formatServiceTypeSubtitle(detail?.serviceTypeNames) ?? "Services team"}
         loading={detailLoading}
       >
-        <Suspense fallback={null}>
-          {detail?.conversation?.id ? (
-            <ConversationCallKit
-              conversationId={detail.conversation.id}
-              disabled={detailLoading}
-            />
-          ) : null}
-        </Suspense>
+        {detail?.conversation?.id ? (
+          <ConversationCallKit
+            conversationId={detail.conversation.id}
+            disabled={detailLoading}
+          />
+        ) : detailLoading ? (
+          <CallActionButtonPlaceholder />
+        ) : null}
         <PanelSettingsButton
           expanded={showSettings}
           label="Team settings"

@@ -551,6 +551,26 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   text-decoration: none;
 }
 
+.user-menu-item-admin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.user-menu-update-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+}
+
 .user-menu-item:hover {
   background: var(--color-surface-2);
   text-decoration: none;
@@ -792,10 +812,10 @@ html[data-theme="6"] .user-menu-dropdown {
   --sidebar-item-pad-x: 11px;
   --sidebar-item-gap: 7px;
   --sidebar-icon-btn: 24px;
-  --sidebar-icon-glyph: 14px;
-  --sidebar-icon-glyph-sm: 13px;
-  --sidebar-channel-prefix-width: 1.15rem;
-  --sidebar-channel-prefix-size: 1rem;
+  --sidebar-icon-glyph: 17px;
+  --sidebar-icon-glyph-sm: 16px;
+  --sidebar-channel-prefix-width: 1.35rem;
+  --sidebar-channel-prefix-size: 1.25rem;
   --sidebar-brand-size: 1.24rem;
   --sidebar-user-menu-avatar: 31px;
   --sidebar-user-menu-min-h: 51px;
@@ -929,7 +949,7 @@ html[data-theme="6"] .user-menu-dropdown {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
   padding-bottom: 7px;
 }
 
@@ -938,12 +958,12 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-section {
-  margin-bottom: 7px;
+  margin-bottom: 5px;
 }
 
 .sidebar-section-header {
   position: relative;
-  padding: 6px 9px;
+  padding: 4px 9px;
   margin-bottom: 5px;
 }
 
@@ -1143,8 +1163,7 @@ html[data-theme="6"] .user-menu-dropdown {
 }
 
 .sidebar-dm-row > .avatar-with-presence,
-.sidebar-dm-row > .sidebar-dm-avatar,
-.sidebar-dm-row > .sidebar-new-message-icon {
+.sidebar-dm-row > .sidebar-dm-avatar {
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: center;
@@ -1317,6 +1336,7 @@ html[data-theme="6"] .user-menu-dropdown {
   width: var(--sidebar-channel-prefix-width);
   color: var(--color-muted);
   font-size: var(--sidebar-channel-prefix-size);
+  line-height: 1;
 }
 
 .sidebar-channel-prefix-hash {
@@ -1742,66 +1762,27 @@ button.sidebar-group-header:focus-visible {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: var(--sidebar-avatar-gap);
+  padding: 5px var(--sidebar-item-pad-x);
+  min-height: 0;
 }
 
 .sidebar-new-message-btn:hover {
   background: color-mix(in srgb, var(--color-surface-2) 75%, transparent);
 }
 
-.sidebar-new-message-btn.sidebar-item-active {
-  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface-2));
-}
-
-.sidebar-new-message-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--sidebar-avatar-size);
-  height: var(--sidebar-avatar-size);
-  min-width: var(--sidebar-avatar-size);
-  max-width: var(--sidebar-avatar-size);
-  flex-shrink: 0;
-  box-sizing: border-box;
-  border-radius: 50%;
-  background: transparent;
-  border: 1.5px dashed color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
-  color: var(--color-muted);
-}
-
-.sidebar-new-message-icon .sidebar-add-channel-icon-glyph {
-  width: var(--sidebar-icon-glyph-sm);
-  height: var(--sidebar-icon-glyph-sm);
-}
-
-.sidebar-new-message-btn:hover .sidebar-new-message-icon,
-.sidebar-item-active.sidebar-new-message-btn .sidebar-new-message-icon {
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary-soft) 50%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 65%, var(--color-border));
-  border-style: dashed;
-}
-
 .sidebar-new-message-label {
+  flex: none;
+  width: 100%;
+  text-align: center;
+  font-size: var(--sidebar-font-size-sm);
   font-style: italic;
   font-weight: 450;
   color: var(--color-muted);
+  line-height: 1.2;
 }
 
-.sidebar-new-message-label-cancel {
-  font-style: normal;
-  font-weight: 500;
-}
-
-.sidebar-new-message-btn:hover .sidebar-new-message-label,
-.sidebar-item-active.sidebar-new-message-btn .sidebar-new-message-label {
+.sidebar-new-message-btn:hover .sidebar-new-message-label {
   color: var(--color-primary);
-}
-
-.sidebar-skeleton-compose-avatar {
-  border-style: dashed;
-  background: transparent;
-  animation: none;
 }
 
 .sidebar-new-dm {
@@ -4231,6 +4212,8 @@ button.sidebar-group-header:focus-visible {
 
 /* Chat thread */
 .chat-thread {
+  --color-chat-own: color-mix(in srgb, var(--color-primary) 88%, #000);
+  --color-chat-own-hover: color-mix(in srgb, var(--color-primary) 78%, #000);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -4530,7 +4513,7 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .message-bubble--own {
-  background: var(--color-primary);
+  background: var(--color-chat-own);
   color: #fff;
   border-bottom-right-radius: 6px;
 }
@@ -4759,6 +4742,49 @@ button.sidebar-group-header:focus-visible {
   color: var(--color-muted);
 }
 
+.chat-thread .message-bubble--own .message-delivery-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 2px;
+  min-height: 14px;
+  align-self: flex-end;
+  width: 100%;
+}
+
+.chat-thread .message-delivery-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
+
+.chat-thread .message-delivery-check {
+  width: 14px;
+  height: 14px;
+  color: var(--color-muted);
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.chat-thread .message-delivery-peer-avatar {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  font-size: 0.45rem;
+  line-height: 14px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.chat-thread .message-delivery-peer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .chat-thread .message-content:has(.edit-form) {
   width: 100%;
 }
@@ -4898,7 +4924,7 @@ button.sidebar-group-header:focus-visible {
 .chat-thread .composer-send {
   width: var(--composer-control-height);
   min-width: var(--composer-control-height);
-  background: var(--color-primary);
+  background: var(--color-chat-own);
   color: #fff;
   border: none;
 }
@@ -4912,7 +4938,7 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-thread .composer-send:not(:disabled):hover {
-  background: var(--color-primary-hover);
+  background: var(--color-chat-own-hover);
 }
 
 .chat-thread .composer-attach-trigger {
@@ -5338,6 +5364,29 @@ button.sidebar-group-header:focus-visible {
   border: none;
   background: none;
   cursor: zoom-in;
+}
+
+.attachment-open--uploading {
+  position: relative;
+  cursor: default;
+}
+
+.attachment-upload-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.attachment-upload-overlay .spinner {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border-width: 3px;
 }
 
 .attachment-open:focus-visible {
@@ -5988,11 +6037,11 @@ button.sidebar-group-header:focus-visible {
 
 /* Panel layout — full-height chat with pinned composer */
 .chat-panel-content:has(> .chat-thread-panel) {
-  --chat-inset-x: 152px;
+  --chat-inset-x: 128px;
 }
 
 .chat-thread-panel {
-  --chat-inset-x: 152px;
+  --chat-inset-x: 128px;
   --chat-messages-bottom-gap: 48px;
   --chat-composer-top-padding: 8px;
   --chat-composer-bottom-padding: 8px;
@@ -6503,7 +6552,7 @@ html.standalone-display .chat-thread-panel {
 
   .chat-panel-content:has(> .chat-thread-panel),
   .chat-thread-panel {
-    --chat-inset-x: 16px;
+    --chat-inset-x: 14px;
     --chat-messages-bottom-gap: 36px;
     --chat-composer-top-padding: 6px;
     --chat-composer-bottom-padding: 6px;
@@ -6631,7 +6680,7 @@ html.standalone-display .chat-thread-panel {
 
   .chat-panel-content:has(> .chat-thread-panel),
   .chat-thread-panel {
-    --chat-inset-x: 12px;
+    --chat-inset-x: 10px;
     --chat-messages-bottom-gap: 28px;
     --chat-composer-top-padding: 4px;
     --chat-composer-bottom-padding: 6px;
@@ -6657,7 +6706,7 @@ html.standalone-display .chat-thread-panel {
 
   html.standalone-display .chat-panel-content:has(> .chat-thread-panel),
   html.standalone-display .chat-thread-panel {
-    --chat-inset-x: 8px;
+    --chat-inset-x: 6px;
     --chat-messages-bottom-gap: 18px;
     --chat-composer-top-padding: 4px;
     --chat-composer-bottom-padding: 4px;
@@ -6737,6 +6786,11 @@ html.standalone-display .chat-thread-panel {
 
 .call-header-btn--idle {
   color: var(--color-muted);
+}
+
+.call-header-btn--loading {
+  color: var(--color-muted);
+  cursor: wait;
 }
 
 .call-header-btn--waiting {

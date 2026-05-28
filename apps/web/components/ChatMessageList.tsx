@@ -6,12 +6,13 @@ import {
   MessageEmojiActions,
 } from "@/components/MessageReactionToolbar";
 import { MessageBody } from "@/components/MessageBody";
+import { MessageDeliveryStatus } from "@/components/MessageDeliveryStatus";
 import { UserAvatar } from "@/components/UserAvatar";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
 import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
 import { resolveAttachmentDisplayUrl } from "@/lib/attachment-url";
 import { buildMessageLayoutInfos } from "@/lib/message-grouping";
-import type { Message } from "@/lib/api";
+import type { Message, PeerUser } from "@/lib/api";
 import type { AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import type { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 
@@ -48,6 +49,9 @@ type Props = {
   onDeleteTarget: (messageId: string) => void;
   onOpenImage: (image: AttachmentLightboxImage) => void;
   onOpenVideo: (video: AttachmentLightboxImage) => void;
+  isDirectMessage?: boolean;
+  peerLastReadAt?: string | null;
+  peerUser?: PeerUser | null;
 };
 
 function ChatMessageListInner({
@@ -72,6 +76,9 @@ function ChatMessageListInner({
   onDeleteTarget,
   onOpenImage,
   onOpenVideo,
+  isDirectMessage = false,
+  peerLastReadAt = null,
+  peerUser = null,
 }: Props) {
   const layoutInfos = useMemo(
     () => buildMessageLayoutInfos(messages, resolvedUserId),
@@ -83,12 +90,24 @@ function ChatMessageListInner({
   }
 
   function canEditMessage(message: Message): boolean {
-    return Boolean(resolvedUserId && message.authorId === resolvedUserId);
+    return Boolean(
+      resolvedUserId &&
+        message.authorId === resolvedUserId &&
+        !message.pendingUpload &&
+        !message.uploadFailed,
+    );
   }
 
   function canDeleteMessage(message: Message): boolean {
+    if (message.pendingUpload || message.uploadFailed) return false;
     if (isOwnMessage(message)) return true;
     return isGroupLeader;
+  }
+
+  function messageAttachmentSrc(message: Message): string | null {
+    if (message.pendingUpload && message.localPreviewUrl) return message.localPreviewUrl;
+    if (message.attachmentUrl) return resolveAttachmentDisplayUrl(message.attachmentUrl);
+    return null;
   }
 
   return (
@@ -213,72 +232,117 @@ function ChatMessageListInner({
                           .join(" ")}
                         {...messageActions.getBubbleHandlers(m.id)}
                       >
-                        <span className="message-actions">
-                          <MessageEmojiActions
-                            messageId={m.id}
-                            reactions={m.reactions ?? []}
-                            currentUserId={resolvedUserId}
-                            onToggleReaction={onToggleReaction}
-                          />
-                          {(canEditMessage(m) || canDeleteMessage(m)) && (
-                            <span className="message-actions-divider" aria-hidden />
-                          )}
-                          {canEditMessage(m) && (
-                            <button
-                              type="button"
-                              className="link-btn"
-                              onClick={() => onStartEdit(m.id, m.body)}
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {canDeleteMessage(m) && (
-                            <button
-                              type="button"
-                              className="link-btn danger"
-                              onClick={() => onDeleteTarget(m.id)}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </span>
-                        {m.attachmentUrl && m.messageType === "image" && (
+                        {!m.pendingUpload && !m.uploadFailed ? (
+                          <span className="message-actions">
+                            <MessageEmojiActions
+                              messageId={m.id}
+                              reactions={m.reactions ?? []}
+                              currentUserId={resolvedUserId}
+                              onToggleReaction={onToggleReaction}
+                            />
+                            {(canEditMessage(m) || canDeleteMessage(m)) && (
+                              <span className="message-actions-divider" aria-hidden />
+                            )}
+                            {canEditMessage(m) && (
+                              <button
+                                type="button"
+                                className="link-btn"
+                                onClick={() => onStartEdit(m.id, m.body)}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {canDeleteMessage(m) && (
+                              <button
+                                type="button"
+                                className="link-btn danger"
+                                onClick={() => onDeleteTarget(m.id)}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </span>
+                        ) : null}
+                        {messageAttachmentSrc(m) && m.messageType === "image" && (
                           <button
                             type="button"
-                            className="attachment-open"
-                            aria-label="View full image"
+                            className={[
+                              "attachment-open",
+                              m.pendingUpload ? "attachment-open--uploading" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            aria-label={m.pendingUpload ? "Uploading image" : "View full image"}
+                            aria-busy={m.pendingUpload || undefined}
+                            disabled={m.pendingUpload}
                             onClick={(event) => {
                               event.stopPropagation();
-                              if (messageActions.isRevealed(m.id)) return;
+                              if (messageActions.isRevealed(m.id) || m.pendingUpload || !m.attachmentUrl) {
+                                return;
+                              }
                               onOpenImage({
-                                src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
+                                src: resolveAttachmentDisplayUrl(m.attachmentUrl),
                                 alt: m.body || "Shared image",
                               });
                             }}
                           >
                             <img
-                              src={resolveAttachmentDisplayUrl(m.attachmentUrl)}
+                              src={messageAttachmentSrc(m)!}
                               alt={m.body || "Shared image"}
                               className="attachment"
                               draggable={false}
                             />
+                            {m.pendingUpload ? (
+                              <span className="attachment-upload-overlay" aria-hidden="true">
+                                <span className="spinner" />
+                              </span>
+                            ) : null}
                           </button>
                         )}
-                        {m.attachmentUrl && m.messageType === "video" && (
+                        {messageAttachmentSrc(m) && m.messageType === "video" && !m.pendingUpload && (
                           <VideoAttachmentPreview
                             label={m.body || "Shared video"}
-                            src={resolveAttachmentDisplayUrl(m.attachmentUrl!)}
+                            src={messageAttachmentSrc(m)!}
                             onPlay={() => {
-                              if (messageActions.isRevealed(m.id)) return;
+                              if (messageActions.isRevealed(m.id) || !m.attachmentUrl) return;
                               onOpenVideo({
-                                src: resolveAttachmentDisplayUrl(m.attachmentUrl!),
+                                src: resolveAttachmentDisplayUrl(m.attachmentUrl),
                                 alt: m.body || "Shared video",
                               });
                             }}
                           />
                         )}
+                        {m.pendingUpload && m.localPreviewUrl && m.messageType === "video" && (
+                          <button
+                            type="button"
+                            className="attachment-open attachment-open--uploading attachment-video-preview"
+                            aria-label="Uploading video"
+                            aria-busy
+                            disabled
+                          >
+                            <video
+                              className="attachment attachment-video-preview-video attachment-video-preview-video--ready"
+                              src={m.localPreviewUrl}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              aria-hidden="true"
+                            />
+                            <span className="attachment-upload-overlay" aria-hidden="true">
+                              <span className="spinner" />
+                            </span>
+                          </button>
+                        )}
                         {m.body ? (
                           <MessageBody body={m.body} currentUserId={resolvedUserId} />
+                        ) : null}
+                        {isOwn && !isEditing ? (
+                          <MessageDeliveryStatus
+                            message={m}
+                            peerLastReadAt={peerLastReadAt}
+                            peerUser={peerUser}
+                            showPeerReadReceipt={isDirectMessage}
+                          />
                         ) : null}
                       </div>
                     </MessageBubbleStack>
