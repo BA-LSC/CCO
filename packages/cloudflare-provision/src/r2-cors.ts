@@ -29,10 +29,36 @@ export type R2UploadChatOriginSources = {
   webUrl?: string | null;
   publicWebUrl?: string | null;
   signInRedirectUri?: string | null;
+  /** Browser Origin header on the presign request (often omitted for same-origin API calls). */
   requestOrigin?: string | null;
   requestReferer?: string | null;
+  /** Explicit chat origin from the client or web proxy (window.location.origin). */
+  clientChatOrigin?: string | null;
   extraOrigins?: string[];
 };
+
+/** Add www ↔ apex variants so uploads work when DNS serves both hostnames. */
+export function expandWwwOriginVariants(origins: string[]): string[] {
+  const expanded = new Set(origins);
+
+  for (const origin of origins) {
+    try {
+      const url = new URL(origin);
+      const host = url.hostname.toLowerCase();
+      const port = url.port ? `:${url.port}` : "";
+
+      if (host.startsWith("www.")) {
+        expanded.add(`${url.protocol}//${host.slice(4)}${port}`);
+      } else if (host !== "localhost" && host !== "127.0.0.1" && !host.includes(":")) {
+        expanded.add(`${url.protocol}//www.${host}${port}`);
+      }
+    } catch {
+      // ignore invalid origins
+    }
+  }
+
+  return [...expanded];
+}
 
 /** Collect chat site origins for R2 bucket CORS (deployment URL, OAuth redirect, live browser origin). */
 export function resolveR2UploadChatOrigins(sources: R2UploadChatOriginSources): string[] {
@@ -41,6 +67,7 @@ export function resolveR2UploadChatOrigins(sources: R2UploadChatOriginSources): 
     sources.webUrl,
     sources.publicWebUrl,
     sources.signInRedirectUri,
+    sources.clientChatOrigin,
     sources.requestOrigin,
     sources.requestReferer,
     ...(sources.extraOrigins ?? []),
@@ -51,7 +78,7 @@ export function resolveR2UploadChatOrigins(sources: R2UploadChatOriginSources): 
     if (origin) origins.add(origin);
   }
 
-  return [...origins];
+  return expandWwwOriginVariants([...origins]);
 }
 
 /** CORS rules for browser presigned PUT/GET uploads from the chat web origin. */

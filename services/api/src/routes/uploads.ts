@@ -70,7 +70,7 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
     return c.json({ error: "R2 uploads are not configured" }, 503);
   }
 
-  let body: { contentType?: string; size?: number };
+  let body: { contentType?: string; size?: number; chatOrigin?: string };
   try {
     body = await c.req.json();
   } catch {
@@ -85,7 +85,13 @@ uploadsRouter.post("/presign", requireAuth, async (c) => {
   const ext = EXT_BY_MIME[contentType] ?? contentType.split("/")[1] ?? "bin";
   const filename = `${crypto.randomUUID()}.${ext}`;
 
+  const clientChatOrigin =
+    body.chatOrigin?.trim() ||
+    c.req.header("X-CCO-Chat-Origin")?.trim() ||
+    null;
+
   await reconcileOrgR2UploadCors({
+    clientChatOrigin,
     requestOrigin: c.req.header("Origin"),
     requestReferer: c.req.header("Referer"),
   }).catch((err) => {

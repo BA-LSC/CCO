@@ -132,9 +132,17 @@ function uploadFetchErrorMessage(stage: "presign" | "storage", err: unknown): st
 async function uploadMediaViaPresign(file: File, contentType: string): Promise<string> {
   let presign: PresignResponse;
   try {
+    const chatOrigin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : undefined;
     presign = await apiFetch<PresignResponse>("/api/v1/uploads/presign", {
       method: "POST",
-      body: JSON.stringify({ contentType, size: file.size }),
+      body: JSON.stringify({
+        contentType,
+        size: file.size,
+        ...(chatOrigin ? { chatOrigin } : {}),
+      }),
     });
   } catch (err) {
     if (err instanceof Error && err.message !== "Failed to fetch") {

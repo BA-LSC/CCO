@@ -79,6 +79,9 @@ export async function proxyToApi(request: Request, pathSegments: string[]): Prom
   if (origin) headers.set("origin", origin);
   const referer = request.headers.get("referer");
   if (referer) headers.set("referer", referer);
+  if (request.method === "POST" && path === "uploads/presign") {
+    headers.set("X-CCO-Chat-Origin", new URL(request.url).origin);
+  }
 
   const uploadPost = isUploadPost(request.method, path);
   const uploadMedia = isUploadMediaRequest(request.method, path);

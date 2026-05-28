@@ -107,6 +107,7 @@ export function isR2UploadsEnabled(): boolean {
 
 /** Apply R2 bucket CORS for browser presigned PUT from the chat web origin (idempotent). */
 export async function reconcileOrgR2UploadCors(options?: {
+  clientChatOrigin?: string | null;
   requestOrigin?: string | null;
   requestReferer?: string | null;
 }): Promise<void> {
@@ -117,6 +118,7 @@ export async function reconcileOrgR2UploadCors(options?: {
     webUrl: process.env.WEB_URL,
     publicWebUrl: process.env.NEXT_PUBLIC_WEB_URL,
     signInRedirectUri: org.pcoWebRedirectUri,
+    clientChatOrigin: options?.clientChatOrigin,
     requestOrigin: options?.requestOrigin,
     requestReferer: options?.requestReferer,
   });

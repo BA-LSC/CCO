@@ -105,8 +105,14 @@ describe("reconcileOrgR2UploadCors", () => {
     process.env.CLOUDFLARE_API_TOKEN = "cf-token";
 
     const { reconcileOrgR2UploadCors } = await import(`./r2-uploads?t=${Date.now()}`);
-    await reconcileOrgR2UploadCors({ requestOrigin: "https://www.chat.example.com" });
-    await reconcileOrgR2UploadCors({ requestOrigin: "https://www.chat.example.com" });
+    await reconcileOrgR2UploadCors({
+      clientChatOrigin: "https://www.chat.example.com",
+      requestOrigin: "https://www.chat.example.com",
+    });
+    await reconcileOrgR2UploadCors({
+      clientChatOrigin: "https://www.chat.example.com",
+      requestOrigin: "https://www.chat.example.com",
+    });
 
     expect(r2CorsCalls).toBe(2);
     expect(lastCorsOrigins).toEqual([
