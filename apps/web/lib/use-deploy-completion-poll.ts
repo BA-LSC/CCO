@@ -6,10 +6,8 @@ import {
   applyAppUpdate,
   clearDeployWait,
   DEPLOY_POLL_MS,
-  isDeployOverlaySuppressed,
   probeServerAppVersion,
 } from "@/lib/app-update";
-import { setAppUpdateOverlayLabel } from "@/lib/app-update-overlay";
 import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
 import { getClientBuildVersion } from "@/lib/build-version";
 
@@ -19,6 +17,7 @@ export type UseDeployCompletionPollOptions = {
   deploying: boolean;
   /** Called when deploy finishes; return "abort" to skip reload (caller clears deploy state). */
   validateBeforeReload?: () => Promise<DeployReloadValidation>;
+  /** Live step labels — only used on Admin Settings (inline deploying UI). */
   onDeployStatusMessage?: (message: string) => void;
 };
 
@@ -41,9 +40,6 @@ export function useDeployCompletionPoll({
         elapsedMs,
       });
       onDeployStatusMessage?.(message);
-      if (!isDeployOverlaySuppressed()) {
-        setAppUpdateOverlayLabel(message);
-      }
     },
     [onDeployStatusMessage],
   );
@@ -65,7 +61,9 @@ export function useDeployCompletionPoll({
       const { updating, version: serverVersion, unavailable, deployPhase } =
         await probeServerAppVersion();
       if (cancelled) return;
-      refreshDeployStatusMessage(updating, deployPhase);
+      if (onDeployStatusMessage) {
+        refreshDeployStatusMessage(updating, deployPhase);
+      }
       if (updating) {
         sawDeployUpdatingRef.current = true;
         return;

@@ -10,8 +10,6 @@ import {
   shouldRunAppUpdateChecks,
 } from "@/lib/app-update";
 import { getClientBuildVersion } from "@/lib/build-version";
-import { setAppUpdateOverlayLabel } from "@/lib/app-update-overlay";
-import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
 
 const RECONNECT_MS = 5_000;
 
@@ -70,15 +68,9 @@ export function listenForDeployEvents(): () => void {
   };
 
   const pollDeployState = async () => {
-    const { updating, version: serverVersion, unavailable, deployPhase } =
-      await probeServerAppVersion();
+    const { updating, version: serverVersion, unavailable } = await probeServerAppVersion();
     if (updating) {
       markDeployUpdating();
-      if (!isDeployOverlaySuppressed()) {
-        setAppUpdateOverlayLabel(
-          resolveDeployStatusMessage({ phase: deployPhase, updating: true, elapsedMs: 0 }),
-        );
-      }
       return;
     }
     if (isDeployPending()) {
