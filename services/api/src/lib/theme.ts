@@ -1,4 +1,16 @@
-export const USER_THEMES = ["1", "2", "3", "4", "5", "6"] as const;
+export const USER_THEMES = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+] as const;
 export type UserTheme = (typeof USER_THEMES)[number];
 
 export function parseUserTheme(value: unknown): UserTheme | null {

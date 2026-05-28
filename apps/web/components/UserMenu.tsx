@@ -14,12 +14,8 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { UserPresenceDot } from "@/components/UserPresenceDot";
 import { resolvePresenceDotState, usePresence } from "@/components/PresenceProvider";
 import { apiFetch } from "@/lib/api";
-import {
-  CHAOS_UNLOCK_CLICKS,
-  CHAOS_UNLOCK_WINDOW_MS,
-  THEME_LABELS,
-  type UserTheme,
-} from "@/lib/themes";
+import { ThemePicker } from "@/components/ThemePicker";
+import { CHAOS_UNLOCK_CLICKS, CHAOS_UNLOCK_WINDOW_MS, type UserTheme } from "@/lib/themes";
 import { useAdminUpdateAvailable } from "@/lib/use-admin-update-available";
 
 type SessionUser = {
@@ -29,8 +25,6 @@ type SessionUser = {
   avatarUrl?: string | null;
   siteAdministrator?: boolean;
 };
-
-const PICKER_THEMES: UserTheme[] = ["1", "2", "3", "4", "5"];
 
 type Props = {
   variant?: "default" | "sidebar";
@@ -254,37 +248,11 @@ export function UserMenu({ variant = "default" }: Props) {
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-theme" role="group" aria-label="Theme">
             <span className="user-menu-dropdown-label">Theme</span>
-            <div className="user-menu-theme-grid">
-              {PICKER_THEMES.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={`user-menu-theme-btn user-menu-theme-btn-${id}${
-                    theme === id ? " user-menu-theme-btn-active" : ""
-                  }`}
-                  aria-pressed={theme === id}
-                  aria-label={`${THEME_LABELS[id]} theme`}
-                  title={THEME_LABELS[id]}
-                  onClick={() => void handleThemePick(id)}
-                >
-                  {id}
-                </button>
-              ))}
-              {chaosUnlocked && (
-                <button
-                  type="button"
-                  className={`user-menu-theme-btn user-menu-theme-btn-6${
-                    theme === "6" ? " user-menu-theme-btn-active" : ""
-                  }`}
-                  aria-pressed={theme === "6"}
-                  aria-label="CHAOS theme"
-                  title="CHAOS"
-                  onClick={() => void handleThemePick("6")}
-                >
-                  ☠
-                </button>
-              )}
-            </div>
+            <ThemePicker
+              theme={theme}
+              chaosUnlocked={chaosUnlocked}
+              onPick={(next) => handleThemePick(next)}
+            />
             {chaosHint && (
               <p className="user-menu-chaos-toast" role="status">
                 <span className="user-menu-chaos-toast-text">🎉 CHAOS UNLEASHED 🎊</span>

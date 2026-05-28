@@ -12,6 +12,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import {
   applyThemeToDocument,
+  CHAOS_THEME,
   isUserTheme,
   THEME_STORAGE_KEY,
   type UserTheme,
@@ -45,7 +46,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (cached) {
       setThemeState(cached);
       applyThemeToDocument(cached);
-      if (cached === "6") setChaosUnlocked(true);
+      if (cached === CHAOS_THEME) setChaosUnlocked(true);
     }
   }, []);
 
@@ -58,7 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setThemeState(me.theme);
         applyThemeToDocument(me.theme);
         localStorage.setItem(THEME_STORAGE_KEY, me.theme);
-        if (me.theme === "6") setChaosUnlocked(true);
+        if (me.theme === CHAOS_THEME) setChaosUnlocked(true);
       })
       .catch(() => {
         /* signed out — keep local theme for guests */
@@ -76,7 +77,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(next);
     applyThemeToDocument(next);
     localStorage.setItem(THEME_STORAGE_KEY, next);
-    if (next === "6") setChaosUnlocked(true);
+    if (next === CHAOS_THEME) setChaosUnlocked(true);
 
     try {
       await apiFetch<{ theme: string }>("/api/v1/session/me/theme", {
@@ -90,7 +91,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(
     async (next: UserTheme) => {
-      if (next === "6" && !chaosUnlocked) return;
+      if (next === CHAOS_THEME && !chaosUnlocked) return;
       await persistTheme(next);
     },
     [chaosUnlocked, persistTheme],
@@ -98,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const unlockChaos = useCallback(async () => {
     setChaosUnlocked(true);
-    await persistTheme("6");
+    await persistTheme(CHAOS_THEME);
   }, [persistTheme]);
 
   const value = useMemo(

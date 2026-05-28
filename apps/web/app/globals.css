@@ -656,72 +656,114 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   border-color: var(--color-primary);
 }
 
-.user-menu-theme-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
+.user-menu-theme-picker {
+  position: relative;
   margin-top: 8px;
 }
 
-.user-menu-theme-btn {
-  aspect-ratio: 1;
-  min-width: 0;
-  padding: 0;
-  border: 2px solid var(--color-border);
+.user-menu-theme-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
-  color: #fff;
   transition:
-    transform 0.12s,
-    border-color 0.12s,
-    box-shadow 0.12s;
+    border-color 0.15s,
+    background 0.15s;
 }
 
-.user-menu-theme-btn:hover {
-  transform: scale(1.06);
+.user-menu-theme-trigger:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
-.user-menu-theme-btn-active {
-  border-color: var(--color-text);
-  box-shadow: 0 0 0 2px var(--color-primary-soft);
-  transform: scale(1.08);
+.user-menu-theme-trigger-label {
+  flex: 1;
+  text-align: left;
 }
 
-.user-menu-theme-btn-1 {
-  background: linear-gradient(135deg, #1d4ed8, #60a5fa);
+.user-menu-theme-trigger-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-muted);
 }
 
-.user-menu-theme-btn-2 {
-  background: linear-gradient(135deg, #0b1220, #374151);
+.user-menu-theme-swatch {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.user-menu-theme-btn-3 {
-  background: linear-gradient(135deg, #15803d, #86efac);
-}
-
-.user-menu-theme-btn-4 {
-  background: linear-gradient(135deg, #c2410c, #fdba74);
-}
-
-.user-menu-theme-btn-5 {
-  background: linear-gradient(135deg, #44403c, #d6d3d1);
-  color: #1c1917;
-}
-
-.user-menu-theme-btn-6 {
-  background: linear-gradient(
-    90deg,
-    #ff00ff,
-    #00ffff,
-    #ffff00,
-    #ff00ff
-  );
+.user-menu-theme-swatch-chaos {
+  background: linear-gradient(90deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
   background-size: 200% 100%;
   animation: chaos-rainbow-bg 1.5s linear infinite;
-  font-size: 1rem;
+}
+
+.user-menu-theme-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.user-menu-sidebar .user-menu-theme-list {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.user-menu-theme-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.user-menu-theme-option:hover {
+  background: var(--color-primary-soft);
+}
+
+.user-menu-theme-option-active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.user-menu-theme-option-label {
+  flex: 1;
 }
 
 @keyframes party-confetti-fall {
@@ -837,7 +879,7 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   animation: party-bounce 0.65s ease-in-out infinite alternate;
 }
 
-html[data-theme="6"] .user-menu-dropdown {
+html[data-theme="11"] .user-menu-dropdown {
   min-width: 240px;
 }
 
@@ -1054,7 +1096,7 @@ html[data-theme="6"] .user-menu-dropdown {
   margin-bottom: 8px;
 }
 
-.user-menu-sidebar .user-menu-theme-grid,
+.user-menu-sidebar .user-menu-theme-picker,
 .user-menu-sidebar .user-menu-status-grid {
   margin-top: 6px;
 }
@@ -3748,10 +3790,11 @@ button.sidebar-group-header:focus-visible {
   font: inherit;
   font-size: 0.9375rem;
   background: var(--color-bg);
-  color: var(--color-text);
+  color: color-mix(in srgb, var(--color-muted) 42%, var(--color-text));
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    color 0.15s ease;
 }
 
 .integrations-input::placeholder {
@@ -3762,6 +3805,7 @@ button.sidebar-group-header:focus-visible {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-soft);
+  color: var(--color-text);
 }
 
 .integrations-textarea {

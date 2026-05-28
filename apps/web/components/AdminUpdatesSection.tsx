@@ -286,8 +286,6 @@ export function AdminUpdatesSection({
         </p>
       )}
 
-      <UpdatesFeedback error={feedback.error} success={feedback.success} />
-
       {isUpdating && (
         <div className="integrations-updates-deploying" role="status" aria-live="polite">
           <div className="integrations-updates-deploying-head">
@@ -296,11 +294,14 @@ export function AdminUpdatesSection({
               Workers are redeploying. This page refreshes when the deploy finishes.
             </span>
           </div>
+          <UpdatesFeedback success={feedback.success} />
           <div className="integrations-updates-progress" aria-hidden="true">
             <div className="integrations-updates-progress-bar" />
           </div>
         </div>
       )}
+
+      <UpdatesFeedback error={feedback.error} success={isUpdating ? undefined : feedback.success} />
 
       <div className="integrations-actions">
         <button
