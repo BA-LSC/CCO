@@ -108,9 +108,14 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 
   const pendingJoinRef = useRef<string | null>(null);
   const inCallRef = useRef(inCall);
+  const prevInCallRef = useRef(inCall);
   const endedCallIdsRef = useRef(new Set<string>());
+  /** Solo auto-leave notice (seconds) shown after inCall becomes false. */
+  const pendingSoloNoticeSecondsRef = useRef<number | null>(null);
 
+  const activeCallRef = useRef(activeCall);
   inCallRef.current = inCall;
+  activeCallRef.current = activeCall;
 
   const { registerActiveCall } = useActiveCallsMap();
 
@@ -170,8 +175,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   }, [clearCallQueryParam, hangUp]);
 
   const handleSoloAutoLeave = useCallback((durationMs: number) => {
-    const durationSeconds = Math.max(1, Math.round(durationMs / 1000));
-    setSoloCallNotice(formatSoloCallAutoLeaveNotice(durationSeconds));
+    pendingSoloNoticeSecondsRef.current = Math.max(1, Math.round(durationMs / 1000));
   }, []);
 
   useEffect(() => {
@@ -204,13 +208,18 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       }
 
       if (event.type === "call.ended") {
+        const call = activeCallRef.current;
+        const endedHomeCall =
+          inCallRef.current &&
+          (conversationId === homeConversationId ||
+            conversationId === call?.conversationId);
         if (conversationId === homeConversationId || conversationId === incomingConversationId) {
           endedCallIdsRef.current.add(event.callId);
           acknowledgeCallEnded(event.callId);
           setIncomingCall(null);
           setIncomingConversationId(null);
           clearCallQueryParam();
-          if (inCallRef.current && conversationId === homeConversationId) {
+          if (endedHomeCall) {
             void handleHangUp();
           }
         }
@@ -248,9 +257,16 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     if (!inCall) {
       setHomeConversationId(null);
       setHomeChatPath(null);
-    } else {
+      const pendingSeconds = pendingSoloNoticeSecondsRef.current;
+      if (pendingSeconds != null) {
+        pendingSoloNoticeSecondsRef.current = null;
+        setSoloCallNotice(formatSoloCallAutoLeaveNotice(pendingSeconds));
+      }
+    } else if (!prevInCallRef.current) {
+      pendingSoloNoticeSecondsRef.current = null;
       setSoloCallNotice(null);
     }
+    prevInCallRef.current = inCall;
   }, [inCall]);
 
   const inCallOnConversation = useCallback(
@@ -335,7 +351,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         <ChatHomeBanner
           key={soloCallNotice}
           variant="neutral"
-          placement="panel"
+          placement="fixed"
           autoDismissMs={CHAT_PANEL_BANNER_AUTO_DISMISS_MS}
           onDismiss={() => setSoloCallNotice(null)}
         >

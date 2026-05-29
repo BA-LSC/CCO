@@ -8850,6 +8850,30 @@ html.standalone-display .chat-thread-panel {
   z-index: 15;
 }
 
+.call-panel--inline-docked .call-participant-grid--solo {
+  align-items: center;
+  justify-items: center;
+  place-content: center;
+  padding: 10px 8px 14px;
+}
+
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
+  width: min(100%, 252px);
+  height: auto;
+  max-height: 100%;
+  min-height: 0;
+  align-self: center;
+}
+
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar {
+  flex: 0 1 auto;
+}
+
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar img,
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__initials {
+  height: min(152px, 100%);
+}
+
 .call-panel--guest {
   position: fixed;
   inset: 0;
