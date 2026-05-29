@@ -6,6 +6,7 @@ import {
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
 import { useCallParticipantAvatars } from "@/hooks/useCallParticipantAvatars";
+import { useParticipantAudioSpeaking } from "@/hooks/useParticipantAudioSpeaking";
 
 type CallPeer = {
   id: string;
@@ -13,6 +14,8 @@ type CallPeer = {
   picture?: string;
   customParticipantId?: string;
   videoEnabled?: boolean;
+  audioEnabled?: boolean;
+  audioTrack?: MediaStreamTrack;
   registerVideoElement?: (element: HTMLVideoElement, isPreview?: boolean) => void;
   deregisterVideoElement?: (element?: HTMLVideoElement, isPreview?: boolean) => void;
 };
@@ -28,14 +31,19 @@ function CallParticipantBox({
   peer,
   avatarUrl,
   isSelf,
+  audioTrack,
+  audioEnabled,
 }: {
   peer: CallPeer;
   avatarUrl?: string;
   isSelf: boolean;
+  audioTrack?: MediaStreamTrack;
+  audioEnabled: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayName = peer.name?.trim() || "Participant";
   const showVideo = Boolean(peer.videoEnabled);
+  const isSpeaking = useParticipantAudioSpeaking(audioTrack, audioEnabled);
 
   useEffect(() => {
     const element = videoRef.current;
@@ -48,7 +56,7 @@ function CallParticipantBox({
   }, [peer, showVideo]);
 
   return (
-    <div className="call-participant-box">
+    <div className={`call-participant-box${isSpeaking ? " call-participant-box--speaking" : ""}`}>
       {showVideo ? (
         <video
           ref={videoRef}
@@ -58,7 +66,10 @@ function CallParticipantBox({
           muted={isSelf}
         />
       ) : (
-        <div className="call-participant-box__avatar" aria-hidden={!avatarUrl}>
+        <div
+          className={`call-participant-box__avatar${isSpeaking ? " call-participant-box__avatar--speaking" : ""}`}
+          aria-hidden={!avatarUrl}
+        >
           {avatarUrl ? (
             <img src={avatarUrl} alt="" />
           ) : (
@@ -78,6 +89,8 @@ export function CallParticipantGrid() {
   const { meeting } = useRealtimeKitMeeting();
   const joined = useRealtimeKitSelector((m) => m.participants.joined.toArray());
   const self = useRealtimeKitSelector((m) => m.self);
+  const selfAudioTrack = useRealtimeKitSelector((m) => m.self?.audioTrack);
+  const selfAudioEnabled = useRealtimeKitSelector((m) => m.self?.audioEnabled ?? false);
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const avatarMap = useCallParticipantAvatars(meeting);
 
@@ -112,6 +125,8 @@ export function CallParticipantGrid() {
             peer={peer}
             avatarUrl={avatarUrl}
             isSelf={peer.id === self?.id}
+            audioTrack={peer.id === self?.id ? selfAudioTrack : peer.audioTrack}
+            audioEnabled={peer.id === self?.id ? selfAudioEnabled : Boolean(peer.audioEnabled)}
           />
         );
       })}

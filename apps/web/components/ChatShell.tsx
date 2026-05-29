@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
 import { ActiveCallProvider } from "@/components/calls/ConversationCallContext";
+import { ActiveCallsMapProvider } from "@/hooks/useActiveCallsMap";
 import { ChatLayoutProvider } from "@/components/ChatLayoutContext";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
@@ -46,6 +47,7 @@ export function ChatShell({ children }: Props) {
 
   return (
     <ChatLayoutProvider>
+      <ActiveCallsMapProvider>
       <ActiveCallProvider>
         <WebPushRegistrar />
         <AppUnreadSync />
@@ -59,6 +61,7 @@ export function ChatShell({ children }: Props) {
         </main>
         </div>
       </ActiveCallProvider>
+      </ActiveCallsMapProvider>
     </ChatLayoutProvider>
   );
 }

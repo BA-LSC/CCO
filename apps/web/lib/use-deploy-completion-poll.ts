@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { isUpdateAvailable, releaseShasEqual } from "@cco/shared";
 import {
-  applyAppUpdate,
   clearDeployWait,
+  completeDeployReload,
   DEPLOY_POLL_MS,
   isDeployPending,
   probeServerAppVersion,
@@ -34,6 +34,8 @@ export type UseDeployCompletionPollOptions = {
   validateBeforeReload?: () => Promise<DeployReloadValidation>;
   /** Live step labels — only used on Admin Settings (inline deploying UI). */
   onDeployStatusMessage?: (message: string) => void;
+  /** Called when reload was blocked (loop guard) or otherwise did not run. */
+  onReloadBlocked?: () => void;
 };
 
 /** True when the server is no longer draining and this tab should reload. */
@@ -57,6 +59,7 @@ export function useDeployCompletionPoll({
   deploying,
   validateBeforeReload,
   onDeployStatusMessage,
+  onReloadBlocked,
 }: UseDeployCompletionPollOptions): void {
   const sawDeployUpdatingRef = useRef(false);
   const deployStartedAtRef = useRef<number | null>(null);
@@ -129,7 +132,10 @@ export function useDeployCompletionPoll({
           }
         }
 
-        await applyAppUpdate();
+        const reloaded = await completeDeployReload();
+        if (!reloaded) {
+          onReloadBlocked?.();
+        }
       } finally {
         if (!cancelled) {
           finishingDeployRef.current = false;
@@ -144,7 +150,7 @@ export function useDeployCompletionPoll({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [deploying, refreshDeployStatusMessage, validateBeforeReload]);
+  }, [deploying, onReloadBlocked, refreshDeployStatusMessage, validateBeforeReload]);
 }
 
 /** True when org updates status reflects a finished apply (installed matches target or no update flag). */
@@ -192,19 +198,10 @@ export async function waitForUpdatesStatusAfterDeploy<T extends UpdatesReloadSta
 export function validateUpdatesReload(
   status: UpdatesReloadStatus | null,
   onError: (message: string) => void,
-  options?: ValidateUpdatesReloadOptions,
 ): DeployReloadValidation {
-  if (!status) return "reload";
-  if (status.lastApplyError) {
+  if (status?.lastApplyError) {
     clearDeployWait();
     onError(`Apply failed: ${status.lastApplyError}`);
-    return "abort";
-  }
-  if (!shouldAcceptUpdatesReload(status, options?.expectedAppliedVersion)) {
-    clearDeployWait();
-    onError(
-      "Deploy finished but the release is still pending. Check for updates and try Apply again.",
-    );
     return "abort";
   }
   return "reload";

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { CallSummaryDto } from "@cco/shared/calls";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
-import { reduceActiveCallsMap } from "./useActiveCallsMap";
+import { applyActiveCallToMap, reduceActiveCallsMap } from "./useActiveCallsMap";
+import { resolveSidebarActiveCall } from "@/lib/sidebar-active-call";
 
 const CONV_ID = "11111111-1111-4111-8111-111111111111";
 const CALL_ID = "22222222-2222-4222-8222-222222222222";
@@ -72,6 +73,22 @@ describe("reduceActiveCallsMap", () => {
       timelineEvent: null,
     });
     expect(map.has(CONV_ID)).toBe(false);
+  });
+
+  test("applyActiveCallToMap sets and clears by participant count", () => {
+    let map = applyActiveCallToMap(new Map(), callSummary(2), CONV_ID);
+    expect(map.get(CONV_ID)?.participantCount).toBe(2);
+
+    map = applyActiveCallToMap(map, null, CONV_ID);
+    expect(map.has(CONV_ID)).toBe(false);
+  });
+
+  test("resolveSidebarActiveCall prefers map then session", () => {
+    const mapCall = callSummary(2);
+    const sessionCall = { ...callSummary(3), id: "55555555-5555-4555-8555-555555555555" };
+    expect(resolveSidebarActiveCall(CONV_ID, mapCall, sessionCall)).toBe(mapCall);
+    expect(resolveSidebarActiveCall(CONV_ID, undefined, sessionCall)).toBe(sessionCall);
+    expect(resolveSidebarActiveCall(CONV_ID, undefined, callSummary(0))).toBeUndefined();
   });
 
   test("ignores unrelated realtime events", () => {

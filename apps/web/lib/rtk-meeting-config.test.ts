@@ -50,19 +50,39 @@ describe("buildRtkMeetingConfig", () => {
     expect(right).not.toContain("rtk-plugins-toggle");
     expect(right).not.toContain("rtk-participants-toggle");
     expect(center).not.toContain("rtk-leave-button");
+    expect(center).toContain("rtk-settings-toggle");
+    expect(center).toContain("rtk-screen-share-toggle");
+    expect(center).toContain("rtk-mic-toggle");
+    expect(center).toContain("rtk-camera-toggle");
     expect(config.styles?.["rtk-leave-button"]?.display).toBe("none");
     expect(config.styles?.["rtk-chat-toggle"]?.display).toBe("none");
+    expect(config.styles?.["rtk-controlbar"]?.justifyContent).toBe("center");
+    expect(config.styles?.["div#controlbar-left"]?.display).toBe("none");
   });
 
   test("pip removes chat, polls, plugins, participants, and leave", () => {
     const config = buildRtkMeetingConfig({ enableInRoomChat: false, placement: "pip" });
     const right = listControlbarTags(config, "div#controlbar-right");
     const center = listControlbarTags(config, "div#controlbar-center");
+    const centerChildren = config.root?.["div#controlbar-center"];
 
     expect(right).not.toContain("rtk-chat-toggle");
     expect(right).not.toContain("rtk-polls-toggle");
     expect(right).not.toContain("rtk-plugins-toggle");
     expect(right).not.toContain("rtk-participants-toggle");
     expect(center).not.toContain("rtk-leave-button");
+    expect(centerChildren).toEqual(center.map((tag) => [tag, { size: "sm" }]));
+    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("2px");
+    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBe("36px");
+    expect(config.styles?.["rtk-mic-toggle"]?.["--rtk-controlbar-button-icon-size"]).toBe("20px");
+  });
+
+  test("inline keeps full-size labeled controlbar buttons", () => {
+    const config = buildRtkMeetingConfig({ enableInRoomChat: true, placement: "inline" });
+    const centerChildren = config.root?.["div#controlbar-center"];
+
+    expect(centerChildren?.[0]).toBe("rtk-settings-toggle");
+    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("6px");
+    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBeUndefined();
   });
 });

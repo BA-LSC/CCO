@@ -20,10 +20,9 @@ import {
   formatMessageDayDivider,
   formatMessageTime,
 } from "@/lib/message-time";
-import { CallTimelineJoinAction } from "@/components/calls/CallTimelineJoinAction";
+import { CallTimelineDivider } from "@/components/calls/CallTimelineDivider";
 import {
   buildThreadTimeline,
-  formatCallTimelineLabel,
   threadItemStartsNewDay,
   type CallTimelineEventDto,
 } from "@/lib/call-timeline";
@@ -195,11 +194,8 @@ function ChatMessageListInner({
                   </div>
                 </li>
               )}
-              <li className="messages-day-divider-wrap" aria-hidden={false}>
-                <div className="messages-call-divider" role="status">
-                  <time dateTime={item.at}>{formatCallTimelineLabel(item.call)}</time>
-                  <CallTimelineJoinAction event={item.call} conversationId={conversationId} />
-                </div>
+              <li className="messages-call-divider-wrap" aria-hidden={false}>
+                <CallTimelineDivider event={item.call} conversationId={conversationId} />
               </li>
             </Fragment>
           );

@@ -32,6 +32,68 @@ const CCO_HIDDEN_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
   "rtk-leave-button": { display: "none" },
 };
 
+const CONTROLBAR_SECTION_KEYS = [
+  "div#controlbar-left",
+  "div#controlbar-center",
+  "div#controlbar-right",
+] as const;
+
+const CCO_CONTROLBAR_TOGGLE_VARS = {
+  "--rtk-controlbar-button-background-color": "transparent",
+} as const;
+
+const CCO_CONTROLBAR_TOGGLE_KEYS = [
+  "rtk-settings-toggle",
+  "rtk-screen-share-toggle",
+  "rtk-livestream-toggle",
+  "rtk-mic-toggle",
+  "rtk-camera-toggle",
+  "rtk-webinar-stage-toggle",
+  "rtk-stage-toggle",
+  "rtk-more-toggle",
+  "rtk-ai-toggle",
+] as const;
+
+const PIP_CONTROLBAR_BUTTON_PROPS = { size: "sm" } as const;
+
+const PIP_CONTROLBAR_TOGGLE_VARS = {
+  ...CCO_CONTROLBAR_TOGGLE_VARS,
+  "--rtk-controlbar-button-icon-size": "20px",
+  minWidth: "36px",
+} as const;
+
+const CCO_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
+  "rtk-controlbar": {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+    padding: "0",
+    gap: "0",
+    backgroundColor: "transparent",
+  },
+  "div#controlbar-center": {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: "6px",
+    width: "auto",
+    maxWidth: "100%",
+  },
+  "div#controlbar-left": { display: "none" },
+  "div#controlbar-right": { display: "none" },
+  "rtk-settings-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-screen-share-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-livestream-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-mic-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-camera-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-webinar-stage-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-stage-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-more-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-ai-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+};
+
 function tagName(child: RootChild): string {
   return typeof child === "string" ? child : child[0];
 }
@@ -54,14 +116,97 @@ function applyControlbarFilter(config: UIConfig, remove: ReadonlySet<string>): U
   return config;
 }
 
+/** One centered row — avoids empty 3-column grid with controls stuck on the left. */
+function applyCcoControlbarLayout(config: UIConfig): UIConfig {
+  const root = config.root;
+  if (!root) return config;
+
+  const merged: string[] = [];
+  for (const key of CONTROLBAR_SECTION_KEYS) {
+    const children = root[key];
+    if (!Array.isArray(children)) continue;
+    for (const child of children) {
+      const tag = tagName(child as RootChild);
+      if (!merged.includes(tag)) merged.push(tag);
+    }
+  }
+  if (merged.length === 0) return config;
+
+  const controlbar = root["rtk-controlbar"];
+  if (controlbar && typeof controlbar === "object" && !Array.isArray(controlbar)) {
+    root["rtk-controlbar"] = {
+      ...controlbar,
+      children: ["div#controlbar-center"],
+    };
+  }
+  root["div#controlbar-center"] = merged;
+  return config;
+}
+
+function buildCompactControlbarStyles(): NonNullable<UIConfig["styles"]> {
+  return {
+    ...CCO_CONTROLBAR_STYLES,
+    ...CCO_HIDDEN_CONTROLBAR_STYLES,
+  };
+}
+
+function buildPipControlbarStyles(): NonNullable<UIConfig["styles"]> {
+  const pipToggleStyles = Object.fromEntries(
+    CCO_CONTROLBAR_TOGGLE_KEYS.map((key) => [key, PIP_CONTROLBAR_TOGGLE_VARS]),
+  ) as Pick<NonNullable<UIConfig["styles"]>, (typeof CCO_CONTROLBAR_TOGGLE_KEYS)[number]>;
+
+  return {
+    ...buildCompactControlbarStyles(),
+    ...pipToggleStyles,
+    "rtk-controlbar": {
+      ...CCO_CONTROLBAR_STYLES["rtk-controlbar"],
+      gap: "0",
+    },
+    "div#controlbar-center": {
+      ...CCO_CONTROLBAR_STYLES["div#controlbar-center"],
+      gap: "2px",
+    },
+  };
+}
+
+function withSmallControlbarButtons(children: unknown): unknown {
+  if (!Array.isArray(children)) return children;
+  return children.map((child) => {
+    if (typeof child === "string") {
+      return [child, PIP_CONTROLBAR_BUTTON_PROPS] as RootChild;
+    }
+    const [tag, props = {}] = child as [string, Record<string, unknown>?];
+    return [tag, { ...props, ...PIP_CONTROLBAR_BUTTON_PROPS }] as RootChild;
+  });
+}
+
+function applyPipControlbarButtons(config: UIConfig): UIConfig {
+  const root = config.root;
+  if (!root) return config;
+
+  const center = root["div#controlbar-center"];
+  if (Array.isArray(center)) {
+    root["div#controlbar-center"] = withSmallControlbarButtons(center) as typeof center;
+  }
+  return config;
+}
+
 function buildCompactControlbarConfig(): UIConfig {
-  const config = applyControlbarFilter(
-    createDefaultConfig(),
-    new Set<string>(CCO_CONTROLBAR_REMOVAL),
+  const config = applyCcoControlbarLayout(
+    applyControlbarFilter(createDefaultConfig(), new Set<string>(CCO_CONTROLBAR_REMOVAL)),
   );
   config.styles = {
     ...config.styles,
-    ...CCO_HIDDEN_CONTROLBAR_STYLES,
+    ...buildCompactControlbarStyles(),
+  };
+  return config;
+}
+
+function buildPipControlbarConfig(): UIConfig {
+  const config = applyPipControlbarButtons(buildCompactControlbarConfig());
+  config.styles = {
+    ...config.styles,
+    ...buildPipControlbarStyles(),
   };
   return config;
 }
@@ -82,7 +227,10 @@ export function buildRtkMeetingConfig({
   enableInRoomChat: boolean;
   placement: CallPanelPlacement;
 }): UIConfig {
-  if (placement === "inline" || placement === "pip") {
+  if (placement === "pip") {
+    return buildPipControlbarConfig();
+  }
+  if (placement === "inline") {
     return buildCompactControlbarConfig();
   }
   if (!enableInRoomChat) {

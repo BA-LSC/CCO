@@ -139,37 +139,34 @@ describe("shouldAcceptUpdatesReload", () => {
 });
 
 describe("validateUpdatesReload", () => {
-  it("aborts with pending message when status still shows an available update", () => {
+  it("reloads when the catalog still shows an available update", () => {
     const onError = vi.fn();
     expect(
       validateUpdatesReload(
         {
           lastApplyError: null,
+          currentVersion: OLD_SHA,
+          latestVersion: NEW_SHA,
+        },
+        onError,
+      ),
+    ).toBe("reload");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("aborts when the apply endpoint recorded an error", () => {
+    const onError = vi.fn();
+    expect(
+      validateUpdatesReload(
+        {
+          lastApplyError: "boom",
           currentVersion: OLD_SHA,
           latestVersion: NEW_SHA,
         },
         onError,
       ),
     ).toBe("abort");
-    expect(onError).toHaveBeenCalledWith(
-      "Deploy finished but the release is still pending. Check for updates and try Apply again.",
-    );
-  });
-
-  it("reloads when expected applied version matches despite stale flag", () => {
-    const onError = vi.fn();
-    expect(
-      validateUpdatesReload(
-        {
-          lastApplyError: null,
-          currentVersion: OLD_SHA,
-          latestVersion: NEW_SHA,
-        },
-        onError,
-        { expectedAppliedVersion: NEW_SHA },
-      ),
-    ).toBe("reload");
-    expect(onError).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith("Apply failed: boom");
   });
 });
 

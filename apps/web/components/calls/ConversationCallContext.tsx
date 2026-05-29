@@ -19,6 +19,7 @@ import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
 import { useChatPanelBounds } from "@/hooks/useChatPanelBounds";
+import { useCallConversationTitle } from "@/hooks/useCallConversationTitle";
 import { usePipPanel } from "@/hooks/usePipPanel";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
 import { CallOverlay } from "@/components/calls/CallOverlay";
@@ -107,6 +108,17 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const endedCallIdsRef = useRef(new Set<string>());
 
   inCallRef.current = inCall;
+
+  const { registerActiveCall } = useActiveCallsMap();
+
+  useEffect(() => {
+    const conversationId = activeCall?.conversationId ?? homeConversationId;
+    if (!conversationId) return;
+    registerActiveCall(
+      activeCall && activeCall.participantCount > 0 ? activeCall : null,
+      { conversationId },
+    );
+  }, [activeCall, homeConversationId, registerActiveCall]);
 
   const isHost = activeCall?.hostUserId === session?.userId;
 
@@ -262,6 +274,14 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   );
   const pip = usePipPanel();
   const chatBounds = useChatPanelBounds(showPipCall);
+  const pipTitle = useCallConversationTitle(
+    showPipCall ? homeConversationId : null,
+    showPipCall ? homeChatPath : null,
+  );
+
+  const returnToCallChat = useCallback(() => {
+    if (homeChatPath) router.push(homeChatPath);
+  }, [homeChatPath, router]);
 
   return (
     <ActiveCallContext.Provider value={contextValue}>
@@ -297,7 +317,13 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       ) : null}
 
       {homeConversationId && inCall && authToken && showPipCall ? (
-        <CallPipShell pip={pip} bounds={chatBounds}>
+        <CallPipShell
+          pip={pip}
+          bounds={chatBounds}
+          title={pipTitle}
+          startedAt={activeCall?.startedAt ?? null}
+          onTitleClick={homeChatPath ? returnToCallChat : undefined}
+        >
           <CallOverlay
             key={authToken}
             authToken={authToken}

@@ -1,11 +1,13 @@
 import {
+  collapseCallTimelineEvents,
+  formatCallLiveDuration,
   formatCallTimelineLabel,
   type CallTimelineEventDto,
 } from "@cco/shared/call-timeline";
 import type { Message } from "@/lib/api";
 
 export type { CallTimelineEventDto };
-export { formatCallTimelineLabel };
+export { formatCallLiveDuration, formatCallTimelineLabel };
 
 export type ThreadTimelineItem =
   | { kind: "message"; at: string; message: Message }
@@ -37,9 +39,10 @@ export function buildThreadTimeline(
   messages: Message[],
   callEvents: CallTimelineEventDto[],
 ): ThreadTimelineItem[] {
+  const collapsedCalls = collapseCallTimelineEvents(callEvents);
   const items: ThreadTimelineItem[] = [
     ...messages.map((message) => ({ kind: "message" as const, at: message.createdAt, message })),
-    ...callEvents.map((call) => ({ kind: "call" as const, at: call.at, call })),
+    ...collapsedCalls.map((call) => ({ kind: "call" as const, at: call.at, call })),
   ];
   items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   return items;

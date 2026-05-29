@@ -18,7 +18,9 @@ import {
   type GroupSidebarConversation,
 } from "@/lib/api";
 import { subscribeConversationUpdated, subscribeUnreadChanged } from "@/lib/sidebar-events";
+import { useOptionalActiveCall } from "@/components/calls/ConversationCallContext";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
+import { resolveSidebarActiveCall } from "@/lib/sidebar-active-call";
 import { SidebarCallIndicator } from "@/components/calls/SidebarCallIndicator";
 
 type Props = {
@@ -56,6 +58,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
   const pathname = usePathname();
   const router = useRouter();
   const { getActiveCall } = useActiveCallsMap();
+  const sessionCall = useOptionalActiveCall()?.activeCall;
   const [groups, setGroups] = useState(initialGroups);
   const [creatingForGroup, setCreatingForGroup] = useState<string | null>(null);
   const [menuOpenForGroup, setMenuOpenForGroup] = useState<string | null>(null);
@@ -381,7 +384,11 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                             <span className="sidebar-item-label sidebar-team-name">{conv.title}</span>
                             <span className="sidebar-nested-trailing">
                               {(() => {
-                                const activeCall = getActiveCall(conv.id);
+                                const activeCall = resolveSidebarActiveCall(
+                                  conv.id,
+                                  getActiveCall(conv.id),
+                                  sessionCall,
+                                );
                                 if (!activeCall) return null;
                                 return (
                                   <SidebarCallIndicator

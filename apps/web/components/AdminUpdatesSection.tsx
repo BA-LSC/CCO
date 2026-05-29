@@ -10,7 +10,6 @@ import { resolveDeployStatusMessage } from "@/lib/deploy-phase";
 import {
   useDeployCompletionPoll,
   validateUpdatesReload,
-  waitForUpdatesStatusAfterDeploy,
 } from "@/lib/use-deploy-completion-poll";
 export type UpdatesStatus = {
   platform: "cloudflare" | "unknown";
@@ -161,16 +160,12 @@ export function AdminUpdatesSection({
 
   const validateBeforeReload = useCallback(async () => {
     try {
-      const next = await waitForUpdatesStatusAfterDeploy(loadStatus, {
-        expectedAppliedVersion: pendingAppliedVersionRef.current,
-      });
+      const next = await loadStatus();
       if (next) setStatus(next);
       return validateUpdatesReload(next, (message) => {
         setDeploying(false);
         pendingAppliedVersionRef.current = null;
         setFeedback({ error: message });
-      }, {
-        expectedAppliedVersion: pendingAppliedVersionRef.current,
       });
     } catch {
       return "reload" as const;
@@ -181,6 +176,14 @@ export function AdminUpdatesSection({
     deploying,
     validateBeforeReload,
     onDeployStatusMessage: (message) => setDeployStatusMessage(message),
+    onReloadBlocked: () => {
+      setDeploying(false);
+      pendingAppliedVersionRef.current = null;
+      setFeedback({
+        error:
+          "Update finished but this page could not refresh automatically. Reload the page to continue.",
+      });
+    },
   });
 
   const beginAutoApplyDeploy = useCallback(

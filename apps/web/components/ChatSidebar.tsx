@@ -34,7 +34,9 @@ import {
   groupTeamsByServiceType,
   shouldShowTeamServiceSections,
 } from "@/lib/service-team-sidebar";
+import { useOptionalActiveCall } from "@/components/calls/ConversationCallContext";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
+import { resolveSidebarActiveCall } from "@/lib/sidebar-active-call";
 import { SidebarCallIndicator } from "@/components/calls/SidebarCallIndicator";
 
 function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
@@ -56,6 +58,22 @@ function previewFromMessage(
       ? undefined
       : (otherParticipantDisplayName ?? message.authorName),
   });
+}
+
+function collectSidebarConversationIds(
+  dms: DmSummary[],
+  groups: GroupSidebarItem[],
+  teams: ServiceTeamSummary[],
+): string[] {
+  const ids = new Set<string>();
+  for (const dm of dms) ids.add(dm.id);
+  for (const group of groups) {
+    for (const conv of group.conversations) ids.add(conv.id);
+  }
+  for (const team of teams) {
+    if (team.conversationId) ids.add(team.conversationId);
+  }
+  return [...ids];
 }
 
 function applyDmMessagePreview(
@@ -82,7 +100,14 @@ export function ChatSidebar() {
   const router = useRouter();
   const { sidebarOpen, closeSidebar, subscribeRealtime, session, activeConversationId } =
     useChatLayout();
-  const { getActiveCall } = useActiveCallsMap();
+  const { getActiveCall, hydrateActiveCalls } = useActiveCallsMap();
+  const callCtx = useOptionalActiveCall();
+  const sessionCall = callCtx?.activeCall;
+  const resolveActiveCall = useCallback(
+    (conversationId: string) =>
+      resolveSidebarActiveCall(conversationId, getActiveCall(conversationId), sessionCall),
+    [getActiveCall, sessionCall],
+  );
 
   const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
   const [dms, setDms] = useState<DmSummary[]>([]);
@@ -114,6 +139,13 @@ export function ChatSidebar() {
       setGroups(groupsData.groups);
       setDms(dmsData.conversations);
       setTeams(teamsData.teams);
+      void hydrateActiveCalls(
+        collectSidebarConversationIds(
+          dmsData.conversations,
+          groupsData.groups,
+          teamsData.teams,
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load sidebar");
     } finally {
@@ -121,7 +153,7 @@ export function ChatSidebar() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [hydrateActiveCalls]);
 
   useEffect(() => {
     void loadSidebar();
@@ -255,7 +287,9 @@ export function ChatSidebar() {
   }
 
   function renderTeamItem(team: ServiceTeamSummary) {
-    const activeCall = team.conversationId ? getActiveCall(team.conversationId) : undefined;
+    const activeCall = team.conversationId
+      ? resolveActiveCall(team.conversationId)
+      : undefined;
     return (
       <Link
         href={teamChatHref(team)}
@@ -487,7 +521,7 @@ export function ChatSidebar() {
                             </span>
                           )}
                           {(() => {
-                            const activeCall = getActiveCall(dm.id);
+                            const activeCall = resolveActiveCall(dm.id);
                             const showTrailing =
                               activeCall ||
                               (dm.hasUnread && activeDmId !== dm.id) ||

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCallTimelineEvents,
+  collapseCallTimelineEvents,
   formatCallDuration,
+  formatCallLiveDuration,
   formatCallTimelineLabel,
 } from "./call-timeline";
 
@@ -14,13 +16,46 @@ describe("formatCallDuration", () => {
   });
 });
 
+describe("formatCallLiveDuration", () => {
+  it("formats live call timers", () => {
+    expect(formatCallLiveDuration(45)).toBe("0:45");
+    expect(formatCallLiveDuration(320)).toBe("5:20");
+    expect(formatCallLiveDuration(3900)).toBe("1:05:00");
+  });
+});
+
 describe("formatCallTimelineLabel", () => {
   it("labels call timeline events", () => {
     expect(formatCallTimelineLabel({ kind: "started" })).toBe("Call started");
     expect(formatCallTimelineLabel({ kind: "missed" })).toBe("Missed call");
     expect(formatCallTimelineLabel({ kind: "ended", durationSeconds: 320 })).toBe(
-      "Call ended • 5m 20s",
+      "Ended call • 5m 20s",
     );
+  });
+});
+
+describe("collapseCallTimelineEvents", () => {
+  it("merges started and terminal events into one row at start time", () => {
+    const callId = "11111111-1111-4111-8111-111111111111";
+    const collapsed = collapseCallTimelineEvents([
+      {
+        id: `${callId}:started`,
+        callId,
+        kind: "started",
+        at: "2026-05-28T17:00:00.000Z",
+      },
+      {
+        id: `${callId}:missed`,
+        callId,
+        kind: "missed",
+        at: "2026-05-28T17:00:45.000Z",
+      },
+    ]);
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0]).toMatchObject({
+      kind: "missed",
+      at: "2026-05-28T17:00:00.000Z",
+    });
   });
 });
 

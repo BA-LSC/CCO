@@ -245,16 +245,23 @@ export function completeAppUpdateReload(): boolean {
   return true;
 }
 
+/** Reload after Apply update once the server is no longer draining. */
+export async function completeDeployReload(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  deployWaitActive = false;
+  window.__ccoDeployPending = false;
+  markDeployReload();
+  await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
+  if (!completeAppUpdateReload()) {
+    forceClearStaleUpdateState();
+    return false;
+  }
+  return true;
+}
+
 export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<void> {
-  const afterDeploy = isDeployPending();
-  if (afterDeploy) {
-    deployWaitActive = false;
-    if (typeof window !== "undefined") window.__ccoDeployPending = false;
-    markDeployReload();
-    await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
-    if (!completeAppUpdateReload()) {
-      forceClearStaleUpdateState();
-    }
+  if (isDeployPending() || isAppUpdateInProgress()) {
+    await completeDeployReload();
     return;
   }
 
