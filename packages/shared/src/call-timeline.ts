@@ -9,6 +9,7 @@ export const CallTimelineEventDtoSchema = z.object({
   kind: CallTimelineKindSchema,
   at: z.string(),
   durationSeconds: z.number().int().nonnegative().optional(),
+  missedCount: z.number().int().positive().optional(),
 });
 
 export type CallTimelineEventDto = z.infer<typeof CallTimelineEventDtoSchema>;
@@ -40,9 +41,14 @@ export function formatCallLiveDuration(totalSeconds: number): string {
   return `${minutes}:${String(remainderSeconds).padStart(2, "0")}`;
 }
 
-export function formatCallTimelineLabel(event: Pick<CallTimelineEventDto, "kind" | "durationSeconds">): string {
+export function formatCallTimelineLabel(
+  event: Pick<CallTimelineEventDto, "kind" | "durationSeconds" | "missedCount">,
+): string {
   if (event.kind === "started") return "Call started";
-  if (event.kind === "missed") return "Missed call";
+  if (event.kind === "missed") {
+    const count = event.missedCount ?? 1;
+    return count === 1 ? "Missed call" : `${count} missed calls`;
+  }
   const duration = event.durationSeconds ?? 0;
   return `Ended call • ${formatCallDuration(duration)}`;
 }
@@ -76,6 +82,42 @@ export function collapseCallTimelineEvents(events: CallTimelineEventDto[]): Call
   }
 
   return collapsed.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
+/** Merge back-to-back missed call rows into one grouped divider. */
+export function groupConsecutiveMissedCallEvents(
+  events: CallTimelineEventDto[],
+): CallTimelineEventDto[] {
+  const grouped: CallTimelineEventDto[] = [];
+
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index]!;
+    if (event.kind !== "missed") {
+      grouped.push(event);
+      continue;
+    }
+
+    let end = index + 1;
+    while (end < events.length && events[end]!.kind === "missed") {
+      end += 1;
+    }
+
+    const count = end - index;
+    if (count === 1) {
+      grouped.push(event);
+    } else {
+      const last = events[end - 1]!;
+      grouped.push({
+        ...event,
+        id: `missed-group:${event.callId}:${last.callId}`,
+        missedCount: count,
+      });
+    }
+
+    index = end - 1;
+  }
+
+  return grouped;
 }
 
 export function callTimelineEventId(callId: string, kind: CallTimelineKind): string {

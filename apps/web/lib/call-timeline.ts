@@ -45,7 +45,48 @@ export function buildThreadTimeline(
     ...collapsedCalls.map((call) => ({ kind: "call" as const, at: call.at, call })),
   ];
   items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-  return items;
+  return groupConsecutiveMissedCallTimelineItems(items);
+}
+
+function groupConsecutiveMissedCallTimelineItems(
+  items: ThreadTimelineItem[],
+): ThreadTimelineItem[] {
+  const grouped: ThreadTimelineItem[] = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]!;
+    if (item.kind !== "call" || item.call.kind !== "missed") {
+      grouped.push(item);
+      continue;
+    }
+
+    let end = index + 1;
+    while (end < items.length) {
+      const next = items[end];
+      if (next?.kind !== "call" || next.call.kind !== "missed") break;
+      end += 1;
+    }
+
+    const count = end - index;
+    if (count === 1) {
+      grouped.push(item);
+    } else {
+      const last = items[end - 1] as Extract<ThreadTimelineItem, { kind: "call" }>;
+      grouped.push({
+        kind: "call",
+        at: item.at,
+        call: {
+          ...item.call,
+          id: `missed-group:${item.call.callId}:${last.call.callId}`,
+          missedCount: count,
+        },
+      });
+    }
+
+    index = end - 1;
+  }
+
+  return grouped;
 }
 
 export function threadItemStartsNewDay(

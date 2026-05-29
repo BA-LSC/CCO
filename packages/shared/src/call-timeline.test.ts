@@ -5,6 +5,7 @@ import {
   formatCallDuration,
   formatCallLiveDuration,
   formatCallTimelineLabel,
+  groupConsecutiveMissedCallEvents,
 } from "./call-timeline";
 
 describe("formatCallDuration", () => {
@@ -28,9 +29,72 @@ describe("formatCallTimelineLabel", () => {
   it("labels call timeline events", () => {
     expect(formatCallTimelineLabel({ kind: "started" })).toBe("Call started");
     expect(formatCallTimelineLabel({ kind: "missed" })).toBe("Missed call");
+    expect(formatCallTimelineLabel({ kind: "missed", missedCount: 3 })).toBe("3 missed calls");
     expect(formatCallTimelineLabel({ kind: "ended", durationSeconds: 320 })).toBe(
       "Ended call • 5m 20s",
     );
+  });
+});
+
+describe("groupConsecutiveMissedCallEvents", () => {
+  it("groups adjacent missed calls into one row", () => {
+    const grouped = groupConsecutiveMissedCallEvents([
+      {
+        id: "a:missed",
+        callId: "11111111-1111-4111-8111-111111111111",
+        kind: "missed",
+        at: "2026-05-28T17:00:00.000Z",
+      },
+      {
+        id: "b:missed",
+        callId: "22222222-2222-4222-8222-222222222222",
+        kind: "missed",
+        at: "2026-05-28T17:01:00.000Z",
+      },
+      {
+        id: "c:missed",
+        callId: "33333333-3333-4333-8333-333333333333",
+        kind: "missed",
+        at: "2026-05-28T17:02:00.000Z",
+      },
+    ]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0]).toMatchObject({
+      kind: "missed",
+      missedCount: 3,
+      at: "2026-05-28T17:00:00.000Z",
+    });
+  });
+
+  it("keeps ended calls between missed groups separate", () => {
+    const grouped = groupConsecutiveMissedCallEvents([
+      {
+        id: "a:missed",
+        callId: "11111111-1111-4111-8111-111111111111",
+        kind: "missed",
+        at: "2026-05-28T17:00:00.000Z",
+      },
+      {
+        id: "b:ended",
+        callId: "22222222-2222-4222-8222-222222222222",
+        kind: "ended",
+        at: "2026-05-28T17:05:00.000Z",
+        durationSeconds: 120,
+      },
+      {
+        id: "c:missed",
+        callId: "33333333-3333-4333-8333-333333333333",
+        kind: "missed",
+        at: "2026-05-28T17:10:00.000Z",
+      },
+    ]);
+
+    expect(grouped).toHaveLength(3);
+    expect(grouped[0]?.kind).toBe("missed");
+    expect(grouped[0]?.missedCount).toBeUndefined();
+    expect(grouped[1]?.kind).toBe("ended");
+    expect(grouped[2]?.kind).toBe("missed");
   });
 });
 
