@@ -403,20 +403,14 @@ export async function listMessages(
 
   let callEvents: CallTimelineEventDto[] = [];
   const pageOldest = uniqueRows[0]?.createdAt;
-  const pageNewest = uniqueRows[uniqueRows.length - 1]?.createdAt;
-  if (pageOldest && pageNewest) {
-    if (beforeAnchorCreatedAt) {
-      callEvents = await listCallTimelineEvents(conversationId, {
-        from: pageOldest,
-        to: beforeAnchorCreatedAt,
-        toExclusive: true,
-      });
-    } else {
-      callEvents = await listCallTimelineEvents(conversationId, {
-        from: pageOldest,
-        to: pageNewest,
-      });
-    }
+  if (beforeAnchorCreatedAt && pageOldest) {
+    callEvents = await listCallTimelineEvents(conversationId, {
+      from: pageOldest,
+      to: beforeAnchorCreatedAt,
+      toExclusive: true,
+    });
+  } else {
+    callEvents = await listCallTimelineEvents(conversationId);
   }
 
   return {

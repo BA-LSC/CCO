@@ -531,6 +531,7 @@ export function ChatThread({
     if (messagesLoading) return;
 
     setMessages((prev) => mergeConversationMessages(prev, initialMessages));
+    setCallEvents((prev) => mergeCallTimelineEvents(prev, initialCallEvents));
     setHasMore((prev) =>
       messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
     );

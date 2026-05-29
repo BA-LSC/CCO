@@ -8509,9 +8509,21 @@ html.standalone-display .chat-thread-panel {
 
 .call-participant-box__avatar img,
 .call-participant-box__initials {
-  width: 64px;
-  height: 64px;
+  width: clamp(72px, 28%, 96px);
+  height: clamp(72px, 28%, 96px);
   border-radius: 50%;
+}
+
+.call-participant-grid--duo .call-participant-box__avatar img,
+.call-participant-grid--duo .call-participant-box__initials {
+  width: clamp(80px, 34%, 112px);
+  height: clamp(80px, 34%, 112px);
+}
+
+.call-participant-grid--solo .call-participant-box__avatar img,
+.call-participant-grid--solo .call-participant-box__initials {
+  width: clamp(120px, 45%, 192px);
+  height: clamp(120px, 45%, 192px);
 }
 
 .call-participant-box__avatar img {
@@ -8526,6 +8538,10 @@ html.standalone-display .chat-thread-panel {
   color: var(--color-text);
   font-size: 1.125rem;
   font-weight: 700;
+}
+
+.call-participant-grid--solo .call-participant-box__initials {
+  font-size: clamp(1.75rem, 10vw, 2.75rem);
 }
 
 .call-participant-box__name {
@@ -8603,18 +8619,21 @@ html.standalone-display .chat-thread-panel {
   border-radius: 0;
 }
 
+.call-panel--inline-docked {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: min(34vh, 320px);
+  z-index: 15;
+}
+
 .call-panel--guest {
   position: fixed;
   inset: 0;
   z-index: 1300;
   background: #111;
-}
-
-.call-inline-anchor {
-  flex-shrink: 0;
-  width: 100%;
-  height: 0;
-  pointer-events: none;
 }
 
 .call-inline-spacer {

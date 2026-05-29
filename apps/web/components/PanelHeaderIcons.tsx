@@ -132,20 +132,18 @@ export function PanelHeaderPhoneIcon({ className = "panel-header-icon" }: IconPr
   );
 }
 
-/** Phone handset angled down — standard hang-up / leave-call affordance. */
+/** Downward handset — leave-call affordance (drawn natively, no transform blur). */
 export function PanelHeaderPhoneHangUpIcon({ className = "panel-header-icon" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <g transform="rotate(135 12 12)">
-        <path
-          d="M6.5 4h3l1.5 5-2 1.2a11 11 0 0 0 5.3 5.3L17.5 14l5 1.5v3a1.5 1.5 0 0 1-1.6 1.5C9.8 20 4 14.2 4 6.1 4 5 4.9 4 6.5 4Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
+      <path
+        d="M7.5 10C7.5 7.5 8.75 6.5 10.25 6.5C11 6.5 11.35 6.85 12 7.35C12.65 6.85 13 6.5 13.75 6.5C15.25 6.5 16.5 7.5 16.5 10C16.5 12.75 14.5 15.25 12 15.75C9.5 15.25 7.5 12.75 7.5 10Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

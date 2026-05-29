@@ -35,6 +35,8 @@ type Props = {
   placement?: CallPanelPlacement;
   /** Measured anchor for inline placement (top of chat-panel-content). */
   inlineAnchorRect?: DOMRect | null;
+  /** Render inline call inside chat-panel-content (below channel settings). */
+  docked?: boolean;
   /** Fill a parent pip shell instead of using fixed viewport positioning. */
   embedded?: boolean;
   /** Signed-in users skip RTK setup; guests may show it. */
@@ -198,9 +200,10 @@ function panelStyle(
   placement: CallPanelPlacement,
   inlineAnchorRect: DOMRect | null | undefined,
   embedded: boolean,
+  docked: boolean,
 ): CSSProperties | undefined {
   if (placement === "guest") return undefined;
-  if (embedded) return undefined;
+  if (embedded || docked) return undefined;
 
   if (placement === "pip") return undefined;
 
@@ -227,6 +230,7 @@ export function CallOverlay({
   onLeave,
   placement = "inline",
   inlineAnchorRect,
+  docked = false,
   embedded = false,
   showSetupScreen = false,
 }: Props) {
@@ -248,6 +252,7 @@ export function CallOverlay({
   const className = [
     "call-panel",
     placement === "inline" ? "call-panel--inline" : "",
+    docked ? "call-panel--inline-docked" : "",
     placement === "pip" ? "call-panel--pip" : "",
     embedded ? "call-panel--pip-embedded" : "",
     placement === "guest" ? "call-panel--guest" : "",
@@ -259,7 +264,7 @@ export function CallOverlay({
     <div
       ref={panelRef}
       className={className}
-      style={panelStyle(placement, inlineAnchorRect, embedded)}
+      style={panelStyle(placement, inlineAnchorRect, embedded, docked)}
       role="region"
       aria-label="Video call"
     >
