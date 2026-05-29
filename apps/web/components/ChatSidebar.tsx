@@ -533,6 +533,7 @@ export function ChatSidebar() {
                                   <SidebarCallIndicator
                                     conversationId={dm.id}
                                     participantCount={activeCall.participantCount}
+                                    iconOnly
                                   />
                                 )}
                                 {dm.hasUnread && activeDmId !== dm.id && (

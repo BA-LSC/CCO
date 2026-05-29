@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 const SPEAKING_LEVEL = 0.08;
-const SPEAKING_HOLD_MS = 350;
+const SPEAKING_HOLD_MS = 480;
+const SPEAKING_START_FRAMES = 3;
 
 /** True while the participant's mic input exceeds a speech threshold. */
 export function useParticipantAudioSpeaking(
@@ -29,6 +30,7 @@ export function useParticipantAudioSpeaking(
     const bins = new Uint8Array(analyser.frequencyBinCount);
     let holdUntil = 0;
     let frame = 0;
+    let aboveThresholdFrames = 0;
 
     const sample = () => {
       analyser.getByteFrequencyData(bins);
@@ -38,10 +40,16 @@ export function useParticipantAudioSpeaking(
       const now = performance.now();
 
       if (level > SPEAKING_LEVEL) {
+        aboveThresholdFrames += 1;
         holdUntil = now + SPEAKING_HOLD_MS;
-        setSpeaking(true);
-      } else if (now >= holdUntil) {
-        setSpeaking(false);
+        if (aboveThresholdFrames >= SPEAKING_START_FRAMES) {
+          setSpeaking(true);
+        }
+      } else {
+        aboveThresholdFrames = 0;
+        if (now >= holdUntil) {
+          setSpeaking(false);
+        }
       }
 
       frame = requestAnimationFrame(sample);

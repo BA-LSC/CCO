@@ -40,6 +40,8 @@ const CONTROLBAR_SECTION_KEYS = [
 
 const CCO_CONTROLBAR_TOGGLE_VARS = {
   "--rtk-controlbar-button-background-color": "transparent",
+  "--rtk-controlbar-button-icon-size": "18px",
+  minWidth: "34px",
 } as const;
 
 const CCO_CONTROLBAR_TOGGLE_KEYS = [
@@ -54,12 +56,14 @@ const CCO_CONTROLBAR_TOGGLE_KEYS = [
   "rtk-ai-toggle",
 ] as const;
 
-const PIP_CONTROLBAR_BUTTON_PROPS = { size: "sm" } as const;
+const COMPACT_CONTROLBAR_BUTTON_PROPS = { size: "sm" } as const;
+
+const PIP_CONTROLBAR_BUTTON_PROPS = COMPACT_CONTROLBAR_BUTTON_PROPS;
 
 const PIP_CONTROLBAR_TOGGLE_VARS = {
   ...CCO_CONTROLBAR_TOGGLE_VARS,
-  "--rtk-controlbar-button-icon-size": "20px",
-  minWidth: "36px",
+  "--rtk-controlbar-button-icon-size": "18px",
+  minWidth: "32px",
 } as const;
 
 const CCO_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
@@ -77,7 +81,7 @@ const CCO_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
     alignItems: "center",
     justifyContent: "center",
     flexWrap: "wrap",
-    gap: "6px",
+    gap: "2px",
     width: "auto",
     maxWidth: "100%",
   },
@@ -171,11 +175,18 @@ function buildPipControlbarStyles(): NonNullable<UIConfig["styles"]> {
     ...PIP_CONTROLBAR_TOGGLE_STYLES,
     "rtk-controlbar": {
       ...CCO_CONTROLBAR_STYLES["rtk-controlbar"],
+      width: "100%",
       gap: "0",
+      padding: "0",
+      backgroundColor: "transparent",
     },
     "div#controlbar-center": {
       ...CCO_CONTROLBAR_STYLES["div#controlbar-center"],
-      gap: "2px",
+      gap: "0px",
+      flexWrap: "nowrap",
+      width: "100%",
+      maxWidth: "100%",
+      justifyContent: "center",
     },
   };
 }
@@ -191,7 +202,7 @@ function withSmallControlbarButtons(children: unknown): unknown {
   });
 }
 
-function applyPipControlbarButtons(config: UIConfig): UIConfig {
+function applyCompactControlbarButtons(config: UIConfig): UIConfig {
   const root = config.root;
   if (!root) return config;
 
@@ -203,8 +214,10 @@ function applyPipControlbarButtons(config: UIConfig): UIConfig {
 }
 
 function buildCompactControlbarConfig(): UIConfig {
-  const config = applyCcoControlbarLayout(
-    applyControlbarFilter(createDefaultConfig(), new Set<string>(CCO_CONTROLBAR_REMOVAL)),
+  const config = applyCompactControlbarButtons(
+    applyCcoControlbarLayout(
+      applyControlbarFilter(createDefaultConfig(), new Set<string>(CCO_CONTROLBAR_REMOVAL)),
+    ),
   );
   config.styles = {
     ...config.styles,
@@ -214,7 +227,7 @@ function buildCompactControlbarConfig(): UIConfig {
 }
 
 function buildPipControlbarConfig(): UIConfig {
-  const config = applyPipControlbarButtons(buildCompactControlbarConfig());
+  const config = buildCompactControlbarConfig();
   config.styles = {
     ...config.styles,
     ...buildPipControlbarStyles(),

@@ -8,9 +8,11 @@ import { useOptionalActiveCall } from "@/components/calls/ConversationCallContex
 type Props = {
   conversationId: string;
   participantCount: number;
+  /** DM rows show the phone icon only; groups/teams keep the participant count. */
+  iconOnly?: boolean;
 };
 
-export function SidebarCallIndicator({ conversationId, participantCount }: Props) {
+export function SidebarCallIndicator({ conversationId, participantCount, iconOnly = false }: Props) {
   const router = useRouter();
   const callCtx = useOptionalActiveCall();
   const inCall = callCtx?.inCall ?? false;
@@ -24,15 +26,21 @@ export function SidebarCallIndicator({ conversationId, participantCount }: Props
   const content = (
     <>
       <PanelHeaderPhoneIcon className="sidebar-call-indicator-icon" />
-      <span className="sidebar-call-indicator-count">{participantCount}</span>
+      {!iconOnly && (
+        <span className="sidebar-call-indicator-count">{participantCount}</span>
+      )}
     </>
   );
+
+  const className = `sidebar-call-indicator sidebar-call-indicator--action${
+    iconOnly ? " sidebar-call-indicator--icon-only" : ""
+  }`;
 
   if (inCall && inCallHere && homeChatPath) {
     return (
       <Link
         href={homeChatPath}
-        className="sidebar-call-indicator sidebar-call-indicator--action"
+        className={className}
         aria-label={`Return to call, ${label}`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -45,7 +53,7 @@ export function SidebarCallIndicator({ conversationId, participantCount }: Props
     return (
       <button
         type="button"
-        className="sidebar-call-indicator sidebar-call-indicator--action"
+        className={className}
         aria-label={`Join call, ${label}`}
         onClick={(event) => {
           event.preventDefault();
@@ -62,7 +70,7 @@ export function SidebarCallIndicator({ conversationId, participantCount }: Props
     return (
       <button
         type="button"
-        className="sidebar-call-indicator sidebar-call-indicator--action"
+        className={className}
         aria-label={`Return to your call, ${label}`}
         onClick={(event) => {
           event.preventDefault();
@@ -76,7 +84,10 @@ export function SidebarCallIndicator({ conversationId, participantCount }: Props
   }
 
   return (
-    <span className="sidebar-call-indicator" aria-label={label}>
+    <span
+      className={`sidebar-call-indicator${iconOnly ? " sidebar-call-indicator--icon-only" : ""}`}
+      aria-label={label}
+    >
       {content}
     </span>
   );

@@ -72,17 +72,19 @@ describe("buildRtkMeetingConfig", () => {
     expect(right).not.toContain("rtk-participants-toggle");
     expect(center).not.toContain("rtk-leave-button");
     expect(centerChildren).toEqual(center.map((tag) => [tag, { size: "sm" }]));
-    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("2px");
-    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBe("36px");
-    expect(config.styles?.["rtk-mic-toggle"]?.["--rtk-controlbar-button-icon-size"]).toBe("20px");
+    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("0px");
+    expect(config.styles?.["div#controlbar-center"]?.flexWrap).toBe("nowrap");
+    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBe("32px");
+    expect(config.styles?.["rtk-mic-toggle"]?.["--rtk-controlbar-button-icon-size"]).toBe("18px");
   });
 
-  test("inline keeps full-size labeled controlbar buttons", () => {
+  test("inline uses compact icon-only controlbar buttons with hover tooltips", () => {
     const config = buildRtkMeetingConfig({ enableInRoomChat: true, placement: "inline" });
     const centerChildren = config.root?.["div#controlbar-center"];
 
-    expect(centerChildren?.[0]).toBe("rtk-settings-toggle");
-    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("6px");
-    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBeUndefined();
+    expect(centerChildren?.[0]).toEqual(["rtk-settings-toggle", { size: "sm" }]);
+    expect(config.styles?.["div#controlbar-center"]?.gap).toBe("2px");
+    expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBe("34px");
+    expect(config.styles?.["rtk-mic-toggle"]?.["--rtk-controlbar-button-icon-size"]).toBe("18px");
   });
 });

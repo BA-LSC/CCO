@@ -96,6 +96,7 @@ export function CallPipShell({
     offsetX: number;
     offsetY: number;
   } | null>(null);
+  const didDragRef = useRef(false);
   const [snapReady, setSnapReady] = useState(false);
 
   const resolvedBounds = useMemo(() => resolvePipBounds(bounds), [bounds]);
@@ -128,10 +129,11 @@ export function CallPipShell({
 
   const onHandlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if ((event.target as HTMLElement).closest("button")) return;
+      if ((event.target as HTMLElement).closest(".call-pip__toggle")) return;
       const shell = shellRef.current;
       if (!shell) return;
       event.preventDefault();
+      didDragRef.current = false;
       const rect = shell.getBoundingClientRect();
       dragRef.current = {
         pointerId: event.pointerId,
@@ -144,10 +146,19 @@ export function CallPipShell({
     [setDragPoint],
   );
 
+  const onTitleActivate = useCallback(() => {
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    onTitleClick?.();
+  }, [onTitleClick]);
+
   const onHandlePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
+      didDragRef.current = true;
       const next: PipPoint = {
         x: event.clientX - drag.offsetX,
         y: event.clientY - drag.offsetY,
@@ -214,7 +225,7 @@ export function CallPipShell({
               className="call-pip__title"
               title={title}
               aria-label={`Return to ${title} chat`}
-              onClick={onTitleClick}
+              onClick={onTitleActivate}
             >
               {title}
             </button>
