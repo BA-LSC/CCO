@@ -89,6 +89,25 @@ export function MessageDeliveryStatus({
         <span className="spinner message-delivery-spinner" aria-hidden />
       ) : delivered && (showDeliveryCheck || showPeerAvatar || showReaders) ? (
         <>
+          {showReaders ? (
+            <div className="message-delivery-readers" aria-hidden>
+              {readByMembers.map((member) => (
+                <UserAvatar
+                  key={member.userId}
+                  displayName={member.displayName}
+                  avatarUrl={member.avatarUrl}
+                  className="message-delivery-peer-avatar user-avatar"
+                />
+              ))}
+            </div>
+          ) : null}
+          {showPeerAvatar && peerUser ? (
+            <UserAvatar
+              displayName={peerUser.displayName}
+              avatarUrl={peerUser.avatarUrl}
+              className="message-delivery-peer-avatar user-avatar"
+            />
+          ) : null}
           {showDeliveryCheck ? (
             <svg
               className="message-delivery-check"
@@ -102,25 +121,6 @@ export function MessageDeliveryStatus({
             >
               <path d="M20 6 9 17l-5-5" />
             </svg>
-          ) : null}
-          {showPeerAvatar && peerUser ? (
-            <UserAvatar
-              displayName={peerUser.displayName}
-              avatarUrl={peerUser.avatarUrl}
-              className="message-delivery-peer-avatar user-avatar"
-            />
-          ) : null}
-          {showReaders ? (
-            <div className="message-delivery-readers" aria-hidden>
-              {readByMembers.map((member) => (
-                <UserAvatar
-                  key={member.userId}
-                  displayName={member.displayName}
-                  avatarUrl={member.avatarUrl}
-                  className="message-delivery-peer-avatar user-avatar"
-                />
-              ))}
-            </div>
           ) : null}
         </>
       ) : null}

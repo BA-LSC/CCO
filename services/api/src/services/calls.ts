@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   CallGuestPreview,
   CallInviteCandidateDto,
@@ -8,6 +8,7 @@ import type {
   CallSummaryDto,
 } from "@cco/shared/calls";
 import { db } from "../db";
+import { matchDisplayNameOrEmail } from "../lib/db-search";
 import {
   callInviteTokens,
   callParticipants,
@@ -611,8 +612,7 @@ export async function searchCallInviteCandidates(params: {
   const conditions = [eq(users.organizationId, params.organizationId)];
 
   if (q) {
-    const pattern = `%${q.replace(/[%_\\]/g, "")}%`;
-    conditions.push(or(ilike(users.displayName, pattern), ilike(users.email, pattern))!);
+    conditions.push(matchDisplayNameOrEmail(users.displayName, users.email, q));
   }
 
   const rows = await db

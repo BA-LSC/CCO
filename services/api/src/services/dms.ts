@@ -1,4 +1,4 @@
-import { and, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   conversationMembers,
@@ -8,6 +8,7 @@ import {
   userPcoCredentials,
   users,
 } from "../db/schema";
+import { matchDisplayNameOrEmail } from "../lib/db-search";
 import {
   buildAllSignedUpMemberRecords,
   buildSignedUpMemberRecords,
@@ -298,8 +299,7 @@ export async function searchDmCandidates(params: {
   const conditions = [inArray(users.id, idList)];
 
   if (q) {
-    const pattern = `%${q.replace(/[%_\\]/g, "")}%`;
-    conditions.push(or(ilike(users.displayName, pattern), ilike(users.email, pattern))!);
+    conditions.push(matchDisplayNameOrEmail(users.displayName, users.email, q));
   }
 
   const rows = await db
