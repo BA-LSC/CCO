@@ -50,6 +50,17 @@ describe("buildRtkMeetingConfig", () => {
     expect(right).not.toContain("rtk-plugins-toggle");
     expect(right).not.toContain("rtk-participants-toggle");
     expect(center).not.toContain("rtk-leave-button");
+    expect(center).not.toContain("rtk-livestream-toggle");
+    expect(center).not.toContain("rtk-webinar-stage-toggle");
+    expect(center).not.toContain("rtk-stage-toggle");
+    expect(center).not.toContain("rtk-ai-toggle");
+    expect(center).toEqual([
+      "rtk-settings-toggle",
+      "rtk-screen-share-toggle",
+      "rtk-mic-toggle",
+      "rtk-camera-toggle",
+      "rtk-more-toggle",
+    ]);
     expect(center).toContain("rtk-settings-toggle");
     expect(center).toContain("rtk-screen-share-toggle");
     expect(center).toContain("rtk-mic-toggle");

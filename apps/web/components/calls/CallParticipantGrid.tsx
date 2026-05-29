@@ -44,19 +44,23 @@ function CallParticipantBox({
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayName = peer.name?.trim() || "Participant";
   const showVideo = Boolean(peer.videoEnabled);
+  const isMuted = !audioEnabled;
   const isSpeaking = useParticipantAudioSpeaking(audioTrack, audioEnabled);
   const { showOutline, isPulsing } = useSpeakingOutline(isSpeaking);
 
-  const speakingBoxClass = showOutline
-    ? isPulsing
-      ? " call-participant-box--speaking"
-      : " call-participant-box--speaking-out"
-    : "";
-  const speakingAvatarClass = showOutline
-    ? isPulsing
-      ? " call-participant-box__avatar--speaking"
-      : " call-participant-box__avatar--speaking-out"
-    : "";
+  const mutedBoxClass = isMuted ? " call-participant-box--muted" : "";
+  const speakingBoxClass =
+    !isMuted && showOutline
+      ? isPulsing
+        ? " call-participant-box--speaking"
+        : " call-participant-box--speaking-out"
+      : "";
+  const speakingAvatarClass =
+    !isMuted && showOutline
+      ? isPulsing
+        ? " call-participant-box__avatar--speaking"
+        : " call-participant-box__avatar--speaking-out"
+      : "";
 
   useEffect(() => {
     const element = videoRef.current;
@@ -69,7 +73,7 @@ function CallParticipantBox({
   }, [peer, showVideo]);
 
   return (
-    <div className={`call-participant-box${speakingBoxClass}`}>
+    <div className={`call-participant-box${mutedBoxClass}${speakingBoxClass}`}>
       {showVideo ? (
         <video
           ref={videoRef}

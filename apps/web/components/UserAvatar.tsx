@@ -35,7 +35,7 @@ export function UserAvatar({ displayName, avatarUrl, className = "user-avatar" }
           onError={() => setImageFailed(true)}
         />
       ) : (
-        initials(displayName)
+        <span className="avatar-initials-text">{initials(displayName)}</span>
       )}
     </span>
   );

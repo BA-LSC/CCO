@@ -651,6 +651,47 @@ html.standalone-display input:not([type="button"]):not([type="submit"]):not([typ
   display: inline-flex;
 }
 
+/* Initials-only avatar circles — shared fill and typography (sidebar, header, settings). */
+.sidebar-dm-avatar,
+.sidebar-group-avatar,
+.chat-panel-header-avatar,
+.dm-group-settings-avatar {
+  --avatar-font-scale: 0.385;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: calc(var(--avatar-size, 32px) * var(--avatar-font-scale));
+}
+
+.sidebar-dm-avatar img,
+.sidebar-group-avatar img,
+.chat-panel-header-avatar img,
+.dm-group-settings-avatar img {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.sidebar-dm-avatar .avatar-initials-text,
+.sidebar-group-avatar .avatar-initials-text,
+.chat-panel-header-avatar .avatar-initials-text,
+.dm-group-settings-avatar .avatar-initials-text {
+  grid-area: 1 / 1;
+  line-height: 1;
+}
+
 .avatar-with-presence--sm {
   width: 28px;
   height: 28px;
@@ -1756,31 +1797,15 @@ html[data-theme="11"] .user-menu-dropdown {
 }
 
 .sidebar-dm-avatar {
-  width: var(--sidebar-avatar-size);
-  height: var(--sidebar-avatar-size);
-  min-width: var(--sidebar-avatar-size);
-  max-width: var(--sidebar-avatar-size);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: var(--sidebar-font-size-sm);
-  flex-shrink: 0;
-  overflow: hidden;
-  line-height: 0;
+  --avatar-size: var(--sidebar-avatar-size);
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  min-width: var(--avatar-size);
+  max-width: var(--avatar-size);
 }
 
 .sidebar-dm-avatar img {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  object-fit: cover;
-  object-position: center;
+  display: block;
 }
 
 .sidebar-item-preview {
@@ -2208,31 +2233,15 @@ button.sidebar-group-header:focus-visible {
 }
 
 .sidebar-group-avatar {
-  width: var(--sidebar-avatar-size);
-  height: var(--sidebar-avatar-size);
-  min-width: var(--sidebar-avatar-size);
-  max-width: var(--sidebar-avatar-size);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: var(--sidebar-font-size-sm);
-  flex-shrink: 0;
-  overflow: hidden;
-  line-height: 0;
+  --avatar-size: var(--sidebar-avatar-size);
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  min-width: var(--avatar-size);
+  max-width: var(--avatar-size);
 }
 
 .sidebar-group-avatar img {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  object-fit: cover;
-  object-position: center;
+  display: block;
 }
 
 .sidebar-add-channel-icon {
@@ -2548,30 +2557,14 @@ button.sidebar-group-header:focus-visible {
 }
 
 .dm-group-settings-avatar {
-  width: 56px;
-  height: 56px;
-  min-width: 56px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: 0.875rem;
-  line-height: 1;
-  flex-shrink: 0;
-  overflow: hidden;
+  --avatar-size: 56px;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  min-width: var(--avatar-size);
 }
 
 .dm-group-settings-avatar img {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  object-fit: cover;
-  object-position: center;
+  display: block;
 }
 
 .dm-group-settings-photo-actions {
@@ -3014,18 +3007,13 @@ button.sidebar-group-header:focus-visible {
 }
 
 .chat-panel-header-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.85rem;
-  flex-shrink: 0;
-  overflow: hidden;
+  --avatar-size: 40px;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+}
+
+.chat-panel-header-avatar img {
+  display: block;
 }
 
 .chat-panel-header .avatar-with-presence {
@@ -8514,8 +8502,8 @@ html.standalone-display .chat-thread-panel {
   width: 100%;
   margin-top: auto;
   padding: 6px 10px 8px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  border-bottom: none;
+  background: var(--color-bg);
   --rtk-controlbar-button-background-color: transparent;
   --rtk-controlbar-button-icon-size: 18px;
 }
@@ -8609,6 +8597,17 @@ html.standalone-display .chat-thread-panel {
   box-shadow: none;
 }
 
+.call-participant-box--muted::after {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--color-danger) 72%, transparent);
+  animation: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 18%, transparent);
+}
+
+.call-participant-box--muted .call-participant-box__avatar {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+
 .call-participant-box__avatar {
   display: flex;
   align-items: center;
@@ -8698,11 +8697,18 @@ html.standalone-display .chat-thread-panel {
   padding: 4px;
 }
 
+.call-pip .call-participant-grid--solo {
+  align-items: center;
+  justify-items: center;
+  place-content: center;
+}
+
 .call-pip .call-participant-grid--solo .call-participant-box {
   width: auto;
   max-width: 100%;
   height: auto;
   min-height: 0;
+  align-self: center;
   padding: 4px 8px;
   background: transparent;
   flex-direction: row;
@@ -8711,6 +8717,7 @@ html.standalone-display .chat-thread-panel {
 .call-pip .call-participant-grid--solo .call-participant-box__avatar {
   width: auto;
   height: auto;
+  flex: 0 0 auto;
 }
 
 .call-pip .call-participant-grid--solo .call-participant-box__avatar img,
@@ -8787,11 +8794,19 @@ html.standalone-display .chat-thread-panel {
 .call-meeting-ui rtk-chat-toggle,
 .call-meeting-ui rtk-polls-toggle,
 .call-meeting-ui rtk-plugins-toggle,
+.call-meeting-ui rtk-livestream-toggle,
+.call-meeting-ui rtk-webinar-stage-toggle,
+.call-meeting-ui rtk-stage-toggle,
+.call-meeting-ui rtk-ai-toggle,
 .call-meeting-ui__footer rtk-participants-toggle,
 .call-meeting-ui__footer rtk-leave-button,
 .call-meeting-ui__footer rtk-chat-toggle,
 .call-meeting-ui__footer rtk-polls-toggle,
-.call-meeting-ui__footer rtk-plugins-toggle {
+.call-meeting-ui__footer rtk-plugins-toggle,
+.call-meeting-ui__footer rtk-livestream-toggle,
+.call-meeting-ui__footer rtk-webinar-stage-toggle,
+.call-meeting-ui__footer rtk-stage-toggle,
+.call-meeting-ui__footer rtk-ai-toggle {
   display: none !important;
 }
 

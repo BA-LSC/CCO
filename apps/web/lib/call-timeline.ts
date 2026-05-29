@@ -3,6 +3,7 @@ import {
   formatCallLiveDuration,
   formatCallTimelineLabel,
   type CallTimelineEventDto,
+  type CallTimelineKind,
 } from "@cco/shared/call-timeline";
 import type { Message } from "@/lib/api";
 
@@ -32,6 +33,38 @@ export function upsertCallTimelineEvent(
   return mergeCallTimelineEvents(
     existing.filter((item) => item.id !== event.id),
     [event],
+  );
+}
+
+const TERMINAL_CALL_KINDS = new Set<CallTimelineKind>(["ended", "missed"]);
+
+/** Drop in-progress started rows once a terminal event exists for the same call. */
+export function normalizeCallTimelineEvents(
+  events: CallTimelineEventDto[],
+): CallTimelineEventDto[] {
+  const terminalCallIds = new Set(
+    events.filter((event) => TERMINAL_CALL_KINDS.has(event.kind)).map((event) => event.callId),
+  );
+  if (terminalCallIds.size === 0) return events;
+
+  return events.filter(
+    (event) => !(event.kind === "started" && terminalCallIds.has(event.callId)),
+  );
+}
+
+/** Apply a call end event: clear live started row and upsert missed/ended divider. */
+export function applyCallEndedToTimelineEvents(
+  existing: CallTimelineEventDto[],
+  params: { callId: string; timelineEvent?: CallTimelineEventDto | null },
+): CallTimelineEventDto[] {
+  const withoutLiveRow = existing.filter(
+    (event) => !(event.callId === params.callId && event.kind === "started"),
+  );
+  if (!params.timelineEvent) {
+    return withoutLiveRow;
+  }
+  return normalizeCallTimelineEvents(
+    mergeCallTimelineEvents(withoutLiveRow, [params.timelineEvent]),
   );
 }
 

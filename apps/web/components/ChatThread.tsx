@@ -51,6 +51,8 @@ import {
 } from "@/lib/optimistic-text-message";
 import {
   mergeCallTimelineEvents,
+  normalizeCallTimelineEvents,
+  applyCallEndedToTimelineEvents,
   upsertCallTimelineEvent,
   type CallTimelineEventDto,
 } from "@/lib/call-timeline";
@@ -531,7 +533,9 @@ export function ChatThread({
     if (messagesLoading) return;
 
     setMessages((prev) => mergeConversationMessages(prev, initialMessages));
-    setCallEvents((prev) => mergeCallTimelineEvents(prev, initialCallEvents));
+    setCallEvents((prev) =>
+      normalizeCallTimelineEvents(mergeCallTimelineEvents(prev, initialCallEvents)),
+    );
     setHasMore((prev) =>
       messagesRef.current.length > initialMessages.length ? prev : initialHasMore,
     );
@@ -733,14 +737,25 @@ export function ChatThread({
           });
         }
       }
-      if (event.type === "call.started" && event.timelineEvent) {
-        setCallEvents((prev) => upsertCallTimelineEvent(prev, event.timelineEvent!));
+      if (
+        event.type === "call.started" &&
+        event.conversationId === conversationId &&
+        event.timelineEvent
+      ) {
+        setCallEvents((prev) =>
+          normalizeCallTimelineEvents(upsertCallTimelineEvent(prev, event.timelineEvent!)),
+        );
         if (pinnedToBottomRef.current) {
           autoScrollToBottomRef.current = true;
         }
       }
-      if (event.type === "call.ended" && event.timelineEvent) {
-        setCallEvents((prev) => upsertCallTimelineEvent(prev, event.timelineEvent!));
+      if (event.type === "call.ended" && event.conversationId === conversationId) {
+        setCallEvents((prev) =>
+          applyCallEndedToTimelineEvents(prev, {
+            callId: event.callId,
+            timelineEvent: event.timelineEvent,
+          }),
+        );
         if (pinnedToBottomRef.current) {
           autoScrollToBottomRef.current = true;
         }
@@ -792,6 +807,7 @@ export function ChatThread({
     messagesLoading,
     setMessages,
     { getMergeOptions: getPollMergeOptions },
+    setCallEvents,
   );
 
   async function postMessage(payload: {
@@ -853,7 +869,9 @@ export function ChatThread({
         return sortMessagesByCreatedAt([...incoming.filter((m) => !ids.has(m.id)), ...prev]);
       });
       if (data.callEvents?.length) {
-        setCallEvents((prev) => mergeCallTimelineEvents(prev, data.callEvents ?? []));
+        setCallEvents((prev) =>
+          normalizeCallTimelineEvents(mergeCallTimelineEvents(prev, data.callEvents ?? [])),
+        );
       }
       setHasMore(data.hasMore);
     } finally {

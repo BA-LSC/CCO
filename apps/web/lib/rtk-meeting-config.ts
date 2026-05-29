@@ -8,6 +8,7 @@ export type CallPanelPlacement = "inline" | "pip" | "guest";
 type RootChild = string | [string, Record<string, unknown>?];
 
 const CONTROLBAR_CHILD_KEYS = [
+  "div#controlbar-left",
   "div#controlbar-right",
   "div#controlbar-center",
   "div#controlbar-mobile",
@@ -22,6 +23,10 @@ const CCO_CONTROLBAR_REMOVAL = [
   "rtk-plugins-toggle",
   "rtk-participants-toggle",
   "rtk-leave-button",
+  "rtk-livestream-toggle",
+  "rtk-webinar-stage-toggle",
+  "rtk-stage-toggle",
+  "rtk-ai-toggle",
 ] as const;
 
 const CCO_HIDDEN_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
@@ -30,6 +35,10 @@ const CCO_HIDDEN_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
   "rtk-plugins-toggle": { display: "none" },
   "rtk-participants-toggle": { display: "none" },
   "rtk-leave-button": { display: "none" },
+  "rtk-livestream-toggle": { display: "none" },
+  "rtk-webinar-stage-toggle": { display: "none" },
+  "rtk-stage-toggle": { display: "none" },
+  "rtk-ai-toggle": { display: "none" },
 };
 
 const CONTROLBAR_SECTION_KEYS = [

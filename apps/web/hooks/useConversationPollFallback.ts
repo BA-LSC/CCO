@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { apiFetch, type Message } from "@/lib/api";
+import type { CallTimelineEventDto } from "@/lib/call-timeline";
+import { mergeCallTimelineEvents, normalizeCallTimelineEvents } from "@/lib/call-timeline";
 import { mergeConversationMessages, type MergeConversationMessagesOptions } from "@/lib/message-reactions";
 import { conversationMessagesPath } from "@/lib/messages";
 
@@ -19,6 +21,7 @@ export function useConversationPollFallback(
   messagesLoading: boolean,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
   pollMerge?: ConversationPollMergeOptions,
+  setCallEvents?: React.Dispatch<React.SetStateAction<CallTimelineEventDto[]>>,
 ): void {
   const pollMergeRef = useRef(pollMerge);
   pollMergeRef.current = pollMerge;
@@ -31,13 +34,18 @@ export function useConversationPollFallback(
 
     async function poll() {
       try {
-        const data = await apiFetch<{ messages: Message[] }>(
+        const data = await apiFetch<{ messages: Message[]; callEvents?: CallTimelineEventDto[] }>(
           conversationMessagesPath(activeConversationId, { limit: 50 }),
         );
         if (cancelled) return;
 
         const mergeOptions = pollMergeRef.current?.getMergeOptions?.();
         setMessages((prev) => mergeConversationMessages(prev, data.messages, mergeOptions));
+        if (setCallEvents && data.callEvents) {
+          setCallEvents((prev) =>
+            normalizeCallTimelineEvents(mergeCallTimelineEvents(prev, data.callEvents ?? [])),
+          );
+        }
       } catch {
         // ignore transient poll errors
       }
@@ -51,5 +59,5 @@ export function useConversationPollFallback(
       cancelled = true;
       clearInterval(interval);
     };
-  }, [conversationId, connected, messagesLoading, setMessages]);
+  }, [conversationId, connected, messagesLoading, setMessages, setCallEvents]);
 }
