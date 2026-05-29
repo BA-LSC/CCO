@@ -120,16 +120,21 @@ export function useDeployCompletionPoll({
       finishingDeployRef.current = true;
       sawDeployUpdatingRef.current = true;
 
-      if (validateBeforeReload) {
-        const result = await validateBeforeReload();
-        if (cancelled) return;
-        if (result === "abort") {
+      try {
+        if (validateBeforeReload) {
+          const result = await validateBeforeReload();
+          if (cancelled) return;
+          if (result === "abort") {
+            return;
+          }
+        }
+
+        await applyAppUpdate();
+      } finally {
+        if (!cancelled) {
           finishingDeployRef.current = false;
-          return;
         }
       }
-
-      void applyAppUpdate();
     };
 
     void pollUntilReady();

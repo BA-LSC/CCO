@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   createContext,
   Suspense,
@@ -20,9 +19,9 @@ import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
 import { useAnchorRect } from "@/hooks/useAnchorRect";
+import { useChatPanelBounds } from "@/hooks/useChatPanelBounds";
 import { usePipPanel } from "@/hooks/usePipPanel";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
-import { CallInCallActions, callInCallActionsInlineOffset } from "@/components/calls/CallInCallActions";
 import { CallOverlay } from "@/components/calls/CallOverlay";
 import { CallPipShell } from "@/components/calls/CallPipShell";
 import { ChatHomeBanner } from "@/components/ChatHomeBanner";
@@ -78,54 +77,6 @@ function ConversationCallUrlJoin({
   }, [endedCallIdsRef, inCall, joinExisting, loading, searchParams]);
 
   return null;
-}
-
-function ActiveCallChrome({
-  homeChatPath,
-  inlineAnchor,
-  activeCall,
-  showInline,
-  pip,
-}: {
-  homeChatPath: string | null;
-  inlineAnchor: HTMLElement | null;
-  activeCall: CallSummaryDto | null;
-  showInline: boolean;
-  pip: ReturnType<typeof usePipPanel>;
-}) {
-  const inlineRect = useAnchorRect(inlineAnchor, showInline);
-
-  if (showInline) {
-    return (
-      <div className="call-panel-host">
-        <CallInCallActions placement="inline" inlineAnchorRect={inlineRect} />
-      </div>
-    );
-  }
-
-  if (!pip.ready || !pip.position) return null;
-
-  return (
-    <>
-      <CallPipShell
-        participantCount={activeCall?.participantCount ?? 1}
-        returnLink={
-          homeChatPath ? (
-            <Link href={homeChatPath} className="call-pip-return">
-              Return to call
-            </Link>
-          ) : null
-        }
-        pip={pip}
-        chromeOnly
-      />
-      <CallInCallActions
-        placement="pip"
-        pipAnchorRect={pip.position}
-        pipCollapsed={pip.collapsed}
-      />
-    </>
-  );
 }
 
 export function ActiveCallProvider({ children }: { children: ReactNode }) {
@@ -327,18 +278,11 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const showInlineCall = Boolean(
     homeConversationId && inCall && activeConversationId === homeConversationId,
   );
+  const showPipCall = Boolean(homeConversationId && inCall && authToken && !showInlineCall);
   const pip = usePipPanel();
+  const chatBounds = useChatPanelBounds(showPipCall);
   const inlineRect = useAnchorRect(inlineAnchor, showInlineCall);
-  const inlineActionsOffset = callInCallActionsInlineOffset();
-  const inlinePanelRect =
-    showInlineCall && inlineRect
-      ? new DOMRect(
-          inlineRect.x,
-          inlineRect.y + inlineActionsOffset,
-          inlineRect.width,
-          inlineRect.height,
-        )
-      : null;
+  const inlinePanelRect = showInlineCall && inlineRect ? inlineRect : null;
 
   return (
     <ActiveCallContext.Provider value={contextValue}>
@@ -374,26 +318,29 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       ) : null}
 
       {homeConversationId && inCall && authToken ? (
-        <>
-          <ActiveCallChrome
-            homeChatPath={homeChatPath}
-            inlineAnchor={inlineAnchor}
-            activeCall={activeCall}
-            showInline={showInlineCall}
-            pip={pip}
-          />
+        showInlineCall ? (
           <CallOverlay
             key={authToken}
             authToken={authToken}
             sessionParticipantCount={activeCall?.participantCount ?? 1}
             onLeave={() => void handleHangUp()}
-            placement={showInlineCall ? "inline" : "pip"}
-            inlineAnchorRect={showInlineCall ? inlinePanelRect : null}
-            pipAnchor={showInlineCall ? null : pip.position}
-            pipCollapsed={pip.collapsed}
+            placement="inline"
+            inlineAnchorRect={inlinePanelRect}
             showSetupScreen={false}
           />
-        </>
+        ) : (
+          <CallPipShell pip={pip} bounds={chatBounds}>
+            <CallOverlay
+              key={authToken}
+              authToken={authToken}
+              sessionParticipantCount={activeCall?.participantCount ?? 1}
+              onLeave={() => void handleHangUp()}
+              placement="pip"
+              embedded
+              showSetupScreen={false}
+            />
+          </CallPipShell>
+        )
       ) : null}
 
       {children}

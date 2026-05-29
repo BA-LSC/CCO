@@ -2,7 +2,7 @@
 
 import type { CallSummaryDto } from "@cco/shared/calls";
 import { ChatHomeBanner } from "@/components/ChatHomeBanner";
-import { PanelHeaderPhoneIcon } from "@/components/PanelHeaderIcons";
+import { PanelHeaderPhoneHangUpIcon, PanelHeaderPhoneIcon } from "@/components/PanelHeaderIcons";
 
 type CallIconState = "idle" | "waiting" | "joinable" | "in-call";
 
@@ -80,7 +80,7 @@ export function CallActionButton({
       title={label}
       aria-pressed={!inCall && (state === "waiting" || state === "joinable")}
     >
-      <PanelHeaderPhoneIcon />
+      {state === "in-call" ? <PanelHeaderPhoneHangUpIcon /> : <PanelHeaderPhoneIcon />}
     </button>
   );
 }

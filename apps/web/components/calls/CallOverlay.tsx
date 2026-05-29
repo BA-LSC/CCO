@@ -15,7 +15,6 @@ import {
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
 import { CallMeetingUi } from "@/components/calls/CallMeetingUi";
-import { CallParticipantAvatars } from "@/components/calls/CallParticipantAvatars";
 import { useTheme } from "@/components/ThemeProvider";
 import { shouldApplySoloCallBehavior } from "@/lib/call-solo";
 import { applyCcoRtkDesignSystem } from "@/lib/rtk-design-system";
@@ -23,15 +22,11 @@ import {
   type CallPanelPlacement,
   peerLooksLikeGuest,
 } from "@/lib/rtk-meeting-config";
-import type { PipPosition } from "@/hooks/usePipPanel";
 
 export type { CallPanelPlacement };
 
 const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
-const INLINE_MAX_HEIGHT_PX = 400;
-const PIP_HANDLE_HEIGHT_PX = 48;
-const PIP_ACTIONS_HEIGHT_PX = 36;
-const PIP_WIDTH_PX = 360;
+const INLINE_MAX_HEIGHT_PX = 320;
 
 type Props = {
   authToken: string;
@@ -40,9 +35,8 @@ type Props = {
   placement?: CallPanelPlacement;
   /** Measured anchor for inline placement (top of chat-panel-content). */
   inlineAnchorRect?: DOMRect | null;
-  /** Fixed position for pip placement (handle is rendered separately). */
-  pipAnchor?: PipPosition | null;
-  pipCollapsed?: boolean;
+  /** Fill a parent pip shell instead of using fixed viewport positioning. */
+  embedded?: boolean;
   /** Signed-in users skip RTK setup; guests may show it. */
   showSetupScreen?: boolean;
 };
@@ -189,7 +183,6 @@ function MeetingInner({
 
   return (
     <>
-      <CallParticipantAvatars panelRef={panelRef} />
       <CallMeetingUi
         meeting={meeting}
         placement={placement}
@@ -204,30 +197,17 @@ function MeetingInner({
 function panelStyle(
   placement: CallPanelPlacement,
   inlineAnchorRect: DOMRect | null | undefined,
-  pipAnchor: PipPosition | null | undefined,
-  pipCollapsed: boolean,
+  embedded: boolean,
 ): CSSProperties | undefined {
   if (placement === "guest") return undefined;
+  if (embedded) return undefined;
 
-  if (placement === "pip") {
-    if (!pipAnchor || pipCollapsed) return { visibility: "hidden" };
-    const margin = 8;
-    const width = Math.min(PIP_WIDTH_PX, window.innerWidth - margin * 2);
-    const height = Math.min(240, window.innerHeight - 160);
-    return {
-      position: "fixed",
-      left: pipAnchor.x,
-      top: pipAnchor.y + PIP_HANDLE_HEIGHT_PX + PIP_ACTIONS_HEIGHT_PX,
-      width,
-      height,
-      zIndex: 1200,
-    };
-  }
+  if (placement === "pip") return undefined;
 
   if (!inlineAnchorRect) return { visibility: "hidden" };
 
   const height = Math.min(
-    typeof window !== "undefined" ? window.innerHeight * 0.42 : INLINE_MAX_HEIGHT_PX,
+    typeof window !== "undefined" ? window.innerHeight * 0.34 : INLINE_MAX_HEIGHT_PX,
     INLINE_MAX_HEIGHT_PX,
   );
 
@@ -247,8 +227,7 @@ export function CallOverlay({
   onLeave,
   placement = "inline",
   inlineAnchorRect,
-  pipAnchor,
-  pipCollapsed = false,
+  embedded = false,
   showSetupScreen = false,
 }: Props) {
   const [meeting, initMeeting] = useRealtimeKitClient();
@@ -270,6 +249,7 @@ export function CallOverlay({
     "call-panel",
     placement === "inline" ? "call-panel--inline" : "",
     placement === "pip" ? "call-panel--pip" : "",
+    embedded ? "call-panel--pip-embedded" : "",
     placement === "guest" ? "call-panel--guest" : "",
   ]
     .filter(Boolean)
@@ -279,7 +259,7 @@ export function CallOverlay({
     <div
       ref={panelRef}
       className={className}
-      style={panelStyle(placement, inlineAnchorRect, pipAnchor, pipCollapsed)}
+      style={panelStyle(placement, inlineAnchorRect, embedded)}
       role="region"
       aria-label="Video call"
     >

@@ -2,39 +2,38 @@
 
 import {
   useCallback,
-  useEffect,
+  useMemo,
   useRef,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
-  clampPipPosition,
+  clampPipPoint,
+  cornerPosition,
+  pipDimensions,
+  resolvePipBounds,
   usePipPanel,
-  type PipPosition,
+  type PipPoint,
 } from "@/hooks/usePipPanel";
 
 type PipState = ReturnType<typeof usePipPanel>;
 
 type Props = {
-  participantCount: number;
-  returnLink?: ReactNode;
-  children?: ReactNode;
-  /** Shared pip state from parent (keeps handle and overlay in sync). */
-  pip?: PipState;
-  /** Render only the draggable handle bar; media renders in a fixed sibling overlay. */
-  chromeOnly?: boolean;
+  bounds: DOMRect | null;
+  pip: PipState;
+  children: ReactNode;
 };
 
-export function CallPipShell({
-  participantCount,
-  returnLink,
-  children,
-  pip: pipProp,
-  chromeOnly = false,
-}: Props) {
-  const internalPip = usePipPanel();
-  const pip = pipProp ?? internalPip;
-  const { collapsed, toggleCollapsed, position, setPosition, ready } = pip;
+export function CallPipShell({ bounds, pip, children }: Props) {
+  const {
+    collapsed,
+    toggleCollapsed,
+    corner,
+    dragPoint,
+    setDragPoint,
+    snapDragToCorner,
+    ready,
+  } = pip;
   const shellRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -42,20 +41,22 @@ export function CallPipShell({
     offsetY: number;
   } | null>(null);
 
-  useEffect(() => {
-    if (!ready || !position) return;
-    const onResize = () => {
-      setPosition(clampPipPosition(position, collapsed));
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [collapsed, position, ready, setPosition]);
+  const resolvedBounds = useMemo(() => resolvePipBounds(bounds), [bounds]);
+
+  const layout = useMemo(() => {
+    if (dragPoint) {
+      const size = pipDimensions(collapsed, resolvedBounds.width);
+      const clamped = clampPipPoint(dragPoint, size, resolvedBounds);
+      return { ...size, ...clamped };
+    }
+    return cornerPosition(corner, resolvedBounds, collapsed);
+  }, [collapsed, corner, dragPoint, resolvedBounds]);
 
   const onHandlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if ((event.target as HTMLElement).closest("button, a")) return;
+      if ((event.target as HTMLElement).closest("button")) return;
       const shell = shellRef.current;
-      if (!shell || !position) return;
+      if (!shell) return;
       event.preventDefault();
       const rect = shell.getBoundingClientRect();
       dragRef.current = {
@@ -63,74 +64,80 @@ export function CallPipShell({
         offsetX: event.clientX - rect.left,
         offsetY: event.clientY - rect.top,
       };
+      setDragPoint({ x: rect.left, y: rect.top });
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [position],
+    [setDragPoint],
   );
 
   const onHandlePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
-      setPosition({
+      const next: PipPoint = {
         x: event.clientX - drag.offsetX,
         y: event.clientY - drag.offsetY,
-      });
+      };
+      const size = pipDimensions(collapsed, resolvedBounds.width);
+      setDragPoint(clampPipPoint(next, size, resolvedBounds));
     },
-    [setPosition],
+    [collapsed, resolvedBounds, setDragPoint],
   );
 
-  const onHandlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+  const finishDrag = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      dragRef.current = null;
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      const size = pipDimensions(collapsed, resolvedBounds.width);
+      const point = clampPipPoint(
+        {
+          x: event.clientX - drag.offsetX,
+          y: event.clientY - drag.offsetY,
+        },
+        size,
+        resolvedBounds,
+      );
+      snapDragToCorner(point, resolvedBounds, collapsed);
+    },
+    [collapsed, resolvedBounds, snapDragToCorner],
+  );
 
-  if (!ready || !position) return null;
-
-  const style = pipPositionStyle(position);
+  if (!ready) return null;
 
   return (
     <div
       ref={shellRef}
-      className={`call-pip-shell${collapsed ? " call-pip--collapsed" : ""}${chromeOnly ? " call-pip-shell--chrome-only" : ""}`}
-      style={style}
+      className={`call-pip${collapsed ? " call-pip--collapsed" : ""}`}
+      style={{
+        left: layout.x,
+        top: layout.y,
+        width: layout.width,
+        height: layout.height,
+      }}
     >
       <div
-        className="call-pip-handle"
+        className="call-pip__handle"
         onPointerDown={onHandlePointerDown}
         onPointerMove={onHandlePointerMove}
-        onPointerUp={onHandlePointerUp}
-        onPointerCancel={onHandlePointerUp}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
       >
-        <span className="call-pip-handle-grip" aria-hidden="true" />
-        {!collapsed && returnLink ? (
-          <span className="call-pip-handle-return">{returnLink}</span>
-        ) : null}
-        <span className="call-pip-handle-count">
-          {participantCount} in call
-        </span>
+        <span className="call-pip__title">Call</span>
         <button
           type="button"
-          className="call-pip-collapse-btn"
+          className="call-pip__toggle"
           onClick={toggleCollapsed}
-          aria-label={collapsed ? "Expand call panel" : "Collapse call panel"}
+          aria-label={collapsed ? "Expand call" : "Collapse call"}
           aria-expanded={!collapsed}
         >
           {collapsed ? "▴" : "▾"}
         </button>
       </div>
-      {!collapsed && !chromeOnly ? <div className="call-pip-body">{children}</div> : null}
+      {!collapsed ? <div className="call-pip__body">{children}</div> : null}
     </div>
   );
-}
-
-function pipPositionStyle(position: PipPosition): { left: number; top: number } {
-  return {
-    left: position.x,
-    top: position.y,
-  };
 }

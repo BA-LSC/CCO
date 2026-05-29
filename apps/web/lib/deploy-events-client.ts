@@ -69,12 +69,12 @@ export function listenForDeployEvents(): () => void {
 
   const pollDeployState = async () => {
     const { updating, version: serverVersion, unavailable } = await probeServerAppVersion();
-    if (updating) {
-      markDeployUpdating();
+    if (isDeployPending() && !updating) {
+      await finishDeployUpdateSafely();
       return;
     }
-    if (isDeployPending()) {
-      await finishDeployUpdateSafely();
+    if (updating) {
+      markDeployUpdating();
       return;
     }
     // Auto-update can finish before this tab observed draining — still refresh on new build.

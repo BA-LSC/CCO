@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { useRealtimeKitClient } from "@cloudflare/realtimekit-react";
 import {
   RtkControlbar,
@@ -33,6 +33,8 @@ export function CallMeetingUi({
   authToken,
 }: Props) {
   const rtkRef = useRef<HTMLRtkMeetingElement>(null);
+  const providerRef = useRef<HTMLRtkUiProviderElement>(null);
+  const [controlbarReady, setControlbarReady] = useState(false);
   const meetingConfig = useMemo(
     () => buildRtkMeetingConfig({ enableInRoomChat, placement }),
     [enableInRoomChat, placement],
@@ -42,6 +44,18 @@ export function CallMeetingUi({
     if (showSetupScreen || !rtkRef.current) return;
     rtkRef.current.showSetupScreen = false;
   }, [showSetupScreen, meeting, authToken]);
+
+  useLayoutEffect(() => {
+    setControlbarReady(false);
+    const provider = providerRef.current;
+    if (provider) {
+      provider.config = meetingConfig;
+    }
+    const frame = requestAnimationFrame(() => {
+      setControlbarReady(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [meetingConfig, authToken, placement]);
 
   if (!meeting) return null;
 
@@ -67,19 +81,24 @@ export function CallMeetingUi({
     <div className={`call-meeting-ui ${panelClass}`}>
       <RtkUiProvider
         key={authToken}
+        ref={providerRef}
         meeting={meeting}
         config={meetingConfig}
         mode="fill"
         showSetupScreen={false}
       >
-        <div className="call-meeting-ui__body">
-          <CallParticipantGrid />
-          {enableInRoomChat ? <RtkSidebar /> : null}
+        <div className="call-meeting-ui__layout">
+          <div className="call-meeting-ui__body">
+            <CallParticipantGrid />
+            {enableInRoomChat ? <RtkSidebar /> : null}
+          </div>
+          <div className="call-meeting-ui__footer">
+            {controlbarReady ? <RtkControlbar config={meetingConfig} /> : null}
+          </div>
+          <RtkParticipantsAudio />
+          <RtkDialogManager />
+          <RtkNotifications />
         </div>
-        <RtkControlbar />
-        <RtkParticipantsAudio />
-        <RtkDialogManager />
-        <RtkNotifications />
       </RtkUiProvider>
     </div>
   );

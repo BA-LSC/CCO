@@ -235,10 +235,14 @@ export async function prepareAppUpdate(onUpdating?: () => Promise<void>): Promis
   await waitForOverlayPaint();
 }
 
-export function completeAppUpdateReload(): void {
-  if (typeof window === "undefined") return;
-  if (shouldBlockReloadLoop()) return;
+export function completeAppUpdateReload(): boolean {
+  if (typeof window === "undefined") return false;
+  if (shouldBlockReloadLoop()) {
+    forceClearStaleUpdateState();
+    return false;
+  }
   window.location.reload();
+  return true;
 }
 
 export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<void> {
@@ -248,7 +252,9 @@ export async function applyAppUpdate(onUpdating?: () => Promise<void>): Promise<
     if (typeof window !== "undefined") window.__ccoDeployPending = false;
     markDeployReload();
     await waitForSendIdle(DEPLOY_RELOAD_SEND_WAIT_MS);
-    completeAppUpdateReload();
+    if (!completeAppUpdateReload()) {
+      forceClearStaleUpdateState();
+    }
     return;
   }
 
@@ -290,7 +296,7 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
       return {
         version: null,
         unavailable: true,
-        updating: isDeployPending(),
+        updating: false,
         deployPhase: null,
       };
     }
@@ -322,7 +328,7 @@ export async function probeServerAppVersion(): Promise<AppVersionProbe> {
     return {
       version: null,
       unavailable: true,
-      updating: isDeployPending(),
+      updating: false,
       deployPhase: null,
     };
   }
@@ -355,13 +361,6 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  if (serverVersion === clientVersion && clientVersion !== "dev") {
-    syncMetaBuildVersion(serverVersion);
-    forceClearStaleUpdateState();
-    clearReloadLoopGuard();
-    return false;
-  }
-
   // Deploy draining — keep the update overlay up until the server clears the flag.
   if (updating) {
     if (!unavailable && serverVersion && serverVersion !== clientVersion) {
@@ -372,17 +371,15 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  if (
-    !unavailable &&
-    serverVersion &&
-    serverVersion !== clientVersion &&
-    isDeployPending()
-  ) {
+  if (isDeployPending()) {
     await applyAppUpdate(onUpdating);
     return true;
   }
 
-  if (isDeployPending()) {
+  if (serverVersion === clientVersion && clientVersion !== "dev") {
+    syncMetaBuildVersion(serverVersion);
+    forceClearStaleUpdateState();
+    clearReloadLoopGuard();
     return false;
   }
 

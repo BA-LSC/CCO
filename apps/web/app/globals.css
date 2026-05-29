@@ -8399,6 +8399,8 @@ html.standalone-display .chat-thread-panel {
 .call-panel-meeting {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .call-meeting-ui {
@@ -8406,20 +8408,142 @@ html.standalone-display .chat-thread-panel {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  width: 100%;
   height: 100%;
   background: var(--color-bg);
 }
 
-.call-meeting-ui__body {
+.call-meeting-ui > rtk-ui-provider {
   display: flex;
   flex: 1;
-  min-height: 120px;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.call-meeting-ui__layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.call-meeting-ui__body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
   overflow: hidden;
   background: var(--color-bg);
 }
 
-.call-meeting-ui__body rtk-simple-grid,
+.call-meeting-ui__footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.call-participant-grid {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch;
+  align-items: stretch;
+}
+
+.call-participant-grid--solo {
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+}
+
+.call-participant-grid--solo .call-participant-box {
+  width: min(100%, 420px);
+  height: 100%;
+  max-height: none;
+}
+
+.call-participant-grid--duo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.call-participant-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.call-participant-box__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+.call-participant-box__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.call-participant-box__avatar img,
+.call-participant-box__initials {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+}
+
+.call-participant-box__avatar img {
+  object-fit: cover;
+}
+
+.call-participant-box__initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.call-participant-box__name {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .call-meeting-ui__body rtk-grid {
   flex: 1;
   min-height: 0;
@@ -8429,22 +8553,24 @@ html.standalone-display .chat-thread-panel {
 }
 
 .call-meeting-ui rtk-controlbar {
-  flex-shrink: 0;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  border-top: none;
+  background: transparent;
 }
 
-.call-meeting-ui rtk-participant-tile {
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--color-surface-2);
-}
-
-.call-meeting-ui rtk-participant-tile rtk-avatar,
-.call-meeting-ui rtk-participant-tile ::slotted(rtk-avatar) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.call-meeting-ui rtk-participants-toggle,
+.call-meeting-ui rtk-leave-button,
+.call-meeting-ui rtk-chat-toggle,
+.call-meeting-ui rtk-polls-toggle,
+.call-meeting-ui rtk-plugins-toggle,
+.call-meeting-ui__footer rtk-participants-toggle,
+.call-meeting-ui__footer rtk-leave-button,
+.call-meeting-ui__footer rtk-chat-toggle,
+.call-meeting-ui__footer rtk-polls-toggle,
+.call-meeting-ui__footer rtk-plugins-toggle {
+  display: none !important;
 }
 
 .call-panel--pip {
@@ -8455,16 +8581,15 @@ html.standalone-display .chat-thread-panel {
   z-index: auto;
   border-radius: 0;
   border: none;
-  border-top: 1px solid var(--color-border);
   box-shadow: none;
 }
 
-.call-pip-shell--chrome-only {
-  height: 48px;
-}
-
-.call-pip-shell--chrome-only.call-pip--collapsed {
-  height: 48px;
+.call-panel--pip-embedded {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--color-bg);
 }
 
 .call-panel-meeting--no-chat rtk-chat-toggle,
@@ -8494,34 +8619,31 @@ html.standalone-display .chat-thread-panel {
 
 .call-inline-spacer {
   flex-shrink: 0;
-  height: min(42vh, 400px);
+  height: min(34vh, 320px);
   pointer-events: none;
 }
 
-.call-pip-shell {
+.call-pip {
   position: fixed;
   z-index: 1200;
   display: flex;
   flex-direction: column;
-  width: min(360px, calc(100vw - 40px));
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
   background: var(--color-surface);
   overflow: hidden;
-  animation: cco-fade-in 0.25s var(--motion-ease-out);
+  animation: cco-fade-in 0.2s var(--motion-ease-out);
 }
 
-.call-pip-shell.call-pip--collapsed {
-  height: 48px;
-}
-
-.call-pip-handle {
+.call-pip__handle {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  min-height: 48px;
-  padding: 0 10px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0 8px;
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-border);
   cursor: grab;
@@ -8529,48 +8651,26 @@ html.standalone-display .chat-thread-panel {
   user-select: none;
 }
 
-.call-pip-shell.call-pip--collapsed .call-pip-handle {
+.call-pip--collapsed .call-pip__handle {
   border-bottom: none;
-  cursor: grab;
 }
 
-.call-pip-handle:active {
+.call-pip__handle:active {
   cursor: grabbing;
 }
 
-.call-pip-handle-grip {
-  width: 10px;
-  height: 14px;
-  flex-shrink: 0;
-  opacity: 0.45;
-  background:
-    radial-gradient(circle, currentColor 1.5px, transparent 1.5px) 0 0 / 5px 5px;
-}
-
-.call-pip-handle-return {
-  flex: 1;
-  min-width: 0;
-}
-
-.call-pip-handle-count {
-  flex: 1;
-  min-width: 0;
-  font-size: 0.8125rem;
+.call-pip__title {
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.call-pip-shell:not(.call-pip--collapsed) .call-pip-handle-count {
-  flex: 0 1 auto;
-}
-
-.call-pip-collapse-btn {
+.call-pip__toggle {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8579,70 +8679,25 @@ html.standalone-display .chat-thread-panel {
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   line-height: 1;
 }
 
-.call-pip-collapse-btn:hover {
+.call-pip__toggle:hover {
   background: var(--color-bg);
 }
 
-.call-pip-body {
+.call-pip__body {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
+  height: 176px;
+  background: var(--color-bg);
 }
 
-.call-pip-body .call-in-call-actions {
-  position: static;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.call-pip-return {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  box-shadow: none;
-  text-decoration: none;
-}
-
-.call-pip-return:hover {
-  background: var(--color-surface);
-}
-
-.call-in-call-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 4px 8px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-}
-
-.call-pip-wrap .call-in-call-actions {
-  border-radius: var(--radius-sm);
-}
-
-.call-panel-host .call-in-call-actions {
-  border-bottom: none;
-  box-shadow: var(--shadow-sm);
-}
-
-.call-panel-host {
-  display: contents;
+.call-pip--collapsed .call-pip__body {
+  display: none;
 }
 
 .call-invite-dialog-backdrop {
