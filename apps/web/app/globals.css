@@ -8505,7 +8505,7 @@ html.standalone-display .chat-thread-panel {
   justify-content: center;
   width: 100%;
   margin-top: auto;
-  padding: 6px 10px 8px;
+  padding: 0 10px 8px;
   border-bottom: none;
   background: var(--color-bg);
   --rtk-controlbar-button-background-color: transparent;
@@ -8726,7 +8726,7 @@ html.standalone-display .chat-thread-panel {
 
 .call-pip .call-participant-grid--solo .call-participant-box__avatar img,
 .call-pip .call-participant-grid--solo .call-participant-box__initials {
-  --call-avatar-size: 56px;
+  --call-avatar-size: 64px;
   width: var(--call-avatar-size);
   height: var(--call-avatar-size);
   aspect-ratio: 1;
@@ -8738,7 +8738,7 @@ html.standalone-display .chat-thread-panel {
 }
 
 .call-pip .call-meeting-ui__footer {
-  padding: 2px 4px 4px;
+  padding: 0 4px 4px;
   --rtk-space-14: 32px;
   border-bottom: none;
 }
@@ -8787,7 +8787,8 @@ html.standalone-display .chat-thread-panel {
   margin-inline: auto;
   padding: 4px 6px;
   border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
   background: color-mix(in srgb, var(--color-surface-2) 92%, transparent);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.22);
   gap: 2px;

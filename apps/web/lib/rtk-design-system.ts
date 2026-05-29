@@ -29,4 +29,9 @@ export function applyCcoRtkDesignSystem(target: HTMLElement = document.documentE
       success,
     },
   });
+
+  // Keep RealtimeKit chrome on CCO radius tokens (theme picker updates these).
+  target.style.setProperty("--rtk-border-radius-sm", readCcoCssColor("--radius-sm", "8px"));
+  target.style.setProperty("--rtk-border-radius-md", readCcoCssColor("--radius-sm", "8px"));
+  target.style.setProperty("--rtk-border-radius-lg", readCcoCssColor("--radius-md", "12px"));
 }
