@@ -1679,11 +1679,13 @@ html[data-theme="11"] .user-menu-dropdown {
   min-width: 0;
 }
 
+.sidebar-dm-row > .sidebar-nested-trailing,
 .sidebar-dm-row > .sidebar-unread-dot,
 .sidebar-dm-row > .sidebar-badge {
   grid-column: 3;
   grid-row: 1 / span 2;
   align-self: center;
+  justify-self: end;
 }
 
 .sidebar-team-row {
@@ -1850,9 +1852,15 @@ html[data-theme="11"] .user-menu-dropdown {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   color: var(--color-muted);
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.messages-call-join-btn {
+  flex-shrink: 0;
 }
 
 .messages-call-divider time {
@@ -8285,6 +8293,14 @@ html.standalone-display .chat-thread-panel {
   }
 }
 
+.sidebar-call-indicator {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-success);
+  animation: call-header-pulse 2s ease-in-out infinite;
+}
+
 .call-header-btn--idle {
   color: var(--color-muted);
 }
@@ -8352,6 +8368,46 @@ html.standalone-display .chat-thread-panel {
 .call-overlay-meeting {
   flex: 1;
   min-height: 0;
+}
+
+.call-overlay--docked {
+  inset: auto 0 50% 0;
+  top: 0;
+  height: 42vh;
+  min-height: 280px;
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.call-overlay--pip {
+  inset: auto 20px 20px auto;
+  width: min(360px, calc(100vw - 40px));
+  height: min(240px, calc(100vh - 120px));
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.call-in-call-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.call-in-call-toolbar .btn {
+  flex-shrink: 0;
+}
+
+.call-overlay--docked,
+.call-overlay--pip {
+  pointer-events: auto;
 }
 
 .call-invite-dialog-backdrop {

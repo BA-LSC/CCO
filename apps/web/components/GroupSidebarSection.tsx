@@ -18,6 +18,7 @@ import {
   type GroupSidebarConversation,
 } from "@/lib/api";
 import { subscribeConversationUpdated, subscribeUnreadChanged } from "@/lib/sidebar-events";
+import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
 
 type Props = {
   groups: GroupSidebarItem[];
@@ -53,6 +54,7 @@ function SidebarChannelPrefix({ conv }: { conv: GroupSidebarConversation }) {
 export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const { getActiveCall } = useActiveCallsMap();
   const [groups, setGroups] = useState(initialGroups);
   const [creatingForGroup, setCreatingForGroup] = useState<string | null>(null);
   const [menuOpenForGroup, setMenuOpenForGroup] = useState<string | null>(null);
@@ -377,6 +379,20 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                             <SidebarChannelPrefix conv={conv} />
                             <span className="sidebar-item-label sidebar-team-name">{conv.title}</span>
                             <span className="sidebar-nested-trailing">
+                              {(() => {
+                                const activeCall = getActiveCall(conv.id);
+                                if (!activeCall) return null;
+                                return (
+                                  <span
+                                    className="sidebar-call-indicator"
+                                    aria-label={`Active call, ${activeCall.participantCount} participant${
+                                      activeCall.participantCount === 1 ? "" : "s"
+                                    }`}
+                                  >
+                                    📞 Call · {activeCall.participantCount}
+                                  </span>
+                                );
+                              })()}
                               {conv.muted && (
                                 <span className="sidebar-badge" title="Muted">
                                   🔕

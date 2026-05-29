@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import type { CallLayoutMode } from "@/components/calls/CallInCallToolbar";
 import {
   RealtimeKitProvider,
   useRealtimeKitClient,
@@ -8,7 +16,9 @@ import {
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
 import { RtkMeeting } from "@cloudflare/realtimekit-react-ui";
+import { useTheme } from "@/components/ThemeProvider";
 import { shouldApplySoloCallBehavior } from "@/lib/call-solo";
+import { applyCcoRtkDesignSystem } from "@/lib/rtk-design-system";
 
 const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
 
@@ -18,6 +28,8 @@ type Props = {
   onLeave: () => void;
   /** When false, join immediately using the participant name from the auth token. */
   showSetupScreen?: boolean;
+  toolbar?: ReactNode;
+  layoutMode?: CallLayoutMode;
 };
 
 function useSoloCallBehavior(
@@ -105,15 +117,16 @@ function MeetingInner({
   sessionParticipantCount,
   onLeave,
   showSetupScreen = false,
+  overlayRef,
 }: {
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
   showSetupScreen?: boolean;
+  overlayRef: RefObject<HTMLDivElement | null>;
 }) {
   const { meeting } = useRealtimeKitMeeting();
   const rtkRef = useRef<HTMLRtkMeetingElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const onLeaveRef = useRef(onLeave);
   const leftRef = useRef(false);
 
@@ -155,7 +168,7 @@ function MeetingInner({
   if (!meeting) return null;
 
   return (
-    <div className="call-overlay-meeting" ref={overlayRef}>
+    <div className="call-overlay-meeting">
       <RtkMeeting
         key={authToken}
         ref={rtkRef}
@@ -173,8 +186,16 @@ export function CallOverlay({
   sessionParticipantCount,
   onLeave,
   showSetupScreen = false,
+  toolbar,
+  layoutMode = "full",
 }: Props) {
   const [meeting, initMeeting] = useRealtimeKitClient();
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+
+  useLayoutEffect(() => {
+    applyCcoRtkDesignSystem(overlayRef.current ?? document.documentElement);
+  }, [theme]);
 
   useEffect(() => {
     void initMeeting({
@@ -184,13 +205,20 @@ export function CallOverlay({
   }, [authToken, initMeeting]);
 
   return (
-    <div className="call-overlay" role="dialog" aria-label="Video call">
+    <div
+      ref={overlayRef}
+      className={`call-overlay call-overlay--${layoutMode}`}
+      role="dialog"
+      aria-label="Video call"
+    >
+      {toolbar ? <div className="call-in-call-toolbar">{toolbar}</div> : null}
       <RealtimeKitProvider value={meeting}>
         <MeetingInner
           authToken={authToken}
           sessionParticipantCount={sessionParticipantCount}
           onLeave={onLeave}
           showSetupScreen={showSetupScreen}
+          overlayRef={overlayRef}
         />
       </RealtimeKitProvider>
     </div>

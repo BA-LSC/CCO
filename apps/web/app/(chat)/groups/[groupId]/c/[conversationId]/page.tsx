@@ -4,7 +4,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
-import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
+import {
+  ConversationCallHeaderButton,
+  ConversationCallShell,
+} from "@/components/calls/ConversationCallContext";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
 import { ChannelMembersSection, type ChannelMember } from "@/components/ChannelMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -376,22 +379,23 @@ export default function GroupConversationPage() {
   }
 
   return (
-    <div className="chat-panel">
-      <ChatPanelHeader
-        title={detail?.group.name ?? ""}
-        subtitle={activeConversation ? `#${activeConversation.title}` : undefined}
-        avatarUrl={detail?.group.imageUrl ?? null}
-        loading={detailLoading}
-      >
-        <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
-        <PanelSettingsButton
-          expanded={showChannelSettings}
-          disabled={detailLoading || !activeConversation}
-          onClick={openChannelSettings}
-        />
-      </ChatPanelHeader>
+    <ConversationCallShell conversationId={conversationId} disabled={detailLoading}>
+      <div className="chat-panel">
+        <ChatPanelHeader
+          title={detail?.group.name ?? ""}
+          subtitle={activeConversation ? `#${activeConversation.title}` : undefined}
+          avatarUrl={detail?.group.imageUrl ?? null}
+          loading={detailLoading}
+        >
+          <ConversationCallHeaderButton disabled={detailLoading} />
+          <PanelSettingsButton
+            expanded={showChannelSettings}
+            disabled={detailLoading || !activeConversation}
+            onClick={openChannelSettings}
+          />
+        </ChatPanelHeader>
 
-      <div className="chat-panel-content">
+        <div className="chat-panel-content">
         {activeConversation && detail && (
           <ChannelSettingsPanel
             open={showChannelSettings}
@@ -512,7 +516,8 @@ export default function GroupConversationPage() {
           composerDisabled={composerDisabled}
           initialMemberReadReceipts={memberReadReceipts}
         />
+        </div>
       </div>
-    </div>
+    </ConversationCallShell>
   );
 }

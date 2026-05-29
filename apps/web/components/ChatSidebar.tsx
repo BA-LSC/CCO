@@ -34,6 +34,7 @@ import {
   groupTeamsByServiceType,
   shouldShowTeamServiceSections,
 } from "@/lib/service-team-sidebar";
+import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
 
 function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
   return [...dms].sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
@@ -80,6 +81,7 @@ export function ChatSidebar() {
   const router = useRouter();
   const { sidebarOpen, closeSidebar, subscribeRealtime, session, activeConversationId } =
     useChatLayout();
+  const { getActiveCall } = useActiveCallsMap();
 
   const [groups, setGroups] = useState<GroupSidebarItem[]>([]);
   const [dms, setDms] = useState<DmSummary[]>([]);
@@ -252,6 +254,7 @@ export function ChatSidebar() {
   }
 
   function renderTeamItem(team: ServiceTeamSummary) {
+    const activeCall = team.conversationId ? getActiveCall(team.conversationId) : undefined;
     return (
       <Link
         href={teamChatHref(team)}
@@ -263,6 +266,16 @@ export function ChatSidebar() {
           <span className="sidebar-channel-prefix sidebar-channel-prefix-hash">#</span>
           <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
           <span className="sidebar-nested-trailing">
+            {activeCall && (
+              <span
+                className="sidebar-call-indicator"
+                aria-label={`Active call, ${activeCall.participantCount} participant${
+                  activeCall.participantCount === 1 ? "" : "s"
+                }`}
+              >
+                📞 Call · {activeCall.participantCount}
+              </span>
+            )}
             {team.role === "leader" && (
               <span className="sidebar-team-leader" title="Team leader">
                 <SidebarCrownIcon className="sidebar-team-crown-glyph" />
@@ -476,10 +489,36 @@ export function ChatSidebar() {
                                 `${dm.participantCount ?? 0} members`}
                             </span>
                           )}
-                          {dm.hasUnread && activeDmId !== dm.id && (
-                            <span className="sidebar-unread-dot" aria-label="Unread messages" />
-                          )}
-                          {dm.muted && <span className="sidebar-badge" title="Muted">🔕</span>}
+                          {(() => {
+                            const activeCall = getActiveCall(dm.id);
+                            const showTrailing =
+                              activeCall ||
+                              (dm.hasUnread && activeDmId !== dm.id) ||
+                              dm.muted;
+                            if (!showTrailing) return null;
+                            return (
+                              <span className="sidebar-nested-trailing">
+                                {activeCall && (
+                                  <span
+                                    className="sidebar-call-indicator"
+                                    aria-label={`Active call, ${activeCall.participantCount} participant${
+                                      activeCall.participantCount === 1 ? "" : "s"
+                                    }`}
+                                  >
+                                    📞 Call · {activeCall.participantCount}
+                                  </span>
+                                )}
+                                {dm.hasUnread && activeDmId !== dm.id && (
+                                  <span className="sidebar-unread-dot" aria-label="Unread messages" />
+                                )}
+                                {dm.muted && (
+                                  <span className="sidebar-badge" title="Muted">
+                                    🔕
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </Link>
                     </li>

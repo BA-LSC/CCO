@@ -20,6 +20,7 @@ import {
   formatMessageDayDivider,
   formatMessageTime,
 } from "@/lib/message-time";
+import { CallTimelineJoinAction } from "@/components/calls/CallTimelineJoinAction";
 import {
   buildThreadTimeline,
   formatCallTimelineLabel,
@@ -195,6 +196,7 @@ function ChatMessageListInner({
               <li className="messages-day-divider-wrap" aria-hidden={false}>
                 <div className="messages-call-divider" role="status">
                   <time dateTime={item.at}>{formatCallTimelineLabel(item.call)}</time>
+                  <CallTimelineJoinAction event={item.call} />
                 </div>
               </li>
             </Fragment>
