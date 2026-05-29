@@ -44,6 +44,7 @@ export default function GroupConversationPage() {
     messagesLoading,
     canPost: messagesCanPost,
     loadError,
+    memberReadReceipts,
   } = useLoadConversationMessages(conversationId);
 
   const isLeader =
@@ -505,6 +506,7 @@ export default function GroupConversationPage() {
           layout="panel"
           messagesLoading={messagesLoading}
           composerDisabled={composerDisabled}
+          initialMemberReadReceipts={memberReadReceipts}
         />
       </div>
     </div>

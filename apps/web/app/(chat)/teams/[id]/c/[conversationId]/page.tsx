@@ -49,6 +49,7 @@ export default function TeamConversationPage() {
     firstUnreadMessageId,
     messagesLoading,
     loadError,
+    memberReadReceipts,
   } = useLoadConversationMessages(conversationId);
 
   const isLeader =
@@ -245,6 +246,7 @@ export default function TeamConversationPage() {
           composerPlaceholder="Message your team…"
           messagesLoading={messagesLoading}
           composerDisabled={detailLoading || messagesLoading}
+          initialMemberReadReceipts={memberReadReceipts}
         />
       </div>
     </div>

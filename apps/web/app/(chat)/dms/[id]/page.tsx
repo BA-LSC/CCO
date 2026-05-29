@@ -34,6 +34,7 @@ export default function DmChatPage() {
     loadError,
     peerLastReadAt,
     peerUser,
+    memberReadReceipts,
   } = useLoadConversationMessages(conversationId);
 
   useEffect(() => {
@@ -197,6 +198,7 @@ export default function DmChatPage() {
                   : null)
               : null
           }
+          initialMemberReadReceipts={isGroup ? memberReadReceipts : []}
         />
       </div>
     </div>

@@ -351,6 +351,13 @@ export type PeerUser = {
   avatarUrl?: string | null;
 };
 
+export type MemberReadReceipt = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  lastReadAt?: string | null;
+};
+
 export type MessageListResponse = {
   messages: Message[];
   hasMore: boolean;
@@ -359,6 +366,7 @@ export type MessageListResponse = {
   canPost?: boolean;
   peerLastReadAt?: string | null;
   peerUser?: PeerUser | null;
+  memberReadReceipts?: MemberReadReceipt[];
 };
 
 export type Message = {

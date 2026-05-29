@@ -162,6 +162,13 @@ export type PeerUserDto = {
   avatarUrl: string | null;
 };
 
+export type MemberReadReceiptDto = {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  lastReadAt: string | null;
+};
+
 async function getDmPeerReadReceipt(
   conversationId: string,
   userId: string,
@@ -208,6 +215,52 @@ async function getDmPeerReadReceipt(
   };
 }
 
+async function getMemberReadReceipts(
+  conversationId: string,
+  userId: string,
+): Promise<MemberReadReceiptDto[] | null> {
+  const conv = await db
+    .select({ dmPairKey: conversations.dmPairKey })
+    .from(conversations)
+    .where(eq(conversations.id, conversationId))
+    .limit(1);
+
+  if (!conv[0]) return null;
+
+  const pairKey = conv[0].dmPairKey;
+  if (pairKey && isDirectDmPairKey(pairKey)) return null;
+
+  const members = await db
+    .select({
+      userId: conversationMembers.userId,
+      lastReadAt: conversationMembers.lastReadAt,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(conversationMembers)
+    .innerJoin(users, eq(users.id, conversationMembers.userId))
+    .where(
+      and(
+        eq(conversationMembers.conversationId, conversationId),
+        ne(conversationMembers.userId, userId),
+      ),
+    );
+
+  const receipts: MemberReadReceiptDto[] = [];
+  for (const member of members) {
+    const displayName =
+      (await ensureUserDisplayNameResolved(member.userId)) ?? member.displayName;
+    receipts.push({
+      userId: member.userId,
+      displayName,
+      avatarUrl: member.avatarUrl ?? null,
+      lastReadAt: lastReadAtIso(member.lastReadAt),
+    });
+  }
+
+  return receipts;
+}
+
 export async function listMessages(
   conversationId: string,
   userId: string,
@@ -220,11 +273,15 @@ export async function listMessages(
   canPost: boolean;
   peerLastReadAt?: string | null;
   peerUser?: PeerUserDto | null;
+  memberReadReceipts?: MemberReadReceiptDto[];
 } | null> {
   const membership = await getMembershipForConversation(conversationId, userId);
   if (!membership) return null;
 
-  const dmPeer = await getDmPeerReadReceipt(conversationId, userId);
+  const [dmPeer, memberReadReceipts] = await Promise.all([
+    getDmPeerReadReceipt(conversationId, userId),
+    getMemberReadReceipts(conversationId, userId),
+  ]);
 
   const lastReadAt = membership.lastReadAt;
   const limit = Math.min(options?.limit ?? 50, 100);
@@ -348,6 +405,7 @@ export async function listMessages(
     ...(dmPeer
       ? { peerLastReadAt: dmPeer.peerLastReadAt, peerUser: dmPeer.peerUser }
       : {}),
+    ...(memberReadReceipts ? { memberReadReceipts } : {}),
   };
 }
 

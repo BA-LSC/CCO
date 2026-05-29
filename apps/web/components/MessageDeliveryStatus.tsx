@@ -1,15 +1,17 @@
 "use client";
 
 import { UserAvatar } from "@/components/UserAvatar";
-import type { Message, PeerUser } from "@/lib/api";
+import type { MemberReadReceipt, Message, PeerUser } from "@/lib/api";
 
 type Props = {
   message: Message;
   peerUser: PeerUser | null;
-  /** Peer read receipt on the last-read own message (any age). */
+  /** Peer read receipt on the last-read own message (1:1 DMs only). */
   showPeerAvatar: boolean;
   /** Delivery check only on the newest own message. */
   showDeliveryCheck: boolean;
+  /** Group/team readers for the latest own message. */
+  readByMembers?: MemberReadReceipt[];
 };
 
 function isMessageSending(message: Message): boolean {
@@ -45,24 +47,47 @@ export function findLastPeerReadMessageId(
   return lastId;
 }
 
+export function getMessageReaders(
+  message: Message,
+  resolvedUserId: string | undefined,
+  memberReadReceipts: MemberReadReceipt[],
+): MemberReadReceipt[] {
+  if (!resolvedUserId || message.authorId !== resolvedUserId) return [];
+  if (!isMessageDelivered(message)) return [];
+
+  const sentMs = new Date(message.createdAt).getTime();
+  if (Number.isNaN(sentMs)) return [];
+
+  return memberReadReceipts
+    .filter((member) => {
+      if (!member.lastReadAt) return false;
+      const readMs = new Date(member.lastReadAt).getTime();
+      if (Number.isNaN(readMs)) return false;
+      return readMs >= sentMs;
+    })
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 export function MessageDeliveryStatus({
   message,
   peerUser,
   showPeerAvatar,
   showDeliveryCheck,
+  readByMembers = [],
 }: Props) {
   const sending = isMessageSending(message);
   const delivered = isMessageDelivered(message);
+  const showReaders = readByMembers.length > 0;
 
   let label = "Sending";
-  if (delivered && showPeerAvatar) label = "Read";
+  if (delivered && (showPeerAvatar || showReaders)) label = "Read";
   else if (delivered && showDeliveryCheck) label = "Delivered";
 
   return (
     <div className="message-delivery-status" aria-label={label}>
       {sending ? (
         <span className="spinner message-delivery-spinner" aria-hidden />
-      ) : delivered && (showDeliveryCheck || showPeerAvatar) ? (
+      ) : delivered && (showDeliveryCheck || showPeerAvatar || showReaders) ? (
         <>
           {showDeliveryCheck ? (
             <svg
@@ -84,6 +109,18 @@ export function MessageDeliveryStatus({
               avatarUrl={peerUser.avatarUrl}
               className="message-delivery-peer-avatar user-avatar"
             />
+          ) : null}
+          {showReaders ? (
+            <div className="message-delivery-readers" aria-hidden>
+              {readByMembers.map((member) => (
+                <UserAvatar
+                  key={member.userId}
+                  displayName={member.displayName}
+                  avatarUrl={member.avatarUrl}
+                  className="message-delivery-peer-avatar user-avatar"
+                />
+              ))}
+            </div>
           ) : null}
         </>
       ) : null}

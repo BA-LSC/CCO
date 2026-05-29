@@ -6,7 +6,7 @@ import {
   MessageEmojiActions,
 } from "@/components/MessageReactionToolbar";
 import { MessageBody } from "@/components/MessageBody";
-import { MessageDeliveryStatus, findLastPeerReadMessageId } from "@/components/MessageDeliveryStatus";
+import { MessageDeliveryStatus, findLastPeerReadMessageId, getMessageReaders } from "@/components/MessageDeliveryStatus";
 import { UserAvatar } from "@/components/UserAvatar";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
 import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
@@ -21,7 +21,7 @@ import {
   formatMessageTime,
   messageStartsNewDay,
 } from "@/lib/message-time";
-import type { Message, PeerUser } from "@/lib/api";
+import type { MemberReadReceipt, Message, PeerUser } from "@/lib/api";
 import type { AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import type { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 
@@ -67,6 +67,7 @@ type Props = {
   isDirectMessage?: boolean;
   peerLastReadAt?: string | null;
   peerUser?: PeerUser | null;
+  memberReadReceipts?: MemberReadReceipt[];
 };
 
 function ChatMessageListInner({
@@ -95,6 +96,7 @@ function ChatMessageListInner({
   isDirectMessage = false,
   peerLastReadAt = null,
   peerUser = null,
+  memberReadReceipts = [],
 }: Props) {
   const layoutInfos = useMemo(
     () => buildMessageLayoutInfos(messages, resolvedUserId),
@@ -181,8 +183,14 @@ function ChatMessageListInner({
         const actionsOnTextBubble = Boolean(bodyText) || !hasMediaAttachment;
         const isLatestOwn = isOwn && m.id === lastOwnMessageId;
         const isLastPeerRead = isDirectMessage && m.id === lastPeerReadMessageId;
+        const messageReaders =
+          !isDirectMessage && isLatestOwn
+            ? getMessageReaders(m, resolvedUserId, memberReadReceipts)
+            : [];
         const showDeliveryFooter =
-          isOwn && !isEditing && (isLatestOwn || isLastPeerRead || isSending);
+          isOwn &&
+          !isEditing &&
+          (isLatestOwn || isLastPeerRead || isSending);
         const showPeerAvatar = isLastPeerRead;
         const showDeliveryCheck = isLatestOwn;
         const enterDelayMs = messageEnterDelays?.get(m.id);
@@ -479,6 +487,7 @@ function ChatMessageListInner({
                           peerUser={peerUser}
                           showPeerAvatar={showPeerAvatar}
                           showDeliveryCheck={showDeliveryCheck}
+                          readByMembers={messageReaders}
                         />
                       </div>
                     ) : null}

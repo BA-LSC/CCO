@@ -5850,6 +5850,14 @@ button.sidebar-group-header:focus-visible {
   object-fit: cover;
 }
 
+.chat-thread .message-delivery-readers {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
 .chat-thread .message-content:has(.edit-form) {
   width: 100%;
 }

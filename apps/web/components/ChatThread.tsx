@@ -10,6 +10,7 @@ import {
   uploadImage,
   uploadVideo,
   type Message,
+  type MemberReadReceipt,
   type PeerUser,
   type Reaction,
 } from "@/lib/api";
@@ -124,6 +125,7 @@ type Props = {
   isDirectMessage?: boolean;
   initialPeerLastReadAt?: string | null;
   peerUser?: PeerUser | null;
+  initialMemberReadReceipts?: MemberReadReceipt[];
 };
 
 const RECENT_MESSAGE_MS = 15_000;
@@ -152,6 +154,7 @@ export function ChatThread({
   isDirectMessage = false,
   initialPeerLastReadAt = null,
   peerUser = null,
+  initialMemberReadReceipts = [],
 }: Props) {
   const coarsePointer = useCoarsePointer();
   const appUpdateBlocked = useAppUpdateGuard();
@@ -166,6 +169,9 @@ export function ChatThread({
     initialFirstUnreadMessageId,
   );
   const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(initialPeerLastReadAt);
+  const [memberReadReceipts, setMemberReadReceipts] = useState<MemberReadReceipt[]>(
+    initialMemberReadReceipts,
+  );
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const hasMarkedReadRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -506,6 +512,7 @@ export function ChatThread({
       setEditBody("");
       setFirstUnreadMessageId(initialFirstUnreadMessageId);
       setPeerLastReadAt(initialPeerLastReadAt);
+      setMemberReadReceipts(initialMemberReadReceipts);
       hasMarkedReadRef.current = false;
       setMessages(sortMessagesByCreatedAt(initialMessages));
       setHasMore(initialHasMore);
@@ -525,16 +532,19 @@ export function ChatThread({
     initialHasMore,
     initialFirstUnreadMessageId,
     initialPeerLastReadAt,
+    initialMemberReadReceipts,
     messagesLoading,
   ]);
 
   useEffect(() => {
-    if (!isDirectMessage) {
-      setPeerLastReadAt(null);
+    if (isDirectMessage) {
+      setMemberReadReceipts([]);
+      setPeerLastReadAt(initialPeerLastReadAt);
       return;
     }
-    setPeerLastReadAt(initialPeerLastReadAt);
-  }, [initialPeerLastReadAt, isDirectMessage]);
+    setPeerLastReadAt(null);
+    setMemberReadReceipts(initialMemberReadReceipts);
+  }, [initialMemberReadReceipts, initialPeerLastReadAt, isDirectMessage]);
 
   useEffect(() => {
     if (!firstUnreadMessageId || messagesLoading) return;
@@ -622,6 +632,7 @@ export function ChatThread({
       action?: string;
       leaderOnly?: boolean;
       title?: string;
+      imageUrl?: string | null;
       userId?: string;
       readAt?: string;
       displayName?: string;
@@ -630,12 +641,15 @@ export function ChatThread({
       if (event.type === "message.created" && event.message) {
         markMessageLive(event.message.id);
         if (event.message.authorId !== resolvedUserId) {
-          setActiveTypers((prev) => {
-            if (!prev.has(event.message!.authorId)) return prev;
-            const next = new Map(prev);
-            next.delete(event.message!.authorId);
-            return next;
-          });
+          const authorId = event.message.authorId;
+          if (authorId) {
+            setActiveTypers((prev) => {
+              if (!prev.has(authorId)) return prev;
+              const next = new Map(prev);
+              next.delete(authorId);
+              return next;
+            });
+          }
         }
         setMessages((prev) => {
           const incoming = event.message!;
@@ -679,7 +693,31 @@ export function ChatThread({
         event.userId &&
         event.userId !== resolvedUserId
       ) {
-        setPeerLastReadAt(event.readAt);
+        if (isDirectMessage) {
+          setPeerLastReadAt(event.readAt);
+        } else {
+          const readerUserId = event.userId;
+          const readerReadAt = event.readAt;
+          setMemberReadReceipts((prev) => {
+            const existingIndex = prev.findIndex((member) => member.userId === readerUserId);
+            if (existingIndex >= 0) {
+              const next = [...prev];
+              next[existingIndex] = { ...next[existingIndex]!, lastReadAt: readerReadAt };
+              return next;
+            }
+            const rosterMember = members.find((member) => member.id === readerUserId);
+            if (!rosterMember) return prev;
+            return [
+              ...prev,
+              {
+                userId: readerUserId,
+                displayName: rosterMember.displayName,
+                avatarUrl: null,
+                lastReadAt: readerReadAt,
+              },
+            ];
+          });
+        }
       }
       if (event.type === "conversation.updated" && conversationId) {
         dispatchConversationUpdated({
@@ -718,7 +756,7 @@ export function ChatThread({
         }
       }
     },
-    [conversationId, isDirectMessage, markConversationRead, markMessageDeleted, markMessageLive, onConversationSettingsChange, peerUser, resolvedUserId],
+    [conversationId, isDirectMessage, markConversationRead, markMessageDeleted, markMessageLive, members, onConversationSettingsChange, peerUser, resolvedUserId],
   );
 
   useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
@@ -1094,6 +1132,7 @@ export function ChatThread({
           isDirectMessage={isDirectMessage}
           peerLastReadAt={peerLastReadAt}
           peerUser={peerUser}
+          memberReadReceipts={memberReadReceipts}
         />
       )}
     </>
