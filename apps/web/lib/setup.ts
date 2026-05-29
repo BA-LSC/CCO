@@ -1,6 +1,4 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
-import { getServerApiOrigin, getServerApiOriginAsync } from "@/lib/api-origin";
+import { getServerApiOrigin } from "@/lib/api-origin";
 import { fetchFromApi } from "@/lib/api-fetch-server";
 
 export type SetupStatus = {
@@ -31,44 +29,12 @@ export type InstallSetupContext = {
   readOnlyUrls: boolean;
 };
 
-function setupStatusUrl(): string {
-  if (typeof window !== "undefined") {
-    return "/api/v1/setup/status";
-  }
-  return `${getServerApiOrigin()}/v1/setup/status`;
-}
-
-async function setupStatusUrlAsync(): Promise<string> {
-  if (typeof window !== "undefined") {
-    return "/api/v1/setup/status";
-  }
-  return `${await getServerApiOriginAsync()}/v1/setup/status`;
-}
-
 export async function fetchSetupStatus(): Promise<SetupStatus> {
   try {
     if (typeof window !== "undefined") {
       const res = await fetch("/api/v1/setup/status", { cache: "no-store", credentials: "include" });
       if (!res.ok) return { configured: false, signInAvailable: false };
       return (await res.json()) as SetupStatus;
-    }
-
-    if (isCloudflareDeployTarget()) {
-      try {
-        const { env } = await getCloudflareContext({ async: true });
-        const record = env as Record<string, unknown>;
-        const webUrl =
-          (typeof record.WEB_URL === "string" ? record.WEB_URL.trim() : "") ||
-          (typeof record.NEXT_PUBLIC_WEB_URL === "string" ? record.NEXT_PUBLIC_WEB_URL.trim() : "");
-        if (webUrl) {
-          const res = await fetch(`${webUrl.replace(/\/$/, "")}/api/v1/setup/status`, {
-            cache: "no-store",
-          });
-          if (res.ok) return (await res.json()) as SetupStatus;
-        }
-      } catch {
-        // fall through to direct API fetch
-      }
     }
 
     const res = await fetchFromApi("/v1/setup/status", { cache: "no-store" });

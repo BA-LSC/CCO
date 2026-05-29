@@ -3,6 +3,9 @@ import { SetupLoading } from "@/components/SetupLoading";
 import { fetchSetupStatus } from "@/lib/setup";
 import { SignInContent } from "./SignInContent";
 
+/** Church name and setup flags come from the API on every request (OpenNext worker). */
+export const dynamic = "force-dynamic";
+
 export default async function SignInPage() {
   const status = await fetchSetupStatus();
   const churchName = status.churchName?.trim() || null;

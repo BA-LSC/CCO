@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { isCloudflareDeployTarget } from "@/lib/cloudflare-deploy";
-import { readRuntimeEnv } from "@/lib/runtime-env";
+import { readRuntimeEnv, readRuntimeEnvAsync } from "@/lib/runtime-env";
 import { deriveApiHostname } from "@/lib/websocket-url";
 
 function normalizeOrigin(value: string): string {
@@ -16,7 +16,7 @@ function normalizeOrigin(value: string): string {
  * Prefers explicit API_URL, then API_DOMAIN, then derives api.<zone> from WEB_URL.
  */
 export function getServerApiOrigin(): string {
-  return resolveServerApiOriginFromEnv();
+  return resolveServerApiOriginFromProcessEnv();
 }
 
 /** Cloudflare OpenNext server routes should prefer async context for worker bindings. */
@@ -49,10 +49,13 @@ export async function getServerApiOriginAsync(): Promise<string> {
     }
   }
 
-  return resolveServerApiOriginFromEnv();
+  const fromBindings = await resolveServerApiOriginFromBindings();
+  if (fromBindings) return fromBindings;
+
+  return resolveServerApiOriginFromProcessEnv();
 }
 
-function resolveServerApiOriginFromEnv(): string {
+function resolveServerApiOriginFromProcessEnv(): string {
   const bakedOrigin = readRuntimeEnv("SERVER_API_ORIGIN");
   if (bakedOrigin) {
     return normalizeOrigin(bakedOrigin);
@@ -83,6 +86,33 @@ function resolveServerApiOriginFromEnv(): string {
 
   if (apiUrl) return normalizeOrigin(apiUrl);
   return "http://127.0.0.1:3001";
+}
+
+async function resolveServerApiOriginFromBindings(): Promise<string | null> {
+  const apiUrl = await readRuntimeEnvAsync("API_URL");
+  if (apiUrl && !isDockerInternalApiUrl(apiUrl)) {
+    return normalizeOrigin(apiUrl);
+  }
+
+  const apiDomain = await readRuntimeEnvAsync("API_DOMAIN");
+  if (apiDomain) {
+    return normalizeOrigin(apiDomain);
+  }
+
+  const webUrl =
+    (await readRuntimeEnvAsync("WEB_URL")) ||
+    (await readRuntimeEnvAsync("NEXT_PUBLIC_WEB_URL")) ||
+    (await readRuntimeEnvAsync("CCO_DOMAIN"));
+  if (webUrl) {
+    try {
+      const parsed = new URL(normalizeOrigin(webUrl));
+      return `${parsed.protocol}//${deriveApiHostname(parsed.hostname)}`;
+    } catch {
+      // fall through
+    }
+  }
+
+  return null;
 }
 function isDockerInternalApiUrl(url: string): boolean {
   try {

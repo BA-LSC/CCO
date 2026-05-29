@@ -1,8 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resolveAppBuildVersionFromEnv } from "@/lib/build-version";
 
-const WEB_APP_ROOT = join(__dirname, "..");
+function webAppRoot(): string {
+  try {
+    if (typeof __dirname !== "undefined") {
+      return join(__dirname, "..");
+    }
+  } catch {
+    // Workers may not define __dirname.
+  }
+  return join(dirname(fileURLToPath(import.meta.url)), "..");
+}
 
 let cachedBakedBuildId: string | undefined;
 
@@ -15,7 +25,7 @@ function readBakedBuildId(): string | null {
   for (const relativePath of ["BUILD_ID", ".next/BUILD_ID"] as const) {
     try {
       const buildIdPath = join(
-        /* turbopackIgnore: true */ WEB_APP_ROOT,
+        /* turbopackIgnore: true */ webAppRoot(),
         ...relativePath.split("/"),
       );
       if (!existsSync(buildIdPath)) continue;
