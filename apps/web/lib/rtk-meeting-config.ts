@@ -150,14 +150,25 @@ function buildCompactControlbarStyles(): NonNullable<UIConfig["styles"]> {
   };
 }
 
-function buildPipControlbarStyles(): NonNullable<UIConfig["styles"]> {
-  const pipToggleStyles = Object.fromEntries(
-    CCO_CONTROLBAR_TOGGLE_KEYS.map((key) => [key, PIP_CONTROLBAR_TOGGLE_VARS]),
-  ) as Pick<NonNullable<UIConfig["styles"]>, (typeof CCO_CONTROLBAR_TOGGLE_KEYS)[number]>;
+const PIP_CONTROLBAR_TOGGLE_STYLES: Pick<
+  NonNullable<UIConfig["styles"]>,
+  (typeof CCO_CONTROLBAR_TOGGLE_KEYS)[number]
+> = {
+  "rtk-settings-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-screen-share-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-livestream-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-mic-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-camera-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-webinar-stage-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-stage-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-more-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-ai-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+};
 
+function buildPipControlbarStyles(): NonNullable<UIConfig["styles"]> {
   return {
     ...buildCompactControlbarStyles(),
-    ...pipToggleStyles,
+    ...PIP_CONTROLBAR_TOGGLE_STYLES,
     "rtk-controlbar": {
       ...CCO_CONTROLBAR_STYLES["rtk-controlbar"],
       gap: "0",
