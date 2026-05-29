@@ -95,6 +95,8 @@ export function AdminUpdatesSection({
   const deployStartedAtRef = useRef<number | null>(null);
   const pendingAppliedVersionRef = useRef<string | null>(null);
   const mountLoadStartedRef = useRef(false);
+  const prevUpdateAvailableRef = useRef(false);
+  const autoInstallCheckInFlightRef = useRef(false);
 
   const loadStatus = useCallback(async () => {
     const next = await apiFetch<UpdatesStatus>("/api/v1/settings/updates");
@@ -196,27 +198,69 @@ export function AdminUpdatesSection({
     [],
   );
 
-  const runAutoInstallCheck = useCallback(async () => {
-    const next = await apiFetch<UpdatesActionResponse>("/api/v1/settings/updates/check", {
-      method: "POST",
-    });
-    setStatus(next);
-    if (beginAutoApplyDeploy(next)) return next;
-    return next;
-  }, [beginAutoApplyDeploy]);
+  const runAutoInstallCheck = useCallback(
+    async (options?: { notify?: boolean }) => {
+      if (autoInstallCheckInFlightRef.current) return null;
+      autoInstallCheckInFlightRef.current = true;
+      try {
+        const next = await apiFetch<UpdatesActionResponse>("/api/v1/settings/updates/check", {
+          method: "POST",
+        });
+        setStatus(next);
+        if (beginAutoApplyDeploy(next)) {
+          if (options?.notify) {
+            setFeedback({ success: "Update detected — installing automatically." });
+          }
+          return next;
+        }
+        if (options?.notify && next.autoApply?.error) {
+          setFeedback({ error: next.autoApply.error });
+        }
+        return next;
+      } finally {
+        autoInstallCheckInFlightRef.current = false;
+      }
+    },
+    [beginAutoApplyDeploy],
+  );
 
   useEffect(() => {
     if (!status?.autoUpdateEnabled || deploying || busy !== null) return;
 
-    const intervalMs = CCO_UPDATE_CHECK_INTERVAL_MINUTES * 60 * 1000;
-    const intervalId = window.setInterval(() => {
+    const run = () => {
       void runAutoInstallCheck().catch(() => {
         // Keep the last known state when background auto-check fails.
       });
-    }, intervalMs);
+    };
+
+    run();
+
+    const intervalMs = CCO_UPDATE_CHECK_INTERVAL_MINUTES * 60 * 1000;
+    const intervalId = window.setInterval(run, intervalMs);
 
     return () => window.clearInterval(intervalId);
   }, [status?.autoUpdateEnabled, deploying, busy, runAutoInstallCheck]);
+
+  useEffect(() => {
+    const updateAvailable = status?.updateAvailable ?? false;
+    const wasAvailable = prevUpdateAvailableRef.current;
+    prevUpdateAvailableRef.current = updateAvailable;
+
+    if (!status?.autoUpdateEnabled || !updateAvailable || !status.canApply) return;
+    if (deploying || busy !== null) return;
+    if (wasAvailable) return;
+
+    void runAutoInstallCheck({ notify: true }).catch(() => {
+      // Keep the last known state when background auto-check fails.
+    });
+  }, [
+    status?.autoUpdateEnabled,
+    status?.updateAvailable,
+    status?.canApply,
+    deploying,
+    busy,
+    runAutoInstallCheck,
+  ]);
 
   async function handleCheck() {
     setBusy("check");

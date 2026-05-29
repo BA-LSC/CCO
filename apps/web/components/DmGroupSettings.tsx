@@ -66,6 +66,25 @@ export function DmGroupSettings({ conversationId, title, imageUrl, onUpdated }: 
     }
   }
 
+  async function removePhoto() {
+    setUploadingImage(true);
+    setError(null);
+    try {
+      const result = await apiFetch<{ title: string; imageUrl: string | null }>(
+        `/api/v1/dms/${conversationId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ imageUrl: null }),
+        },
+      );
+      onUpdated({ title: result.title, imageUrl: result.imageUrl });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove photo");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   return (
     <section className="channel-settings-group" aria-label="Group settings">
       <div className="channel-settings-group-intro">
@@ -104,18 +123,7 @@ export function DmGroupSettings({ conversationId, title, imageUrl, onUpdated }: 
                 type="button"
                 className="link-btn"
                 disabled={uploadingImage}
-                onClick={() =>
-                  void apiFetch(`/api/v1/dms/${conversationId}`, {
-                    method: "PATCH",
-                    body: JSON.stringify({ imageUrl: null }),
-                  })
-                    .then((result: { title: string; imageUrl: string | null }) => {
-                      onUpdated({ title: result.title, imageUrl: result.imageUrl });
-                    })
-                    .catch((err: unknown) => {
-                      setError(err instanceof Error ? err.message : "Could not remove photo");
-                    })
-                }
+                onClick={() => void removePhoto()}
               >
                 Remove photo
               </button>
