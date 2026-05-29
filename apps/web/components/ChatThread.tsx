@@ -15,6 +15,7 @@ import {
   type Reaction,
 } from "@/lib/api";
 import { useConversationPollFallback } from "@/hooks/useConversationPollFallback";
+import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 import { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
 import { useMessageEnterDelays } from "@/hooks/useMessageEnterDelays";
@@ -639,23 +640,7 @@ export function ChatThread({
   }, []);
 
   const onEvent = useCallback(
-    (event: {
-      type: string;
-      message?: Message;
-      messageId?: string;
-      reaction?: Reaction;
-      action?: string;
-      leaderOnly?: boolean;
-      title?: string;
-      imageUrl?: string | null;
-      userId?: string;
-      readAt?: string;
-      displayName?: string;
-      isTyping?: boolean;
-      call?: import("@cco/shared/calls").CallSummaryDto;
-      callId?: string;
-      timelineEvent?: CallTimelineEventDto | null;
-    }) => {
+    (event: RealtimeEvent) => {
       if (event.type === "message.created" && event.message) {
         markMessageLive(event.message.id);
         if (event.message.authorId !== resolvedUserId) {
