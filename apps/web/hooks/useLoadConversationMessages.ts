@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, type MemberReadReceipt, type Message, type MessageListResponse, type PeerUser } from "@/lib/api";
+import type { CallTimelineEventDto } from "@/lib/call-timeline";
 import {
   getCachedMessages,
   invalidateConversation,
@@ -21,6 +22,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
   const anchorUnread = searchParams.get(NOTIFICATION_ANCHOR_QUERY) === "1";
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [callEvents, setCallEvents] = useState<CallTimelineEventDto[]>([]);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
   const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
     null,
@@ -36,6 +38,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
+      setCallEvents([]);
       setHasMore(false);
       setFirstUnreadMessageId(null);
       setMessagesForConversationId(null);
@@ -60,6 +63,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
       anchorHandledRef.current = conversationId;
       invalidateConversation(conversationId);
       setMessages([]);
+      setCallEvents([]);
       setHasMore(false);
       setFirstUnreadMessageId(null);
       setMessagesForConversationId(null);
@@ -68,11 +72,13 @@ export function useLoadConversationMessages(conversationId: string | null) {
       const cached = getCachedMessages(conversationId);
       if (cached) {
         setMessages(cached.messages);
+        setCallEvents(cached.callEvents);
         setHasMore(cached.hasMore);
         setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
         setMessagesForConversationId(conversationId);
       } else {
         setMessages([]);
+      setCallEvents([]);
         setHasMore(false);
         setMessagesForConversationId(null);
       }
@@ -85,6 +91,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
       .then((data) => {
         if (cancelled) return;
         setMessages(data.messages);
+        setCallEvents(data.callEvents ?? []);
         setHasMore(data.hasMore);
         setFirstUnreadMessageId(data.firstUnreadMessageId);
         setMessagesForConversationId(conversationId);
@@ -96,6 +103,7 @@ export function useLoadConversationMessages(conversationId: string | null) {
         }
         setCachedMessages(conversationId, {
           messages: data.messages,
+          callEvents: data.callEvents ?? [],
           hasMore: data.hasMore,
           firstUnreadMessageId: data.firstUnreadMessageId,
         });
@@ -127,10 +135,12 @@ export function useLoadConversationMessages(conversationId: string | null) {
   }, [conversationId]);
 
   const threadMessages = messagesForConversationId === conversationId ? messages : [];
+  const threadCallEvents = messagesForConversationId === conversationId ? callEvents : [];
   const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
 
   return {
     threadMessages,
+    threadCallEvents,
     threadHasMore,
     firstUnreadMessageId,
     messagesLoading,

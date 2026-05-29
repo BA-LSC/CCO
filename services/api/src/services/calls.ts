@@ -20,6 +20,8 @@ import {
 import { publishMessageEventToMembers } from "../realtime/pubsub";
 import { listConversationMemberUserIds } from "./conversations";
 import type { RealtimeEvent } from "../realtime/events";
+import { buildCallTimelineEvents, callTimelineEventId } from "@cco/shared/call-timeline";
+import { countJoinedParticipants } from "./call-timeline";
 import { notifyIncomingCall } from "./push-notify";
 import { scheduleBackgroundWork } from "../runtime/worker-context";
 import {
@@ -205,10 +207,28 @@ async function finalizeCallSession(callSessionId: string, conversationId: string
     await deactivateRealtimeKitMeeting(meetingId);
   }
 
+  const joinedParticipantCount = await countJoinedParticipants(callSessionId);
+  const endedAt = new Date().toISOString();
+  const callRow = await db
+    .select({ startedAt: callSessions.startedAt })
+    .from(callSessions)
+    .where(eq(callSessions.id, callSessionId))
+    .limit(1);
+  const startedAt = callRow[0]?.startedAt.toISOString() ?? endedAt;
+  const timelineEvents = buildCallTimelineEvents({
+    callId: callSessionId,
+    startedAt,
+    endedAt,
+    joinedParticipantCount,
+  });
+  const endTimelineEvent =
+    timelineEvents.find((event) => event.kind === "ended" || event.kind === "missed") ?? null;
+
   await publishCallEvent(conversationId, {
     type: "call.ended",
     conversationId,
     callId: callSessionId,
+    timelineEvent: endTimelineEvent,
   });
 }
 
@@ -391,6 +411,12 @@ export async function startOrJoinConversationCall(params: {
       type: "call.started",
       conversationId: params.conversationId,
       call: summary,
+      timelineEvent: {
+        id: callTimelineEventId(callSessionId, "started"),
+        callId: callSessionId,
+        kind: "started",
+        at: summary.startedAt,
+      },
     });
 
     scheduleBackgroundWork(() =>

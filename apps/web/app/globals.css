@@ -1846,6 +1846,21 @@ html[data-theme="11"] .user-menu-dropdown {
   color: inherit;
 }
 
+.messages-call-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.messages-call-divider time {
+  flex-shrink: 0;
+  font: inherit;
+  color: inherit;
+}
+
 .sidebar-channel-prefix,
 .sidebar-hash {
   flex-shrink: 0;

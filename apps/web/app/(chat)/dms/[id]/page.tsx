@@ -28,6 +28,7 @@ export default function DmChatPage() {
 
   const {
     threadMessages,
+    threadCallEvents,
     threadHasMore,
     firstUnreadMessageId,
     messagesLoading,
@@ -175,6 +176,7 @@ export default function DmChatPage() {
           key={conversationId}
           conversationId={conversationId}
           initialMessages={threadMessages}
+          initialCallEvents={threadCallEvents}
           hasMore={threadHasMore}
           firstUnreadMessageId={firstUnreadMessageId}
           members={members}

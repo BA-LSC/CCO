@@ -19,8 +19,13 @@ import { buildMessageLayoutInfos, type MessageGroupPosition } from "@/lib/messag
 import {
   formatMessageDayDivider,
   formatMessageTime,
-  messageStartsNewDay,
 } from "@/lib/message-time";
+import {
+  buildThreadTimeline,
+  formatCallTimelineLabel,
+  threadItemStartsNewDay,
+  type CallTimelineEventDto,
+} from "@/lib/call-timeline";
 import type { MemberReadReceipt, Message, PeerUser } from "@/lib/api";
 import type { AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import type { useMessageActionsReveal } from "@/hooks/useMessageActionsReveal";
@@ -43,6 +48,7 @@ function splitTextBubbleGroupPosition(groupPosition: MessageGroupPosition): Mess
 
 type Props = {
   messages: Message[];
+  callEvents?: CallTimelineEventDto[];
   messageEnterDelays?: ReadonlyMap<string, number>;
   firstUnreadMessageId: string | null;
   resolvedUserId?: string;
@@ -72,6 +78,7 @@ type Props = {
 
 function ChatMessageListInner({
   messages,
+  callEvents = [],
   messageEnterDelays,
   firstUnreadMessageId,
   resolvedUserId,
@@ -102,6 +109,17 @@ function ChatMessageListInner({
     () => buildMessageLayoutInfos(messages, resolvedUserId),
     [messages, resolvedUserId],
   );
+
+  const timeline = useMemo(
+    () => buildThreadTimeline(messages, callEvents),
+    [messages, callEvents],
+  );
+
+  const messageIndexById = useMemo(() => {
+    const map = new Map<string, number>();
+    messages.forEach((message, index) => map.set(message.id, index));
+    return map;
+  }, [messages]);
 
   const lastOwnMessageId = useMemo(() => {
     if (!resolvedUserId) return null;
@@ -163,10 +181,31 @@ function ChatMessageListInner({
       aria-label="Messages"
       onScroll={layout === "panel" ? undefined : onScrollContainer}
     >
-      {messages.map((m, index) => {
+      {timeline.map((item, index) => {
+        if (item.kind === "call") {
+          return (
+            <Fragment key={item.call.id}>
+              {threadItemStartsNewDay(timeline, index) && (
+                <li className="messages-day-divider-wrap" aria-hidden={false}>
+                  <div className="messages-day-divider" role="separator">
+                    <time dateTime={item.at}>{formatMessageDayDivider(item.at)}</time>
+                  </div>
+                </li>
+              )}
+              <li className="messages-day-divider-wrap" aria-hidden={false}>
+                <div className="messages-call-divider" role="status">
+                  <time dateTime={item.at}>{formatCallTimelineLabel(item.call)}</time>
+                </div>
+              </li>
+            </Fragment>
+          );
+        }
+
+        const m = item.message;
+        const messageIndex = messageIndexById.get(m.id) ?? 0;
         const isOwn = isOwnMessage(m);
         const isEditing = editingId === m.id;
-        const layoutInfo = layoutInfos[index]!;
+        const layoutInfo = layoutInfos[messageIndex]!;
         const showOwnMessageHeader =
           isOwn &&
           (layoutInfo.groupPosition === "first" ||
@@ -197,7 +236,7 @@ function ChatMessageListInner({
 
         return (
           <Fragment key={m.clientMessageId ?? m.id}>
-            {messageStartsNewDay(messages, index) && (
+            {threadItemStartsNewDay(timeline, index) && (
               <li className="messages-day-divider-wrap" aria-hidden={false}>
                 <div className="messages-day-divider" role="separator">
                   <time dateTime={m.createdAt}>{formatMessageDayDivider(m.createdAt)}</time>

@@ -367,6 +367,7 @@ export type MessageListResponse = {
   peerLastReadAt?: string | null;
   peerUser?: PeerUser | null;
   memberReadReceipts?: MemberReadReceipt[];
+  callEvents?: import("@/lib/call-timeline").CallTimelineEventDto[];
 };
 
 export type Message = {

@@ -45,6 +45,7 @@ export default function TeamConversationPage() {
 
   const {
     threadMessages,
+    threadCallEvents,
     threadHasMore,
     firstUnreadMessageId,
     messagesLoading,
@@ -236,6 +237,7 @@ export default function TeamConversationPage() {
           key={conversationId}
           conversationId={conversationId}
           initialMessages={threadMessages}
+          initialCallEvents={threadCallEvents}
           hasMore={threadHasMore}
           firstUnreadMessageId={firstUnreadMessageId}
           members={mentionMembers}

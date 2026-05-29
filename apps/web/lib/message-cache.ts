@@ -1,7 +1,9 @@
 import type { Message } from "@/lib/api";
+import type { CallTimelineEventDto } from "@/lib/call-timeline";
 
 export type CachedConversationMessages = {
   messages: Message[];
+  callEvents: CallTimelineEventDto[];
   hasMore: boolean;
   firstUnreadMessageId?: string | null;
   fetchedAt: number;
@@ -33,10 +35,11 @@ export function getCachedMessages(conversationId: string): CachedConversationMes
 
 export function setCachedMessages(
   conversationId: string,
-  data: Pick<CachedConversationMessages, "messages" | "hasMore" | "firstUnreadMessageId">,
+  data: Pick<CachedConversationMessages, "messages" | "callEvents" | "hasMore" | "firstUnreadMessageId">,
 ): void {
   touch(conversationId, {
     messages: data.messages,
+    callEvents: data.callEvents ?? [],
     hasMore: data.hasMore,
     firstUnreadMessageId: data.firstUnreadMessageId ?? null,
     fetchedAt: Date.now(),

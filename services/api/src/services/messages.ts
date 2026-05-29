@@ -21,6 +21,8 @@ import { refreshUserAvatarFromPco, ensureUserDisplayNameResolved } from "./user-
 import { lastReadAtIso } from "./unread";
 import type { ReactionDto } from "./reactions";
 import { scheduleBackgroundWork } from "../runtime/worker-context";
+import { listCallTimelineEvents } from "./call-timeline";
+import type { CallTimelineEventDto } from "@cco/shared/call-timeline";
 
 export type MessageDto = {
   id: string;
@@ -274,6 +276,7 @@ export async function listMessages(
   peerLastReadAt?: string | null;
   peerUser?: PeerUserDto | null;
   memberReadReceipts?: MemberReadReceiptDto[];
+  callEvents?: CallTimelineEventDto[];
 } | null> {
   const membership = await getMembershipForConversation(conversationId, userId);
   if (!membership) return null;
@@ -320,6 +323,7 @@ export async function listMessages(
 
   let rows: MessageRow[] = [];
   let hasMore = false;
+  let beforeAnchorCreatedAt: Date | undefined;
 
   if (options?.before) {
     const anchor = await db
@@ -328,6 +332,7 @@ export async function listMessages(
       .where(eq(messages.id, options.before))
       .limit(1);
     if (anchor[0]) {
+      beforeAnchorCreatedAt = anchor[0].createdAt;
       const pageRows = await fetchPage(lt(messages.createdAt, anchor[0].createdAt));
       hasMore = pageRows.length > limit;
       rows = (hasMore ? pageRows.slice(0, limit) : pageRows).reverse() as MessageRow[];
@@ -396,12 +401,31 @@ export async function listMessages(
     leaderOnly: membership.leaderOnly,
   });
 
+  let callEvents: CallTimelineEventDto[] = [];
+  const pageOldest = uniqueRows[0]?.createdAt;
+  const pageNewest = uniqueRows[uniqueRows.length - 1]?.createdAt;
+  if (pageOldest && pageNewest) {
+    if (beforeAnchorCreatedAt) {
+      callEvents = await listCallTimelineEvents(conversationId, {
+        from: pageOldest,
+        to: beforeAnchorCreatedAt,
+        toExclusive: true,
+      });
+    } else {
+      callEvents = await listCallTimelineEvents(conversationId, {
+        from: pageOldest,
+        to: pageNewest,
+      });
+    }
+  }
+
   return {
     messages: messagesDto,
     hasMore,
     firstUnreadMessageId,
     lastReadAt: lastReadAtIso(lastReadAt),
     canPost,
+    callEvents,
     ...(dmPeer
       ? { peerLastReadAt: dmPeer.peerLastReadAt, peerUser: dmPeer.peerUser }
       : {}),

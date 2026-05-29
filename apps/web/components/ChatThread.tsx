@@ -49,6 +49,11 @@ import {
   createPendingSendMessage,
   removePendingSendByClientMessageId,
 } from "@/lib/optimistic-text-message";
+import {
+  mergeCallTimelineEvents,
+  upsertCallTimelineEvent,
+  type CallTimelineEventDto,
+} from "@/lib/call-timeline";
 
 /** Stable scroll/list key while an optimistic send is confirmed (id changes, clientMessageId does not). */
 function messageListTailKey(message: Message | undefined): string {
@@ -109,6 +114,7 @@ type Member = { id?: string; displayName: string; onCco?: boolean };
 type Props = {
   conversationId: string | null;
   initialMessages: Message[];
+  initialCallEvents?: CallTimelineEventDto[];
   hasMore?: boolean;
   firstUnreadMessageId?: string | null;
   members?: Member[];
@@ -139,6 +145,7 @@ type ActiveTyper = {
 export function ChatThread({
   conversationId,
   initialMessages,
+  initialCallEvents = [],
   hasMore: initialHasMore = false,
   firstUnreadMessageId: initialFirstUnreadMessageId = null,
   members = [],
@@ -164,6 +171,7 @@ export function ChatThread({
   const messageActions = useMessageActionsReveal();
   const resolvedUserId = currentUserId ?? session?.userId;
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [callEvents, setCallEvents] = useState<CallTimelineEventDto[]>(initialCallEvents);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(
     initialFirstUnreadMessageId,
@@ -515,6 +523,7 @@ export function ChatThread({
       setMemberReadReceipts(initialMemberReadReceipts);
       hasMarkedReadRef.current = false;
       setMessages(sortMessagesByCreatedAt(initialMessages));
+      setCallEvents(initialCallEvents);
       setHasMore(initialHasMore);
       return;
     }
@@ -529,6 +538,7 @@ export function ChatThread({
   }, [
     conversationId,
     initialMessages,
+    initialCallEvents,
     initialHasMore,
     initialFirstUnreadMessageId,
     initialPeerLastReadAt,
@@ -637,6 +647,9 @@ export function ChatThread({
       readAt?: string;
       displayName?: string;
       isTyping?: boolean;
+      call?: import("@cco/shared/calls").CallSummaryDto;
+      callId?: string;
+      timelineEvent?: CallTimelineEventDto | null;
     }) => {
       if (event.type === "message.created" && event.message) {
         markMessageLive(event.message.id);
@@ -717,6 +730,18 @@ export function ChatThread({
               },
             ];
           });
+        }
+      }
+      if (event.type === "call.started" && event.timelineEvent) {
+        setCallEvents((prev) => upsertCallTimelineEvent(prev, event.timelineEvent!));
+        if (pinnedToBottomRef.current) {
+          autoScrollToBottomRef.current = true;
+        }
+      }
+      if (event.type === "call.ended" && event.timelineEvent) {
+        setCallEvents((prev) => upsertCallTimelineEvent(prev, event.timelineEvent!));
+        if (pinnedToBottomRef.current) {
+          autoScrollToBottomRef.current = true;
         }
       }
       if (event.type === "conversation.updated" && conversationId) {
@@ -808,7 +833,7 @@ export function ChatThread({
     const oldestId = currentMessages[0].id;
 
     try {
-      const data = await apiFetch<{ messages: Message[]; hasMore: boolean }>(
+      const data = await apiFetch<{ messages: Message[]; hasMore: boolean; callEvents?: CallTimelineEventDto[] }>(
         conversationMessagesPath(conversationId, { before: oldestId, limit: MESSAGE_PAGE_SIZE }),
       );
       const incoming = data.messages.filter(
@@ -826,6 +851,9 @@ export function ChatThread({
         const ids = new Set(prev.map((m) => m.id));
         return sortMessagesByCreatedAt([...incoming.filter((m) => !ids.has(m.id)), ...prev]);
       });
+      if (data.callEvents?.length) {
+        setCallEvents((prev) => mergeCallTimelineEvents(prev, data.callEvents ?? []));
+      }
       setHasMore(data.hasMore);
     } finally {
       loadingMoreRef.current = false;
@@ -1094,7 +1122,7 @@ export function ChatThread({
         <div className="messages-loading" role="status" aria-live="polite">
           <div className="spinner" aria-hidden />
         </div>
-      ) : messages.length === 0 ? (
+      ) : messages.length === 0 && callEvents.length === 0 ? (
         <div className="empty-state">
           <h3>No messages yet</h3>
           <p>{canPost ? "Be the first to say hello." : "Messages from leaders will appear here."}</p>
@@ -1102,6 +1130,7 @@ export function ChatThread({
       ) : (
         <ChatMessageList
           messages={messages}
+          callEvents={callEvents}
           messageEnterDelays={messageEnterDelays}
           firstUnreadMessageId={firstUnreadMessageId}
           resolvedUserId={resolvedUserId}

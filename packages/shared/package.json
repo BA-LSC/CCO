@@ -29,6 +29,10 @@
       "types": "./dist/calls.d.ts",
       "default": "./dist/calls.js"
     },
+    "./call-timeline": {
+      "types": "./dist/call-timeline.d.ts",
+      "default": "./dist/call-timeline.js"
+    },
     "./message-preview": {
       "types": "./dist/message-preview.d.ts",
       "default": "./dist/message-preview.js"

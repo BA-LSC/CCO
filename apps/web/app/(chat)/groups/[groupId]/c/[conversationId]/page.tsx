@@ -39,6 +39,7 @@ export default function GroupConversationPage() {
 
   const {
     threadMessages,
+    threadCallEvents,
     threadHasMore,
     firstUnreadMessageId,
     messagesLoading,
@@ -493,6 +494,7 @@ export default function GroupConversationPage() {
           key={conversationId}
           conversationId={conversationId}
           initialMessages={threadMessages}
+          initialCallEvents={threadCallEvents}
           hasMore={threadHasMore}
           firstUnreadMessageId={firstUnreadMessageId}
           members={mentionMembers}

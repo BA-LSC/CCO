@@ -25,9 +25,9 @@ export type RealtimeEvent =
       userId: string;
       readAt: string;
     }
-  | { type: "call.started"; conversationId: string; call: import("@cco/shared/calls").CallSummaryDto }
+  | { type: "call.started"; conversationId: string; call: import("@cco/shared/calls").CallSummaryDto; timelineEvent: import("@cco/shared/call-timeline").CallTimelineEventDto }
   | { type: "call.updated"; conversationId: string; call: import("@cco/shared/calls").CallSummaryDto }
-  | { type: "call.ended"; conversationId: string; callId: string }
+  | { type: "call.ended"; conversationId: string; callId: string; timelineEvent: import("@cco/shared/call-timeline").CallTimelineEventDto | null }
   | {
       type: "typing";
       conversationId: string;
