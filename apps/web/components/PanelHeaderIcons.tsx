@@ -135,20 +135,21 @@ export function PanelHeaderPhoneIcon({ className = "panel-header-icon" }: IconPr
   );
 }
 
-/** Downward handset — same glyph as start-call, rotated for hang-up. */
+/** Downward handset for leave-call (earpiece and mouthpiece at the bottom). */
+const PANEL_HEADER_PHONE_HANG_UP_PATH =
+  "M7.25 17.25c0-4.5 2.25-7.75 4.75-7.75s4.75 3.25 4.75 7.75";
+
 export function PanelHeaderPhoneHangUpIcon({ className = "panel-header-icon" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <g transform="translate(12 12) rotate(135) scale(0.88) translate(-12 -12)">
-        <path
-          d={PANEL_HEADER_PHONE_PATH}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
+      <path
+        d={PANEL_HEADER_PHONE_HANG_UP_PATH}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

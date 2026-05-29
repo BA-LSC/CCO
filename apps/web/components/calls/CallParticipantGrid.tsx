@@ -8,6 +8,10 @@ import {
 import { useCallParticipantAvatars } from "@/hooks/useCallParticipantAvatars";
 import { useParticipantAudioSpeaking } from "@/hooks/useParticipantAudioSpeaking";
 import { useSpeakingOutline } from "@/hooks/useSpeakingOutline";
+import {
+  buildCallParticipantTiles,
+  isCallTileSelf,
+} from "@/lib/call-participant-tiles";
 
 type CallPeer = {
   id: string;
@@ -111,13 +115,15 @@ export function CallParticipantGrid() {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const avatarMap = useCallParticipantAvatars(meeting);
 
-  const participants = useMemo(() => {
-    const peers = [...joined] as CallPeer[];
-    if (self?.id && !peers.some((peer) => peer.id === self.id)) {
-      peers.unshift(self as unknown as CallPeer);
-    }
-    return peers;
-  }, [joined, self]);
+  const participants = useMemo(
+    () =>
+      buildCallParticipantTiles(
+        joined as CallPeer[],
+        self as unknown as CallPeer | undefined,
+        roomJoined,
+      ) as CallPeer[],
+    [joined, self, roomJoined],
+  );
 
   if (!meeting || !roomJoined || participants.length === 0) return null;
 
@@ -141,7 +147,7 @@ export function CallParticipantGrid() {
             key={peer.id}
             peer={peer}
             avatarUrl={avatarUrl}
-            isSelf={peer.id === self?.id}
+            isSelf={isCallTileSelf(peer, self as unknown as CallPeer | undefined)}
             audioTrack={peer.id === self?.id ? selfAudioTrack : peer.audioTrack}
             audioEnabled={peer.id === self?.id ? selfAudioEnabled : Boolean(peer.audioEnabled)}
           />

@@ -8369,12 +8369,16 @@ html.standalone-display .chat-thread-panel {
 }
 
 .sidebar-call-indicator--icon-only.sidebar-call-indicator--action {
-  padding: 2px 4px;
+  width: var(--sidebar-icon-btn);
+  height: var(--sidebar-icon-btn);
+  padding: 0;
+  justify-content: center;
 }
 
 .sidebar-call-indicator-icon {
-  width: 14px;
-  height: 14px;
+  display: block;
+  width: var(--sidebar-channel-prefix-size);
+  height: var(--sidebar-channel-prefix-size);
   flex-shrink: 0;
 }
 
@@ -8854,7 +8858,7 @@ html.standalone-display .chat-thread-panel {
   align-items: center;
   justify-items: center;
   place-content: center;
-  padding: 10px 8px 14px;
+  padding: 10px 8px 8px;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
@@ -8863,6 +8867,7 @@ html.standalone-display .chat-thread-panel {
   max-height: 100%;
   min-height: 0;
   align-self: center;
+  padding-bottom: 4px;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar {
