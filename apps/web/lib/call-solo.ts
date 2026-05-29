@@ -1,3 +1,13 @@
+import { formatCallDuration } from "@cco/shared/call-timeline";
+
+/** End a solo call automatically when nobody else joins within this window. */
+export const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
+
+export function formatSoloCallAutoLeaveNotice(durationSeconds: number): string {
+  const duration = formatCallDuration(Math.max(1, Math.floor(durationSeconds)));
+  return `Call ended after ${duration} — no one else joined`;
+}
+
 /**
  * RealtimeKit `participants.count` tracks other joined peers only (self is excluded).
  */

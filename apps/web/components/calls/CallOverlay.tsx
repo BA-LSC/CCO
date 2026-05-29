@@ -16,7 +16,7 @@ import {
 } from "@cloudflare/realtimekit-react";
 import { CallMeetingUi } from "@/components/calls/CallMeetingUi";
 import { useTheme } from "@/components/ThemeProvider";
-import { shouldApplySoloCallBehavior } from "@/lib/call-solo";
+import { shouldApplySoloCallBehavior, SOLO_CALL_AUTO_LEAVE_MS } from "@/lib/call-solo";
 import { applyCcoRtkDesignSystem } from "@/lib/rtk-design-system";
 import {
   type CallPanelPlacement,
@@ -25,13 +25,13 @@ import {
 
 export type { CallPanelPlacement };
 
-const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
 const INLINE_MAX_HEIGHT_PX = 320;
 
 type Props = {
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
+  onSoloAutoLeave?: (durationMs: number) => void;
   placement?: CallPanelPlacement;
   /** Measured anchor for inline placement (top of chat-panel-content). */
   inlineAnchorRect?: DOMRect | null;
@@ -47,13 +47,17 @@ function useSoloCallBehavior(
   meeting: ReturnType<typeof useRealtimeKitMeeting>["meeting"],
   panelRef: RefObject<HTMLDivElement | null>,
   sessionParticipantCount: number,
+  onSoloAutoLeave?: (durationMs: number) => void,
 ) {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const participantCount = useRealtimeKitSelector((m) => m.participants.count);
   const [othersJoinedInRoom, setOthersJoinedInRoom] = useState(false);
   const sessionParticipantCountRef = useRef(sessionParticipantCount);
+  const soloJoinedAtRef = useRef<number | null>(null);
+  const onSoloAutoLeaveRef = useRef(onSoloAutoLeave);
 
   sessionParticipantCountRef.current = sessionParticipantCount;
+  onSoloAutoLeaveRef.current = onSoloAutoLeave;
 
   useEffect(() => {
     if (!meeting) return;
@@ -114,9 +118,19 @@ function useSoloCallBehavior(
   }, [meeting, panelRef, othersJoinedInRoom, sessionParticipantCount]);
 
   useEffect(() => {
+    if (roomJoined && isSoloNow()) {
+      soloJoinedAtRef.current ??= Date.now();
+      return;
+    }
+    soloJoinedAtRef.current = null;
+  }, [meeting, roomJoined, participantCount, othersJoinedInRoom, sessionParticipantCount]);
+
+  useEffect(() => {
     if (!meeting || !roomJoined || !isSoloNow()) return;
     const timer = setTimeout(() => {
       if (!isSoloNow()) return;
+      const joinedAt = soloJoinedAtRef.current ?? Date.now() - SOLO_CALL_AUTO_LEAVE_MS;
+      onSoloAutoLeaveRef.current?.(Date.now() - joinedAt);
       void meeting.leaveRoom();
     }, SOLO_CALL_AUTO_LEAVE_MS);
     return () => clearTimeout(timer);
@@ -127,6 +141,7 @@ function MeetingInner({
   authToken,
   sessionParticipantCount,
   onLeave,
+  onSoloAutoLeave,
   showSetupScreen,
   panelRef,
   isGuestSession,
@@ -135,6 +150,7 @@ function MeetingInner({
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
+  onSoloAutoLeave?: (durationMs: number) => void;
   showSetupScreen: boolean;
   panelRef: RefObject<HTMLDivElement | null>;
   isGuestSession: boolean;
@@ -154,7 +170,7 @@ function MeetingInner({
 
   onLeaveRef.current = onLeave;
 
-  useSoloCallBehavior(meeting, panelRef, sessionParticipantCount);
+  useSoloCallBehavior(meeting, panelRef, sessionParticipantCount, onSoloAutoLeave);
 
   useEffect(() => {
     if (!meeting) return;
@@ -228,6 +244,7 @@ export function CallOverlay({
   authToken,
   sessionParticipantCount,
   onLeave,
+  onSoloAutoLeave,
   placement = "inline",
   inlineAnchorRect,
   docked = false,
@@ -273,6 +290,7 @@ export function CallOverlay({
           authToken={authToken}
           sessionParticipantCount={sessionParticipantCount}
           onLeave={onLeave}
+          onSoloAutoLeave={onSoloAutoLeave}
           showSetupScreen={showSetupScreen}
           panelRef={panelRef}
           isGuestSession={placement === "guest"}

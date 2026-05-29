@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatSoloCallAutoLeaveNotice,
   isSoloCallRoom,
   isSoloCallSession,
   shouldApplySoloCallBehavior,
+  SOLO_CALL_AUTO_LEAVE_MS,
 } from "./call-solo";
 
 describe("isSoloCallRoom", () => {
@@ -40,5 +42,13 @@ describe("shouldApplySoloCallBehavior", () => {
 
   it("blocks solo behavior after another participant joined in the room", () => {
     expect(shouldApplySoloCallBehavior(1, 0, true)).toBe(false);
+  });
+});
+
+describe("formatSoloCallAutoLeaveNotice", () => {
+  it("describes how long the solo call lasted", () => {
+    expect(formatSoloCallAutoLeaveNotice(320)).toBe(
+      "Call ended after 5m 20s — no one else joined",
+    );
   });
 });

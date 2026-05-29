@@ -3,18 +3,29 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PanelHeaderPhoneIcon } from "@/components/PanelHeaderIcons";
+import { canJoinCallAsParticipant } from "@cco/shared/calls";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { useOptionalActiveCall } from "@/components/calls/ConversationCallContext";
 
 type Props = {
   conversationId: string;
   participantCount: number;
+  hostUserId: string;
   /** DM rows show the phone icon only; groups/teams keep the participant count. */
   iconOnly?: boolean;
 };
 
-export function SidebarCallIndicator({ conversationId, participantCount, iconOnly = false }: Props) {
+export function SidebarCallIndicator({
+  conversationId,
+  participantCount,
+  hostUserId,
+  iconOnly = false,
+}: Props) {
   const router = useRouter();
+  const { session } = useChatLayout();
   const callCtx = useOptionalActiveCall();
+  const call = { hostUserId };
+  const mayJoinAsCallee = canJoinCallAsParticipant(call, session?.userId);
   const inCall = callCtx?.inCall ?? false;
   const inCallHere = callCtx?.inCallOnConversation(conversationId) ?? false;
   const homeChatPath = callCtx?.homeChatPath;
@@ -50,6 +61,16 @@ export function SidebarCallIndicator({ conversationId, participantCount, iconOnl
   }
 
   if (!inCall) {
+    if (!mayJoinAsCallee) {
+      return (
+        <span
+          className={`${className} sidebar-call-indicator--passive`}
+          aria-label={label}
+        >
+          {content}
+        </span>
+      );
+    }
     return (
       <button
         type="button"

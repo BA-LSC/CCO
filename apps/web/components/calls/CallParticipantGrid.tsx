@@ -7,6 +7,7 @@ import {
 } from "@cloudflare/realtimekit-react";
 import { useCallParticipantAvatars } from "@/hooks/useCallParticipantAvatars";
 import { useParticipantAudioSpeaking } from "@/hooks/useParticipantAudioSpeaking";
+import { useSpeakingOutline } from "@/hooks/useSpeakingOutline";
 
 type CallPeer = {
   id: string;
@@ -44,6 +45,18 @@ function CallParticipantBox({
   const displayName = peer.name?.trim() || "Participant";
   const showVideo = Boolean(peer.videoEnabled);
   const isSpeaking = useParticipantAudioSpeaking(audioTrack, audioEnabled);
+  const { showOutline, isPulsing } = useSpeakingOutline(isSpeaking);
+
+  const speakingBoxClass = showOutline
+    ? isPulsing
+      ? " call-participant-box--speaking"
+      : " call-participant-box--speaking-out"
+    : "";
+  const speakingAvatarClass = showOutline
+    ? isPulsing
+      ? " call-participant-box__avatar--speaking"
+      : " call-participant-box__avatar--speaking-out"
+    : "";
 
   useEffect(() => {
     const element = videoRef.current;
@@ -56,7 +69,7 @@ function CallParticipantBox({
   }, [peer, showVideo]);
 
   return (
-    <div className={`call-participant-box${isSpeaking ? " call-participant-box--speaking" : ""}`}>
+    <div className={`call-participant-box${speakingBoxClass}`}>
       {showVideo ? (
         <video
           ref={videoRef}
@@ -67,7 +80,7 @@ function CallParticipantBox({
         />
       ) : (
         <div
-          className={`call-participant-box__avatar${isSpeaking ? " call-participant-box__avatar--speaking" : ""}`}
+          className={`call-participant-box__avatar${speakingAvatarClass}`}
           aria-hidden={!avatarUrl}
         >
           {avatarUrl ? (

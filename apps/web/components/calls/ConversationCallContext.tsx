@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { CallSummaryDto } from "@cco/shared/calls";
+import { canJoinCallAsParticipant, type CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
@@ -24,7 +24,8 @@ import { usePipPanel } from "@/hooks/usePipPanel";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
 import { CallOverlay } from "@/components/calls/CallOverlay";
 import { CallPipShell } from "@/components/calls/CallPipShell";
-import { ChatHomeBanner } from "@/components/ChatHomeBanner";
+import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
+import { formatSoloCallAutoLeaveNotice } from "@/lib/call-solo";
 
 type CallSessionValue = ReturnType<typeof useCallSession>;
 
@@ -34,6 +35,7 @@ export type ActiveCallContextValue = CallSessionValue & {
   isHost: boolean;
   joinConversation: (conversationId: string) => void;
   inCallOnConversation: (conversationId: string) => boolean;
+  onSoloAutoLeave: (durationMs: number) => void;
 };
 
 const ActiveCallContext = createContext<ActiveCallContextValue | null>(null);
@@ -87,6 +89,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const [homeChatPath, setHomeChatPath] = useState<string | null>(null);
   const [incomingConversationId, setIncomingConversationId] = useState<string | null>(null);
   const [incomingCall, setIncomingCall] = useState<CallSummaryDto | null>(null);
+  const [soloCallNotice, setSoloCallNotice] = useState<string | null>(null);
 
   const callSession = useCallSession(homeConversationId);
   const {
@@ -166,6 +169,11 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     setHomeChatPath(null);
   }, [clearCallQueryParam, hangUp]);
 
+  const handleSoloAutoLeave = useCallback((durationMs: number) => {
+    const durationSeconds = Math.max(1, Math.round(durationMs / 1000));
+    setSoloCallNotice(formatSoloCallAutoLeaveNotice(durationSeconds));
+  }, []);
+
   useEffect(() => {
     return subscribeRealtime((event: RealtimeEvent) => {
       const conversationId =
@@ -184,7 +192,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 
         if (
           event.type === "call.started" &&
-          event.call.hostUserId !== session?.userId &&
+          canJoinCallAsParticipant(event.call, session?.userId) &&
           !inCallRef.current &&
           event.call.participantCount > 0 &&
           !shouldIgnoreCall(event.call.id) &&
@@ -240,6 +248,8 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     if (!inCall) {
       setHomeConversationId(null);
       setHomeChatPath(null);
+    } else {
+      setSoloCallNotice(null);
     }
   }, [inCall]);
 
@@ -257,10 +267,12 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       joinConversation,
       inCallOnConversation,
       hangUp: handleHangUp,
+      onSoloAutoLeave: handleSoloAutoLeave,
     }),
     [
       callSession,
       handleHangUp,
+      handleSoloAutoLeave,
       homeChatPath,
       homeConversationId,
       inCallOnConversation,
@@ -298,6 +310,9 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         <IncomingCallToast
           hostName={incomingCall.hostDisplayName}
           onJoin={() => {
+            if (!incomingCall || !canJoinCallAsParticipant(incomingCall, session?.userId)) {
+              return;
+            }
             const targetId = incomingConversationId;
             setIncomingCall(null);
             setIncomingConversationId(null);
@@ -316,6 +331,18 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         </ChatHomeBanner>
       ) : null}
 
+      {soloCallNotice ? (
+        <ChatHomeBanner
+          key={soloCallNotice}
+          variant="neutral"
+          placement="panel"
+          autoDismissMs={CHAT_PANEL_BANNER_AUTO_DISMISS_MS}
+          onDismiss={() => setSoloCallNotice(null)}
+        >
+          {soloCallNotice}
+        </ChatHomeBanner>
+      ) : null}
+
       {homeConversationId && inCall && authToken && showPipCall ? (
         <CallPipShell
           pip={pip}
@@ -329,6 +356,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
             authToken={authToken}
             sessionParticipantCount={activeCall?.participantCount ?? 1}
             onLeave={() => void handleHangUp()}
+            onSoloAutoLeave={handleSoloAutoLeave}
             placement="pip"
             embedded
             showSetupScreen={false}
@@ -342,7 +370,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 }
 
 export function CallInlineSlot({ conversationId }: { conversationId: string }) {
-  const { inCallOnConversation, authToken, activeCall, hangUp } = useActiveCall();
+  const { inCallOnConversation, authToken, activeCall, hangUp, onSoloAutoLeave } = useActiveCall();
   const showInline = inCallOnConversation(conversationId);
 
   if (!showInline) return null;
@@ -355,6 +383,7 @@ export function CallInlineSlot({ conversationId }: { conversationId: string }) {
           authToken={authToken}
           sessionParticipantCount={activeCall?.participantCount ?? 1}
           onLeave={() => void hangUp()}
+          onSoloAutoLeave={onSoloAutoLeave}
           placement="inline"
           docked
           showSetupScreen={false}
@@ -374,8 +403,11 @@ export function ConversationCallHeaderButton({
 }) {
   const { activeCall, loading, joinConversation, inCallOnConversation, hangUp } = useActiveCall();
   const { getActiveCall } = useActiveCallsMap();
+  const { session } = useChatLayout();
   const inCallHere = inCallOnConversation(conversationId);
-  const joinableCall = getActiveCall(conversationId) ?? null;
+  const mapCall = getActiveCall(conversationId) ?? null;
+  const joinableCall =
+    mapCall && canJoinCallAsParticipant(mapCall, session?.userId) ? mapCall : null;
 
   return (
     <CallActionButton

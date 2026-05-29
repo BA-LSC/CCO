@@ -305,6 +305,7 @@ export function ChatSidebar() {
               <SidebarCallIndicator
                 conversationId={team.conversationId!}
                 participantCount={activeCall.participantCount}
+                hostUserId={activeCall.hostUserId}
               />
             )}
             {team.role === "leader" && (
@@ -533,6 +534,7 @@ export function ChatSidebar() {
                                   <SidebarCallIndicator
                                     conversationId={dm.id}
                                     participantCount={activeCall.participantCount}
+                                    hostUserId={activeCall.hostUserId}
                                     iconOnly
                                   />
                                 )}

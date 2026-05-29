@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import type {
-  CallGuestPreview,
-  CallInviteCandidateDto,
-  CallJoinResponse,
-  CallParticipantDto,
-  CallSummaryDto,
+import {
+  canJoinCallAsParticipant,
+  type CallGuestPreview,
+  type CallInviteCandidateDto,
+  type CallJoinResponse,
+  type CallParticipantDto,
+  type CallSummaryDto,
 } from "@cco/shared/calls";
 import { db } from "../db";
 import { matchDisplayNameOrEmail } from "../lib/db-search";
@@ -469,9 +470,10 @@ export async function joinCall(params: {
 
   const call = row[0];
   if (!call || call.status === "ended") return null;
+  if (!canJoinCallAsParticipant(call, params.userId)) return null;
 
   const user = await getUserDisplay(params.userId);
-  const role = call.hostUserId === params.userId ? "host" : "member";
+  const role = "member";
   const { authToken } = await ensureParticipantToken({
     callSessionId: params.callId,
     meetingId: call.meetingId,

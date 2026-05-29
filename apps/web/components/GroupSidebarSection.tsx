@@ -394,6 +394,7 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                                   <SidebarCallIndicator
                                     conversationId={conv.id}
                                     participantCount={activeCall.participantCount}
+                                    hostUserId={activeCall.hostUserId}
                                   />
                                 );
                               })()}

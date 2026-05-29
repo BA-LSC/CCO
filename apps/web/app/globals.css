@@ -8514,12 +8514,8 @@ html.standalone-display .chat-thread-panel {
   width: 100%;
   margin-top: auto;
   padding: 6px 10px 8px;
-  border-top: 1px solid var(--color-border);
-  background: linear-gradient(
-    to top,
-    var(--color-surface),
-    color-mix(in srgb, var(--color-surface) 94%, transparent)
-  );
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-2);
   --rtk-controlbar-button-background-color: transparent;
   --rtk-controlbar-button-icon-size: 18px;
 }
@@ -8540,21 +8536,34 @@ html.standalone-display .chat-thread-panel {
 
 .call-participant-grid--solo {
   grid-template-columns: minmax(0, 1fr);
-  place-items: center;
-  padding-block: 10px;
+  grid-template-rows: minmax(0, 1fr);
+  justify-items: center;
+  align-items: stretch;
+  align-content: stretch;
+  padding: 4px 8px;
 }
 
 .call-participant-grid--solo .call-participant-box {
-  width: auto;
-  max-width: min(100%, 240px);
-  height: auto;
+  width: min(100%, 280px);
+  height: 100%;
   min-height: 0;
-  padding: 10px 12px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  flex-direction: column;
 }
 
 .call-participant-grid--solo .call-participant-box__avatar {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+}
+
+.call-participant-grid--solo .call-participant-box__avatar img,
+.call-participant-grid--solo .call-participant-box__initials {
   width: auto;
-  height: auto;
+  height: min(168px, 100%);
+  max-width: 100%;
+  aspect-ratio: 1;
 }
 
 .call-participant-grid--duo {
@@ -8593,6 +8602,13 @@ html.standalone-display .chat-thread-panel {
   animation: call-participant-speaking-outline 2.4s ease-in-out infinite;
 }
 
+.call-participant-box--speaking-out::after {
+  opacity: 0;
+  animation: none;
+  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
+  box-shadow: none;
+}
+
 .call-participant-box__avatar {
   display: flex;
   align-items: center;
@@ -8604,6 +8620,11 @@ html.standalone-display .chat-thread-panel {
 
 .call-participant-box__avatar--speaking {
   animation: call-participant-speaking-glow 2.4s ease-in-out infinite;
+}
+
+.call-participant-box__avatar--speaking-out {
+  animation: none;
+  box-shadow: 0 0 0 0 transparent;
 }
 
 @keyframes call-participant-speaking-outline {
@@ -8654,9 +8675,8 @@ html.standalone-display .chat-thread-panel {
   --call-avatar-size: clamp(80px, 34vmin, 112px);
 }
 
-.call-participant-grid--solo .call-participant-box__avatar img,
 .call-participant-grid--solo .call-participant-box__initials {
-  --call-avatar-size: clamp(72px, 16vmin, 112px);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
 }
 
 .call-participant-box__avatar img {
@@ -8673,10 +8693,6 @@ html.standalone-display .chat-thread-panel {
   font-weight: 700;
 }
 
-.call-participant-grid--solo .call-participant-box__initials {
-  font-size: clamp(1.25rem, 5vw, 1.75rem);
-}
-
 /* PiP body is 176px tall — keep avatar compact above the control bar */
 .call-pip .call-participant-grid {
   padding: 4px;
@@ -8689,6 +8705,7 @@ html.standalone-display .chat-thread-panel {
   min-height: 0;
   padding: 4px 8px;
   background: transparent;
+  flex-direction: row;
 }
 
 .call-pip .call-participant-grid--solo .call-participant-box__avatar {
@@ -8712,7 +8729,7 @@ html.standalone-display .chat-thread-panel {
 .call-pip .call-meeting-ui__footer {
   padding: 2px 4px 4px;
   --rtk-space-14: 32px;
-  border-top: none;
+  border-bottom: none;
 }
 
 .call-pip .call-meeting-ui rtk-controlbar {

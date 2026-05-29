@@ -33,6 +33,14 @@ export const CallSummaryDtoSchema = z.object({
 
 export type CallSummaryDto = z.infer<typeof CallSummaryDtoSchema>;
 
+/** Callee join flows (Answer, Join call, ?call= deep link) — not the host who started the call. */
+export function canJoinCallAsParticipant(
+  call: Pick<CallSummaryDto, "hostUserId">,
+  userId: string | null | undefined,
+): boolean {
+  return Boolean(userId && call.hostUserId !== userId);
+}
+
 export const CallJoinResponseSchema = z.object({
   call: CallSummaryDtoSchema,
   authToken: z.string(),

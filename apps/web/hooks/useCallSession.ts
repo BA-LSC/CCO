@@ -73,7 +73,8 @@ export function useCallSession(conversationId: string | null) {
       setAuthToken(result.authToken);
       setInCall(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not join call");
+      const message = err instanceof Error ? err.message : "Could not join call";
+      setError(message.includes("Forbidden") ? "You cannot join your own call" : message);
     } finally {
       setLoading(false);
     }

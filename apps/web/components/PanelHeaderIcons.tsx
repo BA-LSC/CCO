@@ -139,7 +139,7 @@ export function PanelHeaderPhoneIcon({ className = "panel-header-icon" }: IconPr
 export function PanelHeaderPhoneHangUpIcon({ className = "panel-header-icon" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <g transform="rotate(135 12 12)">
+      <g transform="translate(12 12) rotate(135) scale(0.88) translate(-12 -12)">
         <path
           d={PANEL_HEADER_PHONE_PATH}
           fill="none"
