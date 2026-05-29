@@ -144,22 +144,21 @@ export default function DmChatPage() {
         />
       </ChatPanelHeader>
 
-      {detail && (
-        <ChannelSettingsPanel open={showOptions}>
-          <ConversationMuteSetting muted={detail.muted} onChange={toggleMute} />
-          {isGroup ? (
-            <DmGroupSettings
-              conversationId={conversationId}
-              title={detail.title}
-              imageUrl={detail.imageUrl}
-              onUpdated={applyGroupUpdates}
-            />
-          ) : null}
-          <PresenceMembersSection members={settingsMembers} enabled={showOptions} />
-        </ChannelSettingsPanel>
-      )}
-
       <div className="chat-panel-content">
+        {detail && (
+          <ChannelSettingsPanel open={showOptions} onClose={() => setShowOptions(false)}>
+            <ConversationMuteSetting muted={detail.muted} onChange={toggleMute} />
+            {isGroup ? (
+              <DmGroupSettings
+                conversationId={conversationId}
+                title={detail.title}
+                imageUrl={detail.imageUrl}
+                onUpdated={applyGroupUpdates}
+              />
+            ) : null}
+            <PresenceMembersSection members={settingsMembers} enabled={showOptions} />
+          </ChannelSettingsPanel>
+        )}
         {displayError ? (
           <div className="chat-panel-banner-slot">
             <ChatHomeBanner

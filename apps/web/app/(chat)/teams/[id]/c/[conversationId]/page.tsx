@@ -200,27 +200,26 @@ export default function TeamConversationPage() {
         />
       </ChatPanelHeader>
 
-      {detail?.conversation && (
-        <ChannelSettingsPanel open={showSettings}>
-          <ConversationMuteSetting
-            muted={detail.conversation.muted}
-            onChange={toggleMute}
-          />
-
-          <ChannelMembersSection
-            title="Team members"
-            members={detail.members ?? []}
-            isLeader={isLeader}
-            sessionUserId={session?.userId}
-            inviteFeedback={inviteFeedback}
-            removingMemberId={removingMemberId}
-            onInvite={isLeader ? inviteMember : undefined}
-            onRemove={isLeader ? removeFromTeam : undefined}
-          />
-        </ChannelSettingsPanel>
-      )}
-
       <div className="chat-panel-content">
+        {detail?.conversation && (
+          <ChannelSettingsPanel open={showSettings} onClose={() => setShowSettings(false)}>
+            <ConversationMuteSetting
+              muted={detail.conversation.muted}
+              onChange={toggleMute}
+            />
+
+            <ChannelMembersSection
+              title="Team members"
+              members={detail.members ?? []}
+              isLeader={isLeader}
+              sessionUserId={session?.userId}
+              inviteFeedback={inviteFeedback}
+              removingMemberId={removingMemberId}
+              onInvite={isLeader ? inviteMember : undefined}
+              onRemove={isLeader ? removeFromTeam : undefined}
+            />
+          </ChannelSettingsPanel>
+        )}
         {displayError ? (
           <div className="chat-panel-banner-slot">
             <ChatHomeBanner

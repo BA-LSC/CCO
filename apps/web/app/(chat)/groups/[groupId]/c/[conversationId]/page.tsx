@@ -390,91 +390,93 @@ export default function GroupConversationPage() {
         />
       </ChatPanelHeader>
 
-      {activeConversation && detail && (
-        <ChannelSettingsPanel open={showChannelSettings}>
-          <ConversationMuteSetting
-            muted={activeConversation.muted ?? false}
-            onChange={toggleMute}
-          />
-
-          {isLeader && activeConversation.slug !== "general" && (
-            <section className="channel-settings-group" aria-label="Channel settings">
-              <label className="channel-settings-field">
-                <span className="channel-settings-field-label">Channel name</span>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  onBlur={handleTitleBlur}
-                  aria-label="Channel name"
-                />
-              </label>
-            </section>
-          )}
-
-          {isLeader && (
-            <section className="channel-settings-group" aria-label="Channel permissions">
-              <div className="channel-settings-group-intro">
-                <h3 className="channel-settings-group-label">Channel permissions</h3>
-                {activeConversation.slug === "general" && (
-                  <p className="channel-settings-group-desc">
-                    All group members always have access to the general channel.
-                  </p>
-                )}
-              </div>
-
-              <div className="channel-settings-card">
-                <label className="channel-settings-row channel-settings-toggle">
-                  <span className="channel-settings-row-label">Leaders only can post</span>
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={editLeaderOnly}
-                    onChange={(e) => handleLeaderOnlyChange(e.target.checked)}
-                    aria-label="Leaders only can post"
-                  />
-                  <span className="toggle-switch" aria-hidden="true" />
-                </label>
-              </div>
-            </section>
-          )}
-
-          <ChannelMembersSection
-            title="Group members"
-            members={detail.members ?? []}
-            isLeader={isLeader}
-            sessionUserId={session?.userId}
-            inviteFeedback={inviteFeedback}
-            removingMemberId={removingMemberId}
-            onInvite={isLeader ? inviteMember : undefined}
-            onRemove={isLeader ? removeFromGroup : undefined}
-            channelAccess={
-              showChannelHiddenAccess
-                ? {
-                    channelAccessIds,
-                    onToggleAccess: toggleChannelAccess,
-                  }
-                : undefined
-            }
-          />
-
-          {isLeader && activeConversation.slug !== "general" && (
-            <section className="channel-settings-group channel-settings-group-danger" aria-label="Danger zone">
-              <div className="channel-settings-card">
-                <button
-                  type="button"
-                  className="channel-settings-danger-action"
-                  onClick={() => void archiveConversation()}
-                >
-                  Archive channel
-                </button>
-              </div>
-            </section>
-          )}
-        </ChannelSettingsPanel>
-      )}
-
       <div className="chat-panel-content">
+        {activeConversation && detail && (
+          <ChannelSettingsPanel
+            open={showChannelSettings}
+            onClose={() => setShowChannelSettings(false)}
+          >
+            <ConversationMuteSetting
+              muted={activeConversation.muted ?? false}
+              onChange={toggleMute}
+            />
+
+            {isLeader && activeConversation.slug !== "general" && (
+              <section className="channel-settings-group" aria-label="Channel settings">
+                <label className="channel-settings-field">
+                  <span className="channel-settings-field-label">Channel name</span>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    onBlur={handleTitleBlur}
+                    aria-label="Channel name"
+                  />
+                </label>
+              </section>
+            )}
+
+            {isLeader && (
+              <section className="channel-settings-group" aria-label="Channel permissions">
+                <div className="channel-settings-group-intro">
+                  <h3 className="channel-settings-group-label">Channel permissions</h3>
+                  {activeConversation.slug === "general" && (
+                    <p className="channel-settings-group-desc">
+                      All group members always have access to the general channel.
+                    </p>
+                  )}
+                </div>
+
+                <div className="channel-settings-card">
+                  <label className="channel-settings-row channel-settings-toggle">
+                    <span className="channel-settings-row-label">Leaders only can post</span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={editLeaderOnly}
+                      onChange={(e) => handleLeaderOnlyChange(e.target.checked)}
+                      aria-label="Leaders only can post"
+                    />
+                    <span className="toggle-switch" aria-hidden="true" />
+                  </label>
+                </div>
+              </section>
+            )}
+
+            <ChannelMembersSection
+              title="Group members"
+              members={detail.members ?? []}
+              isLeader={isLeader}
+              sessionUserId={session?.userId}
+              inviteFeedback={inviteFeedback}
+              removingMemberId={removingMemberId}
+              onInvite={isLeader ? inviteMember : undefined}
+              onRemove={isLeader ? removeFromGroup : undefined}
+              channelAccess={
+                showChannelHiddenAccess
+                  ? {
+                      channelAccessIds,
+                      onToggleAccess: toggleChannelAccess,
+                    }
+                  : undefined
+              }
+            />
+
+            {isLeader && activeConversation.slug !== "general" && (
+              <section className="channel-settings-group channel-settings-group-danger" aria-label="Danger zone">
+                <div className="channel-settings-card">
+                  <button
+                    type="button"
+                    className="channel-settings-danger-action"
+                    onClick={() => void archiveConversation()}
+                  >
+                    Archive channel
+                  </button>
+                </div>
+              </section>
+            )}
+          </ChannelSettingsPanel>
+        )}
         {displayError ? (
           <div className="chat-panel-banner-slot">
             <ChatHomeBanner

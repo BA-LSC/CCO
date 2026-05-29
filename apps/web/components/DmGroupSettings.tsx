@@ -87,21 +87,16 @@ export function DmGroupSettings({ conversationId, title, imageUrl, onUpdated }: 
 
   return (
     <section className="channel-settings-group" aria-label="Group settings">
-      <div className="channel-settings-group-intro">
-        <h3 className="channel-settings-group-label">Group settings</h3>
-        <p className="channel-settings-group-desc">
-          Anyone in this group can change the name and photo.
-        </p>
-      </div>
+      <h3 className="channel-settings-group-label">Group settings</h3>
 
       <div className="channel-settings-card dm-group-settings-card">
-        <div className="dm-group-settings-avatar-row">
-          <UserAvatar
-            displayName={editTitle || title}
-            avatarUrl={imageUrl}
-            className="dm-group-settings-avatar"
-          />
-          <div className="dm-group-settings-avatar-actions">
+        <div className="dm-group-settings-row">
+          <div className="dm-group-settings-photo">
+            <UserAvatar
+              displayName={editTitle || title}
+              avatarUrl={imageUrl}
+              className="dm-group-settings-avatar"
+            />
             <input
               ref={fileRef}
               type="file"
@@ -110,38 +105,40 @@ export function DmGroupSettings({ conversationId, title, imageUrl, onUpdated }: 
               disabled={uploadingImage}
               onChange={(event) => void handleImageSelected(event.target.files?.[0])}
             />
-            <button
-              type="button"
-              className="link-btn"
-              disabled={uploadingImage}
-              onClick={() => fileRef.current?.click()}
-            >
-              {uploadingImage ? "Uploading…" : imageUrl ? "Change photo" : "Add photo"}
-            </button>
-            {imageUrl ? (
+            <div className="dm-group-settings-photo-actions">
               <button
                 type="button"
                 className="link-btn"
                 disabled={uploadingImage}
-                onClick={() => void removePhoto()}
+                onClick={() => fileRef.current?.click()}
               >
-                Remove photo
+                {uploadingImage ? "Uploading…" : imageUrl ? "Change photo" : "Add photo"}
               </button>
-            ) : null}
+              {imageUrl ? (
+                <button
+                  type="button"
+                  className="link-btn"
+                  disabled={uploadingImage}
+                  onClick={() => void removePhoto()}
+                >
+                  Remove photo
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        <label className="channel-settings-field">
-          <span className="channel-settings-field-label">Group name</span>
-          <input
-            type="text"
-            value={editTitle}
-            disabled={savingTitle}
-            onChange={(event) => setEditTitle(event.target.value)}
-            onBlur={() => void saveTitle(editTitle)}
-            aria-label="Group name"
-          />
-        </label>
+          <label className="channel-settings-field dm-group-settings-name">
+            <span className="channel-settings-field-label">Group name</span>
+            <input
+              type="text"
+              value={editTitle}
+              disabled={savingTitle}
+              onChange={(event) => setEditTitle(event.target.value)}
+              onBlur={() => void saveTitle(editTitle)}
+              aria-label="Group name"
+            />
+          </label>
+        </div>
       </div>
 
       {error ? (

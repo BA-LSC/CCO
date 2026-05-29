@@ -4,13 +4,14 @@ import { useEffect, useState, type ReactNode } from "react";
 
 type Props = {
   open: boolean;
+  onClose: () => void;
   children: ReactNode;
 };
 
 /** Matches channel-settings-panel slide animation in globals.css */
 export const CHANNEL_SETTINGS_PANEL_ANIM_MS = 240;
 
-export function ChannelSettingsPanel({ open, children }: Props) {
+export function ChannelSettingsPanel({ open, onClose, children }: Props) {
   const [mounted, setMounted] = useState(open);
   const [exiting, setExiting] = useState(false);
 
@@ -35,15 +36,25 @@ export function ChannelSettingsPanel({ open, children }: Props) {
 
   if (!mounted) return null;
 
+  const animClass = exiting ? "channel-settings-panel--exit" : "channel-settings-panel--enter";
+  const backdropClass = exiting
+    ? "channel-settings-backdrop--exit"
+    : "channel-settings-backdrop--enter";
+
   return (
-    <div
-      className={[
-        "chat-panel-details channel-settings-panel",
-        exiting ? "channel-settings-panel--exit" : "channel-settings-panel--enter",
-      ].join(" ")}
-    >
-      <div className="channel-settings-body">{children}</div>
-    </div>
+    <>
+      <button
+        type="button"
+        className={["channel-settings-backdrop", backdropClass].join(" ")}
+        aria-label="Close settings"
+        onClick={onClose}
+      />
+      <div
+        className={["chat-panel-details channel-settings-panel", animClass].join(" ")}
+      >
+        <div className="channel-settings-body">{children}</div>
+      </div>
+    </>
   );
 }
 
