@@ -1,14 +1,12 @@
 "use client";
 
-import {
+export {
+  ActiveCallProvider,
+  CallInlineSlot,
   ConversationCallHeaderButton,
   ConversationCallShell,
+  useActiveCall,
+  useOptionalActiveCall,
   useConversationCall,
+  useOptionalConversationCall,
 } from "@/components/calls/ConversationCallContext";
-
-export { ConversationCallHeaderButton, ConversationCallShell, useConversationCall };
-
-/** @deprecated Use ConversationCallShell + ConversationCallHeaderButton */
-export function ConversationCallKit({ disabled }: { conversationId?: string; disabled?: boolean }) {
-  return <ConversationCallHeaderButton disabled={disabled} />;
-}

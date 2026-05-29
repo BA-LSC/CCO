@@ -48,6 +48,7 @@ function splitTextBubbleGroupPosition(groupPosition: MessageGroupPosition): Mess
 }
 
 type Props = {
+  conversationId: string;
   messages: Message[];
   callEvents?: CallTimelineEventDto[];
   messageEnterDelays?: ReadonlyMap<string, number>;
@@ -78,6 +79,7 @@ type Props = {
 };
 
 function ChatMessageListInner({
+  conversationId,
   messages,
   callEvents = [],
   messageEnterDelays,
@@ -196,7 +198,7 @@ function ChatMessageListInner({
               <li className="messages-day-divider-wrap" aria-hidden={false}>
                 <div className="messages-call-divider" role="status">
                   <time dateTime={item.at}>{formatCallTimelineLabel(item.call)}</time>
-                  <CallTimelineJoinAction event={item.call} />
+                  <CallTimelineJoinAction event={item.call} conversationId={conversationId} />
                 </div>
               </li>
             </Fragment>

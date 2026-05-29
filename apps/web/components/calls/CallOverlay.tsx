@@ -5,36 +5,44 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ReactNode,
+  type CSSProperties,
   type RefObject,
 } from "react";
-import type { CallLayoutMode } from "@/components/calls/CallInCallToolbar";
 import {
   RealtimeKitProvider,
   useRealtimeKitClient,
   useRealtimeKitMeeting,
   useRealtimeKitSelector,
 } from "@cloudflare/realtimekit-react";
-import { RtkMeeting } from "@cloudflare/realtimekit-react-ui";
+import { CallMeetingUi } from "@/components/calls/CallMeetingUi";
+import { CallParticipantAvatars } from "@/components/calls/CallParticipantAvatars";
 import { useTheme } from "@/components/ThemeProvider";
 import { shouldApplySoloCallBehavior } from "@/lib/call-solo";
 import { applyCcoRtkDesignSystem } from "@/lib/rtk-design-system";
+import {
+  type CallPanelPlacement,
+  peerLooksLikeGuest,
+} from "@/lib/rtk-meeting-config";
+
+export type { CallPanelPlacement };
 
 const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
+const INLINE_MAX_HEIGHT_PX = 400;
 
 type Props = {
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
-  /** When false, join immediately using the participant name from the auth token. */
+  placement?: CallPanelPlacement;
+  /** Measured anchor for inline placement (top of chat-panel-content). */
+  inlineAnchorRect?: DOMRect | null;
+  /** Signed-in users skip RTK setup; guests may show it. */
   showSetupScreen?: boolean;
-  toolbar?: ReactNode;
-  layoutMode?: CallLayoutMode;
 };
 
 function useSoloCallBehavior(
   meeting: ReturnType<typeof useRealtimeKitMeeting>["meeting"],
-  overlayRef: RefObject<HTMLDivElement | null>,
+  panelRef: RefObject<HTMLDivElement | null>,
   sessionParticipantCount: number,
 ) {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
@@ -69,7 +77,7 @@ function useSoloCallBehavior(
 
   useEffect(() => {
     if (!meeting) return;
-    const root = overlayRef.current;
+    const root = panelRef.current;
     if (!root) return;
 
     const leaveImmediately = () => {
@@ -100,7 +108,7 @@ function useSoloCallBehavior(
       root.removeEventListener("click", onLeaveClick, true);
       root.removeEventListener("rtkStateUpdate", onLeaveConfirmation, true);
     };
-  }, [meeting, overlayRef, othersJoinedInRoom, sessionParticipantCount]);
+  }, [meeting, panelRef, othersJoinedInRoom, sessionParticipantCount]);
 
   useEffect(() => {
     if (!meeting || !roomJoined || !isSoloNow()) return;
@@ -116,28 +124,34 @@ function MeetingInner({
   authToken,
   sessionParticipantCount,
   onLeave,
-  showSetupScreen = false,
-  overlayRef,
+  showSetupScreen,
+  panelRef,
+  isGuestSession,
+  placement,
 }: {
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
-  showSetupScreen?: boolean;
-  overlayRef: RefObject<HTMLDivElement | null>;
+  showSetupScreen: boolean;
+  panelRef: RefObject<HTMLDivElement | null>;
+  isGuestSession: boolean;
+  placement: CallPanelPlacement;
 }) {
   const { meeting } = useRealtimeKitMeeting();
-  const rtkRef = useRef<HTMLRtkMeetingElement>(null);
   const onLeaveRef = useRef(onLeave);
   const leftRef = useRef(false);
 
+  const hasGuestInRoom = useRealtimeKitSelector((m) => {
+    if (isGuestSession) return true;
+    const peers = m.participants.joined.toArray();
+    return peers.some((peer) => peerLooksLikeGuest(peer));
+  });
+
+  const enableInRoomChat = isGuestSession || hasGuestInRoom;
+
   onLeaveRef.current = onLeave;
 
-  useSoloCallBehavior(meeting, overlayRef, sessionParticipantCount);
-
-  useLayoutEffect(() => {
-    if (showSetupScreen || !rtkRef.current) return;
-    rtkRef.current.showSetupScreen = false;
-  }, [showSetupScreen, meeting, authToken]);
+  useSoloCallBehavior(meeting, panelRef, sessionParticipantCount);
 
   useEffect(() => {
     if (!meeting) return;
@@ -168,57 +182,92 @@ function MeetingInner({
   if (!meeting) return null;
 
   return (
-    <div className="call-overlay-meeting">
-      <RtkMeeting
-        key={authToken}
-        ref={rtkRef}
-        mode="fill"
+    <>
+      <CallParticipantAvatars panelRef={panelRef} />
+      <CallMeetingUi
         meeting={meeting}
+        placement={placement}
+        enableInRoomChat={enableInRoomChat}
         showSetupScreen={showSetupScreen}
-        loadConfigFromPreset={false}
+        authToken={authToken}
       />
-    </div>
+    </>
   );
+}
+
+function panelStyle(
+  placement: CallPanelPlacement,
+  inlineAnchorRect: DOMRect | null | undefined,
+): CSSProperties | undefined {
+  if (placement === "guest") return undefined;
+  if (placement === "pip") return undefined;
+
+  if (!inlineAnchorRect) return { visibility: "hidden" };
+
+  const height = Math.min(
+    typeof window !== "undefined" ? window.innerHeight * 0.42 : INLINE_MAX_HEIGHT_PX,
+    INLINE_MAX_HEIGHT_PX,
+  );
+
+  return {
+    position: "fixed",
+    top: inlineAnchorRect.top,
+    left: inlineAnchorRect.left,
+    width: inlineAnchorRect.width,
+    height,
+    zIndex: 100,
+  };
 }
 
 export function CallOverlay({
   authToken,
   sessionParticipantCount,
   onLeave,
+  placement = "inline",
+  inlineAnchorRect,
   showSetupScreen = false,
-  toolbar,
-  layoutMode = "full",
 }: Props) {
   const [meeting, initMeeting] = useRealtimeKitClient();
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const { theme } = useTheme();
 
   useLayoutEffect(() => {
-    applyCcoRtkDesignSystem(overlayRef.current ?? document.documentElement);
+    applyCcoRtkDesignSystem(panelRef.current ?? document.documentElement);
   }, [theme]);
 
   useEffect(() => {
     void initMeeting({
       authToken,
-      defaults: { video: false },
+      defaults: { video: false, audio: true },
     });
   }, [authToken, initMeeting]);
 
+  const className = [
+    "call-panel",
+    placement === "inline" ? "call-panel--inline" : "",
+    placement === "pip" ? "call-panel--pip" : "",
+    placement === "guest" ? "call-panel--guest" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      ref={overlayRef}
-      className={`call-overlay call-overlay--${layoutMode}`}
-      role="dialog"
+      ref={panelRef}
+      className={className}
+      style={panelStyle(placement, inlineAnchorRect)}
+      role="region"
       aria-label="Video call"
     >
-      {toolbar ? <div className="call-in-call-toolbar">{toolbar}</div> : null}
       <RealtimeKitProvider value={meeting}>
         <MeetingInner
           authToken={authToken}
           sessionParticipantCount={sessionParticipantCount}
           onLeave={onLeave}
           showSetupScreen={showSetupScreen}
-          overlayRef={overlayRef}
+          panelRef={panelRef}
+          isGuestSession={placement === "guest"}
+          placement={placement}
         />
       </RealtimeKitProvider>
     </div>

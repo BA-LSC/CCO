@@ -1129,6 +1129,7 @@ export function ChatThread({
         </div>
       ) : (
         <ChatMessageList
+          conversationId={conversationId ?? ""}
           messages={messages}
           callEvents={callEvents}
           messageEnterDelays={messageEnterDelays}

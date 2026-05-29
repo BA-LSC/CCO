@@ -45,10 +45,7 @@ function updatedEvent(participantCount: number): RealtimeEvent {
 describe("reduceActiveCallsMap", () => {
   test("call.started with participants adds entry", () => {
     const map = reduceActiveCallsMap(new Map(), startedEvent(2));
-    expect(map.get(CONV_ID)).toEqual({
-      participantCount: 2,
-      hostDisplayName: "Alex Host",
-    });
+    expect(map.get(CONV_ID)).toEqual(callSummary(2));
   });
 
   test("call.updated changes participant count", () => {

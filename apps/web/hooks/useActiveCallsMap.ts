@@ -1,25 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 
-export type ActiveCallEntry = {
-  participantCount: number;
-  hostDisplayName: string;
-};
-
 export function reduceActiveCallsMap(
-  map: Map<string, ActiveCallEntry>,
+  map: Map<string, CallSummaryDto>,
   event: RealtimeEvent,
-): Map<string, ActiveCallEntry> {
+): Map<string, CallSummaryDto> {
   if (event.type === "call.started" || event.type === "call.updated") {
     const next = new Map(map);
     if (event.call.participantCount > 0) {
-      next.set(event.conversationId, {
-        participantCount: event.call.participantCount,
-        hostDisplayName: event.call.hostDisplayName,
-      });
+      next.set(event.conversationId, event.call);
     } else {
       next.delete(event.conversationId);
     }
@@ -37,7 +30,7 @@ export function reduceActiveCallsMap(
 
 export function useActiveCallsMap() {
   const { subscribeRealtime } = useChatLayout();
-  const [activeCalls, setActiveCalls] = useState(() => new Map<string, ActiveCallEntry>());
+  const [activeCalls, setActiveCalls] = useState(() => new Map<string, CallSummaryDto>());
 
   useEffect(() => {
     return subscribeRealtime((event) => {

@@ -35,6 +35,7 @@ import {
   shouldShowTeamServiceSections,
 } from "@/lib/service-team-sidebar";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
+import { SidebarCallIndicator } from "@/components/calls/SidebarCallIndicator";
 
 function sortDmsByActivity(dms: DmSummary[]): DmSummary[] {
   return [...dms].sort((a, b) => (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
@@ -267,14 +268,10 @@ export function ChatSidebar() {
           <span className="sidebar-item-label sidebar-team-name">{team.name}</span>
           <span className="sidebar-nested-trailing">
             {activeCall && (
-              <span
-                className="sidebar-call-indicator"
-                aria-label={`Active call, ${activeCall.participantCount} participant${
-                  activeCall.participantCount === 1 ? "" : "s"
-                }`}
-              >
-                📞 Call · {activeCall.participantCount}
-              </span>
+              <SidebarCallIndicator
+                conversationId={team.conversationId!}
+                participantCount={activeCall.participantCount}
+              />
             )}
             {team.role === "leader" && (
               <span className="sidebar-team-leader" title="Team leader">
@@ -499,14 +496,10 @@ export function ChatSidebar() {
                             return (
                               <span className="sidebar-nested-trailing">
                                 {activeCall && (
-                                  <span
-                                    className="sidebar-call-indicator"
-                                    aria-label={`Active call, ${activeCall.participantCount} participant${
-                                      activeCall.participantCount === 1 ? "" : "s"
-                                    }`}
-                                  >
-                                    📞 Call · {activeCall.participantCount}
-                                  </span>
+                                  <SidebarCallIndicator
+                                    conversationId={dm.id}
+                                    participantCount={activeCall.participantCount}
+                                  />
                                 )}
                                 {dm.hasUnread && activeDmId !== dm.id && (
                                   <span className="sidebar-unread-dot" aria-label="Unread messages" />

@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import {
+  CallInlineSlot,
   ConversationCallHeaderButton,
-  ConversationCallShell,
 } from "@/components/calls/ConversationCallContext";
 import { CallActionButtonPlaceholder } from "@/components/calls/CallControls";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
@@ -185,27 +185,27 @@ export default function TeamConversationPage() {
   }
 
   return (
-    <ConversationCallShell conversationId={conversationId} disabled={detailLoading}>
-      <div className="chat-panel">
-        <ChatPanelHeader
-          title={detail?.team.name ?? ""}
-          subtitle={formatServiceTypeSubtitle(detail?.serviceTypeNames) ?? "Services team"}
-          loading={detailLoading}
-        >
-          {conversationId ? (
-            <ConversationCallHeaderButton disabled={detailLoading} />
-          ) : detailLoading ? (
-            <CallActionButtonPlaceholder />
-          ) : null}
-          <PanelSettingsButton
-            expanded={showSettings}
-            label="Team settings"
-            disabled={detailLoading || !detail?.conversation}
-            onClick={() => setShowSettings((v) => !v)}
-          />
-        </ChatPanelHeader>
+    <div className="chat-panel">
+      <ChatPanelHeader
+        title={detail?.team.name ?? ""}
+        subtitle={formatServiceTypeSubtitle(detail?.serviceTypeNames) ?? "Services team"}
+        loading={detailLoading}
+      >
+        {conversationId ? (
+          <ConversationCallHeaderButton conversationId={conversationId} disabled={detailLoading} />
+        ) : detailLoading ? (
+          <CallActionButtonPlaceholder />
+        ) : null}
+        <PanelSettingsButton
+          expanded={showSettings}
+          label="Team settings"
+          disabled={detailLoading || !detail?.conversation}
+          onClick={() => setShowSettings((v) => !v)}
+        />
+      </ChatPanelHeader>
 
-        <div className="chat-panel-content">
+      <div className="chat-panel-content">
+        {conversationId ? <CallInlineSlot conversationId={conversationId} /> : null}
         {detail?.conversation && (
           <ChannelSettingsPanel open={showSettings} onClose={() => setShowSettings(false)}>
             <ConversationMuteSetting
@@ -253,8 +253,7 @@ export default function TeamConversationPage() {
           composerDisabled={detailLoading || messagesLoading}
           initialMemberReadReceipts={memberReadReceipts}
         />
-        </div>
       </div>
-    </ConversationCallShell>
+    </div>
   );
 }

@@ -50,6 +50,8 @@ function GuestCallJoinContent() {
         onLeave={() => {
           setJoinedCall(null);
         }}
+        placement="guest"
+        showSetupScreen={false}
       />
     );
   }

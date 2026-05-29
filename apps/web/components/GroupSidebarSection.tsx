@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { subscribeConversationUpdated, subscribeUnreadChanged } from "@/lib/sidebar-events";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
+import { SidebarCallIndicator } from "@/components/calls/SidebarCallIndicator";
 
 type Props = {
   groups: GroupSidebarItem[];
@@ -383,14 +384,10 @@ export function GroupSidebarSection({ groups: initialGroups, onGroupsReload }: P
                                 const activeCall = getActiveCall(conv.id);
                                 if (!activeCall) return null;
                                 return (
-                                  <span
-                                    className="sidebar-call-indicator"
-                                    aria-label={`Active call, ${activeCall.participantCount} participant${
-                                      activeCall.participantCount === 1 ? "" : "s"
-                                    }`}
-                                  >
-                                    📞 Call · {activeCall.participantCount}
-                                  </span>
+                                  <SidebarCallIndicator
+                                    conversationId={conv.id}
+                                    participantCount={activeCall.participantCount}
+                                  />
                                 );
                               })()}
                               {conv.muted && (

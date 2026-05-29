@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   createContext,
   Suspense,
@@ -17,45 +18,41 @@ import type { CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
+import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
+import { useAnchorRect } from "@/hooks/useAnchorRect";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
-import { CallInCallToolbar, type CallLayoutMode } from "@/components/calls/CallInCallToolbar";
-import { CallInviteDialog } from "@/components/calls/CallInviteDialog";
+import { CallInCallActions, callInCallActionsInlineOffset } from "@/components/calls/CallInCallActions";
 import { CallOverlay } from "@/components/calls/CallOverlay";
+import { CallPipShell } from "@/components/calls/CallPipShell";
 import { ChatHomeBanner } from "@/components/ChatHomeBanner";
-
-const LAYOUT_STORAGE_KEY = "cco-call-layout";
 
 type CallSessionValue = ReturnType<typeof useCallSession>;
 
-export type ConversationCallContextValue = CallSessionValue & {
+export type ActiveCallContextValue = CallSessionValue & {
+  homeConversationId: string | null;
+  homeChatPath: string | null;
   isHost: boolean;
+  joinConversation: (conversationId: string) => void;
+  registerInlineAnchor: (conversationId: string, element: HTMLElement | null) => void;
+  inCallOnConversation: (conversationId: string) => boolean;
 };
 
-const ConversationCallContext = createContext<ConversationCallContextValue | null>(null);
+const ActiveCallContext = createContext<ActiveCallContextValue | null>(null);
 
-/**
- * Returns call session state for the enclosing {@link ConversationCallShell}.
- * @throws If used outside of `ConversationCallShell`.
- */
-export function useConversationCall(): ConversationCallContextValue {
-  const value = useContext(ConversationCallContext);
+export function useActiveCall(): ActiveCallContextValue {
+  const value = useContext(ActiveCallContext);
   if (!value) {
-    throw new Error("useConversationCall must be used within ConversationCallShell");
+    throw new Error("useActiveCall must be used within ActiveCallProvider");
   }
   return value;
 }
 
-/** Returns null outside {@link ConversationCallShell} (e.g. storybook). */
-export function useOptionalConversationCall(): ConversationCallContextValue | null {
-  return useContext(ConversationCallContext);
+export function useOptionalActiveCall(): ActiveCallContextValue | null {
+  return useContext(ActiveCallContext);
 }
 
-function readLayoutMode(): CallLayoutMode {
-  if (typeof window === "undefined") return "full";
-  const stored = sessionStorage.getItem(LAYOUT_STORAGE_KEY);
-  if (stored === "docked" || stored === "pip" || stored === "full") return stored;
-  return "full";
-}
+export const useConversationCall = useActiveCall;
+export const useOptionalConversationCall = useOptionalActiveCall;
 
 function ConversationCallUrlJoin({
   inCall,
@@ -82,17 +79,94 @@ function ConversationCallUrlJoin({
   return null;
 }
 
-type ShellProps = {
-  conversationId: string;
-  disabled?: boolean;
-  children: ReactNode;
-};
+function ActiveCallPanel({
+  homeConversationId,
+  homeChatPath,
+  inlineAnchor,
+  authToken,
+  activeCall,
+  onLeave,
+}: {
+  homeConversationId: string;
+  homeChatPath: string | null;
+  inlineAnchor: HTMLElement | null;
+  authToken: string;
+  activeCall: CallSummaryDto | null;
+  onLeave: () => void;
+}) {
+  const { activeConversationId } = useChatLayout();
+  const showInline = activeConversationId === homeConversationId;
+  const showPip = activeConversationId !== homeConversationId;
+  const inlineRect = useAnchorRect(inlineAnchor, showInline);
+  const inlineActionsOffset = callInCallActionsInlineOffset();
+  const inlinePanelRect =
+    showInline && inlineRect
+      ? new DOMRect(
+          inlineRect.x,
+          inlineRect.y + inlineActionsOffset,
+          inlineRect.width,
+          inlineRect.height,
+        )
+      : null;
 
-export function ConversationCallShell({ conversationId, disabled: _disabled, children }: ShellProps) {
+  if (!showInline && !showPip) return null;
+
+  const inCallActions = (
+    <CallInCallActions
+      placement={showInline ? "inline" : "pip"}
+      inlineAnchorRect={showInline ? inlineRect : null}
+    />
+  );
+
+  const overlay = (
+    <CallOverlay
+      authToken={authToken}
+      sessionParticipantCount={activeCall?.participantCount ?? 1}
+      onLeave={onLeave}
+      placement={showInline ? "inline" : "pip"}
+      inlineAnchorRect={showInline ? inlinePanelRect : null}
+      showSetupScreen={false}
+    />
+  );
+
+  if (showPip) {
+    return (
+      <CallPipShell
+        participantCount={activeCall?.participantCount ?? 1}
+        returnLink={
+          homeChatPath ? (
+            <Link href={homeChatPath} className="call-pip-return">
+              Return to call
+            </Link>
+          ) : null
+        }
+      >
+        {inCallActions}
+        {overlay}
+      </CallPipShell>
+    );
+  }
+
+  return (
+    <div className="call-panel-host">
+      {inCallActions}
+      {overlay}
+    </div>
+  );
+}
+
+export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { subscribeRealtime, session } = useChatLayout();
-  const callSession = useCallSession(conversationId);
+  const { subscribeRealtime, session, activeConversationId } = useChatLayout();
+
+  const [homeConversationId, setHomeConversationId] = useState<string | null>(null);
+  const [homeChatPath, setHomeChatPath] = useState<string | null>(null);
+  const [inlineAnchors, setInlineAnchors] = useState<Map<string, HTMLElement>>(() => new Map());
+  const [incomingConversationId, setIncomingConversationId] = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<CallSummaryDto | null>(null);
+
+  const callSession = useCallSession(homeConversationId);
   const {
     activeCall,
     authToken,
@@ -102,15 +176,12 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
     join,
     joinExisting,
     hangUp,
-    endForAll,
     acknowledgeCallEnded,
     acceptCallUpdate,
     shouldIgnoreCall,
   } = callSession;
 
-  const [incoming, setIncoming] = useState<CallSummaryDto | null>(null);
-  const [showInvite, setShowInvite] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<CallLayoutMode>(readLayoutMode);
+  const pendingJoinRef = useRef<string | null>(null);
   const inCallRef = useRef(inCall);
   const endedCallIdsRef = useRef(new Set<string>());
 
@@ -118,13 +189,45 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
 
   const isHost = activeCall?.hostUserId === session?.userId;
 
-  const contextValue = useMemo<ConversationCallContextValue>(
-    () => ({
-      ...callSession,
-      isHost: isHost ?? false,
-    }),
-    [callSession, isHost],
+  const registerInlineAnchor = useCallback((conversationId: string, element: HTMLElement | null) => {
+    setInlineAnchors((prev) => {
+      const next = new Map(prev);
+      if (element) {
+        next.set(conversationId, element);
+      } else {
+        next.delete(conversationId);
+      }
+      return next;
+    });
+  }, []);
+
+  const joinConversation = useCallback(
+    (conversationId: string) => {
+      setHomeConversationId(conversationId);
+      setHomeChatPath(pathname);
+      pendingJoinRef.current = conversationId;
+    },
+    [pathname],
   );
+
+  useEffect(() => {
+    const pending = pendingJoinRef.current;
+    if (!pending || homeConversationId !== pending) return;
+    pendingJoinRef.current = null;
+    void join();
+  }, [homeConversationId, join]);
+
+  useEffect(() => {
+    if (inCall && activeCall?.conversationId) {
+      setHomeConversationId(activeCall.conversationId);
+    }
+  }, [activeCall?.conversationId, inCall]);
+
+  useEffect(() => {
+    if (inCall && activeCall?.conversationId && !homeChatPath) {
+      setHomeChatPath(pathname);
+    }
+  }, [activeCall?.conversationId, homeChatPath, inCall, pathname]);
 
   const clearCallQueryParam = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -135,56 +238,62 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
     router.replace(query ? `${pathname}?${query}` : pathname);
   }, [pathname, router]);
 
-  const handleLeave = useCallback(() => {
+  const handleHangUp = useCallback(async () => {
     clearCallQueryParam();
-    void hangUp();
+    await hangUp();
+    setHomeConversationId(null);
+    setHomeChatPath(null);
   }, [clearCallQueryParam, hangUp]);
-
-  const handleEndForAll = useCallback(() => {
-    clearCallQueryParam();
-    void endForAll();
-  }, [clearCallQueryParam, endForAll]);
-
-  const handleLayoutModeChange = useCallback((mode: CallLayoutMode) => {
-    setLayoutMode(mode);
-    sessionStorage.setItem(LAYOUT_STORAGE_KEY, mode);
-  }, []);
 
   useEffect(() => {
     return subscribeRealtime((event: RealtimeEvent) => {
+      const conversationId =
+        "conversationId" in event && typeof event.conversationId === "string"
+          ? event.conversationId
+          : null;
+      if (!conversationId) return;
+
       if (event.type === "call.started" || event.type === "call.updated") {
-        if (event.conversationId === conversationId) {
+        if (conversationId === homeConversationId) {
           if (shouldIgnoreCall(event.call.id) || endedCallIdsRef.current.has(event.call.id)) {
             return;
           }
           acceptCallUpdate(event.call);
-          if (
-            event.type === "call.started" &&
-            event.call.hostUserId !== session?.userId &&
-            !inCallRef.current &&
-            event.call.participantCount > 0
-          ) {
-            setIncoming(event.call);
-          }
+        }
+
+        if (
+          event.type === "call.started" &&
+          event.call.hostUserId !== session?.userId &&
+          !inCallRef.current &&
+          event.call.participantCount > 0 &&
+          conversationId === activeConversationId
+        ) {
+          setIncomingCall(event.call);
+          setIncomingConversationId(conversationId);
         }
       }
-      if (event.type === "call.ended" && event.conversationId === conversationId) {
-        endedCallIdsRef.current.add(event.callId);
-        acknowledgeCallEnded(event.callId);
-        setIncoming(null);
-        setShowInvite(false);
-        clearCallQueryParam();
-        if (inCallRef.current) {
-          void hangUp();
+
+      if (event.type === "call.ended") {
+        if (conversationId === homeConversationId || conversationId === incomingConversationId) {
+          endedCallIdsRef.current.add(event.callId);
+          acknowledgeCallEnded(event.callId);
+          setIncomingCall(null);
+          setIncomingConversationId(null);
+          clearCallQueryParam();
+          if (inCallRef.current && conversationId === homeConversationId) {
+            void handleHangUp();
+          }
         }
       }
     });
   }, [
     acceptCallUpdate,
     acknowledgeCallEnded,
+    activeConversationId,
     clearCallQueryParam,
-    conversationId,
-    hangUp,
+    handleHangUp,
+    homeConversationId,
+    incomingConversationId,
     session?.userId,
     shouldIgnoreCall,
     subscribeRealtime,
@@ -205,24 +314,43 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
 
   useEffect(() => {
     if (!inCall) {
-      setShowInvite(false);
+      setHomeConversationId(null);
+      setHomeChatPath(null);
     }
   }, [inCall]);
 
-  const toolbar =
-    inCall && authToken ? (
-      <CallInCallToolbar
-        isHost={isHost ?? false}
-        layoutMode={layoutMode}
-        onLayoutModeChange={handleLayoutModeChange}
-        onInvite={() => setShowInvite(true)}
-        onEndForAll={handleEndForAll}
-        onLeave={handleLeave}
-      />
-    ) : null;
+  const inCallOnConversation = useCallback(
+    (conversationId: string) => inCall && homeConversationId === conversationId,
+    [homeConversationId, inCall],
+  );
+
+  const contextValue = useMemo<ActiveCallContextValue>(
+    () => ({
+      ...callSession,
+      homeConversationId,
+      homeChatPath,
+      isHost: isHost ?? false,
+      joinConversation,
+      registerInlineAnchor,
+      inCallOnConversation,
+      hangUp: handleHangUp,
+    }),
+    [
+      callSession,
+      handleHangUp,
+      homeChatPath,
+      homeConversationId,
+      inCallOnConversation,
+      isHost,
+      joinConversation,
+      registerInlineAnchor,
+    ],
+  );
+
+  const inlineAnchor = homeConversationId ? (inlineAnchors.get(homeConversationId) ?? null) : null;
 
   return (
-    <ConversationCallContext.Provider value={contextValue}>
+    <ActiveCallContext.Provider value={contextValue}>
       <Suspense fallback={null}>
         <ConversationCallUrlJoin
           inCall={inCall}
@@ -232,14 +360,19 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
         />
       </Suspense>
 
-      {incoming ? (
+      {incomingCall && incomingConversationId === activeConversationId ? (
         <IncomingCallToast
-          hostName={incoming.hostDisplayName}
+          hostName={incomingCall.hostDisplayName}
           onJoin={() => {
-            setIncoming(null);
-            void join();
+            const targetId = incomingConversationId;
+            setIncomingCall(null);
+            setIncomingConversationId(null);
+            if (targetId) joinConversation(targetId);
           }}
-          onDismiss={() => setIncoming(null)}
+          onDismiss={() => {
+            setIncomingCall(null);
+            setIncomingConversationId(null);
+          }}
         />
       ) : null}
 
@@ -249,38 +382,75 @@ export function ConversationCallShell({ conversationId, disabled: _disabled, chi
         </ChatHomeBanner>
       ) : null}
 
-      {inCall && authToken ? (
-        <CallOverlay
+      {homeConversationId && inCall && authToken ? (
+        <ActiveCallPanel
+          homeConversationId={homeConversationId}
+          homeChatPath={homeChatPath}
+          inlineAnchor={inlineAnchor}
           authToken={authToken}
-          sessionParticipantCount={activeCall?.participantCount ?? 1}
-          onLeave={handleLeave}
-          layoutMode={layoutMode}
-          toolbar={toolbar}
+          activeCall={activeCall}
+          onLeave={() => void handleHangUp()}
         />
       ) : null}
 
-      {showInvite && activeCall ? (
-        <CallInviteDialog callId={activeCall.id} onClose={() => setShowInvite(false)} />
-      ) : null}
-
       {children}
-    </ConversationCallContext.Provider>
+    </ActiveCallContext.Provider>
   );
 }
 
-export function ConversationCallHeaderButton({ disabled = false }: { disabled?: boolean }) {
-  const { activeCall, inCall, loading, join } = useConversationCall();
+export function CallInlineSlot({ conversationId }: { conversationId: string }) {
+  const { inCallOnConversation, registerInlineAnchor } = useActiveCall();
+  const showAnchor = inCallOnConversation(conversationId);
+
+  const anchorRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      registerInlineAnchor(conversationId, showAnchor ? node : null);
+    },
+    [conversationId, registerInlineAnchor, showAnchor],
+  );
+
+  useEffect(() => {
+    if (!showAnchor) {
+      registerInlineAnchor(conversationId, null);
+    }
+  }, [conversationId, registerInlineAnchor, showAnchor]);
+
+  if (!showAnchor) return null;
+
+  return (
+    <>
+      <div ref={anchorRef} className="call-inline-anchor" aria-hidden="true" />
+      <div className="call-inline-spacer" aria-hidden="true" />
+    </>
+  );
+}
+
+export function ConversationCallHeaderButton({
+  conversationId,
+  disabled = false,
+}: {
+  conversationId: string;
+  disabled?: boolean;
+}) {
+  const { activeCall, loading, joinConversation, inCallOnConversation } = useActiveCall();
+  const { getActiveCall } = useActiveCallsMap();
+  const inCallHere = inCallOnConversation(conversationId);
+  const joinableCall = getActiveCall(conversationId) ?? null;
 
   return (
     <CallActionButton
-      activeCall={activeCall}
-      inCall={inCall}
+      activeCall={inCallHere ? activeCall : joinableCall}
+      inCall={inCallHere}
       loading={loading}
       disabled={disabled}
-      onStart={() => void join()}
-      onJoin={() => void join()}
+      onStart={() => joinConversation(conversationId)}
+      onJoin={() => joinConversation(conversationId)}
     />
   );
 }
 
-export { ConversationCallContext };
+export function ConversationCallShell({ children }: { conversationId?: string; disabled?: boolean; children: ReactNode }) {
+  return <>{children}</>;
+}
+
+export { ActiveCallContext as ConversationCallContext };

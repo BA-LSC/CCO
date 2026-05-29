@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import {
+  CallInlineSlot,
   ConversationCallHeaderButton,
-  ConversationCallShell,
 } from "@/components/calls/ConversationCallContext";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
 import { DmGroupSettings } from "@/components/DmGroupSettings";
@@ -129,27 +129,27 @@ export default function DmChatPage() {
   }
 
   return (
-    <ConversationCallShell conversationId={conversationId} disabled={detailLoading}>
-      <div className="chat-panel">
-        <ChatPanelHeader
-          title={headerTitle}
-          subtitle={headerSubtitle}
-          avatarUrl={
-            isGroup ? detail?.imageUrl ?? null : detail?.participant?.avatarUrl ?? null
-          }
-          avatarUserId={!isGroup ? detail?.participant?.id : null}
-          loading={detailLoading}
-        >
-          <ConversationCallHeaderButton disabled={detailLoading} />
-          <PanelSettingsButton
-            expanded={showOptions}
-            label="Conversation settings"
-            disabled={detailLoading}
-            onClick={() => setShowOptions((v) => !v)}
-          />
-        </ChatPanelHeader>
+    <div className="chat-panel">
+      <ChatPanelHeader
+        title={headerTitle}
+        subtitle={headerSubtitle}
+        avatarUrl={
+          isGroup ? detail?.imageUrl ?? null : detail?.participant?.avatarUrl ?? null
+        }
+        avatarUserId={!isGroup ? detail?.participant?.id : null}
+        loading={detailLoading}
+      >
+        <ConversationCallHeaderButton conversationId={conversationId} disabled={detailLoading} />
+        <PanelSettingsButton
+          expanded={showOptions}
+          label="Conversation settings"
+          disabled={detailLoading}
+          onClick={() => setShowOptions((v) => !v)}
+        />
+      </ChatPanelHeader>
 
-        <div className="chat-panel-content">
+      <div className="chat-panel-content">
+        <CallInlineSlot conversationId={conversationId} />
         {detail && (
           <ChannelSettingsPanel open={showOptions} onClose={() => setShowOptions(false)}>
             <ConversationMuteSetting muted={detail.muted} onChange={toggleMute} />
@@ -205,8 +205,7 @@ export default function DmChatPage() {
           }
           initialMemberReadReceipts={isGroup ? memberReadReceipts : []}
         />
-        </div>
       </div>
-    </ConversationCallShell>
+    </div>
   );
 }
