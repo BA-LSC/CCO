@@ -11,7 +11,7 @@ import {
 } from "../db/schema";
 import { extractMentionedUserIds } from "../lib/mentions";
 import { isAllowedAttachmentUrl, refreshAttachmentUrl } from "../lib/uploads";
-import { directMessageParticipantsAreSignedUp } from "./dms";
+import { directMessageParticipantsAreSignedUp, isDirectDmPairKey } from "./dms";
 import { markConversationRead } from "./conversations";
 import { canDeleteMessage, canPostInConversation } from "../permissions";
 import { publishMessageEvent, publishMessageEventToMembers } from "../realtime/pubsub";
@@ -172,7 +172,7 @@ async function getDmPeerReadReceipt(
     .where(eq(conversations.id, conversationId))
     .limit(1);
 
-  if (!conv[0]?.dmPairKey) return null;
+  if (!conv[0]?.dmPairKey || !isDirectDmPairKey(conv[0].dmPairKey)) return null;
 
   const peer = await db
     .select({

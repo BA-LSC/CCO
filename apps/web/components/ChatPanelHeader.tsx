@@ -3,18 +3,29 @@
 import { type ReactNode } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { PanelHeaderMenuIcon } from "@/components/PanelHeaderIcons";
+import { usePresenceWatch } from "@/components/PresenceProvider";
 import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 
 type Props = {
   title: string;
   subtitle?: string;
   avatarUrl?: string | null;
+  avatarUserId?: string | null;
   loading?: boolean;
   children?: ReactNode;
 };
 
-export function ChatPanelHeader({ title, subtitle, avatarUrl, loading = false, children }: Props) {
+export function ChatPanelHeader({
+  title,
+  subtitle,
+  avatarUrl,
+  avatarUserId,
+  loading = false,
+  children,
+}: Props) {
   const { openSidebar } = useChatLayout();
+  usePresenceWatch(avatarUserId ? [avatarUserId] : [], Boolean(avatarUserId) && !loading);
 
   return (
     <header className="chat-panel-header">
@@ -27,13 +38,22 @@ export function ChatPanelHeader({ title, subtitle, avatarUrl, loading = false, c
         >
           <PanelHeaderMenuIcon />
         </button>
-        {avatarUrl !== undefined && !loading && (
+        {avatarUrl !== undefined && !loading && avatarUserId ? (
+          <UserAvatarWithPresence
+            userId={avatarUserId}
+            displayName={title}
+            avatarUrl={avatarUrl}
+            className="chat-panel-header-avatar"
+            size="sm"
+          />
+        ) : null}
+        {avatarUrl !== undefined && !loading && !avatarUserId ? (
           <UserAvatar
             displayName={title}
             avatarUrl={avatarUrl}
             className="chat-panel-header-avatar"
           />
-        )}
+        ) : null}
         {avatarUrl !== undefined && loading && (
           <span className="chat-panel-header-avatar chat-panel-header-avatar-skeleton" aria-hidden />
         )}

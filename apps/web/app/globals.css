@@ -2382,6 +2382,84 @@ button.sidebar-group-header:focus-visible {
   text-align: left;
 }
 
+.sidebar-new-dm-row {
+  grid-template-columns: 16px var(--sidebar-avatar-size) minmax(0, 1fr) auto;
+}
+
+.sidebar-new-dm-check {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 4px;
+  box-sizing: border-box;
+  background: var(--color-surface);
+}
+
+.sidebar-new-dm-check--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: inset 0 0 0 2px var(--color-surface);
+}
+
+.sidebar-new-dm-actions {
+  padding: 8px var(--sidebar-item-pad-x) 2px;
+}
+
+.sidebar-new-dm-submit {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface-2) 70%, var(--color-surface));
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--sidebar-font-size-nested);
+  cursor: pointer;
+}
+
+.sidebar-new-dm-submit:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.sidebar-new-dm-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dm-group-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dm-group-settings-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 14px 0;
+}
+
+.dm-group-settings-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.dm-group-settings-avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.channel-settings-error {
+  margin: 0;
+  padding: 0 14px 8px;
+  color: var(--color-danger, #f87171);
+  font-size: 0.82rem;
+}
+
 /* Sidebar & navigation enter animations */
 .chat-sidebar--ready .sidebar-brand,
 .chat-sidebar--ready .sidebar-alert,
@@ -2804,6 +2882,11 @@ button.sidebar-group-header:focus-visible {
   font-size: 0.85rem;
   flex-shrink: 0;
   overflow: hidden;
+}
+
+.chat-panel-header .avatar-with-presence {
+  width: 40px;
+  height: 40px;
 }
 
 .chat-panel-title {
@@ -7390,6 +7473,61 @@ button.sidebar-group-header:focus-visible {
   color: var(--color-danger, #f87171);
   font-size: 0.82rem;
   animation: cco-fade-in 0.18s var(--motion-ease-out) both;
+}
+
+.composer-typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px var(--chat-inset-x, 12px) 4px;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  animation: cco-fade-in 0.18s var(--motion-ease-out) both;
+}
+
+.composer-typing-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-typing-dots {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.composer-typing-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: composer-typing-dot 1.2s ease-in-out infinite;
+}
+
+.composer-typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.composer-typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes composer-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 
 .composer-drop-overlay {

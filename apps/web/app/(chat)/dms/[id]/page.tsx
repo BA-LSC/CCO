@@ -1,11 +1,12 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatPanelHeader } from "@/components/ChatPanelHeader";
 import { ConversationCallKit } from "@/components/calls/ConversationCallKit";
 import { ChannelSettingsPanel, ConversationMuteSetting } from "@/components/ChannelSettingsPanel";
+import { DmGroupSettings } from "@/components/DmGroupSettings";
 import { PresenceMembersSection } from "@/components/PresenceMembersSection";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { PanelSettingsButton } from "@/components/PanelSettingsButton";
@@ -13,11 +14,12 @@ import { ChatThread } from "@/components/ChatThread";
 import { ErrorState } from "@/components/PageStates";
 import { useLoadConversationMessages } from "@/hooks/useLoadConversationMessages";
 import { apiFetch, type DmDetail } from "@/lib/api";
+import { dispatchConversationUpdated } from "@/lib/sidebar-events";
 
 export default function DmChatPage() {
   const params = useParams();
   const conversationId = params.id as string;
-  const { session } = useChatLayout();
+  const { session, subscribeRealtime } = useChatLayout();
 
   const [detail, setDetail] = useState<DmDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,39 @@ export default function DmChatPage() {
       .finally(() => setDetailLoading(false));
   }, [conversationId]);
 
+  useEffect(() => {
+    return subscribeRealtime((event) => {
+      if (event.type !== "conversation.updated" || event.conversationId !== conversationId) return;
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(event.title !== undefined ? { title: event.title } : {}),
+              ...(event.imageUrl !== undefined ? { imageUrl: event.imageUrl } : {}),
+            }
+          : prev,
+      );
+    });
+  }, [conversationId, subscribeRealtime]);
+
   const displayError = error ?? loadError;
+  const isGroup = detail?.kind === "group";
+  const headerTitle = detail?.title ?? "";
+  const headerSubtitle = isGroup
+    ? `${detail?.participants.length ?? 0} members`
+    : "Direct message";
+
+  const members = useMemo(
+    () =>
+      detail?.participants.map((participant) => ({
+        id: participant.id,
+        displayName: participant.displayName,
+        avatarUrl: participant.avatarUrl ?? null,
+      })) ?? [],
+    [detail?.participants],
+  );
+
+  const settingsMembers = members;
 
   async function toggleMute(muted: boolean) {
     if (!detail) return;
@@ -55,39 +89,17 @@ export default function DmChatPage() {
     setDetail({ ...detail, muted });
   }
 
-  const members = detail
-    ? [
-        { id: detail.participant.id, displayName: detail.participant.displayName, avatarUrl: detail.participant.avatarUrl },
-        ...(session?.userId && session.displayName
-          ? [
-              {
-                id: session.userId,
-                displayName: session.displayName,
-                avatarUrl: session.avatarUrl ?? null,
-              },
-            ]
-          : []),
-      ]
-    : [];
-
-  const settingsMembers = detail
-    ? [
-        {
-          id: detail.participant.id,
-          displayName: detail.participant.displayName,
-          avatarUrl: detail.participant.avatarUrl,
-        },
-        ...(session?.userId
-          ? [
-              {
-                id: session.userId,
-                displayName: session.displayName ?? "You",
-                avatarUrl: session.avatarUrl ?? null,
-              },
-            ]
-          : []),
-      ]
-    : [];
+  function applyGroupUpdates(updates: { title?: string; imageUrl?: string | null }) {
+    setDetail((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ...(updates.title !== undefined ? { title: updates.title } : {}),
+        ...(updates.imageUrl !== undefined ? { imageUrl: updates.imageUrl } : {}),
+      };
+    });
+    dispatchConversationUpdated({ conversationId, ...updates });
+  }
 
   if (!detailLoading && displayError && !detail) {
     return (
@@ -114,9 +126,12 @@ export default function DmChatPage() {
   return (
     <div className="chat-panel">
       <ChatPanelHeader
-        title={detail?.participant.displayName ?? ""}
-        subtitle="Direct message"
-        avatarUrl={detail?.participant.avatarUrl ?? null}
+        title={headerTitle}
+        subtitle={headerSubtitle}
+        avatarUrl={
+          isGroup ? detail?.imageUrl ?? null : detail?.participant?.avatarUrl ?? null
+        }
+        avatarUserId={!isGroup ? detail?.participant?.id : null}
         loading={detailLoading}
       >
         <ConversationCallKit conversationId={conversationId} disabled={detailLoading} />
@@ -130,10 +145,15 @@ export default function DmChatPage() {
 
       {detail && (
         <ChannelSettingsPanel open={showOptions}>
-          <ConversationMuteSetting
-            muted={detail.muted}
-            onChange={toggleMute}
-          />
+          <ConversationMuteSetting muted={detail.muted} onChange={toggleMute} />
+          {isGroup ? (
+            <DmGroupSettings
+              conversationId={conversationId}
+              title={detail.title}
+              imageUrl={detail.imageUrl}
+              onUpdated={applyGroupUpdates}
+            />
+          ) : null}
           <PresenceMembersSection members={settingsMembers} enabled={showOptions} />
         </ChannelSettingsPanel>
       )}
@@ -160,16 +180,23 @@ export default function DmChatPage() {
           members={members}
           currentUserId={session?.userId}
           layout="panel"
-          composerPlaceholder="Message…"
+          composerPlaceholder={isGroup ? "Message group…" : "Message…"}
           messagesLoading={messagesLoading || detailLoading}
           composerDisabled={detailLoading || messagesLoading}
-          isDirectMessage
+          isDirectMessage={!isGroup}
           initialPeerLastReadAt={peerLastReadAt}
-          peerUser={peerUser ?? (detail ? {
-            id: detail.participant.id,
-            displayName: detail.participant.displayName,
-            avatarUrl: detail.participant.avatarUrl,
-          } : null)}
+          peerUser={
+            !isGroup
+              ? peerUser ??
+                (detail?.participant
+                  ? {
+                      id: detail.participant.id,
+                      displayName: detail.participant.displayName,
+                      avatarUrl: detail.participant.avatarUrl,
+                    }
+                  : null)
+              : null
+          }
         />
       </div>
     </div>

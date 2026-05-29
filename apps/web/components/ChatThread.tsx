@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChatComposer, useComposerDragHandlers, type PendingComposerMedia } from "@/components/ChatComposer";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { ChatMessageList } from "@/components/ChatMessageList";
@@ -21,6 +21,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { dispatchConversationUpdated, dispatchUnreadChanged } from "@/lib/sidebar-events";
 import { AttachmentLightbox, type AttachmentLightboxImage } from "@/components/AttachmentLightbox";
 import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
+import { TypingIndicator } from "@/components/TypingIndicator";
 import { applyReactionChange, mergeConversationMessages } from "@/lib/message-reactions";
 import { invalidateConversation } from "@/lib/message-cache";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
@@ -126,6 +127,12 @@ type Props = {
 };
 
 const RECENT_MESSAGE_MS = 15_000;
+const TYPING_TTL_MS = 5_000;
+
+type ActiveTyper = {
+  displayName: string;
+  expiresAt: number;
+};
 
 export function ChatThread({
   conversationId,
@@ -170,6 +177,7 @@ export function ChatThread({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<AttachmentLightboxImage | null>(null);
   const [lightboxVideo, setLightboxVideo] = useState<AttachmentLightboxImage | null>(null);
+  const [activeTypers, setActiveTypers] = useState<Map<string, ActiveTyper>>(() => new Map());
   const stageComposerMediaRef = useRef<(files: File | File[]) => void>(() => {});
   const messagesEndRef = useRef<HTMLLIElement>(null);
   const messagesListRef = useRef<HTMLUListElement>(null);
@@ -583,6 +591,28 @@ export function ChatThread({
     };
   }, [layout, messages.length, updateScrollPinned]);
 
+  useEffect(() => {
+    setActiveTypers(new Map());
+  }, [conversationId]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setActiveTypers((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next = new Map(prev);
+        for (const [userId, typer] of prev) {
+          if (typer.expiresAt <= now) {
+            next.delete(userId);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const onEvent = useCallback(
     (event: {
       type: string;
@@ -594,9 +624,19 @@ export function ChatThread({
       title?: string;
       userId?: string;
       readAt?: string;
+      displayName?: string;
+      isTyping?: boolean;
     }) => {
       if (event.type === "message.created" && event.message) {
         markMessageLive(event.message.id);
+        if (event.message.authorId !== resolvedUserId) {
+          setActiveTypers((prev) => {
+            if (!prev.has(event.message!.authorId)) return prev;
+            const next = new Map(prev);
+            next.delete(event.message!.authorId);
+            return next;
+          });
+        }
         setMessages((prev) => {
           const incoming = event.message!;
           let next = removePendingSendByClientMessageId(prev, incoming.clientMessageId);
@@ -646,14 +686,39 @@ export function ChatThread({
           conversationId,
           leaderOnly: event.leaderOnly,
           title: event.title,
+          imageUrl: event.imageUrl,
         });
         onConversationSettingsChange?.({
           leaderOnly: event.leaderOnly,
           title: event.title,
         });
       }
+      if (
+        event.type === "typing" &&
+        event.userId &&
+        event.userId !== resolvedUserId &&
+        (!isDirectMessage || !peerUser || event.userId === peerUser.id)
+      ) {
+        if (event.isTyping) {
+          setActiveTypers((prev) => {
+            const next = new Map(prev);
+            next.set(event.userId!, {
+              displayName: event.displayName?.trim() || "Someone",
+              expiresAt: Date.now() + TYPING_TTL_MS,
+            });
+            return next;
+          });
+        } else {
+          setActiveTypers((prev) => {
+            if (!prev.has(event.userId!)) return prev;
+            const next = new Map(prev);
+            next.delete(event.userId!);
+            return next;
+          });
+        }
+      }
     },
-    [conversationId, markConversationRead, markMessageDeleted, markMessageLive, onConversationSettingsChange, resolvedUserId],
+    [conversationId, isDirectMessage, markConversationRead, markMessageDeleted, markMessageLive, onConversationSettingsChange, peerUser, resolvedUserId],
   );
 
   useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
@@ -1034,6 +1099,11 @@ export function ChatThread({
     </>
   );
 
+  const typingDisplayNames = useMemo(
+    () => [...activeTypers.values()].map((typer) => typer.displayName),
+    [activeTypers],
+  );
+
   return (
     <div
       className={[
@@ -1122,6 +1192,8 @@ export function ChatThread({
             ) : null}
           </button>
         )}
+
+        <TypingIndicator displayNames={typingDisplayNames} />
 
         <ChatComposer
           conversationId={conversationId}

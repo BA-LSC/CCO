@@ -17,24 +17,64 @@ import {
   mergeSignedUpMemberRecords,
   type SignedUpMemberRecord,
 } from "./cco-member-status";
+import { publishMessageEvent } from "../realtime/pubsub";
 import { formatSidebarMessagePreview } from "@cco/shared/message-preview";
 import { fetchLastMessagesForConversations } from "./unread";
 import { isPlaceholderDisplayName } from "./cco-member-status";
 import { resolveDisplayNamesForUsers } from "./user-profile";
 
 export function buildDmPairKey(userIdA: string, userIdB: string): string {
-  return [userIdA, userIdB].sort().join(":");
+  return buildDmMemberKey([userIdA, userIdB]);
 }
+
+export function buildDmMemberKey(userIds: string[]): string {
+  return [...new Set(userIds.map((id) => id.trim()).filter(Boolean))].sort().join(":");
+}
+
+export function isDirectDmPairKey(dmPairKey: string): boolean {
+  return dmPairKey.split(":").length === 2;
+}
+
+export function isDmGroupPairKey(dmPairKey: string): boolean {
+  return dmPairKey.split(":").length >= 3;
+}
+
+function firstName(displayName: string): string {
+  return displayName.trim().split(/\s+/)[0] ?? displayName.trim();
+}
+
+export function formatDefaultDmGroupTitle(displayNames: string[]): string {
+  const names = displayNames.map((name) => firstName(name)).filter(Boolean);
+  if (names.length === 0) return "Group message";
+  if (names.length <= 3) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+}
+
+export type DmKind = "direct" | "group";
 
 export type DmParticipant = { id: string; displayName: string; avatarUrl?: string | null };
 
 export type DmSummary = {
   id: string;
-  participant: DmParticipant;
+  kind: DmKind;
+  title: string;
+  imageUrl?: string | null;
+  participant?: DmParticipant;
+  participantCount?: number;
   hasUnread: boolean;
   lastActivityAt: string | null;
   lastMessagePreview: string | null;
   muted: boolean;
+};
+
+export type DmDetail = {
+  id: string;
+  kind: DmKind;
+  title: string;
+  imageUrl?: string | null;
+  muted: boolean;
+  participant?: DmParticipant;
+  participants: DmParticipant[];
 };
 
 async function listSignedUpUserIds(userIds: string[]): Promise<Set<string>> {
@@ -246,15 +286,10 @@ export async function searchDmCandidates(params: {
   query?: string;
   limit?: number;
 }): Promise<DmParticipant[]> {
-  const [allowedIds, existingDmUserIds] = await Promise.all([
-    listDmEligibleUserIds(params.userId, params.organizationId),
-    listExistingDmParticipantUserIds(params.userId),
-  ]);
+  const allowedIds = await listDmEligibleUserIds(params.userId, params.organizationId);
   if (allowedIds.size === 0) return [];
 
-  const idList = [...allowedIds].filter(
-    (id) => id !== params.userId && !existingDmUserIds.has(id),
-  );
+  const idList = [...allowedIds].filter((id) => id !== params.userId);
   if (idList.length === 0) return [];
 
   const limit = Math.min(params.limit ?? 20, 50);
@@ -276,38 +311,6 @@ export async function searchDmCandidates(params: {
     .limit(limit);
 
   return rows;
-}
-
-async function listExistingDmParticipantUserIds(userId: string): Promise<Set<string>> {
-  const memberships = await db
-    .select({ conversationId: conversationMembers.conversationId })
-    .from(conversationMembers)
-    .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
-    .where(
-      and(
-        eq(conversationMembers.userId, userId),
-        isNull(conversations.groupId),
-        isNull(conversations.serviceTeamId),
-        sql`${conversations.dmPairKey} IS NOT NULL`,
-        isNull(conversations.archivedAt),
-      ),
-    );
-
-  if (memberships.length === 0) return new Set();
-
-  const conversationIds = memberships.map((row) => row.conversationId);
-  const others = await db
-    .select({ id: users.id })
-    .from(conversationMembers)
-    .innerJoin(users, eq(users.id, conversationMembers.userId))
-    .where(
-      and(
-        inArray(conversationMembers.conversationId, conversationIds),
-        ne(conversationMembers.userId, userId),
-      ),
-    );
-
-  return new Set(others.map((row) => row.id));
 }
 
 async function assertCanMessageUser(params: {
@@ -384,6 +387,193 @@ export async function getOrCreateDirectMessage(params: {
   return { id: conversationId, participant };
 }
 
+export async function getOrCreateDmGroup(params: {
+  userId: string;
+  memberUserIds: string[];
+  organizationId: string;
+}): Promise<{ id: string } | null> {
+  const uniqueTargets = [
+    ...new Set(params.memberUserIds.map((id) => id.trim()).filter((id) => id && id !== params.userId)),
+  ];
+  if (uniqueTargets.length < 2) return null;
+
+  for (const targetUserId of uniqueTargets) {
+    const participant = await assertCanMessageUser({
+      userId: params.userId,
+      targetUserId,
+      organizationId: params.organizationId,
+    });
+    if (!participant) return null;
+  }
+
+  const memberKey = buildDmMemberKey([params.userId, ...uniqueTargets]);
+
+  const existing = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(and(eq(conversations.dmPairKey, memberKey), isNull(conversations.archivedAt)))
+    .limit(1);
+
+  if (existing[0]) {
+    return { id: existing[0].id };
+  }
+
+  const otherParticipants = await db
+    .select({ displayName: users.displayName })
+    .from(users)
+    .where(inArray(users.id, uniqueTargets));
+
+  const defaultTitle = formatDefaultDmGroupTitle(otherParticipants.map((row) => row.displayName));
+
+  const [created] = await db
+    .insert(conversations)
+    .values({
+      dmPairKey: memberKey,
+      slug: "dm-group",
+      title: defaultTitle,
+      leaderOnly: false,
+    })
+    .onConflictDoNothing()
+    .returning({ id: conversations.id });
+
+  const conversationId =
+    created?.id ??
+    (
+      await db
+        .select({ id: conversations.id })
+        .from(conversations)
+        .where(eq(conversations.dmPairKey, memberKey))
+        .limit(1)
+    )[0]?.id;
+
+  if (!conversationId) return null;
+
+  await db
+    .insert(conversationMembers)
+    .values([params.userId, ...uniqueTargets].map((userId) => ({ conversationId, userId })))
+    .onConflictDoNothing();
+
+  return { id: conversationId };
+}
+
+export async function updateDmConversation(params: {
+  conversationId: string;
+  userId: string;
+  title?: string;
+  imageUrl?: string | null;
+}): Promise<{ id: string; title: string; imageUrl: string | null } | null> {
+  const row = await db
+    .select({
+      id: conversations.id,
+      title: conversations.title,
+      imageUrl: conversations.imageUrl,
+      dmPairKey: conversations.dmPairKey,
+    })
+    .from(conversationMembers)
+    .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
+    .where(
+      and(
+        eq(conversations.id, params.conversationId),
+        eq(conversationMembers.userId, params.userId),
+        isNull(conversations.groupId),
+        isNull(conversations.serviceTeamId),
+        sql`${conversations.dmPairKey} IS NOT NULL`,
+        isNull(conversations.archivedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!row[0]?.dmPairKey || !isDmGroupPairKey(row[0].dmPairKey)) return null;
+
+  const nextTitle =
+    params.title !== undefined ? params.title.trim() : row[0].title.trim();
+  if (!nextTitle) return null;
+
+  const nextImageUrl =
+    params.imageUrl !== undefined ? params.imageUrl?.trim() || null : row[0].imageUrl ?? null;
+
+  const [updated] = await db
+    .update(conversations)
+    .set({
+      title: nextTitle,
+      imageUrl: nextImageUrl,
+    })
+    .where(eq(conversations.id, params.conversationId))
+    .returning({ id: conversations.id, title: conversations.title, imageUrl: conversations.imageUrl });
+
+  if (!updated) return null;
+
+  await publishMessageEvent({
+    type: "conversation.updated",
+    conversationId: params.conversationId,
+    title: updated.title,
+    imageUrl: updated.imageUrl ?? null,
+  });
+
+  return {
+    id: updated.id,
+    title: updated.title,
+    imageUrl: updated.imageUrl ?? null,
+  };
+}
+
+async function loadDmMembersForUser(
+  conversationIds: string[],
+  userId: string,
+  organizationId?: string,
+): Promise<
+  Map<
+    string,
+    {
+      others: DmParticipant[];
+      all: DmParticipant[];
+    }
+  >
+> {
+  if (conversationIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      conversationId: conversationMembers.conversationId,
+      id: users.id,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(conversationMembers)
+    .innerJoin(users, eq(users.id, conversationMembers.userId))
+    .where(inArray(conversationMembers.conversationId, conversationIds));
+
+  const byConversation = new Map<string, DmParticipant[]>();
+  for (const row of rows) {
+    const list = byConversation.get(row.conversationId) ?? [];
+    list.push({
+      id: row.id,
+      displayName: row.displayName,
+      avatarUrl: row.avatarUrl ?? null,
+    });
+    byConversation.set(row.conversationId, list);
+  }
+
+  const placeholderIds = rows
+    .filter((row) => isPlaceholderDisplayName(row.displayName))
+    .map((row) => row.id);
+  const resolvedNames = await resolveDisplayNamesForUsers(placeholderIds, organizationId);
+
+  const result = new Map<string, { others: DmParticipant[]; all: DmParticipant[] }>();
+  for (const conversationId of conversationIds) {
+    const members = (byConversation.get(conversationId) ?? []).map((member) => {
+      const resolved = resolvedNames.get(member.id);
+      return resolved ? { ...member, displayName: resolved } : member;
+    });
+    result.set(conversationId, {
+      all: members,
+      others: members.filter((member) => member.id !== userId),
+    });
+  }
+
+  return result;
+}
+
 export async function listDirectMessages(
   userId: string,
   organizationId?: string,
@@ -391,6 +581,9 @@ export async function listDirectMessages(
   const rows = await db
     .select({
       id: conversations.id,
+      title: conversations.title,
+      imageUrl: conversations.imageUrl,
+      dmPairKey: conversations.dmPairKey,
       muted: conversationMembers.muted,
       lastReadAt: conversationMembers.lastReadAt,
     })
@@ -408,51 +601,31 @@ export async function listDirectMessages(
 
   if (rows.length === 0) return [];
 
-  const convIds = rows.map((r) => r.id);
+  const convIds = rows.map((row) => row.id);
+  const convById = new Map(rows.map((row) => [row.id, row]));
   const memberByConv = new Map(
-    rows.map((r) => [r.id, { muted: r.muted, lastReadAt: r.lastReadAt }]),
+    rows.map((row) => [row.id, { muted: row.muted, lastReadAt: row.lastReadAt }]),
   );
-
-  const otherMembers = await db
-    .select({
-      conversationId: conversationMembers.conversationId,
-      id: users.id,
-      displayName: users.displayName,
-      avatarUrl: users.avatarUrl,
-    })
-    .from(conversationMembers)
-    .innerJoin(users, eq(users.id, conversationMembers.userId))
-    .where(and(inArray(conversationMembers.conversationId, convIds), ne(conversationMembers.userId, userId)));
-
-  const participantByConv = new Map(
-    otherMembers.map((m) => [
-      m.conversationId,
-      { id: m.id, displayName: m.displayName, avatarUrl: m.avatarUrl ?? null },
-    ]),
+  const membersByConv = await loadDmMembersForUser(convIds, userId, organizationId);
+  const signedUpIds = await listSignedUpUserIds(
+    [...membersByConv.values()].flatMap((entry) => entry.all.map((member) => member.id)),
   );
-
-  const placeholderParticipantIds = otherMembers
-    .filter((member) => isPlaceholderDisplayName(member.displayName))
-    .map((member) => member.id);
-  const resolvedNames = await resolveDisplayNamesForUsers(placeholderParticipantIds, organizationId);
-  for (const [conversationId, participant] of participantByConv) {
-    const resolved = resolvedNames.get(participant.id);
-    if (resolved) {
-      participantByConv.set(conversationId, { ...participant, displayName: resolved });
-    }
-  }
-
-  const signedUpParticipantIds = await listSignedUpUserIds(otherMembers.map((member) => member.id));
 
   const lastByConvRaw = await fetchLastMessagesForConversations(convIds);
   const lastByConv = new Map<string, { authorId: string; createdAt: string }>();
   const previewByConv = new Map<string, string | null>();
+  const authorNameById = new Map<string, string>();
+  for (const entry of membersByConv.values()) {
+    for (const member of entry.all) {
+      authorNameById.set(member.id, member.displayName);
+    }
+  }
+
   for (const [conversationId, last] of lastByConvRaw) {
     lastByConv.set(conversationId, {
       authorId: last.authorId,
       createdAt: last.createdAt.toISOString(),
     });
-    const participant = participantByConv.get(conversationId);
     previewByConv.set(
       conversationId,
       formatSidebarMessagePreview({
@@ -461,15 +634,19 @@ export async function listDirectMessages(
         messageType: last.messageType,
         authorIsSelf: last.authorId === userId,
         authorDisplayName:
-          last.authorId === userId ? undefined : participant?.displayName,
+          last.authorId === userId ? undefined : authorNameById.get(last.authorId),
       }),
     );
   }
 
   const summaries: DmSummary[] = convIds
     .map((id) => {
-      const participant = participantByConv.get(id);
-      if (!participant || !signedUpParticipantIds.has(participant.id)) return null;
+      const conv = convById.get(id);
+      const members = membersByConv.get(id);
+      if (!conv?.dmPairKey || !members) return null;
+      if (!members.all.every((member) => signedUpIds.has(member.id))) return null;
+
+      const isGroup = isDmGroupPairKey(conv.dmPairKey);
       const member = memberByConv.get(id);
       const last = lastByConv.get(id);
       const lastReadAt = member?.lastReadAt?.toISOString() ?? null;
@@ -478,8 +655,27 @@ export async function listDirectMessages(
         last.authorId !== userId &&
         (lastReadAt === null || last.createdAt > lastReadAt);
 
+      if (isGroup) {
+        return {
+          id,
+          kind: "group" as const,
+          title: conv.title,
+          imageUrl: conv.imageUrl ?? null,
+          participantCount: members.all.length,
+          hasUnread,
+          lastActivityAt: last?.createdAt ?? null,
+          lastMessagePreview: previewByConv.get(id) ?? null,
+          muted: member?.muted ?? false,
+        };
+      }
+
+      const participant = members.others[0];
+      if (!participant) return null;
+
       return {
         id,
+        kind: "direct" as const,
+        title: participant.displayName,
         participant,
         hasUnread,
         lastActivityAt: last?.createdAt ?? null,
@@ -487,7 +683,7 @@ export async function listDirectMessages(
         muted: member?.muted ?? false,
       };
     })
-    .filter((s): s is DmSummary => s !== null);
+    .filter((summary): summary is DmSummary => summary !== null);
 
   summaries.sort((a, b) => {
     const aTime = a.lastActivityAt ?? "";
@@ -498,14 +694,16 @@ export async function listDirectMessages(
   return summaries;
 }
 
-export async function getDirectMessage(params: {
+export async function getDmConversation(params: {
   conversationId: string;
   userId: string;
   organizationId?: string;
-}): Promise<{ id: string; participant: DmParticipant; muted: boolean } | null> {
+}): Promise<DmDetail | null> {
   const row = await db
     .select({
       id: conversations.id,
+      title: conversations.title,
+      imageUrl: conversations.imageUrl,
       muted: conversationMembers.muted,
       dmPairKey: conversations.dmPairKey,
     })
@@ -525,38 +723,44 @@ export async function getDirectMessage(params: {
 
   if (!row[0]?.dmPairKey) return null;
 
-  const other = await db
-    .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
-    .from(conversationMembers)
-    .innerJoin(users, eq(users.id, conversationMembers.userId))
-    .where(
-      and(
-        eq(conversationMembers.conversationId, params.conversationId),
-        ne(conversationMembers.userId, params.userId),
-      ),
-    )
-    .limit(1);
+  const membersByConv = await loadDmMembersForUser([params.conversationId], params.userId, params.organizationId);
+  const members = membersByConv.get(params.conversationId);
+  if (!members || members.all.length === 0) return null;
 
-  if (!other[0]) return null;
+  const signedUpIds = await listSignedUpUserIds(members.all.map((member) => member.id));
+  if (!members.all.every((member) => signedUpIds.has(member.id))) return null;
 
-  if (!(await isUserSignedUpOnCco(other[0].id))) return null;
+  const isGroup = isDmGroupPairKey(row[0].dmPairKey);
+  const participant = members.others[0];
 
-  let participant: DmParticipant = {
-    id: other[0].id,
-    displayName: other[0].displayName,
-    avatarUrl: other[0].avatarUrl ?? null,
-  };
-  if (isPlaceholderDisplayName(participant.displayName)) {
-    const resolved = await resolveDisplayNamesForUsers([participant.id], params.organizationId);
-    const displayName = resolved.get(participant.id);
-    if (displayName) {
-      participant = { ...participant, displayName };
-    }
+  if (!isGroup) {
+    if (!participant) return null;
+    return {
+      id: row[0].id,
+      kind: "direct",
+      title: participant.displayName,
+      imageUrl: null,
+      muted: row[0].muted,
+      participant,
+      participants: members.all,
+    };
   }
 
   return {
     id: row[0].id,
-    participant,
+    kind: "group",
+    title: row[0].title,
+    imageUrl: row[0].imageUrl ?? null,
     muted: row[0].muted,
+    participants: members.all,
   };
+}
+
+/** @deprecated Use getDmConversation */
+export async function getDirectMessage(params: {
+  conversationId: string;
+  userId: string;
+  organizationId?: string;
+}): Promise<DmDetail | null> {
+  return getDmConversation(params);
 }

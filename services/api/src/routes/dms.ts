@@ -2,11 +2,14 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
-  getDirectMessage,
+  getDmConversation,
   getOrCreateDirectMessage,
+  getOrCreateDmGroup,
   listDirectMessages,
   searchDmCandidates,
+  updateDmConversation,
 } from "../services/dms";
+import { ensureConversationSchemaBestEffort } from "../services/org-schema-capabilities";
 import { setConversationMuted } from "../services/conversations";
 
 type Env = { Variables: AuthVariables };
@@ -14,6 +17,10 @@ type Env = { Variables: AuthVariables };
 export const dmsRouter = new Hono<Env>();
 
 dmsRouter.use("*", requireAuth);
+dmsRouter.use("*", async (_c, next) => {
+  await ensureConversationSchemaBestEffort();
+  await next();
+});
 
 dmsRouter.get("/", async (c) => {
   const session = c.get("session");
@@ -37,14 +44,33 @@ dmsRouter.get("/people", async (c) => {
   }
 });
 
-const CreateDmSchema = z.object({
-  userId: z.string().uuid(),
-});
+const CreateDmSchema = z.union([
+  z.object({ userId: z.string().uuid() }),
+  z.object({ userIds: z.array(z.string().uuid()).min(2).max(20) }),
+]);
 
 dmsRouter.post("/", async (c) => {
   const session = c.get("session");
   const body = CreateDmSchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: body.error.flatten() }, 400);
+
+  if ("userIds" in body.data) {
+    const result = await getOrCreateDmGroup({
+      userId: session.userId,
+      memberUserIds: body.data.userIds,
+      organizationId: session.organizationId,
+    });
+    if (!result) {
+      return c.json(
+        {
+          error:
+            "You can only create a group with at least two people who share a group or team with you and have joined CCO.",
+        },
+        403,
+      );
+    }
+    return c.json(result, 201);
+  }
 
   const result = await getOrCreateDirectMessage({
     userId: session.userId,
@@ -64,10 +90,33 @@ dmsRouter.post("/", async (c) => {
 
 dmsRouter.get("/:id", async (c) => {
   const session = c.get("session");
-  const result = await getDirectMessage({
+  const result = await getDmConversation({
     conversationId: c.req.param("id"),
     userId: session.userId,
     organizationId: session.organizationId,
+  });
+  if (!result) return c.json({ error: "Not found" }, 404);
+  return c.json(result);
+});
+
+const UpdateDmSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  imageUrl: z.string().url().nullable().optional(),
+});
+
+dmsRouter.patch("/:id", async (c) => {
+  const session = c.get("session");
+  const body = UpdateDmSchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: body.error.flatten() }, 400);
+  if (body.data.title === undefined && body.data.imageUrl === undefined) {
+    return c.json({ error: "No changes provided" }, 400);
+  }
+
+  const result = await updateDmConversation({
+    conversationId: c.req.param("id"),
+    userId: session.userId,
+    title: body.data.title,
+    imageUrl: body.data.imageUrl,
   });
   if (!result) return c.json({ error: "Not found" }, 404);
   return c.json(result);
@@ -80,7 +129,7 @@ dmsRouter.patch("/:id/mute", async (c) => {
   const body = MuteSchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: body.error.flatten() }, 400);
 
-  const dm = await getDirectMessage({
+  const dm = await getDmConversation({
     conversationId: c.req.param("id"),
     userId: session.userId,
     organizationId: session.organizationId,

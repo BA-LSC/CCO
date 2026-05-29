@@ -7,6 +7,7 @@ export type ConversationUpdatedDetail = {
   conversationId: string;
   leaderOnly?: boolean;
   title?: string;
+  imageUrl?: string | null;
 };
 
 export const UNREAD_CHANGED_EVENT = "cco:unread-changed";

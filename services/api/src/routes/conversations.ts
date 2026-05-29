@@ -20,6 +20,7 @@ import { refreshGroupImageFromPco, refreshMissingGroupImages } from "../services
 import { listGroupMembersForDetail, trySyncGroupRosterForLeader } from "../services/group-sync";
 import { listMessages } from "../services/messages";
 import { areOrgWebhooksEnabled } from "../services/pco-cache";
+import { publishTypingIndicator } from "../services/typing";
 
 type Env = { Variables: AuthVariables };
 
@@ -47,6 +48,23 @@ conversationsRouter.post("/:id/read", async (c) => {
   const ok = await markConversationRead(c.req.param("id"), session.userId);
   if (!ok) return c.json({ error: "Not found" }, 404);
   return c.json({ read: true, hasUnread: false });
+});
+
+const TypingSchema = z.object({ isTyping: z.boolean() });
+
+conversationsRouter.post("/:id/typing", async (c) => {
+  const session = c.get("session");
+  const parsed = TypingSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
+
+  const result = await publishTypingIndicator({
+    conversationId: c.req.param("id"),
+    userId: session.userId,
+    isTyping: parsed.data.isTyping,
+  });
+
+  if ("error" in result) return c.json({ error: result.error }, result.status);
+  return c.json({ ok: true });
 });
 
 conversationsRouter.get("/:id/members", async (c) => {

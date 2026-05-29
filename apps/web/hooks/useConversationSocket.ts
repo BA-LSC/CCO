@@ -14,6 +14,7 @@ type RealtimeEvent =
       conversationId: string;
       leaderOnly?: boolean;
       title?: string;
+      imageUrl?: string | null;
     }
   | {
       type: "conversation.read";
@@ -31,7 +32,14 @@ type RealtimeEvent =
       conversationId: string;
       call: import("@cco/shared/calls").CallSummaryDto;
     }
-  | { type: "call.ended"; conversationId: string; callId: string };
+  | { type: "call.ended"; conversationId: string; callId: string }
+  | {
+      type: "typing";
+      conversationId: string;
+      userId: string;
+      displayName: string;
+      isTyping: boolean;
+    };
 
 export type { RealtimeEvent };
 

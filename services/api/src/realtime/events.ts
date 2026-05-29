@@ -17,6 +17,7 @@ export type RealtimeEvent =
       conversationId: string;
       leaderOnly?: boolean;
       title?: string;
+      imageUrl?: string | null;
     }
   | {
       type: "conversation.read";
@@ -26,7 +27,14 @@ export type RealtimeEvent =
     }
   | { type: "call.started"; conversationId: string; call: import("@cco/shared/calls").CallSummaryDto }
   | { type: "call.updated"; conversationId: string; call: import("@cco/shared/calls").CallSummaryDto }
-  | { type: "call.ended"; conversationId: string; callId: string };
+  | { type: "call.ended"; conversationId: string; callId: string }
+  | {
+      type: "typing";
+      conversationId: string;
+      userId: string;
+      displayName: string;
+      isTyping: boolean;
+    };
 
 export function redisChannelForConversation(conversationId: string): string {
   return `connect:conversation:${conversationId}`;

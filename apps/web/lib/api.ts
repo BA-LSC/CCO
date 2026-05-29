@@ -266,7 +266,11 @@ export type DmParticipant = { id: string; displayName: string; avatarUrl?: strin
 
 export type DmSummary = {
   id: string;
-  participant: DmParticipant;
+  kind: "direct" | "group";
+  title: string;
+  imageUrl?: string | null;
+  participant?: DmParticipant;
+  participantCount?: number;
   hasUnread: boolean;
   lastActivityAt: string | null;
   lastMessagePreview: string | null;
@@ -275,8 +279,12 @@ export type DmSummary = {
 
 export type DmDetail = {
   id: string;
-  participant: DmParticipant;
+  kind: "direct" | "group";
+  title: string;
+  imageUrl?: string | null;
   muted: boolean;
+  participant?: DmParticipant;
+  participants: DmParticipant[];
 };
 
 export type Reaction = {

@@ -7,6 +7,7 @@ import { useChatLayout } from "@/components/ChatLayoutContext";
 import { GroupSidebarSection } from "@/components/GroupSidebarSection";
 import { SidebarSkeleton } from "@/components/SidebarSkeleton";
 import { usePlanningCenterSync } from "@/components/PlanningCenterSyncContext";
+import { UserAvatar } from "@/components/UserAvatar";
 import { UserAvatarWithPresence } from "@/components/UserAvatarWithPresence";
 import { DmSidebarSubtitle } from "@/components/DmSidebarSubtitle";
 import { usePresenceWatch } from "@/components/PresenceProvider";
@@ -93,6 +94,7 @@ export function ChatSidebar() {
   const [dmSearching, setDmSearching] = useState(false);
   const [dmPeopleError, setDmPeopleError] = useState<string | null>(null);
   const [creatingDm, setCreatingDm] = useState<string | null>(null);
+  const [selectedDmUserIds, setSelectedDmUserIds] = useState<Set<string>>(() => new Set());
   const [setupChurchName, setSetupChurchName] = useState<string | null>(null);
 
   const loadSidebar = useCallback(async (options?: { silent?: boolean }) => {
@@ -177,7 +179,7 @@ export function ChatSidebar() {
           const preview = previewFromMessage(
             event.message,
             session?.userId,
-            dm?.participant.displayName,
+            dm?.kind === "direct" ? dm.participant?.displayName : event.message.authorName,
           );
           return applyDmMessagePreview(
             prev,
@@ -196,7 +198,7 @@ export function ChatSidebar() {
           const preview = previewFromMessage(
             event.message,
             session?.userId,
-            dm?.participant.displayName,
+            dm?.kind === "direct" ? dm.participant?.displayName : event.message.authorName,
           );
           return applyDmMessagePreview(
             prev,
@@ -210,6 +212,21 @@ export function ChatSidebar() {
 
       if (event.type === "message.deleted") {
         void loadSidebar({ silent: true });
+        return;
+      }
+
+      if (event.type === "conversation.updated") {
+        setDms((prev) =>
+          prev.map((dm) =>
+            dm.id === conversationId
+              ? {
+                  ...dm,
+                  ...(event.title !== undefined ? { title: event.title } : {}),
+                  ...(event.imageUrl !== undefined ? { imageUrl: event.imageUrl } : {}),
+                }
+              : dm,
+          ),
+        );
       }
     });
   }, [activeConversationId, loadSidebar, session?.userId, subscribeRealtime]);
@@ -221,15 +238,7 @@ export function ChatSidebar() {
   const activeDmId = pathname.match(/^\/dms\/([^/]+)/)?.[1] ?? null;
   const activeTeamId = pathname.match(/^\/teams\/([^/]+)/)?.[1] ?? null;
 
-  const existingDmUserIds = useMemo(
-    () => new Set(dms.map((dm) => dm.participant.id)),
-    [dms],
-  );
-
-  const newDmPeople = useMemo(
-    () => dmPeople.filter((person) => !existingDmUserIds.has(person.id)),
-    [dmPeople, existingDmUserIds],
-  );
+  const newDmPeople = dmPeople;
 
   const teamGroups = useMemo(() => groupTeamsByServiceType(teams), [teams]);
   const showTeamServiceSections = useMemo(
@@ -269,7 +278,9 @@ export function ChatSidebar() {
   }
 
   usePresenceWatch(
-    dms.map((dm) => dm.participant.id),
+    dms
+      .filter((dm) => dm.kind === "direct" && dm.participant)
+      .map((dm) => dm.participant!.id),
     dms.length > 0,
   );
 
@@ -328,6 +339,7 @@ export function ChatSidebar() {
       });
       setShowNewDm(false);
       setDmSearch("");
+      setSelectedDmUserIds(new Set());
       closeSidebar();
       await loadSidebar();
       router.push(`/dms/${result.id}`);
@@ -336,6 +348,36 @@ export function ChatSidebar() {
     } finally {
       setCreatingDm(null);
     }
+  }
+
+  async function startDmGroup(userIds: string[]) {
+    setCreatingDm("group");
+    setError(null);
+    try {
+      const result = await apiFetch<{ id: string }>("/api/v1/dms", {
+        method: "POST",
+        body: JSON.stringify({ userIds }),
+      });
+      setShowNewDm(false);
+      setDmSearch("");
+      setSelectedDmUserIds(new Set());
+      closeSidebar();
+      await loadSidebar();
+      router.push(`/dms/${result.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create group");
+    } finally {
+      setCreatingDm(null);
+    }
+  }
+
+  function toggleDmSelection(userId: string) {
+    setSelectedDmUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
   }
 
   return (
@@ -399,20 +441,33 @@ export function ChatSidebar() {
                         }`}
                       >
                         <div className="sidebar-dm-row">
-                          <UserAvatarWithPresence
-                            userId={dm.participant.id}
-                            displayName={dm.participant.displayName}
-                            avatarUrl={dm.participant.avatarUrl}
-                            className="sidebar-dm-avatar"
-                            size="xs"
-                          />
-                          <span className="sidebar-item-label sidebar-dm-name">
-                            {dm.participant.displayName}
-                          </span>
-                          <DmSidebarSubtitle
-                            userId={dm.participant.id}
-                            preview={dm.lastMessagePreview}
-                          />
+                          {dm.kind === "direct" && dm.participant ? (
+                            <UserAvatarWithPresence
+                              userId={dm.participant.id}
+                              displayName={dm.participant.displayName}
+                              avatarUrl={dm.participant.avatarUrl}
+                              className="sidebar-dm-avatar"
+                              size="xs"
+                            />
+                          ) : (
+                            <UserAvatar
+                              displayName={dm.title}
+                              avatarUrl={dm.imageUrl}
+                              className="sidebar-dm-avatar"
+                            />
+                          )}
+                          <span className="sidebar-item-label sidebar-dm-name">{dm.title}</span>
+                          {dm.kind === "direct" && dm.participant ? (
+                            <DmSidebarSubtitle
+                              userId={dm.participant.id}
+                              preview={dm.lastMessagePreview}
+                            />
+                          ) : (
+                            <span className="sidebar-dm-status">
+                              {dm.lastMessagePreview ??
+                                `${dm.participantCount ?? 0} members`}
+                            </span>
+                          )}
                           {dm.hasUnread && activeDmId !== dm.id && (
                             <span className="sidebar-unread-dot" aria-label="Unread messages" />
                           )}
@@ -443,38 +498,75 @@ export function ChatSidebar() {
                     <p className="sidebar-empty">
                       {dmSearch.trim()
                         ? "No matches found."
-                        : existingDmUserIds.size > 0
-                          ? "You're already messaging everyone available."
-                          : "No one in your groups or teams has joined CCO yet."}
+                        : "No one in your groups or teams has joined CCO yet."}
                     </p>
                   ) : (
                     <ul className="sidebar-list sidebar-new-dm-list">
-                      {newDmPeople.map((p) => (
-                        <li key={p.id}>
-                          <button
-                            type="button"
-                            className="sidebar-item sidebar-dm-item"
-                            disabled={creatingDm === p.id}
-                            onClick={() => void startDm(p.id)}
-                          >
-                            <div className="sidebar-dm-row">
-                              <UserAvatarWithPresence
-                                userId={p.id}
-                                displayName={p.displayName}
-                                avatarUrl={p.avatarUrl}
-                                className="sidebar-dm-avatar"
-                                size="xs"
-                              />
-                              <span className="sidebar-item-label sidebar-dm-name">
-                                {creatingDm === p.id ? "Opening…" : p.displayName}
-                              </span>
-                              <DmSidebarSubtitle userId={p.id} />
-                            </div>
-                          </button>
-                        </li>
-                      ))}
+                      {newDmPeople.map((p) => {
+                        const selected = selectedDmUserIds.has(p.id);
+                        return (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              className={[
+                                "sidebar-item sidebar-dm-item",
+                                selected ? "sidebar-item-active" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              disabled={creatingDm !== null}
+                              onClick={() => toggleDmSelection(p.id)}
+                            >
+                              <div className="sidebar-dm-row sidebar-new-dm-row">
+                                <span
+                                  className={[
+                                    "sidebar-new-dm-check",
+                                    selected ? "sidebar-new-dm-check--selected" : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  aria-hidden="true"
+                                />
+                                <UserAvatarWithPresence
+                                  userId={p.id}
+                                  displayName={p.displayName}
+                                  avatarUrl={p.avatarUrl}
+                                  className="sidebar-dm-avatar"
+                                  size="xs"
+                                />
+                                <span className="sidebar-item-label sidebar-dm-name">
+                                  {p.displayName}
+                                </span>
+                                <DmSidebarSubtitle userId={p.id} />
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
+                  {newDmPeople.length > 0 ? (
+                    <div className="sidebar-new-dm-actions">
+                      <button
+                        type="button"
+                        className="sidebar-new-dm-submit"
+                        disabled={creatingDm !== null || selectedDmUserIds.size === 0}
+                        onClick={() => {
+                          const ids = [...selectedDmUserIds];
+                          if (ids.length === 1) void startDm(ids[0]!);
+                          else if (ids.length >= 2) void startDmGroup(ids);
+                        }}
+                      >
+                        {creatingDm === "group"
+                          ? "Creating group…"
+                          : creatingDm
+                            ? "Opening…"
+                            : selectedDmUserIds.size <= 1
+                              ? "Message"
+                              : `Create group (${selectedDmUserIds.size})`}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -487,9 +579,15 @@ export function ChatSidebar() {
                 aria-expanded={showNewDm}
                 title={showNewDm ? "Cancel" : "New message"}
                 onClick={() => {
-                  setShowNewDm((v) => !v);
-                  setDmSearch("");
-                  setDmPeople([]);
+                  setShowNewDm((v) => {
+                    const next = !v;
+                    if (!next) {
+                      setSelectedDmUserIds(new Set());
+                      setDmSearch("");
+                      setDmPeople([]);
+                    }
+                    return next;
+                  });
                 }}
               >
                 <div className="sidebar-dm-row">

@@ -226,6 +226,7 @@ export const conversations = sqliteTable(
     dmPairKey: text("dm_pair_key"),
     slug: text("slug").notNull().default("general"),
     title: text("title").notNull(),
+    imageUrl: text("image_url"),
     leaderOnly: integer("leader_only", { mode: "boolean" }).notNull().default(false),
     archivedAt: timestampMs("archived_at"),
   },

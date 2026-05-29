@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDmPairKey, resolveDmEligibleUserIds } from "./dms";
+import { buildDmPairKey, buildDmMemberKey, isDirectDmPairKey, isDmGroupPairKey, resolveDmEligibleUserIds } from "./dms";
 import { mergeSignedUpMemberRecords, type SignedUpMemberRecord } from "./cco-member-status";
 
 describe("buildDmPairKey", () => {
@@ -13,6 +13,23 @@ describe("buildDmPairKey", () => {
     const low = "aaaa0000-0000-4000-8000-000000000001";
     const high = "bbbb0000-0000-4000-8000-000000000002";
     expect(buildDmPairKey(high, low)).toBe(`${low}:${high}`);
+  });
+});
+
+describe("buildDmMemberKey", () => {
+  test("dedupes and sorts member ids", () => {
+    const a = "bbbb0000-0000-4000-8000-000000000002";
+    const b = "aaaa0000-0000-4000-8000-000000000001";
+    const c = "cccc0000-0000-4000-8000-000000000003";
+    expect(buildDmMemberKey([c, a, b, a])).toBe(`${b}:${a}:${c}`);
+  });
+});
+
+describe("dm pair key kind", () => {
+  test("detects direct vs group keys", () => {
+    expect(isDirectDmPairKey("a:b")).toBe(true);
+    expect(isDmGroupPairKey("a:b")).toBe(false);
+    expect(isDmGroupPairKey("a:b:c")).toBe(true);
   });
 });
 

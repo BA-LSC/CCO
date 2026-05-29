@@ -27,6 +27,7 @@ import {
   validateComposerMediaFile,
   type PendingComposerMedia,
 } from "@/lib/composer-media";
+import { useComposerTypingPing } from "@/hooks/useComposerTypingPing";
 
 type Member = MentionMember;
 
@@ -87,6 +88,12 @@ export function ChatComposer({
 
   const composerReadOnly = !canPost;
   const composerInputLocked = composerLocked || composerReadOnly;
+
+  useComposerTypingPing(
+    conversationId,
+    canPost && !composerLocked && !composerReadOnly,
+    body,
+  );
 
   useEffect(() => {
     if (!conversationId) return;

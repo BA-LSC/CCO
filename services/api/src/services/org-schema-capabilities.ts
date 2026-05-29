@@ -155,6 +155,10 @@ const D1_ORG_COLUMNS_TO_ENSURE: readonly { name: string; ddl: string }[] = [
   { name: "git_repo_url", ddl: `ALTER TABLE "organizations" ADD COLUMN "git_repo_url" TEXT` },
 ];
 
+const D1_CONVERSATION_COLUMN_STATEMENTS = [
+  `ALTER TABLE "conversations" ADD COLUMN "image_url" TEXT`,
+] as const;
+
 function ddlErrorDetail(err: unknown): string {
   if (err instanceof Error) {
     const cause = err.cause instanceof Error ? err.cause.message : "";
@@ -292,6 +296,37 @@ async function runEnsureD1OrganizationColumns(): Promise<void> {
         throw err;
       }
     }
+  }
+}
+
+async function runEnsureD1ConversationColumns(): Promise<void> {
+  if (!(await d1ConversationsHasColumn("image_url"))) {
+    for (const statement of D1_CONVERSATION_COLUMN_STATEMENTS) {
+      try {
+        await executeDdl(statement);
+      } catch (err) {
+        if (!isBenignD1OrgColumnDdlError(err)) {
+          throw err;
+        }
+      }
+    }
+  }
+}
+
+async function d1ConversationsHasColumn(columnName: string): Promise<boolean> {
+  const d1 = getWorkerD1();
+  if (!d1) return true;
+  const rows = await d1.all<{ name: string }>(sql.raw(`PRAGMA table_info("conversations")`));
+  return rows.some((row) => row.name === columnName);
+}
+
+export async function ensureConversationSchemaBestEffort(): Promise<void> {
+  if (!isCloudflareRuntime()) return;
+  try {
+    await runEnsureD1ConversationColumns();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn("[schema ensure] conversation columns skipped:", detail);
   }
 }
 

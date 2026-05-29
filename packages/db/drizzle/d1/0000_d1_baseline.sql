@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS "conversations" (
   "dm_pair_key" TEXT,
   "slug" TEXT NOT NULL DEFAULT 'general',
   "title" TEXT NOT NULL,
+  "image_url" TEXT,
   "leader_only" INTEGER NOT NULL DEFAULT 0,
   "archived_at" INTEGER,
   CONSTRAINT "conversations_parent_check" CHECK (

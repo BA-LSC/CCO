@@ -211,6 +211,7 @@ export const conversations = pgTable(
     dmPairKey: text("dm_pair_key"),
     slug: text("slug").notNull().default("general"),
     title: text("title").notNull(),
+    imageUrl: text("image_url"),
     leaderOnly: boolean("leader_only").notNull().default(false),
     archivedAt: timestamp("archived_at"),
   },

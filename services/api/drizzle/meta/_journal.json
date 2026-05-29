@@ -197,6 +197,13 @@
       "when": 1747708827000,
       "tag": "0027_worker_placement",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1747708828000,
+      "tag": "0028_dm_group_image",
+      "breakpoints": true
     }
   ]
 }
