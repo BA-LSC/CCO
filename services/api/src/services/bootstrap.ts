@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { organizations, users } from "../db/schema";
 import { isPlaceholderDisplayName } from "./cco-member-status";
+import { insertOrganization } from "./organization-write";
 
 export type PcoProfile = {
   personId: string;
@@ -20,15 +21,10 @@ export async function ensureOrganization(): Promise<string> {
 
   if (existing[0]) return existing[0].id;
 
-  const [created] = await db
-    .insert(organizations)
-    .values({
-      name: process.env.ORGANIZATION_NAME ?? "My Church",
-      pcoOrganizationId: pcoOrgId,
-    })
-    .returning({ id: organizations.id });
-
-  return created.id;
+  return insertOrganization({
+    name: process.env.ORGANIZATION_NAME ?? "My Church",
+    pcoOrganizationId: pcoOrgId,
+  });
 }
 
 export async function upsertUserFromPco(

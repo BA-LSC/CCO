@@ -13,6 +13,7 @@ import {
   getPendingSetupOrganization,
 } from "./org-oauth";
 import { invalidateOrgContextCache } from "./org-context-cache";
+import { ensureOrganizationSchemaForWrite } from "./org-schema-capabilities";
 
 export const InstallHandoffSchema = z.object({
   churchName: z.string().min(1).max(120),
@@ -93,6 +94,7 @@ export async function applyInstallHandoff(payload: InstallHandoffPayload): Promi
         .set(orgPatch)
         .where(eq(organizations.id, configured.id));
     } else {
+      await ensureOrganizationSchemaForWrite();
       await db.insert(organizations).values({
         ...orgPatch,
         pcoOrganizationId: `pending-${randomUUID()}`,

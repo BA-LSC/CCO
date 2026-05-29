@@ -18,6 +18,7 @@ import {
   upsertOrgSecretForOrganization,
 } from "./org-secrets";
 import { selectConfiguredOrganizationRow } from "./configured-org-query";
+import { insertOrganization } from "./organization-write";
 import { isCloudflareRuntime } from "../runtime/worker-context";
 
 export type OrgOAuthCredentials = {
@@ -230,7 +231,7 @@ export async function saveSetupDraft(params: {
     return;
   }
 
-  await db.insert(organizations).values({
+  await insertOrganization({
     name: params.name.trim(),
     pcoOrganizationId: `pending-${randomUUID()}`,
     pcoClientId: clientId,

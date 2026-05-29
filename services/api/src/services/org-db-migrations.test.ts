@@ -20,6 +20,14 @@ describe("isMissingOrgMigrationColumnsError", () => {
     expect(isMissingOrgMigrationColumnsError(err)).toBe(true);
   });
 
+  test("detects sqlite insert missing column", () => {
+    const err = new Error(
+      'Failed query: insert into "organizations" ("cloudflare_secrets_store_id") values (?)',
+    );
+    err.cause = new Error("D1_ERROR: table organizations has no column named cloudflare_secrets_store_id");
+    expect(isMissingOrgMigrationColumnsError(err)).toBe(true);
+  });
+
   test("ignores unrelated query failures", () => {
     const err = new Error('Failed query: select "id" from "users" limit $1');
     expect(isMissingOrgMigrationColumnsError(err)).toBe(false);

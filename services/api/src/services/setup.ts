@@ -4,6 +4,7 @@ import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { organizations, users } from "../db/schema";
 import { normalizeMemberEmail } from "./cco-member-status";
+import { insertOrganization } from "./organization-write";
 
 export type PcoMeProfile = {
   data: {
@@ -100,16 +101,11 @@ export async function ensureOrganizationForProfile(profile: PcoMeProfile): Promi
     return pending[0].id;
   }
 
-  const [created] = await db
-    .insert(organizations)
-    .values({
-      name: orgName,
-      pcoOrganizationId: pcoOrgId,
-      churchCenterSubdomain: parseChurchCenterSubdomain(profile),
-    })
-    .returning({ id: organizations.id });
-
-  return created.id;
+  return insertOrganization({
+    name: orgName,
+    pcoOrganizationId: pcoOrgId,
+    churchCenterSubdomain: parseChurchCenterSubdomain(profile),
+  });
 }
 
 export async function upsertUserFromPcoProfile(

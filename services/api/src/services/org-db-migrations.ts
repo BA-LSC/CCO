@@ -4,9 +4,12 @@ export const ORG_MIGRATIONS_0021_0023_MESSAGE =
 const EXTENDED_ORG_COLUMN_MARKERS = [
   "cloudflare_account_id",
   "cloudflare_api_token_enc",
+  "cloudflare_secrets_store_id",
   "realtime_kit_",
   "pco_last_synced_at",
   "pco_nightly_sync_enabled",
+  "git_repo_url",
+  "last_update_check_at",
 ] as const;
 
 function collectErrorText(err: unknown): string {
@@ -33,11 +36,6 @@ function mentionsExtendedOrgColumn(message: string): boolean {
   return EXTENDED_ORG_COLUMN_MARKERS.some((marker) => message.includes(marker));
 }
 
-const SCHEMA_MISSING_PATTERNS = [
-  /does not exist/i,
-  /undefined column/i,
-] as const;
-
 const CALL_SCHEMA_MARKERS = [
   "call_participants",
   "call_sessions",
@@ -48,11 +46,18 @@ function mentionsCallSchema(message: string): boolean {
   return CALL_SCHEMA_MARKERS.some((marker) => message.includes(marker));
 }
 
+function hasSchemaMissingSignal(message: string): boolean {
+  if (/does not exist/i.test(message)) return true;
+  if (/undefined column/i.test(message)) return true;
+  if (/no such column/i.test(message)) return true;
+  if (/has no column named/i.test(message)) return true;
+  if (/Failed query/i.test(message) && /no such column/i.test(message)) return true;
+  if (/Failed query/i.test(message) && /does not exist/i.test(message)) return true;
+  return false;
+}
+
 export function isMissingOrgMigrationColumnsError(err: unknown): boolean {
   const message = collectErrorText(err);
-  if (!SCHEMA_MISSING_PATTERNS.some((pattern) => pattern.test(message))) {
-    return false;
-  }
-
+  if (!hasSchemaMissingSignal(message)) return false;
   return mentionsExtendedOrgColumn(message) || mentionsCallSchema(message);
 }
