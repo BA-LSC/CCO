@@ -303,15 +303,23 @@ export function ChatSidebar() {
   useEffect(() => {
     if (!showNewDm) return;
 
+    const q = dmSearch.trim();
+    if (!q) {
+      setDmPeople([]);
+      setDmPeopleError(null);
+      setDmSearching(false);
+      return;
+    }
+
     let cancelled = false;
 
     const timer = setTimeout(async () => {
       setDmSearching(true);
       setDmPeopleError(null);
       try {
-        const q = dmSearch.trim();
-        const path = q ? `/api/v1/dms/people?q=${encodeURIComponent(q)}` : "/api/v1/dms/people";
-        const data = await apiFetch<{ people: DmParticipant[] }>(path);
+        const data = await apiFetch<{ people: DmParticipant[] }>(
+          `/api/v1/dms/people?q=${encodeURIComponent(q)}`,
+        );
         if (cancelled) return;
         setDmPeople(data.people);
       } catch (err) {
@@ -490,62 +498,62 @@ export function ChatSidebar() {
                     aria-label="Search people"
                     autoFocus
                   />
-                  {dmSearching ? (
-                    <p className="sidebar-empty">Searching…</p>
-                  ) : dmPeopleError ? (
-                    <p className="sidebar-empty">{dmPeopleError}</p>
-                  ) : newDmPeople.length === 0 ? (
-                    <p className="sidebar-empty">
-                      {dmSearch.trim()
-                        ? "No matches found."
-                        : "No one in your groups or teams has joined CCO yet."}
-                    </p>
+                  {dmSearch.trim() ? (
+                    dmSearching ? (
+                      <p className="sidebar-empty">Searching…</p>
+                    ) : dmPeopleError ? (
+                      <p className="sidebar-empty">{dmPeopleError}</p>
+                    ) : newDmPeople.length === 0 ? (
+                      <p className="sidebar-empty">No matches found.</p>
+                    ) : (
+                      <ul className="sidebar-list sidebar-new-dm-list">
+                        {newDmPeople.map((p) => {
+                          const selected = selectedDmUserIds.has(p.id);
+                          return (
+                            <li key={p.id}>
+                              <button
+                                type="button"
+                                className={[
+                                  "sidebar-item sidebar-dm-item",
+                                  selected ? "sidebar-item-active" : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")}
+                                disabled={creatingDm !== null}
+                                onClick={() => toggleDmSelection(p.id)}
+                              >
+                                <div className="sidebar-dm-row sidebar-new-dm-row">
+                                  <span
+                                    className={[
+                                      "sidebar-new-dm-check",
+                                      selected ? "sidebar-new-dm-check--selected" : "",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                    aria-hidden="true"
+                                  />
+                                  <UserAvatarWithPresence
+                                    userId={p.id}
+                                    displayName={p.displayName}
+                                    avatarUrl={p.avatarUrl}
+                                    className="sidebar-dm-avatar"
+                                    size="xs"
+                                  />
+                                  <span className="sidebar-item-label sidebar-dm-name">
+                                    {p.displayName}
+                                  </span>
+                                  <DmSidebarSubtitle userId={p.id} />
+                                </div>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
                   ) : (
-                    <ul className="sidebar-list sidebar-new-dm-list">
-                      {newDmPeople.map((p) => {
-                        const selected = selectedDmUserIds.has(p.id);
-                        return (
-                          <li key={p.id}>
-                            <button
-                              type="button"
-                              className={[
-                                "sidebar-item sidebar-dm-item",
-                                selected ? "sidebar-item-active" : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
-                              disabled={creatingDm !== null}
-                              onClick={() => toggleDmSelection(p.id)}
-                            >
-                              <div className="sidebar-dm-row sidebar-new-dm-row">
-                                <span
-                                  className={[
-                                    "sidebar-new-dm-check",
-                                    selected ? "sidebar-new-dm-check--selected" : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                  aria-hidden="true"
-                                />
-                                <UserAvatarWithPresence
-                                  userId={p.id}
-                                  displayName={p.displayName}
-                                  avatarUrl={p.avatarUrl}
-                                  className="sidebar-dm-avatar"
-                                  size="xs"
-                                />
-                                <span className="sidebar-item-label sidebar-dm-name">
-                                  {p.displayName}
-                                </span>
-                                <DmSidebarSubtitle userId={p.id} />
-                              </div>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <p className="sidebar-empty">Type a name to search.</p>
                   )}
-                  {newDmPeople.length > 0 ? (
+                  {newDmPeople.length > 0 || selectedDmUserIds.size > 0 ? (
                     <div className="sidebar-new-dm-actions">
                       <button
                         type="button"

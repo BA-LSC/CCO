@@ -2383,7 +2383,30 @@ button.sidebar-group-header:focus-visible {
 }
 
 .sidebar-new-dm-row {
-  grid-template-columns: 16px var(--sidebar-avatar-size) minmax(0, 1fr) auto;
+  grid-template-columns: 16px var(--sidebar-avatar-size) minmax(0, 1fr);
+}
+
+.sidebar-new-dm-row > .sidebar-new-dm-check {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: center;
+}
+
+.sidebar-new-dm-row > .avatar-with-presence,
+.sidebar-new-dm-row > .sidebar-dm-avatar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.sidebar-new-dm-row > .sidebar-dm-name {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.sidebar-new-dm-row > .sidebar-dm-status {
+  grid-column: 3;
+  grid-row: 2;
 }
 
 .sidebar-new-dm-check {
