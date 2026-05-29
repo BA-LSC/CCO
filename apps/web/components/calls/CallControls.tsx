@@ -13,6 +13,7 @@ type Props = {
   disabled?: boolean;
   onStart: () => void;
   onJoin: () => void;
+  onLeave: () => void;
 };
 
 function getCallIconState(activeCall: CallSummaryDto | null, inCall: boolean): CallIconState {
@@ -25,7 +26,7 @@ function getCallIconState(activeCall: CallSummaryDto | null, inCall: boolean): C
 function getCallLabel(state: CallIconState, activeCall: CallSummaryDto | null): string {
   switch (state) {
     case "in-call":
-      return "In call";
+      return "Leave call";
     case "waiting":
       return "Call in progress — join";
     case "joinable":
@@ -44,11 +45,29 @@ export function CallActionButton({
   disabled = false,
   onStart,
   onJoin,
+  onLeave,
 }: Props) {
   const state = getCallIconState(activeCall, inCall);
-  const label = loading && !inCall ? "Starting call…" : getCallLabel(state, activeCall);
-  const isDisabled = loading || inCall || disabled;
+  const label =
+    loading && inCall
+      ? "Leaving call…"
+      : loading && !inCall
+        ? "Starting call…"
+        : getCallLabel(state, activeCall);
+  const isDisabled = disabled || loading;
   const visualState = loading && !inCall ? "loading" : state;
+
+  const handleClick = () => {
+    if (inCall) {
+      onLeave();
+      return;
+    }
+    if (activeCall) {
+      onJoin();
+      return;
+    }
+    onStart();
+  };
 
   return (
     <button
@@ -56,10 +75,10 @@ export function CallActionButton({
       className={`panel-header-icon-btn call-header-btn call-header-btn--${visualState}`}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      onClick={() => (activeCall && !inCall ? onJoin() : onStart())}
+      onClick={handleClick}
       aria-label={label}
       title={label}
-      aria-pressed={state === "in-call" || state === "waiting" || state === "joinable"}
+      aria-pressed={!inCall && (state === "waiting" || state === "joinable")}
     >
       <PanelHeaderPhoneIcon />
     </button>
@@ -76,6 +95,7 @@ export function CallActionButtonPlaceholder() {
       disabled
       onStart={() => {}}
       onJoin={() => {}}
+      onLeave={() => {}}
     />
   );
 }

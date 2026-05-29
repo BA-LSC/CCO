@@ -10,16 +10,31 @@ import {
 import {
   clampPipPosition,
   usePipPanel,
+  type PipPosition,
 } from "@/hooks/usePipPanel";
+
+type PipState = ReturnType<typeof usePipPanel>;
 
 type Props = {
   participantCount: number;
   returnLink?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
+  /** Shared pip state from parent (keeps handle and overlay in sync). */
+  pip?: PipState;
+  /** Render only the draggable handle bar; media renders in a fixed sibling overlay. */
+  chromeOnly?: boolean;
 };
 
-export function CallPipShell({ participantCount, returnLink, children }: Props) {
-  const { collapsed, toggleCollapsed, position, setPosition, ready } = usePipPanel();
+export function CallPipShell({
+  participantCount,
+  returnLink,
+  children,
+  pip: pipProp,
+  chromeOnly = false,
+}: Props) {
+  const internalPip = usePipPanel();
+  const pip = pipProp ?? internalPip;
+  const { collapsed, toggleCollapsed, position, setPosition, ready } = pip;
   const shellRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -76,15 +91,12 @@ export function CallPipShell({ participantCount, returnLink, children }: Props) 
 
   if (!ready || !position) return null;
 
-  const style = {
-    left: position.x,
-    top: position.y,
-  };
+  const style = pipPositionStyle(position);
 
   return (
     <div
       ref={shellRef}
-      className={`call-pip-shell${collapsed ? " call-pip--collapsed" : ""}`}
+      className={`call-pip-shell${collapsed ? " call-pip--collapsed" : ""}${chromeOnly ? " call-pip-shell--chrome-only" : ""}`}
       style={style}
     >
       <div
@@ -111,7 +123,14 @@ export function CallPipShell({ participantCount, returnLink, children }: Props) 
           {collapsed ? "▴" : "▾"}
         </button>
       </div>
-      {!collapsed ? <div className="call-pip-body">{children}</div> : null}
+      {!collapsed && !chromeOnly ? <div className="call-pip-body">{children}</div> : null}
     </div>
   );
+}
+
+function pipPositionStyle(position: PipPosition): { left: number; top: number } {
+  return {
+    left: position.x,
+    top: position.y,
+  };
 }

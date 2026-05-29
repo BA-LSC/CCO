@@ -14,15 +14,23 @@ const CHAT_UI_REMOVAL: UIConfig = {
   },
 };
 
+const CCO_CONTROLBAR_REMOVAL = [
+  "rtk-polls-toggle",
+  "rtk-plugins-toggle",
+  "rtk-participants-toggle",
+  "rtk-leave-button",
+] as const;
+
 function compactControlbarRemoval(enableInRoomChat: boolean): UIConfig {
   const remove = [
-    "rtk-polls-toggle",
-    "rtk-plugins-toggle",
+    ...CCO_CONTROLBAR_REMOVAL,
     ...(enableInRoomChat ? [] : ["rtk-chat-toggle"]),
   ];
   return {
     root: {
       "div#controlbar-right": { remove },
+      "div#controlbar-center": { remove: ["rtk-leave-button"] },
+      "div#controlbar-mobile": { remove: ["rtk-leave-button"] },
       "rtk-more-toggle.activeMoreMenu.sm": { remove },
       "rtk-more-toggle.activeMoreMenu.md": { remove },
     },

@@ -20,6 +20,7 @@ import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { useCallSession } from "@/hooks/useCallSession";
 import { useActiveCallsMap } from "@/hooks/useActiveCallsMap";
 import { useAnchorRect } from "@/hooks/useAnchorRect";
+import { usePipPanel } from "@/hooks/usePipPanel";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
 import { CallInCallActions, callInCallActionsInlineOffset } from "@/components/calls/CallInCallActions";
 import { CallOverlay } from "@/components/calls/CallOverlay";
@@ -79,58 +80,33 @@ function ConversationCallUrlJoin({
   return null;
 }
 
-function ActiveCallPanel({
-  homeConversationId,
+function ActiveCallChrome({
   homeChatPath,
   inlineAnchor,
-  authToken,
   activeCall,
-  onLeave,
+  showInline,
+  pip,
 }: {
-  homeConversationId: string;
   homeChatPath: string | null;
   inlineAnchor: HTMLElement | null;
-  authToken: string;
   activeCall: CallSummaryDto | null;
-  onLeave: () => void;
+  showInline: boolean;
+  pip: ReturnType<typeof usePipPanel>;
 }) {
-  const { activeConversationId } = useChatLayout();
-  const showInline = activeConversationId === homeConversationId;
-  const showPip = activeConversationId !== homeConversationId;
   const inlineRect = useAnchorRect(inlineAnchor, showInline);
-  const inlineActionsOffset = callInCallActionsInlineOffset();
-  const inlinePanelRect =
-    showInline && inlineRect
-      ? new DOMRect(
-          inlineRect.x,
-          inlineRect.y + inlineActionsOffset,
-          inlineRect.width,
-          inlineRect.height,
-        )
-      : null;
 
-  if (!showInline && !showPip) return null;
-
-  const inCallActions = (
-    <CallInCallActions
-      placement={showInline ? "inline" : "pip"}
-      inlineAnchorRect={showInline ? inlineRect : null}
-    />
-  );
-
-  const overlay = (
-    <CallOverlay
-      authToken={authToken}
-      sessionParticipantCount={activeCall?.participantCount ?? 1}
-      onLeave={onLeave}
-      placement={showInline ? "inline" : "pip"}
-      inlineAnchorRect={showInline ? inlinePanelRect : null}
-      showSetupScreen={false}
-    />
-  );
-
-  if (showPip) {
+  if (showInline) {
     return (
+      <div className="call-panel-host">
+        <CallInCallActions placement="inline" inlineAnchorRect={inlineRect} />
+      </div>
+    );
+  }
+
+  if (!pip.ready || !pip.position) return null;
+
+  return (
+    <>
       <CallPipShell
         participantCount={activeCall?.participantCount ?? 1}
         returnLink={
@@ -140,18 +116,15 @@ function ActiveCallPanel({
             </Link>
           ) : null
         }
-      >
-        {inCallActions}
-        {overlay}
-      </CallPipShell>
-    );
-  }
-
-  return (
-    <div className="call-panel-host">
-      {inCallActions}
-      {overlay}
-    </div>
+        pip={pip}
+        chromeOnly
+      />
+      <CallInCallActions
+        placement="pip"
+        pipAnchorRect={pip.position}
+        pipCollapsed={pip.collapsed}
+      />
+    </>
   );
 }
 
@@ -266,7 +239,8 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
           event.call.hostUserId !== session?.userId &&
           !inCallRef.current &&
           event.call.participantCount > 0 &&
-          conversationId === activeConversationId
+          !shouldIgnoreCall(event.call.id) &&
+          !endedCallIdsRef.current.has(event.call.id)
         ) {
           setIncomingCall(event.call);
           setIncomingConversationId(conversationId);
@@ -301,14 +275,16 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!inCall || !activeCall) return;
-    const interval = setInterval(() => {
+    const sendHeartbeat = () => {
       void fetch("/api/v1/presence/heartbeat", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ callId: activeCall.id }),
       });
-    }, 15000);
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 15000);
     return () => clearInterval(interval);
   }, [inCall, activeCall]);
 
@@ -348,6 +324,21 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   );
 
   const inlineAnchor = homeConversationId ? (inlineAnchors.get(homeConversationId) ?? null) : null;
+  const showInlineCall = Boolean(
+    homeConversationId && inCall && activeConversationId === homeConversationId,
+  );
+  const pip = usePipPanel();
+  const inlineRect = useAnchorRect(inlineAnchor, showInlineCall);
+  const inlineActionsOffset = callInCallActionsInlineOffset();
+  const inlinePanelRect =
+    showInlineCall && inlineRect
+      ? new DOMRect(
+          inlineRect.x,
+          inlineRect.y + inlineActionsOffset,
+          inlineRect.width,
+          inlineRect.height,
+        )
+      : null;
 
   return (
     <ActiveCallContext.Provider value={contextValue}>
@@ -360,7 +351,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         />
       </Suspense>
 
-      {incomingCall && incomingConversationId === activeConversationId ? (
+      {incomingCall && incomingConversationId ? (
         <IncomingCallToast
           hostName={incomingCall.hostDisplayName}
           onJoin={() => {
@@ -383,14 +374,26 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       ) : null}
 
       {homeConversationId && inCall && authToken ? (
-        <ActiveCallPanel
-          homeConversationId={homeConversationId}
-          homeChatPath={homeChatPath}
-          inlineAnchor={inlineAnchor}
-          authToken={authToken}
-          activeCall={activeCall}
-          onLeave={() => void handleHangUp()}
-        />
+        <>
+          <ActiveCallChrome
+            homeChatPath={homeChatPath}
+            inlineAnchor={inlineAnchor}
+            activeCall={activeCall}
+            showInline={showInlineCall}
+            pip={pip}
+          />
+          <CallOverlay
+            key={authToken}
+            authToken={authToken}
+            sessionParticipantCount={activeCall?.participantCount ?? 1}
+            onLeave={() => void handleHangUp()}
+            placement={showInlineCall ? "inline" : "pip"}
+            inlineAnchorRect={showInlineCall ? inlinePanelRect : null}
+            pipAnchor={showInlineCall ? null : pip.position}
+            pipCollapsed={pip.collapsed}
+            showSetupScreen={false}
+          />
+        </>
       ) : null}
 
       {children}
@@ -432,7 +435,7 @@ export function ConversationCallHeaderButton({
   conversationId: string;
   disabled?: boolean;
 }) {
-  const { activeCall, loading, joinConversation, inCallOnConversation } = useActiveCall();
+  const { activeCall, loading, joinConversation, inCallOnConversation, hangUp } = useActiveCall();
   const { getActiveCall } = useActiveCallsMap();
   const inCallHere = inCallOnConversation(conversationId);
   const joinableCall = getActiveCall(conversationId) ?? null;
@@ -445,6 +448,7 @@ export function ConversationCallHeaderButton({
       disabled={disabled}
       onStart={() => joinConversation(conversationId)}
       onJoin={() => joinConversation(conversationId)}
+      onLeave={() => void hangUp()}
     />
   );
 }

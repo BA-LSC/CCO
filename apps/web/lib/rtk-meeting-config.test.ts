@@ -36,12 +36,15 @@ describe("buildRtkMeetingConfig", () => {
     expect(removal == null || !removal.includes("rtk-polls-toggle")).toBe(true);
   });
 
-  test("inline removes polls and plugins but keeps chat when enabled", () => {
+  test("inline removes polls, plugins, participants, and leave but keeps chat when enabled", () => {
     const config = buildRtkMeetingConfig({ enableInRoomChat: true, placement: "inline" });
     const removal = config.root?.["div#controlbar-right"]?.remove ?? [];
     expect(removal).toContain("rtk-polls-toggle");
     expect(removal).toContain("rtk-plugins-toggle");
+    expect(removal).toContain("rtk-participants-toggle");
+    expect(removal).toContain("rtk-leave-button");
     expect(removal).not.toContain("rtk-chat-toggle");
+    expect(config.root?.["div#controlbar-center"]?.remove).toContain("rtk-leave-button");
   });
 
   test("pip removes chat toggle when chat disabled", () => {
@@ -50,5 +53,7 @@ describe("buildRtkMeetingConfig", () => {
     expect(removal).toContain("rtk-chat-toggle");
     expect(removal).toContain("rtk-polls-toggle");
     expect(removal).toContain("rtk-plugins-toggle");
+    expect(removal).toContain("rtk-participants-toggle");
+    expect(removal).toContain("rtk-leave-button");
   });
 });

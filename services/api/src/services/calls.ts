@@ -38,6 +38,8 @@ import { ensureCallSessionSchema } from "./org-schema-capabilities";
 import { isConversationMember } from "./call-access";
 import { getUsersPresenceState } from "./presence";
 const GUEST_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+/** Allow newly joined participants before first call presence heartbeat. */
+const CALL_PRESENCE_GRACE_MS = 45_000;
 
 export function hashInviteToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
@@ -98,6 +100,7 @@ async function countActiveParticipants(callSessionId: string): Promise<number> {
     .select({
       id: callParticipants.id,
       userId: callParticipants.userId,
+      joinedAt: callParticipants.joinedAt,
     })
     .from(callParticipants)
     .where(
@@ -118,6 +121,7 @@ async function countActiveParticipants(callSessionId: string): Promise<number> {
 
   let activeCount = 0;
   const staleParticipantIds: string[] = [];
+  const now = Date.now();
 
   for (const row of rows) {
     if (!row.userId) {
@@ -125,6 +129,11 @@ async function countActiveParticipants(callSessionId: string): Promise<number> {
       continue;
     }
     if (presence.inCall[row.userId] === callSessionId) {
+      activeCount++;
+    } else if (
+      row.joinedAt &&
+      now - row.joinedAt.getTime() < CALL_PRESENCE_GRACE_MS
+    ) {
       activeCount++;
     } else {
       staleParticipantIds.push(row.id);
@@ -401,11 +410,6 @@ export async function startOrJoinConversationCall(params: {
   });
 
   if (isNewCall) {
-    await db
-      .update(callSessions)
-      .set({ status: "active" })
-      .where(eq(callSessions.id, callSessionId));
-
     const summary = (await buildCallSummary(callSessionId))!;
     await publishCallEvent(params.conversationId, {
       type: "call.started",
@@ -419,15 +423,19 @@ export async function startOrJoinConversationCall(params: {
       },
     });
 
-    scheduleBackgroundWork(() =>
-      notifyIncomingCall({
-        callId: callSessionId,
-        conversationId: params.conversationId,
-        hostUserId: params.userId,
-        hostDisplayName: user.displayName,
-      }),
-    );
+    await notifyIncomingCall({
+      callId: callSessionId,
+      conversationId: params.conversationId,
+      hostUserId: params.userId,
+      hostDisplayName: user.displayName,
+    });
   } else {
+    if (existing[0].status === "ringing" && existing[0].hostUserId !== params.userId) {
+      await db
+        .update(callSessions)
+        .set({ status: "active" })
+        .where(eq(callSessions.id, callSessionId));
+    }
     const summary = (await buildCallSummary(callSessionId))!;
     await publishCallEvent(params.conversationId, {
       type: "call.updated",

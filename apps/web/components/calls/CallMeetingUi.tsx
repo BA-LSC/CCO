@@ -5,13 +5,13 @@ import type { useRealtimeKitClient } from "@cloudflare/realtimekit-react";
 import {
   RtkControlbar,
   RtkDialogManager,
-  RtkGrid,
   RtkMeeting,
   RtkNotifications,
   RtkParticipantsAudio,
   RtkSidebar,
   RtkUiProvider,
 } from "@cloudflare/realtimekit-react-ui";
+import { CallParticipantGrid } from "@/components/calls/CallParticipantGrid";
 import {
   buildRtkMeetingConfig,
   type CallPanelPlacement,
@@ -73,7 +73,7 @@ export function CallMeetingUi({
         showSetupScreen={false}
       >
         <div className="call-meeting-ui__body">
-          <RtkGrid />
+          <CallParticipantGrid />
           {enableInRoomChat ? <RtkSidebar /> : null}
         </div>
         <RtkControlbar />
