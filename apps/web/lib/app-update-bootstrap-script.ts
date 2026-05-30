@@ -16,10 +16,10 @@ try{
   window.__ccoAppVersion=${versionLiteral};
   function showOverlay(){
     if(document.getElementById("cco-app-update-overlay"))return;
-    var style=document.getElementById("cco-app-update-overlay-style");
+    var style=document.getElementById("cco-app-fullscreen-overlay-style");
     if(!style){
       style=document.createElement("style");
-      style.id="cco-app-update-overlay-style";
+      style.id="cco-app-fullscreen-overlay-style";
       style.textContent=${styleLiteral};
       document.head.appendChild(style);
     }

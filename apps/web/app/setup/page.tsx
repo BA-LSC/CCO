@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PcoSignInButton } from "@/components/pco-sign-in-button";
 import { SetupLoading } from "@/components/SetupLoading";
+import { SetupUnavailable } from "@/components/SetupUnavailable";
 import { SetupReadOnlyUrl } from "@/components/SetupReadOnlyUrl";
 import { SetupThemeShell } from "@/components/SetupThemeShell";
 import { WebhookSecretsField } from "@/components/WebhookSecretsField";
 import { apiFetch } from "@/lib/api";
 import { SECRET_MASK_LINE } from "@/lib/secret-field-mask";
 import type { InstallSetupContext, SetupRedirectUris } from "@/lib/setup";
+import { fetchSetupStatus } from "@/lib/setup";
+import { readCachedSetupConfigured } from "@/lib/setup-status-cache";
 import { deriveApiHostname } from "@/lib/websocket-url";
 
 type SetupDraft = {
@@ -68,6 +71,7 @@ export default function SetupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [phase, setPhase] = useState<Phase>("credentials");
   const [uris, setUris] = useState<SetupRedirectUris | null>(null);
@@ -118,14 +122,24 @@ export default function SetupPage() {
           : Promise.resolve(null);
 
         const [statusRes, draftResRaw, redirectUris, installContext] = await Promise.all([
-          fetch("/api/v1/setup/status").then((r) => r.json() as Promise<{
-            configured: boolean;
-            signInAvailable?: boolean;
-          }>),
+          fetchSetupStatus(),
           fetch("/api/v1/setup/draft", { headers: setupDraftHeaders() }),
           fetch("/api/v1/setup/redirect-uris").then((r) => r.json() as Promise<SetupRedirectUris>),
           installContextPromise,
         ]);
+
+        if (statusRes.unavailable) {
+          if (readCachedSetupConfigured()) {
+            router.replace("/groups");
+            return;
+          }
+          setUnavailableMessage(
+            statusRes.errorMessage ??
+              "CCO is temporarily unavailable. Check that the API is running, then try again.",
+          );
+          setLoading(false);
+          return;
+        }
 
         const draftRes = draftResRaw.ok
           ? ((await draftResRaw.json()) as { configured: boolean; draft: SetupDraft | null })
@@ -272,6 +286,10 @@ export default function SetupPage() {
 
   if (loading) {
     return <SetupLoading label="Loading setup" />;
+  }
+
+  if (unavailableMessage) {
+    return <SetupUnavailable message={unavailableMessage} />;
   }
 
   const cloudflareInputValue =

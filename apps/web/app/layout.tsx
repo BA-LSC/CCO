@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AppShellWrapper } from "@/components/AppShellWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { appBootBootstrapScript } from "@/lib/app-boot-bootstrap-script";
 import { appUpdateBootstrapScript } from "@/lib/app-update-bootstrap-script";
 import { resolveAppBuildVersion } from "@/lib/build-version.server";
 import "./globals.css";
@@ -47,6 +48,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var n=navigator;if(n.standalone||matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches){document.documentElement.classList.add("standalone-display")}}catch(e){}})();`,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: appBootBootstrapScript(),
           }}
         />
       </head>

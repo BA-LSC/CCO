@@ -9,6 +9,7 @@ import { ChatSidebar } from "@/components/ChatSidebar";
 import { AppUnreadSync } from "@/components/AppUnreadSync";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { DeployRouteOverlay } from "@/components/DeployRouteOverlay";
+import { StandaloneBootDismiss } from "@/components/StandaloneBootDismiss";
 import { EnableNotificationsBanner } from "@/components/EnableNotificationsBanner";
 import { WebPushRegistrar } from "@/components/WebPushRegistrar";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
@@ -51,6 +52,7 @@ export function ChatShell({ children }: Props) {
       <ActiveCallProvider>
         <WebPushRegistrar />
         <AppUnreadSync />
+        <StandaloneBootDismiss />
         <div className={`chat-shell${hideSidebar ? " chat-shell--no-sidebar" : ""}`}>
         {!hideSidebar ? <ChatSidebar /> : null}
         <main className="chat-main">

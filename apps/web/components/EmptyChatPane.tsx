@@ -4,6 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useChatLayout } from "@/components/ChatLayoutContext";
 import { PanelHeaderMenuIcon } from "@/components/PanelHeaderIcons";
 import { fetchSetupStatus } from "@/lib/setup";
+import { hideAppBootOverlay } from "@/lib/app-update-overlay";
+import { hasWelcomeSeen, markWelcomeSeen } from "@/lib/welcome-seen";
 
 type Props = {
   banner?: ReactNode;
@@ -20,6 +22,12 @@ export function EmptyChatPane({ banner }: Props) {
     });
   }, []);
 
+  useEffect(() => {
+    if (hasWelcomeSeen()) {
+      hideAppBootOverlay();
+    }
+  }, []);
+
   const churchName = session?.organizationName?.trim() || setupChurchName;
 
   return (
@@ -32,6 +40,7 @@ export function EmptyChatPane({ banner }: Props) {
             aria-label="Open menu"
             onClick={() => {
               setMenuPulse(false);
+              markWelcomeSeen();
               openSidebar();
             }}
           >

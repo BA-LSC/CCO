@@ -1,7 +1,8 @@
 export const APP_UPDATE_OVERLAY_LABEL = "Updating CCO…";
+export const APP_BOOT_OVERLAY_LABEL = "Loading CCO…";
 
-/** Critical overlay styles so the update screen renders before app CSS loads. */
-export const APP_UPDATE_OVERLAY_STYLE_CSS = `
+/** Critical overlay styles so fullscreen loading renders before app CSS loads. */
+export const APP_FULLSCREEN_OVERLAY_STYLE_CSS = `
 @keyframes cco-fade-in{from{opacity:0}to{opacity:1}}
 .app-update-overlay{position:fixed;inset:0;z-index:10000;display:flex;background:var(--color-bg,#111620);animation:cco-fade-in .18s cubic-bezier(0,0,.2,1) both}
 .app-update-overlay .loading-screen{flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:100vh;background:var(--color-bg,#111620)}
@@ -11,17 +12,26 @@ export const APP_UPDATE_OVERLAY_STYLE_CSS = `
 @keyframes cco-app-update-spin{to{transform:rotate(360deg)}}
 `.trim();
 
-export const APP_UPDATE_OVERLAY_INNER_HTML = `
-<div class="loading-screen loading-screen-page" aria-label="Updating CCO">
+/** @deprecated Use APP_FULLSCREEN_OVERLAY_STYLE_CSS */
+export const APP_UPDATE_OVERLAY_STYLE_CSS = APP_FULLSCREEN_OVERLAY_STYLE_CSS;
+
+export function buildFullscreenOverlayInnerHtml(label: string): string {
+  return `
+<div class="loading-screen loading-screen-page" aria-label="${label}">
   <div class="loading-screen-content">
     <div class="spinner" aria-hidden="true"></div>
-    <p class="loading-screen-label">${APP_UPDATE_OVERLAY_LABEL}</p>
+    <p class="loading-screen-label">${label}</p>
   </div>
 </div>
 `.trim();
+}
 
-const OVERLAY_ID = "cco-app-update-overlay";
-const OVERLAY_STYLE_ID = "cco-app-update-overlay-style";
+/** @deprecated Use buildFullscreenOverlayInnerHtml */
+export const APP_UPDATE_OVERLAY_INNER_HTML = buildFullscreenOverlayInnerHtml(APP_UPDATE_OVERLAY_LABEL);
+
+const OVERLAY_STYLE_ID = "cco-app-fullscreen-overlay-style";
+const UPDATE_OVERLAY_ID = "cco-app-update-overlay";
+const BOOT_OVERLAY_ID = "cco-app-boot-overlay";
 
 function ensureOverlayStyles(): void {
   if (typeof document === "undefined") return;
@@ -29,35 +39,62 @@ function ensureOverlayStyles(): void {
 
   const style = document.createElement("style");
   style.id = OVERLAY_STYLE_ID;
-  style.textContent = APP_UPDATE_OVERLAY_STYLE_CSS;
+  style.textContent = APP_FULLSCREEN_OVERLAY_STYLE_CSS;
   document.head.appendChild(style);
 }
 
-/** Imperative overlay so update feedback shows even if React has not painted yet. */
-export function showAppUpdateOverlay(): void {
+function showOverlay(
+  id: string,
+  label: string,
+  options: { role: "alert" | "status"; ariaLive: "assertive" | "polite" },
+): void {
   if (typeof document === "undefined") return;
 
   ensureOverlayStyles();
 
-  let overlay = document.getElementById(OVERLAY_ID);
+  let overlay = document.getElementById(id);
   if (!overlay) {
     overlay = document.createElement("div");
-    overlay.id = OVERLAY_ID;
+    overlay.id = id;
     overlay.className = "app-update-overlay";
-    overlay.setAttribute("role", "alert");
-    overlay.setAttribute("aria-live", "assertive");
-    overlay.innerHTML = APP_UPDATE_OVERLAY_INNER_HTML;
+    overlay.setAttribute("role", options.role);
+    overlay.setAttribute("aria-live", options.ariaLive);
+    overlay.innerHTML = buildFullscreenOverlayInnerHtml(label);
     (document.body ?? document.documentElement).appendChild(overlay);
     return;
   }
 
   overlay.className = "app-update-overlay";
   overlay.hidden = false;
-  const label = overlay.querySelector(".loading-screen-label");
-  if (label) label.textContent = APP_UPDATE_OVERLAY_LABEL;
+  const labelEl = overlay.querySelector(".loading-screen-label");
+  if (labelEl) labelEl.textContent = label;
+}
+
+function hideOverlay(id: string): void {
+  if (typeof document === "undefined") return;
+  document.getElementById(id)?.remove();
+}
+
+/** Imperative overlay so update feedback shows even if React has not painted yet. */
+export function showAppUpdateOverlay(): void {
+  showOverlay(UPDATE_OVERLAY_ID, APP_UPDATE_OVERLAY_LABEL, {
+    role: "alert",
+    ariaLive: "assertive",
+  });
 }
 
 export function hideAppUpdateOverlay(): void {
-  if (typeof document === "undefined") return;
-  document.getElementById(OVERLAY_ID)?.remove();
+  hideOverlay(UPDATE_OVERLAY_ID);
+}
+
+/** Standalone PWA boot overlay — shown before React hydrates on return visits. */
+export function showAppBootOverlay(): void {
+  showOverlay(BOOT_OVERLAY_ID, APP_BOOT_OVERLAY_LABEL, {
+    role: "status",
+    ariaLive: "polite",
+  });
+}
+
+export function hideAppBootOverlay(): void {
+  hideOverlay(BOOT_OVERLAY_ID);
 }

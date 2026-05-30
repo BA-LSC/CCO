@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { getErrorMessage } from "@/lib/api";
+import { hideAppBootOverlay } from "@/lib/app-update-overlay";
 import { useAppUpdateGuard } from "@/hooks/useAppUpdateGuard";
 
 type LoadingStateProps = {
   label?: string;
-  /** Full-page layout for auth and standalone routes. */
-  variant?: "panel" | "page";
+  /** Full-page layout for auth and standalone routes; overlay matches Updating CCO. */
+  variant?: "panel" | "page" | "overlay";
 };
 
 export function LoadingState({ label = "Loading", variant = "panel" }: LoadingStateProps) {
-  return (
+  const screen = (
     <div
-      className={`loading-screen${variant === "page" ? " loading-screen-page" : ""}`}
+      className={`loading-screen${variant !== "panel" ? " loading-screen-page" : ""}`}
       role="status"
       aria-live="polite"
       aria-label={label}
@@ -22,6 +24,24 @@ export function LoadingState({ label = "Loading", variant = "panel" }: LoadingSt
         <div className="spinner" aria-hidden />
         <p className="loading-screen-label">{label}</p>
       </div>
+    </div>
+  );
+
+  if (variant === "overlay") {
+    return <LoadingOverlay label={label}>{screen}</LoadingOverlay>;
+  }
+
+  return screen;
+}
+
+function LoadingOverlay({ label, children }: { label: string; children: React.ReactNode }) {
+  useEffect(() => {
+    hideAppBootOverlay();
+  }, []);
+
+  return (
+    <div className="app-update-overlay" role="status" aria-live="polite" aria-label={label}>
+      {children}
     </div>
   );
 }
@@ -47,7 +67,7 @@ export function ErrorState({
   const safeMessage = sanitizeDisplayMessage(message);
 
   if (deployBlocked || safeMessage === "Updating CCO…") {
-    return <LoadingState label="Updating CCO…" variant={variant} />;
+    return <LoadingState label="Updating CCO…" variant="overlay" />;
   }
 
   const content = (

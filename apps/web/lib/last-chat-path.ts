@@ -1,3 +1,5 @@
+import { markWelcomeSeen } from "@/lib/welcome-seen";
+
 export const LAST_CHAT_PATH_KEY = "cco:last-chat-path";
 
 const PERSISTABLE_CHAT_PATH =
@@ -15,6 +17,7 @@ export function saveLastChatPath(pathname: string): void {
   if (!isPersistableChatPath(pathname)) return;
   try {
     localStorage.setItem(LAST_CHAT_PATH_KEY, pathname);
+    markWelcomeSeen();
   } catch {
     /* ignore quota / private mode */
   }

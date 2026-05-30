@@ -7,6 +7,9 @@ export type SetupStatus = {
   signInAvailable?: boolean;
   credentialsInDb?: boolean;
   webhooksEnabled?: boolean;
+  /** API proxy or worker unreachable — not the same as org setup incomplete. */
+  unavailable?: boolean;
+  errorMessage?: string;
 };
 
 export type SetupRedirectUris = {
@@ -29,19 +32,48 @@ export type InstallSetupContext = {
   readOnlyUrls: boolean;
 };
 
+async function parseSetupStatusResponse(res: Response): Promise<SetupStatus> {
+  if (res.ok) {
+    return (await res.json()) as SetupStatus;
+  }
+
+  if (res.status >= 500 || res.status === 503) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; updating?: boolean };
+    const fallback = body.updating
+      ? "CCO is updating. Please wait a moment and try again."
+      : "CCO is temporarily unavailable. Check that the API is running, then try again.";
+    return {
+      configured: false,
+      signInAvailable: false,
+      unavailable: true,
+      errorMessage: typeof body.error === "string" ? body.error : fallback,
+    };
+  }
+
+  return { configured: false, signInAvailable: false };
+}
+
 export async function fetchSetupStatus(): Promise<SetupStatus> {
   try {
     if (typeof window !== "undefined") {
       const res = await fetch("/api/v1/setup/status", { cache: "no-store", credentials: "include" });
-      if (!res.ok) return { configured: false, signInAvailable: false };
-      return (await res.json()) as SetupStatus;
+      const status = await parseSetupStatusResponse(res);
+      if (status.configured) {
+        const { writeCachedSetupStatus } = await import("@/lib/setup-status-cache");
+        writeCachedSetupStatus(status);
+      }
+      return status;
     }
 
     const res = await fetchFromApi("/v1/setup/status", { cache: "no-store" });
-    if (!res.ok) return { configured: false, signInAvailable: false };
-    return (await res.json()) as SetupStatus;
+    return parseSetupStatusResponse(res);
   } catch {
-    return { configured: false, signInAvailable: false };
+    return {
+      configured: false,
+      signInAvailable: false,
+      unavailable: true,
+      errorMessage: "CCO is temporarily unavailable. Check that the API is running, then try again.",
+    };
   }
 }
 

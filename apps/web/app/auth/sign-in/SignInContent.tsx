@@ -8,9 +8,16 @@ import { SetupThemeShell } from "@/components/SetupThemeShell";
 type Props = {
   churchName: string | null;
   setupIncomplete?: boolean;
+  apiUnavailable?: boolean;
+  apiUnavailableMessage?: string;
 };
 
-export function SignInContent({ churchName, setupIncomplete = false }: Props) {
+export function SignInContent({
+  churchName,
+  setupIncomplete = false,
+  apiUnavailable = false,
+  apiUnavailableMessage,
+}: Props) {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/groups";
   const startHref = `/auth/sign-in/start?next=${encodeURIComponent(next)}`;
@@ -40,6 +47,12 @@ export function SignInContent({ churchName, setupIncomplete = false }: Props) {
           </p>
         )}
         <div className="setup-form-actions setup-form-actions-center">
+          {apiUnavailable ? (
+            <p className="help-text state-error">
+              {apiUnavailableMessage ??
+                "CCO is temporarily unavailable. Check that the API is running, then try again."}
+            </p>
+          ) : null}
           {setupIncomplete ? (
             <>
               <Link href="/setup?step=credentials" className="setup-btn-primary">
@@ -51,7 +64,10 @@ export function SignInContent({ churchName, setupIncomplete = false }: Props) {
               </p>
             </>
           ) : null}
-          <PcoSignInButton href={startHref} className={setupIncomplete ? "setup-btn-secondary" : "setup-btn-primary"}>
+          <PcoSignInButton
+            href={startHref}
+            className={setupIncomplete ? "setup-btn-secondary" : "setup-btn-primary"}
+          >
             Sign in with Planning Center
           </PcoSignInButton>
         </div>

@@ -9,10 +9,16 @@ export const dynamic = "force-dynamic";
 export default async function SignInPage() {
   const status = await fetchSetupStatus();
   const churchName = status.churchName?.trim() || null;
+  const setupIncomplete = !status.configured && !status.unavailable;
 
   return (
     <Suspense fallback={<SetupLoading label="Loading sign in" />}>
-      <SignInContent churchName={churchName} setupIncomplete={!status.configured} />
+      <SignInContent
+        churchName={churchName}
+        setupIncomplete={setupIncomplete}
+        apiUnavailable={Boolean(status.unavailable)}
+        apiUnavailableMessage={status.errorMessage}
+      />
     </Suspense>
   );
 }

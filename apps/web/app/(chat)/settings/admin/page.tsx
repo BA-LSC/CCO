@@ -627,7 +627,7 @@ export default function IntegrationsSettingsPage() {
     }
   }
 
-  if (loading) return <LoadingState variant="page" label="Loading settings" />;
+  if (loading) return <LoadingState variant="overlay" label="Loading settings" />;
 
   const pushStatus =
     vapidKeysConfigured && webPushConfigured
