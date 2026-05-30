@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type RefObject,
 } from "react";
 import {
@@ -27,19 +28,38 @@ export type { CallPanelPlacement };
 
 const INLINE_MAX_HEIGHT_PX = 320;
 
-type Props = {
+type SessionProps = {
+  authToken: string;
+  sessionParticipantCount: number;
+  onLeave: () => void;
+  onSoloAutoLeave?: (durationMs: number) => void;
+  showSetupScreen?: boolean;
+  panelRef: RefObject<HTMLDivElement | null>;
+  /** Changes when the panel DOM surface moves (inline vs PiP). */
+  panelSurfaceKey?: string;
+  children: ReactNode;
+};
+
+type FrameProps = {
+  authToken: string;
+  placement: CallPanelPlacement;
+  inlineAnchorRect?: DOMRect | null;
+  docked?: boolean;
+  embedded?: boolean;
+  showSetupScreen?: boolean;
+  isGuestSession?: boolean;
+  panelRef: RefObject<HTMLDivElement | null>;
+};
+
+type OverlayProps = {
   authToken: string;
   sessionParticipantCount: number;
   onLeave: () => void;
   onSoloAutoLeave?: (durationMs: number) => void;
   placement?: CallPanelPlacement;
-  /** Measured anchor for inline placement (top of chat-panel-content). */
   inlineAnchorRect?: DOMRect | null;
-  /** Render inline call inside chat-panel-content (below channel settings). */
   docked?: boolean;
-  /** Fill a parent pip shell instead of using fixed viewport positioning. */
   embedded?: boolean;
-  /** Signed-in users skip RTK setup; guests may show it. */
   showSetupScreen?: boolean;
 };
 
@@ -48,6 +68,7 @@ function useSoloCallBehavior(
   panelRef: RefObject<HTMLDivElement | null>,
   sessionParticipantCount: number,
   onSoloAutoLeave?: (durationMs: number) => void,
+  panelSurfaceKey = "default",
 ) {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const participantCount = useRealtimeKitSelector((m) => m.participants.count);
@@ -115,7 +136,7 @@ function useSoloCallBehavior(
       root.removeEventListener("click", onLeaveClick, true);
       root.removeEventListener("rtkStateUpdate", onLeaveConfirmation, true);
     };
-  }, [meeting, panelRef, othersJoinedInRoom, sessionParticipantCount]);
+  }, [meeting, panelRef, panelSurfaceKey, othersJoinedInRoom, sessionParticipantCount]);
 
   useEffect(() => {
     if (roomJoined && isSoloNow()) {
@@ -137,40 +158,22 @@ function useSoloCallBehavior(
   }, [meeting, roomJoined, participantCount, othersJoinedInRoom, sessionParticipantCount]);
 }
 
-function MeetingInner({
+function MeetingLifecycle({
   authToken,
   sessionParticipantCount,
   onLeave,
   onSoloAutoLeave,
   showSetupScreen,
   panelRef,
-  isGuestSession,
-  placement,
-}: {
-  authToken: string;
-  sessionParticipantCount: number;
-  onLeave: () => void;
-  onSoloAutoLeave?: (durationMs: number) => void;
-  showSetupScreen: boolean;
-  panelRef: RefObject<HTMLDivElement | null>;
-  isGuestSession: boolean;
-  placement: CallPanelPlacement;
-}) {
+  panelSurfaceKey = "default",
+}: Omit<SessionProps, "children">) {
   const { meeting } = useRealtimeKitMeeting();
   const onLeaveRef = useRef(onLeave);
   const leftRef = useRef(false);
 
-  const hasGuestInRoom = useRealtimeKitSelector((m) => {
-    if (isGuestSession) return true;
-    const peers = m.participants.joined.toArray();
-    return peers.some((peer) => peerLooksLikeGuest(peer));
-  });
-
-  const enableInRoomChat = isGuestSession || hasGuestInRoom;
-
   onLeaveRef.current = onLeave;
 
-  useSoloCallBehavior(meeting, panelRef, sessionParticipantCount, onSoloAutoLeave);
+  useSoloCallBehavior(meeting, panelRef, sessionParticipantCount, onSoloAutoLeave, panelSurfaceKey);
 
   useEffect(() => {
     if (!meeting) return;
@@ -183,6 +186,12 @@ function MeetingInner({
     meeting.self.on("roomLeft", handler);
     return () => {
       meeting.self.off("roomLeft", handler);
+    };
+  }, [meeting]);
+
+  useEffect(() => {
+    if (!meeting) return;
+    return () => {
       if (!leftRef.current && meeting.self.roomJoined) {
         leftRef.current = true;
         void meeting.leaveRoom();
@@ -197,19 +206,7 @@ function MeetingInner({
     });
   }, [meeting, showSetupScreen, authToken]);
 
-  if (!meeting) return null;
-
-  return (
-    <>
-      <CallMeetingUi
-        meeting={meeting}
-        placement={placement}
-        enableInRoomChat={enableInRoomChat}
-        showSetupScreen={showSetupScreen}
-        authToken={authToken}
-      />
-    </>
-  );
+  return null;
 }
 
 function panelStyle(
@@ -220,9 +217,7 @@ function panelStyle(
 ): CSSProperties | undefined {
   if (placement === "guest") return undefined;
   if (embedded || docked) return undefined;
-
   if (placement === "pip") return undefined;
-
   if (!inlineAnchorRect) return { visibility: "hidden" };
 
   const height = Math.min(
@@ -240,6 +235,107 @@ function panelStyle(
   };
 }
 
+function buildPanelClassName(
+  placement: CallPanelPlacement,
+  docked: boolean,
+  embedded: boolean,
+): string {
+  return [
+    "call-panel",
+    placement === "inline" ? "call-panel--inline" : "",
+    docked ? "call-panel--inline-docked" : "",
+    placement === "pip" ? "call-panel--pip" : "",
+    embedded ? "call-panel--pip-embedded" : "",
+    placement === "guest" ? "call-panel--guest" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** Persistent RealtimeKit session — survives inline/PiP panel swaps. */
+export function CallMeetingSession({
+  authToken,
+  sessionParticipantCount,
+  onLeave,
+  onSoloAutoLeave,
+  showSetupScreen = false,
+  panelRef,
+  panelSurfaceKey,
+  children,
+}: SessionProps) {
+  const [meeting, initMeeting] = useRealtimeKitClient();
+
+  useEffect(() => {
+    void initMeeting({
+      authToken,
+      defaults: { video: false, audio: true },
+    });
+  }, [authToken, initMeeting]);
+
+  return (
+    <RealtimeKitProvider value={meeting}>
+      {children}
+      <MeetingLifecycle
+        authToken={authToken}
+        sessionParticipantCount={sessionParticipantCount}
+        onLeave={onLeave}
+        onSoloAutoLeave={onSoloAutoLeave}
+        showSetupScreen={showSetupScreen}
+        panelRef={panelRef}
+        panelSurfaceKey={panelSurfaceKey}
+      />
+    </RealtimeKitProvider>
+  );
+}
+
+/** Visual call panel shell; safe to remount when switching inline vs PiP. */
+export function CallPanelFrame({
+  authToken,
+  placement,
+  inlineAnchorRect,
+  docked = false,
+  embedded = false,
+  showSetupScreen = false,
+  isGuestSession = false,
+  panelRef,
+}: FrameProps) {
+  const { meeting } = useRealtimeKitMeeting();
+  const { theme } = useTheme();
+
+  const hasGuestInRoom = useRealtimeKitSelector((m) => {
+    if (isGuestSession) return true;
+    const peers = m.participants.joined.toArray();
+    return peers.some((peer) => peerLooksLikeGuest(peer));
+  });
+
+  const enableInRoomChat = isGuestSession || hasGuestInRoom;
+
+  useLayoutEffect(() => {
+    applyCcoRtkDesignSystem(panelRef.current ?? document.documentElement);
+  }, [panelRef, theme]);
+
+  if (!meeting) return null;
+
+  return (
+    <div
+      ref={panelRef}
+      className={buildPanelClassName(placement, docked, embedded)}
+      style={panelStyle(placement, inlineAnchorRect, embedded, docked)}
+      role="region"
+      aria-label="Video call"
+    >
+      <CallMeetingUi
+        meeting={meeting}
+        placement={placement}
+        enableInRoomChat={enableInRoomChat}
+        showSetupScreen={showSetupScreen}
+        authToken={authToken}
+      />
+    </div>
+  );
+}
+
+/** Combined session + frame for standalone pages (e.g. guest join). */
 export function CallOverlay({
   authToken,
   sessionParticipantCount,
@@ -250,53 +346,28 @@ export function CallOverlay({
   docked = false,
   embedded = false,
   showSetupScreen = false,
-}: Props) {
-  const [meeting, initMeeting] = useRealtimeKitClient();
+}: OverlayProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const { theme } = useTheme();
-
-  useLayoutEffect(() => {
-    applyCcoRtkDesignSystem(panelRef.current ?? document.documentElement);
-  }, [theme]);
-
-  useEffect(() => {
-    void initMeeting({
-      authToken,
-      defaults: { video: false, audio: true },
-    });
-  }, [authToken, initMeeting]);
-
-  const className = [
-    "call-panel",
-    placement === "inline" ? "call-panel--inline" : "",
-    docked ? "call-panel--inline-docked" : "",
-    placement === "pip" ? "call-panel--pip" : "",
-    embedded ? "call-panel--pip-embedded" : "",
-    placement === "guest" ? "call-panel--guest" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
 
   return (
-    <div
-      ref={panelRef}
-      className={className}
-      style={panelStyle(placement, inlineAnchorRect, embedded, docked)}
-      role="region"
-      aria-label="Video call"
+    <CallMeetingSession
+      authToken={authToken}
+      sessionParticipantCount={sessionParticipantCount}
+      onLeave={onLeave}
+      onSoloAutoLeave={onSoloAutoLeave}
+      showSetupScreen={showSetupScreen}
+      panelRef={panelRef}
     >
-      <RealtimeKitProvider value={meeting}>
-        <MeetingInner
-          authToken={authToken}
-          sessionParticipantCount={sessionParticipantCount}
-          onLeave={onLeave}
-          onSoloAutoLeave={onSoloAutoLeave}
-          showSetupScreen={showSetupScreen}
-          panelRef={panelRef}
-          isGuestSession={placement === "guest"}
-          placement={placement}
-        />
-      </RealtimeKitProvider>
-    </div>
+      <CallPanelFrame
+        authToken={authToken}
+        placement={placement}
+        inlineAnchorRect={inlineAnchorRect}
+        docked={docked}
+        embedded={embedded}
+        showSetupScreen={showSetupScreen}
+        isGuestSession={placement === "guest"}
+        panelRef={panelRef}
+      />
+    </CallMeetingSession>
   );
 }

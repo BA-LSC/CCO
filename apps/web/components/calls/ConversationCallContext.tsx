@@ -6,12 +6,14 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type MutableRefObject,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { canJoinCallAsParticipant, type CallSummaryDto } from "@cco/shared/calls";
 import { useChatLayout } from "@/components/ChatLayoutContext";
@@ -22,10 +24,11 @@ import { useChatPanelBounds } from "@/hooks/useChatPanelBounds";
 import { useCallConversationTitle } from "@/hooks/useCallConversationTitle";
 import { usePipPanel } from "@/hooks/usePipPanel";
 import { CallActionButton, IncomingCallToast } from "@/components/calls/CallControls";
-import { CallOverlay } from "@/components/calls/CallOverlay";
+import { CallMeetingSession, CallPanelFrame } from "@/components/calls/CallOverlay";
 import { CallPipShell } from "@/components/calls/CallPipShell";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
 import { formatSoloCallAutoLeaveNotice } from "@/lib/call-solo";
+import { resolveCallPanelPlacement } from "@/lib/call-panel-placement";
 
 type CallSessionValue = ReturnType<typeof useCallSession>;
 
@@ -35,6 +38,7 @@ export type ActiveCallContextValue = CallSessionValue & {
   isHost: boolean;
   joinConversation: (conversationId: string) => void;
   inCallOnConversation: (conversationId: string) => boolean;
+  registerInlineAnchor: (element: HTMLElement | null) => void;
   onSoloAutoLeave: (durationMs: number) => void;
 };
 
@@ -90,6 +94,8 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const [incomingConversationId, setIncomingConversationId] = useState<string | null>(null);
   const [incomingCall, setIncomingCall] = useState<CallSummaryDto | null>(null);
   const [soloCallNotice, setSoloCallNotice] = useState<string | null>(null);
+  const [inlineAnchorEl, setInlineAnchorEl] = useState<HTMLElement | null>(null);
+  const callPanelRef = useRef<HTMLDivElement>(null);
 
   const callSession = useCallSession(homeConversationId);
   const {
@@ -274,6 +280,10 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     [homeConversationId, inCall],
   );
 
+  const registerInlineAnchor = useCallback((element: HTMLElement | null) => {
+    setInlineAnchorEl(element);
+  }, []);
+
   const contextValue = useMemo<ActiveCallContextValue>(
     () => ({
       ...callSession,
@@ -282,6 +292,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       isHost: isHost ?? false,
       joinConversation,
       inCallOnConversation,
+      registerInlineAnchor,
       hangUp: handleHangUp,
       onSoloAutoLeave: handleSoloAutoLeave,
     }),
@@ -294,12 +305,20 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       inCallOnConversation,
       isHost,
       joinConversation,
+      registerInlineAnchor,
     ],
   );
 
-  const showPipCall = Boolean(
-    homeConversationId && inCall && authToken && activeConversationId !== homeConversationId,
-  );
+  const panelPlacement = resolveCallPanelPlacement({
+    inCall: Boolean(inCall && authToken),
+    homeConversationId,
+    activeConversationId,
+  });
+  const showInlineFrame = panelPlacement === "inline" && inlineAnchorEl;
+  const showPipFrame =
+    panelPlacement === "pip" || (panelPlacement === "inline" && !inlineAnchorEl);
+  const showPipCall = showPipFrame;
+  const panelSurfaceKey = showInlineFrame ? "inline" : showPipFrame ? "pip" : "none";
   const pip = usePipPanel();
   const chatBounds = useChatPanelBounds(showPipCall);
   const pipTitle = useCallConversationTitle(
@@ -310,6 +329,12 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const returnToCallChat = useCallback(() => {
     if (homeChatPath) router.push(homeChatPath);
   }, [homeChatPath, router]);
+
+  const callPanelFrameProps = {
+    authToken: authToken!,
+    showSetupScreen: false as const,
+    panelRef: callPanelRef,
+  };
 
   return (
     <ActiveCallContext.Provider value={contextValue}>
@@ -359,25 +384,42 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         </ChatHomeBanner>
       ) : null}
 
-      {homeConversationId && inCall && authToken && showPipCall ? (
-        <CallPipShell
-          pip={pip}
-          bounds={chatBounds}
-          title={pipTitle}
-          startedAt={activeCall?.startedAt ?? null}
-          onTitleClick={homeChatPath ? returnToCallChat : undefined}
+      {homeConversationId && inCall && authToken ? (
+        <CallMeetingSession
+          authToken={authToken}
+          sessionParticipantCount={activeCall?.participantCount ?? 1}
+          onLeave={() => void handleHangUp()}
+          onSoloAutoLeave={handleSoloAutoLeave}
+          showSetupScreen={false}
+          panelRef={callPanelRef}
+          panelSurfaceKey={panelSurfaceKey}
         >
-          <CallOverlay
-            key={authToken}
-            authToken={authToken}
-            sessionParticipantCount={activeCall?.participantCount ?? 1}
-            onLeave={() => void handleHangUp()}
-            onSoloAutoLeave={handleSoloAutoLeave}
-            placement="pip"
-            embedded
-            showSetupScreen={false}
-          />
-        </CallPipShell>
+          {showInlineFrame
+            ? createPortal(
+                <CallPanelFrame
+                  {...callPanelFrameProps}
+                  placement="inline"
+                  docked
+                />,
+                inlineAnchorEl,
+              )
+            : null}
+          {showPipFrame ? (
+            <CallPipShell
+              pip={pip}
+              bounds={chatBounds}
+              title={pipTitle}
+              startedAt={activeCall?.startedAt ?? null}
+              onTitleClick={homeChatPath ? returnToCallChat : undefined}
+            >
+              <CallPanelFrame
+                {...callPanelFrameProps}
+                placement="pip"
+                embedded
+              />
+            </CallPipShell>
+          ) : null}
+        </CallMeetingSession>
       ) : null}
 
       {children}
@@ -386,26 +428,23 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 }
 
 export function CallInlineSlot({ conversationId }: { conversationId: string }) {
-  const { inCallOnConversation, authToken, activeCall, hangUp, onSoloAutoLeave } = useActiveCall();
-  const showInline = inCallOnConversation(conversationId);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const { inCallOnConversation, registerInlineAnchor } = useActiveCall();
+  const isHomeCall = inCallOnConversation(conversationId);
 
-  if (!showInline) return null;
+  useLayoutEffect(() => {
+    if (!isHomeCall) {
+      registerInlineAnchor(null);
+      return;
+    }
+    registerInlineAnchor(anchorRef.current);
+    return () => registerInlineAnchor(null);
+  }, [isHomeCall, registerInlineAnchor]);
 
   return (
     <>
-      {authToken ? (
-        <CallOverlay
-          key={authToken}
-          authToken={authToken}
-          sessionParticipantCount={activeCall?.participantCount ?? 1}
-          onLeave={() => void hangUp()}
-          onSoloAutoLeave={onSoloAutoLeave}
-          placement="inline"
-          docked
-          showSetupScreen={false}
-        />
-      ) : null}
-      <div className="call-inline-spacer" aria-hidden="true" />
+      <div ref={anchorRef} className="call-inline-anchor" />
+      {isHomeCall ? <div className="call-inline-spacer" aria-hidden="true" /> : null}
     </>
   );
 }
