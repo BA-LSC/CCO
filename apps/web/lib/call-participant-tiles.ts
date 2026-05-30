@@ -39,3 +39,40 @@ export function isCallTileSelf(
   const selfCustomId = self.customParticipantId?.trim();
   return Boolean(peerCustomId && selfCustomId && peerCustomId === selfCustomId);
 }
+
+export type CallScreenSharePeer = CallTilePeer & {
+  name?: string;
+  screenShareEnabled?: boolean;
+  screenShareTracks?: { video?: MediaStreamTrack | null };
+  addListener?: (event: string, handler: () => void) => void;
+  removeListener?: (event: string, handler: () => void) => void;
+};
+
+/** Active screenshare tiles (self + remote), deduped like participant tiles. */
+export function buildCallScreenShareTiles(
+  joined: CallScreenSharePeer[],
+  self: CallScreenSharePeer | null | undefined,
+  roomJoined: boolean,
+): { peer: CallScreenSharePeer; isSelf: boolean }[] {
+  const tiles: { peer: CallScreenSharePeer; isSelf: boolean }[] = [];
+  const seen = new Set<string>();
+
+  const pushIfSharing = (peer: CallScreenSharePeer, isSelf: boolean) => {
+    if (!peer.screenShareEnabled || !peer.screenShareTracks?.video) return;
+    const key = peer.customParticipantId?.trim() || peer.id;
+    if (seen.has(key)) return;
+    seen.add(key);
+    tiles.push({ peer, isSelf });
+  };
+
+  if (roomJoined && self) {
+    pushIfSharing(self, true);
+  }
+
+  for (const peer of joined) {
+    if (isCallTileSelf(peer, self)) continue;
+    pushIfSharing(peer, false);
+  }
+
+  return tiles;
+}

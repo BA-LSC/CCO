@@ -11,7 +11,9 @@ import { useRtkMirrorVideoPref } from "@/hooks/useRtkMirrorVideoPref";
 import { useSpeakingOutline } from "@/hooks/useSpeakingOutline";
 import {
   buildCallParticipantTiles,
+  buildCallScreenShareTiles,
   isCallTileSelf,
+  type CallScreenSharePeer,
 } from "@/lib/call-participant-tiles";
 
 type CallPeer = {
@@ -101,6 +103,65 @@ function CallParticipantBox({
   );
 }
 
+function CallScreenShareBox({
+  peer,
+  isSelf,
+}: {
+  peer: CallScreenSharePeer;
+  isSelf: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const displayName = peer.name?.trim() || "Participant";
+  const label = isSelf ? "Your screen" : `${displayName}'s screen`;
+
+  useEffect(() => {
+    const element = videoRef.current;
+    const track = peer.screenShareTracks?.video ?? null;
+    if (!element || !peer.screenShareEnabled || !track) {
+      if (element) element.srcObject = null;
+      return;
+    }
+
+    const attach = () => {
+      const stream = new MediaStream();
+      stream.addTrack(track);
+      element.srcObject = stream;
+      void element.play().catch(() => {
+        // Autoplay may be blocked until user gesture; ignore.
+      });
+    };
+
+    attach();
+    const onUpdate = () => attach();
+    peer.addListener?.("screenShareUpdate", onUpdate);
+    return () => {
+      peer.removeListener?.("screenShareUpdate", onUpdate);
+      element.srcObject = null;
+    };
+  }, [
+    peer,
+    peer.screenShareEnabled,
+    peer.screenShareTracks?.video?.id,
+  ]);
+
+  if (!peer.screenShareEnabled || !peer.screenShareTracks?.video) {
+    return null;
+  }
+
+  return (
+    <div className="call-participant-box call-participant-box--screenshare">
+      <video
+        ref={videoRef}
+        className="call-participant-box__video call-participant-box__video--screenshare"
+        autoPlay
+        playsInline
+        muted
+      />
+      <span className="call-participant-box__name">{label}</span>
+    </div>
+  );
+}
+
 /** Participant preview tiles for everyone in the call, including when video is off. */
 export function CallParticipantGrid() {
   const { meeting } = useRealtimeKitMeeting();
@@ -122,12 +183,24 @@ export function CallParticipantGrid() {
     [joined, self, roomJoined],
   );
 
-  if (!meeting || !roomJoined || participants.length === 0) return null;
+  const screenShares = useMemo(
+    () =>
+      buildCallScreenShareTiles(
+        joined as CallScreenSharePeer[],
+        self as unknown as CallScreenSharePeer | undefined,
+        roomJoined,
+      ),
+    [joined, self, roomJoined],
+  );
+
+  const tileCount = participants.length + screenShares.length;
+
+  if (!meeting || !roomJoined || tileCount === 0) return null;
 
   const gridClass =
-    participants.length === 1
+    tileCount === 1
       ? "call-participant-grid call-participant-grid--solo"
-      : participants.length === 2
+      : tileCount === 2
         ? "call-participant-grid call-participant-grid--duo"
         : "call-participant-grid";
 
@@ -153,6 +226,13 @@ export function CallParticipantGrid() {
           />
         );
       })}
+      {screenShares.map(({ peer, isSelf }) => (
+        <CallScreenShareBox
+          key={`screenshare-${peer.id}`}
+          peer={peer}
+          isSelf={isSelf}
+        />
+      ))}
     </div>
   );
 }

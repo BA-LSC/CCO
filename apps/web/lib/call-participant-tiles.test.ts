@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildCallParticipantTiles, isCallTileSelf } from "./call-participant-tiles";
+import {
+  buildCallParticipantTiles,
+  buildCallScreenShareTiles,
+  isCallTileSelf,
+} from "./call-participant-tiles";
 
 const USER_ID = "user-1";
 
@@ -26,6 +30,43 @@ describe("buildCallParticipantTiles", () => {
   it("does not add self when room is not joined", () => {
     const self = { id: "self-rtk", customParticipantId: USER_ID };
     expect(buildCallParticipantTiles([], self, false)).toHaveLength(0);
+  });
+});
+
+describe("buildCallScreenShareTiles", () => {
+  const videoTrack = { id: "screen-v1" } as MediaStreamTrack;
+
+  it("includes self when sharing screen", () => {
+    const self = {
+      id: "self-rtk",
+      customParticipantId: USER_ID,
+      screenShareEnabled: true,
+      screenShareTracks: { video: videoTrack },
+    };
+    const tiles = buildCallScreenShareTiles([], self, true);
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]?.isSelf).toBe(true);
+  });
+
+  it("includes remote peer screen share and skips self duplicate in joined", () => {
+    const self = {
+      id: "self-rtk",
+      customParticipantId: USER_ID,
+      screenShareEnabled: false,
+      screenShareTracks: { video: undefined },
+    };
+    const joined = [
+      {
+        id: "peer-rtk",
+        customParticipantId: "user-2",
+        screenShareEnabled: true,
+        screenShareTracks: { video: videoTrack },
+      },
+    ];
+    const tiles = buildCallScreenShareTiles(joined, self, true);
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]?.peer.id).toBe("peer-rtk");
+    expect(tiles[0]?.isSelf).toBe(false);
   });
 });
 

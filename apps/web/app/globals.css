@@ -8663,6 +8663,14 @@ html.standalone-display .chat-thread-panel {
   transform: scaleX(-1);
 }
 
+.call-participant-box--screenshare {
+  background: #000;
+}
+
+.call-participant-box__video--screenshare {
+  object-fit: contain;
+}
+
 .call-participant-box__avatar img,
 .call-participant-box__initials {
   --call-avatar-size: clamp(72px, 28vmin, 96px);
