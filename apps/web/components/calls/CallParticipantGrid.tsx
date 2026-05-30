@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useRealtimeKitMeeting,
   useRealtimeKitSelector,
@@ -103,12 +103,50 @@ function CallParticipantBox({
   );
 }
 
+function ScreenShareTileAction({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="call-participant-box__tile-action"
+      onClick={onToggle}
+      aria-label={expanded ? "Shrink screen share" : "Enlarge screen share"}
+      aria-expanded={expanded}
+    >
+      {expanded ? (
+        <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
+          <path
+            fill="currentColor"
+            d="M9 3H5a2 2 0 0 0-2 2v4h2V5h4V3zm10 0h-4v2h4v4h2V5a2 2 0 0 0-2-2zM3 15v4a2 2 0 0 0 2 2h4v-2H5v-4H3zm18 0v4h-4v2h4a2 2 0 0 0 2-2v-4h-2z"
+          />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
+          <path
+            fill="currentColor"
+            d="M15 3h6v6h-2V5h-4V3zM3 9V3h6v2H5v4H3zm12 12h4v-4h2v6a2 2 0 0 1-2 2h-6v-2zM9 21H3v-6h2v4h4v2z"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function CallScreenShareBox({
   peer,
   isSelf,
+  expanded,
+  onToggleExpand,
 }: {
   peer: CallScreenSharePeer;
   isSelf: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayName = peer.name?.trim() || "Participant";
@@ -149,7 +187,11 @@ function CallScreenShareBox({
   }
 
   return (
-    <div className="call-participant-box call-participant-box--screenshare">
+    <div
+      className={`call-participant-box call-participant-box--screenshare${
+        expanded ? " call-participant-box--screenshare-expanded" : ""
+      }`}
+    >
       <video
         ref={videoRef}
         className="call-participant-box__video call-participant-box__video--screenshare"
@@ -157,6 +199,7 @@ function CallScreenShareBox({
         playsInline
         muted
       />
+      <ScreenShareTileAction expanded={expanded} onToggle={onToggleExpand} />
       <span className="call-participant-box__name">{label}</span>
     </div>
   );
@@ -172,6 +215,7 @@ export function CallParticipantGrid() {
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
   const mirrorVideo = useRtkMirrorVideoPref();
   const avatarMap = useCallParticipantAvatars(meeting);
+  const [screenShareExpanded, setScreenShareExpanded] = useState(false);
 
   const participants = useMemo(
     () =>
@@ -196,10 +240,14 @@ export function CallParticipantGrid() {
   const tileCount = participants.length + screenShares.length;
   const hasScreenShare = screenShares.length > 0;
 
+  useEffect(() => {
+    if (!hasScreenShare) setScreenShareExpanded(false);
+  }, [hasScreenShare]);
+
   if (!meeting || !roomJoined || tileCount === 0) return null;
 
-  const gridClass = hasScreenShare
-    ? "call-participant-grid call-participant-grid--with-screenshare"
+  const gridClass = hasScreenShare && screenShareExpanded
+    ? "call-participant-grid call-participant-grid--with-screenshare-expanded"
     : tileCount === 1
       ? "call-participant-grid call-participant-grid--solo"
       : tileCount === 2
@@ -208,13 +256,17 @@ export function CallParticipantGrid() {
 
   return (
     <div className={gridClass}>
-      {screenShares.map(({ peer, isSelf }) => (
-        <CallScreenShareBox
-          key={`screenshare-${peer.id}`}
-          peer={peer}
-          isSelf={isSelf}
-        />
-      ))}
+      {screenShareExpanded
+        ? screenShares.map(({ peer, isSelf }) => (
+            <CallScreenShareBox
+              key={`screenshare-${peer.id}`}
+              peer={peer}
+              isSelf={isSelf}
+              expanded
+              onToggleExpand={() => setScreenShareExpanded(false)}
+            />
+          ))
+        : null}
       {participants.map((peer) => {
         const customId = peer.customParticipantId;
         const avatarUrl =
@@ -235,6 +287,17 @@ export function CallParticipantGrid() {
           />
         );
       })}
+      {!screenShareExpanded
+        ? screenShares.map(({ peer, isSelf }) => (
+            <CallScreenShareBox
+              key={`screenshare-${peer.id}`}
+              peer={peer}
+              isSelf={isSelf}
+              expanded={false}
+              onToggleExpand={() => setScreenShareExpanded(true)}
+            />
+          ))
+        : null}
     </div>
   );
 }

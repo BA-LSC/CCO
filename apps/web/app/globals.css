@@ -8583,14 +8583,14 @@ html.standalone-display .chat-thread-panel {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.call-participant-grid--with-screenshare {
+.call-participant-grid--with-screenshare-expanded {
   grid-template-columns: repeat(auto-fit, minmax(88px, max-content));
   grid-template-rows: minmax(0, 1fr) auto;
   align-content: stretch;
   justify-content: center;
 }
 
-.call-participant-grid--with-screenshare .call-participant-box--screenshare {
+.call-participant-grid--with-screenshare-expanded .call-participant-box--screenshare {
   grid-column: 1 / -1;
   grid-row: 1;
   width: 100%;
@@ -8599,12 +8599,13 @@ html.standalone-display .chat-thread-panel {
   align-self: stretch;
 }
 
-.call-participant-grid--with-screenshare .call-participant-box:not(.call-participant-box--screenshare) {
+.call-participant-grid--with-screenshare-expanded .call-participant-box:not(.call-participant-box--screenshare) {
   grid-row: 2;
   aspect-ratio: 16 / 9;
   width: auto;
   height: auto;
   max-width: 168px;
+  max-height: calc(168px * 9 / 16);
 }
 
 .call-participant-box {
@@ -8693,6 +8694,33 @@ html.standalone-display .chat-thread-panel {
 
 .call-participant-box__video--screenshare {
   object-fit: contain;
+}
+
+.call-participant-box__tile-action {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  cursor: pointer;
+}
+
+.call-participant-box__tile-action:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.call-participant-box__tile-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .call-participant-box__avatar img,
@@ -8937,14 +8965,14 @@ html.standalone-display .chat-thread-panel {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.call-panel--inline-docked .call-participant-grid--with-screenshare {
+.call-panel--inline-docked .call-participant-grid--with-screenshare-expanded {
   grid-template-columns: repeat(auto-fit, minmax(88px, max-content));
   grid-template-rows: minmax(0, 1fr) auto;
   align-content: stretch;
   justify-content: center;
 }
 
-.call-panel--inline-docked .call-participant-grid--with-screenshare .call-participant-box--screenshare {
+.call-panel--inline-docked .call-participant-grid--with-screenshare-expanded .call-participant-box--screenshare {
   grid-column: 1 / -1;
   grid-row: 1;
   aspect-ratio: auto;
@@ -8957,7 +8985,7 @@ html.standalone-display .chat-thread-panel {
 }
 
 .call-panel--inline-docked
-  .call-participant-grid--with-screenshare
+  .call-participant-grid--with-screenshare-expanded
   .call-participant-box:not(.call-participant-box--screenshare) {
   grid-row: 2;
   aspect-ratio: 16 / 9;
@@ -8987,7 +9015,7 @@ html.standalone-display .chat-thread-panel {
 .call-panel--inline-docked .call-participant-grid--duo .call-participant-box,
 .call-panel--inline-docked
   .call-participant-grid:not(.call-participant-grid--solo):not(.call-participant-grid--duo):not(
-    .call-participant-grid--with-screenshare
+    .call-participant-grid--with-screenshare-expanded
   )
   .call-participant-box {
   width: 100%;
