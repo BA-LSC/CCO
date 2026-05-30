@@ -45,11 +45,14 @@ async function realtimeKitAppRequest<T>(
   }
 }
 
-export async function createRealtimeKitMeeting(title: string): Promise<MeetingResult> {
-  const config = await resolveRealtimeKitConfig();
-  if (!config) throw new RealtimeKitError("RealtimeKit is not configured");
+export async function createRealtimeKitMeeting(
+  title: string,
+  config?: RealtimeKitConfig,
+): Promise<MeetingResult> {
+  const resolved = config ?? (await resolveRealtimeKitConfig());
+  if (!resolved) throw new RealtimeKitError("RealtimeKit is not configured");
 
-  const meeting = await realtimeKitAppRequest<MeetingResult | undefined>(config, "/meetings", {
+  const meeting = await realtimeKitAppRequest<MeetingResult | undefined>(resolved, "/meetings", {
     method: "POST",
     body: JSON.stringify({ title }),
   });
@@ -59,17 +62,20 @@ export async function createRealtimeKitMeeting(title: string): Promise<MeetingRe
   return meeting;
 }
 
-export async function addRealtimeKitParticipant(params: {
-  meetingId: string;
-  name: string;
-  presetName: string;
-  customParticipantId: string;
-}): Promise<ParticipantResult> {
-  const config = await resolveRealtimeKitConfig();
-  if (!config) throw new RealtimeKitError("RealtimeKit is not configured");
+export async function addRealtimeKitParticipant(
+  params: {
+    meetingId: string;
+    name: string;
+    presetName: string;
+    customParticipantId: string;
+  },
+  config?: RealtimeKitConfig,
+): Promise<ParticipantResult> {
+  const resolved = config ?? (await resolveRealtimeKitConfig());
+  if (!resolved) throw new RealtimeKitError("RealtimeKit is not configured");
 
   const participant = await realtimeKitAppRequest<ParticipantResult | undefined>(
-    config,
+    resolved,
     `/meetings/${params.meetingId}/participants`,
     {
       method: "POST",
@@ -86,15 +92,18 @@ export async function addRealtimeKitParticipant(params: {
   return participant;
 }
 
-export async function refreshRealtimeKitParticipantToken(params: {
-  meetingId: string;
-  participantId: string;
-}): Promise<{ token: string }> {
-  const config = await resolveRealtimeKitConfig();
-  if (!config) throw new RealtimeKitError("RealtimeKit is not configured");
+export async function refreshRealtimeKitParticipantToken(
+  params: {
+    meetingId: string;
+    participantId: string;
+  },
+  config?: RealtimeKitConfig,
+): Promise<{ token: string }> {
+  const resolved = config ?? (await resolveRealtimeKitConfig());
+  if (!resolved) throw new RealtimeKitError("RealtimeKit is not configured");
 
   const refreshed = await realtimeKitAppRequest<{ token?: string } | undefined>(
-    config,
+    resolved,
     `/meetings/${params.meetingId}/participants/${params.participantId}/token`,
     { method: "POST" },
   );

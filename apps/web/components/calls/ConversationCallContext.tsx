@@ -112,7 +112,6 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     shouldIgnoreCall,
   } = callSession;
 
-  const pendingJoinRef = useRef<string | null>(null);
   const inCallRef = useRef(inCall);
   const prevInCallRef = useRef(inCall);
   const endedCallIdsRef = useRef(new Set<string>());
@@ -140,17 +139,10 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
     (conversationId: string) => {
       setHomeConversationId(conversationId);
       setHomeChatPath(pathname);
-      pendingJoinRef.current = conversationId;
+      void join(conversationId);
     },
-    [pathname],
+    [join, pathname],
   );
-
-  useEffect(() => {
-    const pending = pendingJoinRef.current;
-    if (!pending || homeConversationId !== pending) return;
-    pendingJoinRef.current = null;
-    void join();
-  }, [homeConversationId, join]);
 
   useEffect(() => {
     if (inCall && activeCall?.conversationId) {

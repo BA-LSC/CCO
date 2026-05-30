@@ -31,11 +31,12 @@ import {
   createRealtimeKitMeeting,
   deactivateRealtimeKitMeeting,
   endRealtimeKitMeetingSession,
-  isRealtimeKitConfigured,
   kickRealtimeKitParticipantsFromSession,
   presetForRole,
   refreshRealtimeKitParticipantToken,
 } from "./realtimekit";
+import { getPresetNames, resolveRealtimeKitConfig, type RealtimeKitConfig } from "./org-realtimekit";
+import { getConfiguredOrganization } from "./org-oauth";
 import { getOrgPcoAccessToken } from "./org-config";
 import { ensureCallSessionSchema } from "./org-schema-capabilities";
 import { isConversationMember } from "./call-access";
@@ -153,6 +154,39 @@ async function countActiveParticipants(callSessionId: string): Promise<number> {
   return activeCount;
 }
 
+async function buildMinimalCallSummary(callSessionId: string): Promise<CallSummaryDto | null> {
+  const row = await db
+    .select({
+      id: callSessions.id,
+      conversationId: callSessions.conversationId,
+      hostUserId: callSessions.hostUserId,
+      status: callSessions.status,
+      startedAt: callSessions.startedAt,
+      endedAt: callSessions.endedAt,
+      hostDisplayName: users.displayName,
+    })
+    .from(callSessions)
+    .innerJoin(users, eq(users.id, callSessions.hostUserId))
+    .where(eq(callSessions.id, callSessionId))
+    .limit(1);
+
+  const call = row[0];
+  if (!call) return null;
+
+  const participantCount = await countJoinedParticipants(callSessionId);
+
+  return {
+    id: call.id,
+    conversationId: call.conversationId,
+    hostUserId: call.hostUserId,
+    hostDisplayName: call.hostDisplayName,
+    status: call.status as CallSummaryDto["status"],
+    participantCount: Math.max(1, participantCount),
+    startedAt: call.startedAt.toISOString(),
+    endedAt: call.endedAt?.toISOString() ?? null,
+  };
+}
+
 async function buildCallSummary(callSessionId: string): Promise<CallSummaryDto | null> {
   const row = await db
     .select({
@@ -251,6 +285,8 @@ async function ensureParticipantToken(params: {
   displayName: string;
   role: "host" | "member" | "guest";
   guestLabel?: string;
+  rtkConfig?: RealtimeKitConfig;
+  presets?: { host: string; member: string; guest: string };
 }): Promise<{ authToken: string; participantRowId: string; joinEpoch: number }> {
   const existing = await db
     .select({
@@ -278,10 +314,13 @@ async function ensureParticipantToken(params: {
       meetingId: params.meetingId,
       customParticipantIds: [customId],
     });
-    const refreshed = await refreshRealtimeKitParticipantToken({
-      meetingId: params.meetingId,
-      participantId: existing[0].realtimeKitParticipantId,
-    });
+    const refreshed = await refreshRealtimeKitParticipantToken(
+      {
+        meetingId: params.meetingId,
+        participantId: existing[0].realtimeKitParticipantId,
+      },
+      params.rtkConfig,
+    );
     await db
       .update(callParticipants)
       .set({ joinedAt })
@@ -289,12 +328,23 @@ async function ensureParticipantToken(params: {
     return { authToken: refreshed.token, participantRowId: existing[0].id, joinEpoch };
   }
 
-  const added = await addRealtimeKitParticipant({
-    meetingId: params.meetingId,
-    name: params.displayName,
-    presetName: await presetForRole(params.role),
-    customParticipantId: customId,
-  });
+  const presetName = params.presets
+    ? params.role === "host"
+      ? params.presets.host
+      : params.role === "guest"
+        ? params.presets.guest
+        : params.presets.member
+    : await presetForRole(params.role);
+
+  const added = await addRealtimeKitParticipant(
+    {
+      meetingId: params.meetingId,
+      name: params.displayName,
+      presetName,
+      customParticipantId: customId,
+    },
+    params.rtkConfig,
+  );
 
   let participantRowId = existing[0]?.id;
   if (!participantRowId) {
@@ -352,32 +402,37 @@ export async function startOrJoinConversationCall(params: {
   userId: string;
   organizationId: string;
 }): Promise<CallJoinResponse | null> {
-  if (!(await isRealtimeKitConfigured())) {
+  const rtkConfig = await resolveRealtimeKitConfig();
+  if (!rtkConfig) {
     throw new Error("Video calls are not configured for this organization");
   }
 
   await ensureCallSessionSchema();
 
-  const isMember = await isConversationMember(params.conversationId, params.userId);
+  const [isMember, existing, user, org] = await Promise.all([
+    isConversationMember(params.conversationId, params.userId),
+    db
+      .select({
+        id: callSessions.id,
+        meetingId: callSessions.realtimeKitMeetingId,
+        hostUserId: callSessions.hostUserId,
+        status: callSessions.status,
+      })
+      .from(callSessions)
+      .where(
+        and(
+          eq(callSessions.conversationId, params.conversationId),
+          inArray(callSessions.status, [...ACTIVE_STATUSES]),
+        ),
+      )
+      .limit(1),
+    getUserDisplay(params.userId),
+    getConfiguredOrganization(),
+  ]);
+  const presets = getPresetNames(org);
+
   if (!isMember) return null;
 
-  const existing = await db
-    .select({
-      id: callSessions.id,
-      meetingId: callSessions.realtimeKitMeetingId,
-      hostUserId: callSessions.hostUserId,
-      status: callSessions.status,
-    })
-    .from(callSessions)
-    .where(
-      and(
-        eq(callSessions.conversationId, params.conversationId),
-        inArray(callSessions.status, [...ACTIVE_STATUSES]),
-      ),
-    )
-    .limit(1);
-
-  const user = await getUserDisplay(params.userId);
   let callSessionId: string;
   let meetingId: string;
   let role: "host" | "member" = "member";
@@ -393,7 +448,7 @@ export async function startOrJoinConversationCall(params: {
       .from(conversations)
       .where(eq(conversations.id, params.conversationId))
       .limit(1);
-    const meeting = await createRealtimeKitMeeting(conv[0]?.title ?? "CCO Call");
+    const meeting = await createRealtimeKitMeeting(conv[0]?.title ?? "CCO Call", rtkConfig);
     meetingId = meeting.id;
     role = "host";
     isNewCall = true;
@@ -416,44 +471,51 @@ export async function startOrJoinConversationCall(params: {
     userId: params.userId,
     displayName: user.displayName,
     role,
+    rtkConfig,
+    presets,
   });
 
   if (isNewCall) {
-    const summary = (await buildCallSummary(callSessionId))!;
-    await publishCallEvent(params.conversationId, {
-      type: "call.started",
-      conversationId: params.conversationId,
-      call: summary,
-      timelineEvent: {
-        id: callTimelineEventId(callSessionId, "started"),
-        callId: callSessionId,
-        kind: "started",
-        at: summary.startedAt,
-      },
-    });
+    scheduleBackgroundWork(async () => {
+      const summary = (await buildCallSummary(callSessionId))!;
+      await publishCallEvent(params.conversationId, {
+        type: "call.started",
+        conversationId: params.conversationId,
+        call: summary,
+        timelineEvent: {
+          id: callTimelineEventId(callSessionId, "started"),
+          callId: callSessionId,
+          kind: "started",
+          at: summary.startedAt,
+        },
+      });
 
-    await notifyIncomingCall({
-      callId: callSessionId,
-      conversationId: params.conversationId,
-      hostUserId: params.userId,
-      hostDisplayName: user.displayName,
+      await notifyIncomingCall({
+        callId: callSessionId,
+        conversationId: params.conversationId,
+        hostUserId: params.userId,
+        hostDisplayName: user.displayName,
+      });
     });
   } else {
-    if (existing[0].status === "ringing" && existing[0].hostUserId !== params.userId) {
-      await db
-        .update(callSessions)
-        .set({ status: "active" })
-        .where(eq(callSessions.id, callSessionId));
-    }
-    const summary = (await buildCallSummary(callSessionId))!;
-    await publishCallEvent(params.conversationId, {
-      type: "call.updated",
-      conversationId: params.conversationId,
-      call: summary,
+    const existingCall = existing[0]!;
+    scheduleBackgroundWork(async () => {
+      if (existingCall.status === "ringing" && existingCall.hostUserId !== params.userId) {
+        await db
+          .update(callSessions)
+          .set({ status: "active" })
+          .where(eq(callSessions.id, callSessionId));
+      }
+      const summary = (await buildCallSummary(callSessionId))!;
+      await publishCallEvent(params.conversationId, {
+        type: "call.updated",
+        conversationId: params.conversationId,
+        call: summary,
+      });
     });
   }
 
-  const call = (await buildCallSummary(callSessionId))!;
+  const call = (await buildMinimalCallSummary(callSessionId))!;
   return { call, authToken, joinEpoch };
 }
 
@@ -461,26 +523,35 @@ export async function joinCall(params: {
   callId: string;
   userId: string;
 }): Promise<CallJoinResponse | null> {
+  const rtkConfig = await resolveRealtimeKitConfig();
+  if (!rtkConfig) {
+    throw new Error("Video calls are not configured for this organization");
+  }
+
   if (!(await canAccessCall({ callSessionId: params.callId, userId: params.userId }))) {
     return null;
   }
 
-  const row = await db
-    .select({
-      conversationId: callSessions.conversationId,
-      meetingId: callSessions.realtimeKitMeetingId,
-      hostUserId: callSessions.hostUserId,
-      status: callSessions.status,
-    })
-    .from(callSessions)
-    .where(eq(callSessions.id, params.callId))
-    .limit(1);
+  const [row, user, org] = await Promise.all([
+    db
+      .select({
+        conversationId: callSessions.conversationId,
+        meetingId: callSessions.realtimeKitMeetingId,
+        hostUserId: callSessions.hostUserId,
+        status: callSessions.status,
+      })
+      .from(callSessions)
+      .where(eq(callSessions.id, params.callId))
+      .limit(1),
+    getUserDisplay(params.userId),
+    getConfiguredOrganization(),
+  ]);
+  const presets = getPresetNames(org);
 
   const call = row[0];
   if (!call || call.status === "ended") return null;
   if (!canJoinCallAsParticipant(call, params.userId)) return null;
 
-  const user = await getUserDisplay(params.userId);
   const role = "member";
   const { authToken, joinEpoch } = await ensureParticipantToken({
     callSessionId: params.callId,
@@ -488,19 +559,24 @@ export async function joinCall(params: {
     userId: params.userId,
     displayName: user.displayName,
     role,
+    rtkConfig,
+    presets,
   });
 
-  if (call.status === "ringing") {
-    await db.update(callSessions).set({ status: "active" }).where(eq(callSessions.id, params.callId));
-  }
-
-  const summary = (await buildCallSummary(params.callId))!;
-  await publishCallEvent(call.conversationId, {
-    type: "call.updated",
-    conversationId: call.conversationId,
-    call: summary,
+  const wasRinging = call.status === "ringing";
+  scheduleBackgroundWork(async () => {
+    if (wasRinging) {
+      await db.update(callSessions).set({ status: "active" }).where(eq(callSessions.id, params.callId));
+    }
+    const summary = (await buildCallSummary(params.callId))!;
+    await publishCallEvent(call.conversationId, {
+      type: "call.updated",
+      conversationId: call.conversationId,
+      call: summary,
+    });
   });
 
+  const summary = (await buildMinimalCallSummary(params.callId))!;
   return { call: summary, authToken, joinEpoch };
 }
 

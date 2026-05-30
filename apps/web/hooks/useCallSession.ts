@@ -44,13 +44,14 @@ export function useCallSession(conversationId: string | null) {
     void refreshActive();
   }, [refreshActive]);
 
-  const join = useCallback(async () => {
-    if (!conversationId) return;
+  const join = useCallback(async (overrideConversationId?: string) => {
+    const targetConversationId = overrideConversationId ?? conversationId;
+    if (!targetConversationId) return;
     leavingRef.current = false;
     setLoading(true);
     setError(null);
     try {
-      const result = await startOrJoinCall(conversationId);
+      const result = await startOrJoinCall(targetConversationId);
       ignoredCallIdsRef.current.delete(result.call.id);
       activeCallIdRef.current = result.call.id;
       joinEpochRef.current = result.joinEpoch;
