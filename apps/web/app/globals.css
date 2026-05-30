@@ -8899,37 +8899,57 @@ html.standalone-display .chat-thread-panel {
   z-index: 15;
 }
 
-.call-panel--inline-docked .call-participant-grid--solo {
+.call-panel--inline-docked .call-participant-grid {
   align-items: center;
   justify-items: center;
+  align-content: center;
   place-content: center;
   padding: 8px 12px 6px;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
+.call-panel--inline-docked .call-participant-grid--duo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.call-panel--inline-docked .call-participant-box {
   aspect-ratio: 16 / 9;
-  width: auto;
-  height: 100%;
   max-width: 100%;
+  max-height: 100%;
   min-height: 0;
   align-self: center;
+  justify-self: center;
   padding: 0;
   flex-direction: column;
   justify-content: center;
 }
 
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__video {
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
+  width: auto;
+  height: 100%;
+}
+
+.call-panel--inline-docked .call-participant-grid--duo .call-participant-box,
+.call-panel--inline-docked
+  .call-participant-grid:not(.call-participant-grid--solo):not(.call-participant-grid--duo)
+  .call-participant-box {
+  width: 100%;
+  height: auto;
+}
+
+.call-panel--inline-docked .call-participant-box__video {
   object-fit: contain;
 }
 
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar {
+.call-panel--inline-docked .call-participant-box__avatar {
   flex: 0 0 auto;
   width: auto;
   height: auto;
 }
 
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar img,
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__initials {
+.call-panel--inline-docked .call-participant-box__avatar img,
+.call-panel--inline-docked .call-participant-box__initials {
   --call-avatar-size: clamp(64px, 10vmin, 80px);
   width: var(--call-avatar-size);
   height: var(--call-avatar-size);
