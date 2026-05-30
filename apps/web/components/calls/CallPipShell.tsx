@@ -129,7 +129,8 @@ export function CallPipShell({
 
   const onHandlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if ((event.target as HTMLElement).closest(".call-pip__toggle")) return;
+      const target = event.target as HTMLElement;
+      if (target.closest(".call-pip__toggle, button.call-pip__title")) return;
       const shell = shellRef.current;
       if (!shell) return;
       event.preventDefault();
@@ -145,14 +146,6 @@ export function CallPipShell({
     },
     [setDragPoint],
   );
-
-  const onTitleActivate = useCallback(() => {
-    if (didDragRef.current) {
-      didDragRef.current = false;
-      return;
-    }
-    onTitleClick?.();
-  }, [onTitleClick]);
 
   const onHandlePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -225,7 +218,7 @@ export function CallPipShell({
               className="call-pip__title"
               title={title}
               aria-label={`Return to ${title} chat`}
-              onClick={onTitleActivate}
+              onClick={() => onTitleClick?.()}
             >
               {title}
             </button>

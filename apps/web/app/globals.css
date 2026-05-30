@@ -8408,6 +8408,18 @@ html.standalone-display .chat-thread-panel {
   color: var(--color-danger);
 }
 
+.call-header-btn__phone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(0deg) scale(1);
+  transition: transform var(--motion-normal) var(--motion-ease-out);
+}
+
+.call-header-btn__phone--hang-up {
+  transform: rotate(135deg) scale(0.88);
+}
+
 .call-header-btn--in-call:hover:not(:disabled) {
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 12%, transparent);
@@ -8702,20 +8714,22 @@ html.standalone-display .chat-thread-panel {
 }
 
 .call-pip .call-participant-grid--solo {
-  align-items: center;
-  justify-items: center;
-  place-content: center;
+  align-items: stretch;
+  justify-items: stretch;
+  place-content: stretch;
+  padding: 6px 8px 4px;
 }
 
 .call-pip .call-participant-grid--solo .call-participant-box {
-  width: auto;
-  max-width: 100%;
-  height: auto;
-  min-height: 0;
-  align-self: center;
-  padding: 4px 8px;
-  background: transparent;
-  flex-direction: row;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 72px;
+  align-self: stretch;
+  padding: 8px 10px 10px;
+  background: var(--color-surface-2);
+  flex-direction: column;
+  justify-content: center;
 }
 
 .call-pip .call-participant-grid--solo .call-participant-box__avatar {
@@ -8726,7 +8740,7 @@ html.standalone-display .chat-thread-panel {
 
 .call-pip .call-participant-grid--solo .call-participant-box__avatar img,
 .call-pip .call-participant-grid--solo .call-participant-box__initials {
-  --call-avatar-size: 64px;
+  --call-avatar-size: 48px;
   width: var(--call-avatar-size);
   height: var(--call-avatar-size);
   aspect-ratio: 1;
@@ -8734,7 +8748,7 @@ html.standalone-display .chat-thread-panel {
 }
 
 .call-pip .call-participant-grid--solo .call-participant-box__initials {
-  font-size: 1.25rem;
+  font-size: 1rem;
 }
 
 .call-pip .call-meeting-ui__footer {
@@ -8857,27 +8871,41 @@ html.standalone-display .chat-thread-panel {
 
 .call-panel--inline-docked .call-participant-grid--solo {
   align-items: center;
-  justify-items: center;
+  justify-items: stretch;
   place-content: center;
-  padding: 10px 8px 8px;
+  padding: 8px 12px 6px;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
-  width: min(100%, 252px);
+  width: 100%;
   height: auto;
-  max-height: 100%;
-  min-height: 0;
-  align-self: center;
-  padding-bottom: 4px;
+  min-height: 88px;
+  max-height: none;
+  align-self: stretch;
+  padding: 10px 12px 12px;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar img,
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box__initials {
-  height: min(152px, 100%);
+  --call-avatar-size: clamp(64px, 10vmin, 80px);
+  width: var(--call-avatar-size);
+  height: var(--call-avatar-size);
+  max-width: none;
+  aspect-ratio: 1;
+}
+
+.call-inline-anchor {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .call-panel--guest {
@@ -8968,15 +8996,14 @@ button.call-pip__title {
   border: none;
   background: transparent;
   padding: 0;
-  cursor: grab;
+  cursor: pointer;
   text-align: left;
   font: inherit;
   transition: color var(--motion-fast) ease;
 }
 
-.call-pip--dragging button.call-pip__title,
-.call-pip__handle:active button.call-pip__title {
-  cursor: grabbing;
+.call-pip--dragging button.call-pip__title {
+  cursor: pointer;
 }
 
 button.call-pip__title:hover {
@@ -9001,7 +9028,7 @@ button.call-pip__title:focus-visible {
   font-size: 0.75rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+  color: var(--color-success);
 }
 
 .call-pip__toggle {
@@ -9159,6 +9186,10 @@ button.call-pip__title:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
   .call-pip--snap {
+    transition: none;
+  }
+
+  .call-header-btn__phone {
     transition: none;
   }
 
