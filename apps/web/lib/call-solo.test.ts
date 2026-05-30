@@ -47,8 +47,17 @@ describe("shouldApplySoloCallBehavior", () => {
 
 describe("formatSoloCallAutoLeaveNotice", () => {
   it("describes how long the solo call lasted", () => {
+    expect(formatSoloCallAutoLeaveNotice(60)).toBe(
+      "Call ended after 1m — no one else joined",
+    );
     expect(formatSoloCallAutoLeaveNotice(320)).toBe(
       "Call ended after 5m 20s — no one else joined",
     );
+  });
+});
+
+describe("SOLO_CALL_AUTO_LEAVE_MS", () => {
+  it("auto-leaves solo calls after one minute", () => {
+    expect(SOLO_CALL_AUTO_LEAVE_MS).toBe(60_000);
   });
 });

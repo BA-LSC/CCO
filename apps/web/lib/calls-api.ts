@@ -21,8 +21,14 @@ export async function joinCallById(callId: string): Promise<CallJoinResponse> {
   return apiFetch<CallJoinResponse>(`/api/v1/calls/${callId}/join`, { method: "POST" });
 }
 
-export async function leaveCall(callId: string): Promise<void> {
-  await apiFetch(`/api/v1/calls/${callId}/leave`, { method: "POST" });
+export async function leaveCall(
+  callId: string,
+  joinEpoch?: number,
+): Promise<{ left: boolean; superseded?: boolean }> {
+  return apiFetch<{ left: boolean; superseded?: boolean }>(`/api/v1/calls/${callId}/leave`, {
+    method: "POST",
+    body: JSON.stringify(joinEpoch != null ? { joinEpoch } : {}),
+  });
 }
 
 export async function endCall(callId: string): Promise<void> {

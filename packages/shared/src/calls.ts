@@ -41,9 +41,21 @@ export function canJoinCallAsParticipant(
   return Boolean(userId && call.hostUserId !== userId);
 }
 
+/** Whether a leave request should mark the participant as left in CCO. */
+export function shouldApplyCallLeave(params: {
+  joinEpoch?: number;
+  participantJoinedAtMs: number | null;
+}): boolean {
+  if (params.joinEpoch == null) return true;
+  if (params.participantJoinedAtMs == null) return true;
+  return params.participantJoinedAtMs === params.joinEpoch;
+}
+
 export const CallJoinResponseSchema = z.object({
   call: CallSummaryDtoSchema,
   authToken: z.string(),
+  /** Milliseconds since epoch for this join; stale leaves from another device are ignored. */
+  joinEpoch: z.number().int(),
 });
 
 export type CallJoinResponse = z.infer<typeof CallJoinResponseSchema>;

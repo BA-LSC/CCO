@@ -1,7 +1,9 @@
 import { formatCallDuration } from "@cco/shared/call-timeline";
 
 /** End a solo call automatically when nobody else joins within this window. */
-export const SOLO_CALL_AUTO_LEAVE_MS = 5 * 60 * 1000;
+export const SOLO_CALL_AUTO_LEAVE_MS = 60 * 1000;
+
+export const CALL_SUPERSEDED_NOTICE = "You joined this call from another location";
 
 export function formatSoloCallAutoLeaveNotice(durationSeconds: number): string {
   const duration = formatCallDuration(Math.max(1, Math.floor(durationSeconds)));
@@ -21,7 +23,7 @@ export function isSoloCallSession(sessionParticipantCount: number): boolean {
 }
 
 /**
- * Apply solo-only UX (instant leave, 5-minute auto-leave) only when both the CCO
+ * Apply solo-only UX (instant leave, 1-minute auto-leave) only when both the CCO
  * session and RealtimeKit room agree nobody else is present.
  */
 export function shouldApplySoloCallBehavior(

@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   canJoinCallAsParticipant,
+  shouldApplyCallLeave,
   type CallGuestPreview,
   type CallInviteCandidateDto,
   type CallJoinResponse,
@@ -31,6 +32,7 @@ import {
   deactivateRealtimeKitMeeting,
   endRealtimeKitMeetingSession,
   isRealtimeKitConfigured,
+  kickRealtimeKitParticipantsFromSession,
   presetForRole,
   refreshRealtimeKitParticipantToken,
 } from "./realtimekit";
@@ -249,7 +251,7 @@ async function ensureParticipantToken(params: {
   displayName: string;
   role: "host" | "member" | "guest";
   guestLabel?: string;
-}): Promise<{ authToken: string; participantRowId: string }> {
+}): Promise<{ authToken: string; participantRowId: string; joinEpoch: number }> {
   const existing = await db
     .select({
       id: callParticipants.id,
@@ -268,17 +270,23 @@ async function ensureParticipantToken(params: {
     .limit(1);
 
   const customId = params.userId ? params.userId : `guest:${params.guestLabel ?? "anon"}`;
+  const joinedAt = new Date();
+  const joinEpoch = joinedAt.getTime();
 
   if (existing[0]?.realtimeKitParticipantId) {
+    await kickRealtimeKitParticipantsFromSession({
+      meetingId: params.meetingId,
+      customParticipantIds: [customId],
+    });
     const refreshed = await refreshRealtimeKitParticipantToken({
       meetingId: params.meetingId,
       participantId: existing[0].realtimeKitParticipantId,
     });
     await db
       .update(callParticipants)
-      .set({ joinedAt: new Date() })
+      .set({ joinedAt })
       .where(eq(callParticipants.id, existing[0].id));
-    return { authToken: refreshed.token, participantRowId: existing[0].id };
+    return { authToken: refreshed.token, participantRowId: existing[0].id, joinEpoch };
   }
 
   const added = await addRealtimeKitParticipant({
@@ -298,7 +306,7 @@ async function ensureParticipantToken(params: {
         guestLabel: params.guestLabel ?? null,
         realtimeKitParticipantId: added.id,
         role: params.role,
-        joinedAt: new Date(),
+        joinedAt,
       })
       .returning({ id: callParticipants.id });
     participantRowId = inserted[0]!.id;
@@ -307,12 +315,12 @@ async function ensureParticipantToken(params: {
       .update(callParticipants)
       .set({
         realtimeKitParticipantId: added.id,
-        joinedAt: new Date(),
+        joinedAt,
       })
       .where(eq(callParticipants.id, participantRowId));
   }
 
-  return { authToken: added.token, participantRowId };
+  return { authToken: added.token, participantRowId, joinEpoch };
 }
 
 export async function getActiveCallForConversation(
@@ -402,7 +410,7 @@ export async function startOrJoinConversationCall(params: {
     callSessionId = inserted[0]!.id;
   }
 
-  const { authToken } = await ensureParticipantToken({
+  const { authToken, joinEpoch } = await ensureParticipantToken({
     callSessionId,
     meetingId,
     userId: params.userId,
@@ -446,7 +454,7 @@ export async function startOrJoinConversationCall(params: {
   }
 
   const call = (await buildCallSummary(callSessionId))!;
-  return { call, authToken };
+  return { call, authToken, joinEpoch };
 }
 
 export async function joinCall(params: {
@@ -474,7 +482,7 @@ export async function joinCall(params: {
 
   const user = await getUserDisplay(params.userId);
   const role = "member";
-  const { authToken } = await ensureParticipantToken({
+  const { authToken, joinEpoch } = await ensureParticipantToken({
     callSessionId: params.callId,
     meetingId: call.meetingId,
     userId: params.userId,
@@ -493,10 +501,41 @@ export async function joinCall(params: {
     call: summary,
   });
 
-  return { call: summary, authToken };
+  return { call: summary, authToken, joinEpoch };
 }
 
-export async function leaveCall(params: { callId: string; userId: string }): Promise<boolean> {
+export type LeaveCallResult = { ok: boolean; superseded: boolean };
+
+export async function leaveCall(params: {
+  callId: string;
+  userId: string;
+  joinEpoch?: number;
+}): Promise<LeaveCallResult> {
+  const participant = await db
+    .select({
+      id: callParticipants.id,
+      joinedAt: callParticipants.joinedAt,
+    })
+    .from(callParticipants)
+    .where(
+      and(
+        eq(callParticipants.callSessionId, params.callId),
+        eq(callParticipants.userId, params.userId),
+        isNull(callParticipants.leftAt),
+      ),
+    )
+    .limit(1);
+
+  if (
+    participant[0] &&
+    !shouldApplyCallLeave({
+      joinEpoch: params.joinEpoch,
+      participantJoinedAtMs: participant[0].joinedAt?.getTime() ?? null,
+    })
+  ) {
+    return { ok: true, superseded: true };
+  }
+
   const updated = await db
     .update(callParticipants)
     .set({ leftAt: new Date() })
@@ -522,7 +561,7 @@ export async function leaveCall(params: { callId: string; userId: string }): Pro
         ),
       )
       .limit(1);
-    if (stillActive[0]) return false;
+    if (stillActive[0]) return { ok: false, superseded: false };
   }
 
   const call = await db
@@ -547,7 +586,7 @@ export async function leaveCall(params: { callId: string; userId: string }): Pro
     }
   }
 
-  return true;
+  return { ok: true, superseded: false };
 }
 
 export async function endCall(params: { callId: string; userId: string }): Promise<boolean> {
@@ -805,7 +844,7 @@ export async function joinCallAsGuest(params: {
 
   const guestName = params.displayName.trim().slice(0, 80) || invite.targetDisplayName || "Guest";
 
-  const { authToken } = await ensureParticipantToken({
+  const { authToken, joinEpoch } = await ensureParticipantToken({
     callSessionId: call[0].id,
     meetingId: call[0].meetingId,
     displayName: guestName,
@@ -829,7 +868,7 @@ export async function joinCallAsGuest(params: {
     call: summary,
   });
 
-  return { call: summary, authToken };
+  return { call: summary, authToken, joinEpoch };
 }
 
 export async function listCallParticipants(callId: string): Promise<CallParticipantDto[]> {

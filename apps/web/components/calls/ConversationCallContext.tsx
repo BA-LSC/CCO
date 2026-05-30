@@ -27,7 +27,7 @@ import { CallActionButton, IncomingCallToast } from "@/components/calls/CallCont
 import { CallMeetingSession, CallPanelFrame } from "@/components/calls/CallOverlay";
 import { CallPipShell } from "@/components/calls/CallPipShell";
 import { ChatHomeBanner, CHAT_PANEL_BANNER_AUTO_DISMISS_MS } from "@/components/ChatHomeBanner";
-import { formatSoloCallAutoLeaveNotice } from "@/lib/call-solo";
+import { CALL_SUPERSEDED_NOTICE, formatSoloCallAutoLeaveNotice } from "@/lib/call-solo";
 import { resolveCallPanelPlacement } from "@/lib/call-panel-placement";
 
 type CallSessionValue = ReturnType<typeof useCallSession>;
@@ -93,7 +93,7 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
   const [homeChatPath, setHomeChatPath] = useState<string | null>(null);
   const [incomingConversationId, setIncomingConversationId] = useState<string | null>(null);
   const [incomingCall, setIncomingCall] = useState<CallSummaryDto | null>(null);
-  const [soloCallNotice, setSoloCallNotice] = useState<string | null>(null);
+  const [callNotice, setCallNotice] = useState<string | null>(null);
   const [inlineAnchorEl, setInlineAnchorEl] = useState<HTMLElement | null>(null);
   const callPanelRef = useRef<HTMLDivElement>(null);
 
@@ -175,7 +175,10 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
 
   const handleHangUp = useCallback(async () => {
     clearCallQueryParam();
-    await hangUp();
+    const result = await hangUp();
+    if (result?.superseded) {
+      setCallNotice(CALL_SUPERSEDED_NOTICE);
+    }
     setHomeConversationId(null);
     setHomeChatPath(null);
   }, [clearCallQueryParam, hangUp]);
@@ -266,11 +269,11 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
       const pendingSeconds = pendingSoloNoticeSecondsRef.current;
       if (pendingSeconds != null) {
         pendingSoloNoticeSecondsRef.current = null;
-        setSoloCallNotice(formatSoloCallAutoLeaveNotice(pendingSeconds));
+        setCallNotice(formatSoloCallAutoLeaveNotice(pendingSeconds));
       }
     } else if (!prevInCallRef.current) {
       pendingSoloNoticeSecondsRef.current = null;
-      setSoloCallNotice(null);
+      setCallNotice(null);
     }
     prevInCallRef.current = inCall;
   }, [inCall]);
@@ -372,15 +375,15 @@ export function ActiveCallProvider({ children }: { children: ReactNode }) {
         </ChatHomeBanner>
       ) : null}
 
-      {soloCallNotice ? (
+      {callNotice ? (
         <ChatHomeBanner
-          key={soloCallNotice}
+          key={callNotice}
           variant="neutral"
           placement="fixed"
           autoDismissMs={CHAT_PANEL_BANNER_AUTO_DISMISS_MS}
-          onDismiss={() => setSoloCallNotice(null)}
+          onDismiss={() => setCallNotice(null)}
         >
-          {soloCallNotice}
+          {callNotice}
         </ChatHomeBanner>
       ) : null}
 

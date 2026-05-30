@@ -36,6 +36,10 @@ const GuestJoinSchema = z.object({
   displayName: z.string().min(1).max(80),
 });
 
+const LeaveCallSchema = z.object({
+  joinEpoch: z.number().int().optional(),
+});
+
 const GuestPreviewSchema = z.object({
   token: z.string().min(1),
 });
@@ -92,9 +96,15 @@ callsRouter.post("/:callId/leave", requireAuth, async (c) => {
   const session = c.get("session");
   const callId = c.req.param("callId");
   if (!callId) return c.json({ error: "callId required" }, 400);
-  const ok = await leaveCall({ callId, userId: session.userId });
-  if (!ok) return c.json({ error: "Not in call" }, 404);
-  return c.json({ left: true });
+  const body = LeaveCallSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) return c.json({ error: body.error.flatten() }, 400);
+  const result = await leaveCall({
+    callId,
+    userId: session.userId,
+    joinEpoch: body.data.joinEpoch,
+  });
+  if (!result.ok) return c.json({ error: "Not in call" }, 404);
+  return c.json({ left: true, superseded: result.superseded });
 });
 
 callsRouter.post("/:callId/end", requireAuth, async (c) => {

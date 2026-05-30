@@ -13,11 +13,13 @@ import {
 export function useCallSession(conversationId: string | null) {
   const [activeCall, setActiveCall] = useState<CallSummaryDto | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [joinEpoch, setJoinEpoch] = useState<number | null>(null);
   const [inCall, setInCall] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const leavingRef = useRef(false);
   const activeCallIdRef = useRef<string | null>(null);
+  const joinEpochRef = useRef<number | null>(null);
   const ignoredCallIdsRef = useRef(new Set<string>());
 
   const applyActiveCall = useCallback((call: CallSummaryDto | null) => {
@@ -51,6 +53,8 @@ export function useCallSession(conversationId: string | null) {
       const result = await startOrJoinCall(conversationId);
       ignoredCallIdsRef.current.delete(result.call.id);
       activeCallIdRef.current = result.call.id;
+      joinEpochRef.current = result.joinEpoch;
+      setJoinEpoch(result.joinEpoch);
       setActiveCall(result.call);
       setAuthToken(result.authToken);
       setInCall(true);
@@ -69,6 +73,8 @@ export function useCallSession(conversationId: string | null) {
       const result = await joinCallById(callId);
       ignoredCallIdsRef.current.delete(result.call.id);
       activeCallIdRef.current = result.call.id;
+      joinEpochRef.current = result.joinEpoch;
+      setJoinEpoch(result.joinEpoch);
       setActiveCall(result.call);
       setAuthToken(result.authToken);
       setInCall(true);
@@ -80,15 +86,18 @@ export function useCallSession(conversationId: string | null) {
     }
   }, []);
 
-  const hangUp = useCallback(async () => {
+  const hangUp = useCallback(async (): Promise<{ superseded: boolean } | void> => {
     if (leavingRef.current) return;
     leavingRef.current = true;
 
     const callId = activeCall?.id ?? activeCallIdRef.current;
     setInCall(false);
     setAuthToken(null);
+    setJoinEpoch(null);
     setError(null);
     activeCallIdRef.current = null;
+    const epoch = joinEpochRef.current;
+    joinEpochRef.current = null;
 
     if (callId) {
       ignoredCallIdsRef.current.add(callId);
@@ -100,8 +109,9 @@ export function useCallSession(conversationId: string | null) {
 
     setLoading(true);
     try {
-      await leaveCall(callId);
+      const result = await leaveCall(callId, epoch ?? undefined);
       await refreshActive();
+      return { superseded: Boolean(result.superseded) };
     } catch {
       await refreshActive();
     } finally {

@@ -116,6 +116,32 @@ export async function isRealtimeKitConfigured(): Promise<boolean> {
   return (await resolveRealtimeKitConfig()) != null;
 }
 
+/** Drop active RealtimeKit sessions for the given participant identities. */
+export async function kickRealtimeKitParticipantsFromSession(params: {
+  meetingId: string;
+  customParticipantIds?: string[];
+  participantIds?: string[];
+}): Promise<void> {
+  const config = await resolveRealtimeKitConfig();
+  if (!config) return;
+
+  const customParticipantIds = params.customParticipantIds?.filter(Boolean) ?? [];
+  const participantIds = params.participantIds?.filter(Boolean) ?? [];
+  if (customParticipantIds.length === 0 && participantIds.length === 0) return;
+
+  try {
+    await realtimeKitAppRequest(config, `/meetings/${params.meetingId}/active-session/kick`, {
+      method: "POST",
+      body: JSON.stringify({
+        custom_participant_ids: customParticipantIds,
+        participant_ids: participantIds,
+      }),
+    });
+  } catch (err) {
+    console.warn("RealtimeKit kick participants failed:", err);
+  }
+}
+
 /** End the active RealtimeKit session for everyone still connected. */
 export async function endRealtimeKitMeetingSession(meetingId: string): Promise<void> {
   const config = await resolveRealtimeKitConfig();
