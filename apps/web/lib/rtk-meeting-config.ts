@@ -174,13 +174,19 @@ function moveSettingsToggleToMoreMenu(config: UIConfig): UIConfig {
 
   for (const key of CONTROLBAR_SECTION_KEYS) {
     if (key in root) {
-      root[key] = filterRootChildren(root[key], new Set(["rtk-settings-toggle"]));
+      root[key] = filterRootChildren(
+        root[key],
+        new Set(["rtk-settings-toggle"]),
+      ) as (typeof root)[typeof key];
     }
   }
 
   const center = root["div#controlbar-center"];
   if (Array.isArray(center)) {
-    root["div#controlbar-center"] = filterRootChildren(center, new Set(["rtk-settings-toggle"]));
+    root["div#controlbar-center"] = filterRootChildren(
+      center,
+      new Set(["rtk-settings-toggle"]),
+    ) as typeof center;
   }
 
   for (const key of MORE_MENU_KEYS) {
