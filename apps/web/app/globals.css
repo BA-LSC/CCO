@@ -8757,8 +8757,26 @@ html.standalone-display .chat-thread-panel {
 }
 
 /* PiP body is 176px tall — keep avatar compact above the control bar */
-.call-pip .call-participant-grid {
+.call-pip .call-participant-grid:not(.call-participant-grid--with-screenshare-expanded) {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
   padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.call-pip .call-participant-grid:not(.call-participant-grid--with-screenshare-expanded) .call-participant-box {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
 .call-pip .call-participant-grid--solo {
@@ -8961,8 +8979,16 @@ html.standalone-display .chat-thread-panel {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.call-panel--inline-docked .call-participant-grid--duo {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.call-panel--inline-docked
+  .call-participant-grid:not(.call-participant-grid--with-screenshare-expanded) {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .call-panel--inline-docked .call-participant-grid--with-screenshare-expanded {
@@ -9007,19 +9033,16 @@ html.standalone-display .chat-thread-panel {
   justify-content: center;
 }
 
-.call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
+.call-panel--inline-docked
+  .call-participant-grid:not(.call-participant-grid--with-screenshare-expanded)
+  .call-participant-box {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
   width: auto;
   height: 100%;
-}
-
-.call-panel--inline-docked .call-participant-grid--duo .call-participant-box,
-.call-panel--inline-docked
-  .call-participant-grid:not(.call-participant-grid--solo):not(.call-participant-grid--duo):not(
-    .call-participant-grid--with-screenshare-expanded
-  )
-  .call-participant-box {
-  width: 100%;
-  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
 .call-panel--inline-docked .call-participant-box__video {

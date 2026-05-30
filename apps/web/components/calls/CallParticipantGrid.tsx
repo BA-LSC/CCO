@@ -216,6 +216,7 @@ export function CallParticipantGrid() {
   const mirrorVideo = useRtkMirrorVideoPref();
   const avatarMap = useCallParticipantAvatars(meeting);
   const [screenShareExpanded, setScreenShareExpanded] = useState(false);
+  const prevSelfSharingRef = useRef(false);
 
   const participants = useMemo(
     () =>
@@ -239,10 +240,18 @@ export function CallParticipantGrid() {
 
   const tileCount = participants.length + screenShares.length;
   const hasScreenShare = screenShares.length > 0;
+  const selfSharing = screenShares.some((tile) => tile.isSelf);
 
   useEffect(() => {
     if (!hasScreenShare) setScreenShareExpanded(false);
   }, [hasScreenShare]);
+
+  useEffect(() => {
+    if (selfSharing && !prevSelfSharingRef.current) {
+      setScreenShareExpanded(true);
+    }
+    prevSelfSharingRef.current = selfSharing;
+  }, [selfSharing]);
 
   if (!meeting || !roomJoined || tileCount === 0) return null;
 
