@@ -1861,10 +1861,19 @@ html[data-theme="11"] .user-menu-dropdown {
 .messages-day-divider {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   justify-content: center;
   color: var(--color-muted);
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.messages-day-divider::before,
+.messages-day-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 .messages-day-divider time {
