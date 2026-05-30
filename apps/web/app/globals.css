@@ -8521,11 +8521,14 @@ html.standalone-display .chat-thread-panel {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 2;
   width: 100%;
   margin-top: auto;
   padding: 0 10px 8px;
   border-bottom: none;
   background: var(--color-bg);
+  overflow: visible;
   --rtk-controlbar-button-background-color: transparent;
   --rtk-controlbar-button-icon-size: 18px;
 }
@@ -8623,11 +8626,7 @@ html.standalone-display .chat-thread-panel {
   opacity: 1;
   border-color: color-mix(in srgb, var(--color-danger) 72%, transparent);
   animation: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 18%, transparent);
-}
-
-.call-participant-box--muted .call-participant-box__avatar {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger) 18%, transparent);
 }
 
 .call-participant-box__avatar {
@@ -8791,7 +8790,9 @@ html.standalone-display .chat-thread-panel {
   padding: 4px 6px;
   border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  overflow: visible;
   background: color-mix(in srgb, var(--color-surface-2) 92%, transparent);
   box-shadow: 0 2px 14px rgba(0, 0, 0, 0.22);
   gap: 2px;
@@ -8811,6 +8812,10 @@ html.standalone-display .chat-thread-panel {
 ) {
   --rtk-colors-text-1000: var(--cco-rtk-toggle-muted);
   border-radius: calc(var(--radius-sm) - 2px);
+  overflow: visible;
+  transition:
+    box-shadow var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 .call-meeting-ui rtk-controlbar :is(
@@ -8821,6 +8826,7 @@ html.standalone-display .chat-thread-panel {
 ):hover {
   --rtk-colors-text-1000: var(--cco-rtk-toggle-text);
   --rtk-colors-background-800: var(--cco-rtk-toggle-hover-bg);
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--color-text) 11%, transparent);
 }
 
 .call-meeting-ui rtk-participants-toggle,
@@ -8872,6 +8878,7 @@ html.standalone-display .chat-thread-panel {
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
   border-radius: 0;
+  overflow: visible;
 }
 
 .call-panel--inline-docked {

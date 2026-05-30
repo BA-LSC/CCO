@@ -114,7 +114,10 @@ const CCO_CONTROLBAR_STYLES: NonNullable<UIConfig["styles"]> = {
   "rtk-camera-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
   "rtk-webinar-stage-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
   "rtk-stage-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
-  "rtk-more-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
+  "rtk-more-toggle": {
+    ...CCO_CONTROLBAR_TOGGLE_VARS,
+    overflow: "visible",
+  },
   "rtk-ai-toggle": CCO_CONTROLBAR_TOGGLE_VARS,
 };
 
@@ -218,7 +221,10 @@ const PIP_CONTROLBAR_TOGGLE_STYLES: Pick<
   "rtk-camera-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
   "rtk-webinar-stage-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
   "rtk-stage-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
-  "rtk-more-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
+  "rtk-more-toggle": {
+    ...PIP_CONTROLBAR_TOGGLE_VARS,
+    overflow: "visible",
+  },
   "rtk-ai-toggle": PIP_CONTROLBAR_TOGGLE_VARS,
 };
 
