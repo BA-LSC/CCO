@@ -17,6 +17,17 @@ const CONTROLBAR_CHILD_KEYS = [
   "rtk-more-toggle.activeMoreMenu.md",
 ] as const;
 
+const MORE_MENU_KEYS = [
+  "rtk-more-toggle.activeMoreMenu",
+  "rtk-more-toggle.activeMoreMenu.sm",
+  "rtk-more-toggle.activeMoreMenu.md",
+] as const;
+
+const SETTINGS_IN_MORE_MENU: RootChild = [
+  "rtk-settings-toggle",
+  { variant: "horizontal", slot: "more-elements" },
+];
+
 const CCO_CONTROLBAR_REMOVAL = [
   "rtk-chat-toggle",
   "rtk-polls-toggle",
@@ -156,6 +167,33 @@ function applyCcoControlbarLayout(config: UIConfig): UIConfig {
   return config;
 }
 
+/** Settings live in the overflow menu, not the primary controlbar row. */
+function moveSettingsToggleToMoreMenu(config: UIConfig): UIConfig {
+  const root = config.root;
+  if (!root) return config;
+
+  for (const key of CONTROLBAR_SECTION_KEYS) {
+    if (key in root) {
+      root[key] = filterRootChildren(root[key], new Set(["rtk-settings-toggle"]));
+    }
+  }
+
+  const center = root["div#controlbar-center"];
+  if (Array.isArray(center)) {
+    root["div#controlbar-center"] = filterRootChildren(center, new Set(["rtk-settings-toggle"]));
+  }
+
+  for (const key of MORE_MENU_KEYS) {
+    const children = root[key];
+    if (!Array.isArray(children)) continue;
+    const tags = children.map((child) => tagName(child as RootChild));
+    if (tags.includes("rtk-settings-toggle")) continue;
+    root[key] = [SETTINGS_IN_MORE_MENU, ...(children as RootChild[])];
+  }
+
+  return config;
+}
+
 function buildCompactControlbarStyles(): NonNullable<UIConfig["styles"]> {
   return {
     ...CCO_CONTROLBAR_STYLES,
@@ -224,8 +262,10 @@ function applyCompactControlbarButtons(config: UIConfig): UIConfig {
 
 function buildCompactControlbarConfig(): UIConfig {
   const config = applyCompactControlbarButtons(
-    applyCcoControlbarLayout(
-      applyControlbarFilter(createDefaultConfig(), new Set<string>(CCO_CONTROLBAR_REMOVAL)),
+    moveSettingsToggleToMoreMenu(
+      applyCcoControlbarLayout(
+        applyControlbarFilter(createDefaultConfig(), new Set<string>(CCO_CONTROLBAR_REMOVAL)),
+      ),
     ),
   );
   config.styles = {

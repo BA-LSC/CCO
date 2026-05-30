@@ -55,16 +55,15 @@ describe("buildRtkMeetingConfig", () => {
     expect(center).not.toContain("rtk-stage-toggle");
     expect(center).not.toContain("rtk-ai-toggle");
     expect(center).toEqual([
-      "rtk-settings-toggle",
       "rtk-screen-share-toggle",
       "rtk-mic-toggle",
       "rtk-camera-toggle",
       "rtk-more-toggle",
     ]);
-    expect(center).toContain("rtk-settings-toggle");
-    expect(center).toContain("rtk-screen-share-toggle");
-    expect(center).toContain("rtk-mic-toggle");
-    expect(center).toContain("rtk-camera-toggle");
+    expect(center).not.toContain("rtk-settings-toggle");
+    expect(listControlbarTags(config, "rtk-more-toggle.activeMoreMenu")[0]).toBe(
+      "rtk-settings-toggle",
+    );
     expect(config.styles?.["rtk-leave-button"]?.display).toBe("none");
     expect(config.styles?.["rtk-chat-toggle"]?.display).toBe("none");
     expect(config.styles?.["rtk-controlbar"]?.justifyContent).toBe("center");
@@ -92,8 +91,10 @@ describe("buildRtkMeetingConfig", () => {
   test("inline uses compact icon-only controlbar buttons with hover tooltips", () => {
     const config = buildRtkMeetingConfig({ enableInRoomChat: true, placement: "inline" });
     const centerChildren = config.root?.["div#controlbar-center"];
+    const moreMenu = listControlbarTags(config, "rtk-more-toggle.activeMoreMenu");
 
-    expect(centerChildren?.[0]).toEqual(["rtk-settings-toggle", { size: "sm" }]);
+    expect(centerChildren?.[0]).toEqual(["rtk-screen-share-toggle", { size: "sm" }]);
+    expect(moreMenu).toContain("rtk-settings-toggle");
     expect(config.styles?.["div#controlbar-center"]?.gap).toBe("2px");
     expect(config.styles?.["rtk-mic-toggle"]?.minWidth).toBe("34px");
     expect(config.styles?.["rtk-mic-toggle"]?.["--rtk-controlbar-button-icon-size"]).toBe("18px");

@@ -7,6 +7,7 @@ import {
 } from "@cloudflare/realtimekit-react";
 import { useCallParticipantAvatars } from "@/hooks/useCallParticipantAvatars";
 import { useParticipantAudioSpeaking } from "@/hooks/useParticipantAudioSpeaking";
+import { useRtkMirrorVideoPref } from "@/hooks/useRtkMirrorVideoPref";
 import { useSpeakingOutline } from "@/hooks/useSpeakingOutline";
 import {
   buildCallParticipantTiles,
@@ -38,12 +39,14 @@ function CallParticipantBox({
   isSelf,
   audioTrack,
   audioEnabled,
+  mirrorSelfVideo,
 }: {
   peer: CallPeer;
   avatarUrl?: string;
   isSelf: boolean;
   audioTrack?: MediaStreamTrack;
   audioEnabled: boolean;
+  mirrorSelfVideo: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const displayName = peer.name?.trim() || "Participant";
@@ -59,38 +62,31 @@ function CallParticipantBox({
         ? " call-participant-box--speaking"
         : " call-participant-box--speaking-out"
       : "";
-  const speakingAvatarClass =
-    !isMuted && showOutline
-      ? isPulsing
-        ? " call-participant-box__avatar--speaking"
-        : " call-participant-box__avatar--speaking-out"
-      : "";
 
   useEffect(() => {
     const element = videoRef.current;
     if (!element || !showVideo || !peer.registerVideoElement) return;
 
-    peer.registerVideoElement(element);
+    peer.registerVideoElement(element, isSelf);
     return () => {
-      peer.deregisterVideoElement?.(element);
+      peer.deregisterVideoElement?.(element, isSelf);
     };
-  }, [peer, showVideo]);
+  }, [peer, showVideo, isSelf]);
 
   return (
     <div className={`call-participant-box${mutedBoxClass}${speakingBoxClass}`}>
       {showVideo ? (
         <video
           ref={videoRef}
-          className="call-participant-box__video"
+          className={`call-participant-box__video${
+            mirrorSelfVideo ? " call-participant-box__video--mirror" : ""
+          }`}
           autoPlay
           playsInline
           muted={isSelf}
         />
       ) : (
-        <div
-          className={`call-participant-box__avatar${speakingAvatarClass}`}
-          aria-hidden={!avatarUrl}
-        >
+        <div className="call-participant-box__avatar" aria-hidden={!avatarUrl}>
           {avatarUrl ? (
             <img src={avatarUrl} alt="" />
           ) : (
@@ -113,6 +109,7 @@ export function CallParticipantGrid() {
   const selfAudioTrack = useRealtimeKitSelector((m) => m.self?.audioTrack);
   const selfAudioEnabled = useRealtimeKitSelector((m) => m.self?.audioEnabled ?? false);
   const roomJoined = useRealtimeKitSelector((m) => m.self.roomJoined);
+  const mirrorVideo = useRtkMirrorVideoPref();
   const avatarMap = useCallParticipantAvatars(meeting);
 
   const participants = useMemo(
@@ -142,12 +139,15 @@ export function CallParticipantGrid() {
           (customId ? avatarMap.get(customId) : undefined) ??
           (peer.picture?.trim() ? peer.picture : undefined);
 
+        const tileIsSelf = isCallTileSelf(peer, self as unknown as CallPeer | undefined);
+
         return (
           <CallParticipantBox
             key={peer.id}
             peer={peer}
             avatarUrl={avatarUrl}
-            isSelf={isCallTileSelf(peer, self as unknown as CallPeer | undefined)}
+            isSelf={tileIsSelf}
+            mirrorSelfVideo={tileIsSelf && mirrorVideo}
             audioTrack={peer.id === self?.id ? selfAudioTrack : peer.audioTrack}
             audioEnabled={peer.id === self?.id ? selfAudioEnabled : Boolean(peer.audioEnabled)}
           />
