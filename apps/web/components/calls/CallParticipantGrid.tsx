@@ -194,11 +194,13 @@ export function CallParticipantGrid() {
   );
 
   const tileCount = participants.length + screenShares.length;
+  const hasScreenShare = screenShares.length > 0;
 
   if (!meeting || !roomJoined || tileCount === 0) return null;
 
-  const gridClass =
-    tileCount === 1
+  const gridClass = hasScreenShare
+    ? "call-participant-grid call-participant-grid--with-screenshare"
+    : tileCount === 1
       ? "call-participant-grid call-participant-grid--solo"
       : tileCount === 2
         ? "call-participant-grid call-participant-grid--duo"
@@ -206,6 +208,13 @@ export function CallParticipantGrid() {
 
   return (
     <div className={gridClass}>
+      {screenShares.map(({ peer, isSelf }) => (
+        <CallScreenShareBox
+          key={`screenshare-${peer.id}`}
+          peer={peer}
+          isSelf={isSelf}
+        />
+      ))}
       {participants.map((peer) => {
         const customId = peer.customParticipantId;
         const avatarUrl =
@@ -226,13 +235,6 @@ export function CallParticipantGrid() {
           />
         );
       })}
-      {screenShares.map(({ peer, isSelf }) => (
-        <CallScreenShareBox
-          key={`screenshare-${peer.id}`}
-          peer={peer}
-          isSelf={isSelf}
-        />
-      ))}
     </div>
   );
 }
