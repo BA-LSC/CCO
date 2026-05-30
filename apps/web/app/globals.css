@@ -8871,20 +8871,33 @@ html.standalone-display .chat-thread-panel {
 
 .call-panel--inline-docked .call-participant-grid--solo {
   align-items: center;
-  justify-items: stretch;
+  justify-items: center;
   place-content: center;
   padding: 8px 12px 6px;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box {
-  width: 100%;
+  width: min(100%, 280px);
   height: auto;
   min-height: 88px;
-  max-height: none;
-  align-self: stretch;
+  max-height: 100%;
+  align-self: center;
   padding: 10px 12px 12px;
   flex-direction: column;
   justify-content: center;
+}
+
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box:has(.call-participant-box__video) {
+  aspect-ratio: 16 / 9;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.call-panel--inline-docked .call-participant-grid--solo .call-participant-box__video {
+  object-fit: contain;
 }
 
 .call-panel--inline-docked .call-participant-grid--solo .call-participant-box__avatar {
