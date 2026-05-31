@@ -5,6 +5,35 @@ const MAX_MEDIA_BYTES = 95 * 1024 * 1024;
 
 const BROWSER_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
+const MIME_BY_EXT: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+const LEGACY_MIME_ALIASES: Record<string, string> = {
+  "image/x-png": "image/png",
+  "image/pjpeg": "image/jpeg",
+};
+
+function stripMimeParameters(type: string): string {
+  return type.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+/** Resolve a browser-native image MIME from type and/or filename extension. */
+export function resolveBrowserImageMimeType(file: File): string | null {
+  const raw = stripMimeParameters(file.type);
+  const aliased = LEGACY_MIME_ALIASES[raw] ?? raw;
+  if (BROWSER_IMAGE_TYPES.has(aliased)) return aliased;
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext && MIME_BY_EXT[ext]) return MIME_BY_EXT[ext];
+
+  return null;
+}
+
 export function isHeicImageFile(file: File): boolean {
   const type = file.type.toLowerCase();
   if (type === "image/heic" || type === "image/heif") return true;
@@ -59,8 +88,10 @@ export async function prepareImageForUpload(file: File): Promise<File> {
     return convertHeicToJpeg(file);
   }
 
-  if (BROWSER_IMAGE_TYPES.has(file.type.toLowerCase())) {
-    return file;
+  const resolvedType = resolveBrowserImageMimeType(file);
+  if (resolvedType) {
+    if (file.type === resolvedType) return file;
+    return new File([file], file.name, { type: resolvedType });
   }
 
   return convertImageBitmapToJpeg(file);

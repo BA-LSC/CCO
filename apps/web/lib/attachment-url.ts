@@ -95,8 +95,8 @@ export function attachmentCacheKey(attachmentUrl: string): string {
 }
 
 function readUploadSignatureExpiry(attachmentUrl: string): number {
-  const { exp } = readUploadSignatureParams(attachmentUrl);
-  if (!exp) return 0;
+  const { sig, exp } = readUploadSignatureParams(attachmentUrl);
+  if (!sig || !exp) return 0;
   const parsed = Number.parseInt(exp, 10);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -113,7 +113,12 @@ export function buildAttachmentDisplaySrcMap(
     const key = attachmentCacheKey(attachmentUrl);
     const exp = readUploadSignatureExpiry(attachmentUrl);
     const existing = resolved.get(key);
-    if (existing && existing.exp >= exp) continue;
+    if (existing) {
+      const existingSigned = existing.exp > 0;
+      const nextSigned = exp > 0;
+      if (existingSigned && !nextSigned) continue;
+      if (existingSigned === nextSigned && existing.exp >= exp) continue;
+    }
 
     resolved.set(key, {
       src: resolveAttachmentDisplayUrl(attachmentUrl),

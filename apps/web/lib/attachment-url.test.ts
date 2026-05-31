@@ -105,6 +105,21 @@ describe("buildAttachmentDisplaySrcMap", () => {
     expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=new&exp=999");
   });
 
+  test("prefers signed URLs over unsigned proxy paths for the same file", () => {
+    const map = buildAttachmentDisplaySrcMap([
+      "/api/v1/uploads/abc.jpeg",
+      "https://api.example.com/uploads/abc.jpeg?sig=fresh&exp=999",
+    ]);
+
+    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=fresh&exp=999");
+  });
+
+  test("keeps unsigned URL only when no signed variant exists", () => {
+    const map = buildAttachmentDisplaySrcMap(["/api/v1/uploads/abc.jpeg"]);
+
+    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg");
+  });
+
   test("keeps distinct external attachment URLs separate", () => {
     const first = "https://media.giphy.com/media/one/giphy.gif";
     const second = "https://media.giphy.com/media/two/giphy.gif";
