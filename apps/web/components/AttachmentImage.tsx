@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ImgHTMLAttributes, type SyntheticEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ImgHTMLAttributes,
+  type SyntheticEvent,
+} from "react";
 import {
   fetchUploadImageBlobUrl,
-  resolveUploadAttachmentImageSrc,
   uploadImageSrcNeedsCredentialFetch,
 } from "@/lib/attachment-image-src";
 import { isCcoUploadDisplaySrc } from "@/lib/attachment-url";
@@ -12,24 +18,39 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   src: string;
 };
 
-export function AttachmentImage({ src, onError, ...props }: Props) {
-  const [displaySrc, setDisplaySrc] = useState(src);
+export function AttachmentImage({ src, onError, className, alt, ...props }: Props) {
+  const [displaySrc, setDisplaySrc] = useState(() => {
+    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) return src;
+    return "";
+  });
   const retriedRef = useRef(false);
   const srcRef = useRef(src);
+  const prevSrcRef = useRef(src);
 
   useEffect(() => {
+    const previous = prevSrcRef.current;
+    prevSrcRef.current = src;
     srcRef.current = src;
     retriedRef.current = false;
     let cancelled = false;
 
-    if (!uploadImageSrcNeedsCredentialFetch(src)) {
+    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) {
       setDisplaySrc(src);
       return;
     }
 
-    setDisplaySrc(src);
-    void resolveUploadAttachmentImageSrc(src).then((resolved) => {
-      if (!cancelled && resolved) setDisplaySrc(resolved);
+    // Keep a composer/thread blob visible while the authenticated fetch runs.
+    if (previous.startsWith("blob:")) {
+      setDisplaySrc(previous);
+    }
+
+    void fetchUploadImageBlobUrl(src).then((blobUrl) => {
+      if (cancelled) return;
+      if (blobUrl) {
+        setDisplaySrc(blobUrl);
+        return;
+      }
+      setDisplaySrc(src);
     });
 
     return () => {
@@ -50,5 +71,23 @@ export function AttachmentImage({ src, onError, ...props }: Props) {
     [onError],
   );
 
-  return <img {...props} src={displaySrc} onError={handleError} />;
+  if (!displaySrc) {
+    return (
+      <span
+        className={className}
+        aria-label={typeof alt === "string" ? alt : undefined}
+        role="img"
+      />
+    );
+  }
+
+  return (
+    <img
+      {...props}
+      src={displaySrc}
+      alt={alt}
+      className={className}
+      onError={handleError}
+    />
+  );
 }

@@ -1,5 +1,6 @@
 import type { Message } from "@/lib/api";
 import type { PendingComposerMedia } from "@/lib/composer-media";
+import { deferRevokeBlobUrl } from "@/lib/blob-url-lifecycle";
 import { sortMessagesByCreatedAt } from "@/lib/message-order";
 
 const PENDING_UPLOAD_ID_PREFIX = "pending-upload:";
@@ -36,7 +37,7 @@ export function createPendingUploadMessage(params: {
 
 export function revokePendingUploadPreview(message: Message | undefined): void {
   if (message?.localPreviewUrl?.startsWith("blob:")) {
-    URL.revokeObjectURL(message.localPreviewUrl);
+    deferRevokeBlobUrl(message.localPreviewUrl);
   }
 }
 

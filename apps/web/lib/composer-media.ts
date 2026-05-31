@@ -1,4 +1,5 @@
 import { prepareImageForUpload } from "@/lib/prepare-image-upload";
+import { deferRevokeBlobUrl } from "@/lib/blob-url-lifecycle";
 
 export const COMPOSER_MEDIA_MAX_BYTES = 95 * 1024 * 1024;
 
@@ -71,7 +72,9 @@ export async function createPendingComposerMedia(
 }
 
 export function revokePendingComposerMedia(media: PendingComposerMedia | null): void {
-  if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl);
+  if (media?.previewUrl?.startsWith("blob:")) {
+    deferRevokeBlobUrl(media.previewUrl);
+  }
 }
 
 export function revokePendingComposerMediaList(items: PendingComposerMedia[]): void {

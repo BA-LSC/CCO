@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi, type Mock } from "bun:test";
 import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
 import {
+  fetchUploadImageBlobUrl,
   resetUploadImageBlobCacheForTests,
   uploadImageSrcNeedsCredentialFetch,
 } from "@/lib/attachment-image-src";
@@ -32,21 +33,49 @@ describe("uploadImageSrcNeedsCredentialFetch", () => {
       ),
     ).toBe(false);
   });
-});
 
-describe("uploadImageSrcNeedsCredentialFetch in standalone PWA", () => {
-  afterEach(() => {
-    resetUploadImageBlobCacheForTests();
-    mockStandaloneDisplay.mockReturnValue(false);
-  });
-
-  test("always credential-fetches upload URLs in standalone display mode", () => {
+  test("allows signed upload URLs in standalone PWA without forcing credential fetch", () => {
     mockStandaloneDisplay.mockReturnValue(true);
-
     expect(
       uploadImageSrcNeedsCredentialFetch(
         "/api/v1/uploads/photo.png?sig=deadbeef&exp=9999999999",
       ),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  test("requires credential fetch in standalone when signature is missing", () => {
+    mockStandaloneDisplay.mockReturnValue(true);
+    expect(uploadImageSrcNeedsCredentialFetch("/api/v1/uploads/photo.png")).toBe(true);
+  });
+});
+
+describe("fetchUploadImageBlobUrl", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    resetUploadImageBlobCacheForTests();
+    globalThis.fetch = originalFetch;
+  });
+
+  test("returns null for failed fetch responses", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
+    ) as typeof fetch;
+
+    await expect(
+      fetchUploadImageBlobUrl("/api/v1/uploads/photo.png?sig=x&exp=9999999999"),
+    ).resolves.toBeNull();
+  });
+
+  test("creates blob URLs for successful image responses", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    ) as typeof fetch;
+
+    const blobUrl = await fetchUploadImageBlobUrl("/api/v1/uploads/photo.png");
+    expect(blobUrl?.startsWith("blob:")).toBe(true);
   });
 });
