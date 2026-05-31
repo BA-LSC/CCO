@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachmentImage } from "@/components/AttachmentImage";
 import type { ComposerMediaKind } from "@/lib/composer-media";
 
 const CARD_SIZE_PX = 72;
@@ -114,7 +115,7 @@ function PendingMediaCard({
       onTouchCancel={coarsePointer ? clearLongPressTimer : undefined}
     >
       {item.kind === "image" ? (
-        <img
+        <AttachmentImage
           src={item.previewUrl}
           alt=""
           className="composer-pending-media-thumb"

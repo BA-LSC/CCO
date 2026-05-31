@@ -1,3 +1,4 @@
+import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
 import {
   attachmentCacheKey,
   hasValidUploadDisplaySignature,
@@ -14,18 +15,25 @@ function resolveFetchUrl(src: string): string {
   return src;
 }
 
+function cacheKeyForSrc(src: string): string {
+  return src.startsWith("blob:") ? src : attachmentCacheKey(src);
+}
+
 /**
- * Plain <img> loads omit session cookies in some PWA WebKit builds when sig/exp are
- * missing or expired. Valid signed URLs load without cookies; fetch with credentials
- * is the fallback when they are not present.
+ * iOS PWA WebKit often fails plain <img> loads for upload proxy URLs and sometimes
+ * for file-picker blob URLs. Load through fetch() and display a fresh blob URL instead.
  */
 export function uploadImageSrcNeedsCredentialFetch(src: string): boolean {
+  if (src.startsWith("blob:")) {
+    return isStandaloneDisplay();
+  }
   if (!isCcoUploadDisplaySrc(src)) return false;
+  if (isStandaloneDisplay()) return true;
   return !hasValidUploadDisplaySignature(src);
 }
 
 export async function fetchUploadImageBlobUrl(src: string): Promise<string | null> {
-  const key = attachmentCacheKey(src);
+  const key = cacheKeyForSrc(src);
   const cached = memoryUrls.get(key);
   if (cached) return cached;
 
@@ -34,7 +42,9 @@ export async function fetchUploadImageBlobUrl(src: string): Promise<string | nul
 
   const promise = (async () => {
     try {
-      const response = await fetch(resolveFetchUrl(src), { credentials: "include" });
+      const response = await fetch(resolveFetchUrl(src), {
+        credentials: src.startsWith("blob:") ? "omit" : "include",
+      });
       if (!response.ok) return null;
 
       const blob = await response.blob();

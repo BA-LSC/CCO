@@ -18,8 +18,13 @@ describe("uploadImageSrcNeedsCredentialFetch", () => {
     mockStandaloneDisplay.mockReturnValue(false);
   });
 
-  test("skips blob preview URLs", () => {
+  test("skips blob preview URLs in browser tabs", () => {
     expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(false);
+  });
+
+  test("refreshes blob preview URLs in standalone PWA", () => {
+    mockStandaloneDisplay.mockReturnValue(true);
+    expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(true);
   });
 
   test("requires credential fetch for unsigned upload URLs in browser tabs", () => {
@@ -34,13 +39,13 @@ describe("uploadImageSrcNeedsCredentialFetch", () => {
     ).toBe(false);
   });
 
-  test("allows signed upload URLs in standalone PWA without forcing credential fetch", () => {
+  test("always fetches upload URLs in standalone PWA even when signed", () => {
     mockStandaloneDisplay.mockReturnValue(true);
     expect(
       uploadImageSrcNeedsCredentialFetch(
         "/api/v1/uploads/photo.png?sig=deadbeef&exp=9999999999",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("requires credential fetch in standalone when signature is missing", () => {

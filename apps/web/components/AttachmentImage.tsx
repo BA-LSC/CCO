@@ -12,7 +12,6 @@ import {
   fetchUploadImageBlobUrl,
   uploadImageSrcNeedsCredentialFetch,
 } from "@/lib/attachment-image-src";
-import { isCcoUploadDisplaySrc } from "@/lib/attachment-url";
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   src: string;
@@ -20,7 +19,7 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
 
 export function AttachmentImage({ src, onError, className, alt, ...props }: Props) {
   const [displaySrc, setDisplaySrc] = useState(() => {
-    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) return src;
+    if (!uploadImageSrcNeedsCredentialFetch(src)) return src;
     return "";
   });
   const retriedRef = useRef(false);
@@ -34,23 +33,19 @@ export function AttachmentImage({ src, onError, className, alt, ...props }: Prop
     retriedRef.current = false;
     let cancelled = false;
 
-    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) {
+    if (!uploadImageSrcNeedsCredentialFetch(src)) {
       setDisplaySrc(src);
       return;
     }
 
-    // Keep a composer/thread blob visible while the authenticated fetch runs.
-    if (previous.startsWith("blob:")) {
+    if (previous.startsWith("blob:") && previous !== src) {
       setDisplaySrc(previous);
+    } else {
+      setDisplaySrc("");
     }
 
     void fetchUploadImageBlobUrl(src).then((blobUrl) => {
-      if (cancelled) return;
-      if (blobUrl) {
-        setDisplaySrc(blobUrl);
-        return;
-      }
-      setDisplaySrc(src);
+      if (!cancelled && blobUrl) setDisplaySrc(blobUrl);
     });
 
     return () => {
@@ -62,7 +57,7 @@ export function AttachmentImage({ src, onError, className, alt, ...props }: Prop
     (event: SyntheticEvent<HTMLImageElement, Event>) => {
       onError?.(event);
       const current = srcRef.current;
-      if (retriedRef.current || !current || !isCcoUploadDisplaySrc(current)) return;
+      if (retriedRef.current || !current || !uploadImageSrcNeedsCredentialFetch(current)) return;
       retriedRef.current = true;
       void fetchUploadImageBlobUrl(current).then((blobUrl) => {
         if (blobUrl) setDisplaySrc(blobUrl);
