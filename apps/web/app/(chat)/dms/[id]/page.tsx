@@ -187,8 +187,8 @@ export default function DmChatPage() {
           currentUserId={session?.userId}
           layout="panel"
           composerPlaceholder={isGroup ? "Message group…" : "Message…"}
-          messagesLoading={messagesLoading || detailLoading}
-          composerDisabled={detailLoading || messagesLoading}
+          messagesLoading={messagesLoading}
+          composerDisabled={messagesLoading || (detailLoading && threadMessages.length === 0)}
           isDirectMessage={!isGroup}
           initialPeerLastReadAt={peerLastReadAt}
           peerUser={

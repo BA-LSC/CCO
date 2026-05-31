@@ -344,7 +344,8 @@ export default function GroupConversationPage() {
           leaderOnly: activeConversation.leaderOnly,
         })
       : false);
-  const composerDisabled = detailLoading || messagesLoading;
+  const composerDisabled =
+    messagesLoading || (detailLoading && threadMessages.length === 0);
 
   function openChannelSettings() {
     setShowChannelSettings((open) => {

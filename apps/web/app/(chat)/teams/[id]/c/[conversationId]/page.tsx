@@ -250,7 +250,7 @@ export default function TeamConversationPage() {
           layout="panel"
           composerPlaceholder="Message your team…"
           messagesLoading={messagesLoading}
-          composerDisabled={detailLoading || messagesLoading}
+          composerDisabled={messagesLoading || (detailLoading && threadMessages.length === 0)}
           initialMemberReadReceipts={memberReadReceipts}
         />
       </div>

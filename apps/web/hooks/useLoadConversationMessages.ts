@@ -101,8 +101,12 @@ export function useLoadConversationMessages(conversationId: string | null) {
     const cached = getCachedMessages(conversationId);
     if (cached) {
       applyCachedConversation(cached, conversationId, cacheSetters);
+      return;
     }
-  }, [anchorUnread, conversationId]);
+    if (messagesForConversationId !== conversationId) {
+      setMessagesLoading(true);
+    }
+  }, [anchorUnread, conversationId, messagesForConversationId]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -248,21 +252,40 @@ export function useLoadConversationMessages(conversationId: string | null) {
     };
   }, [conversationId]);
 
-  const threadMessages = messagesForConversationId === conversationId ? messages : [];
-  const threadCallEvents = messagesForConversationId === conversationId ? callEvents : [];
-  const threadHasMore = messagesForConversationId === conversationId ? hasMore : false;
+  const cachedSnapshot =
+    conversationId && messagesForConversationId !== conversationId
+      ? getCachedMessages(conversationId)
+      : null;
+  const threadSynced = messagesForConversationId === conversationId;
+
+  const threadMessages = threadSynced ? messages : (cachedSnapshot?.messages ?? []);
+  const threadCallEvents = threadSynced ? callEvents : (cachedSnapshot?.callEvents ?? []);
+  const threadHasMore = threadSynced ? hasMore : (cachedSnapshot?.hasMore ?? false);
+  const threadFirstUnreadMessageId = threadSynced
+    ? firstUnreadMessageId
+    : (cachedSnapshot?.firstUnreadMessageId ?? null);
+  const threadCanPost = threadSynced ? canPost : (cachedSnapshot?.canPost ?? null);
+  const threadPeerLastReadAt = threadSynced
+    ? peerLastReadAt
+    : (cachedSnapshot?.peerLastReadAt ?? null);
+  const threadPeerUser = threadSynced ? peerUser : (cachedSnapshot?.peerUser ?? null);
+  const threadMemberReadReceipts = threadSynced
+    ? memberReadReceipts
+    : (cachedSnapshot?.memberReadReceipts ?? []);
+
+  const hasThreadContent = threadMessages.length > 0 || threadCallEvents.length > 0;
+  const showMessagesLoading = Boolean(conversationId) && messagesLoading && !hasThreadContent;
 
   return {
     threadMessages,
     threadCallEvents,
     threadHasMore,
-    firstUnreadMessageId,
-    messagesLoading,
-    canPost,
+    firstUnreadMessageId: threadFirstUnreadMessageId,
+    messagesLoading: showMessagesLoading,
+    canPost: threadCanPost,
     loadError,
-    peerLastReadAt: messagesForConversationId === conversationId ? peerLastReadAt : null,
-    peerUser: messagesForConversationId === conversationId ? peerUser : null,
-    memberReadReceipts:
-      messagesForConversationId === conversationId ? memberReadReceipts : [],
+    peerLastReadAt: threadPeerLastReadAt,
+    peerUser: threadPeerUser,
+    memberReadReceipts: threadMemberReadReceipts,
   };
 }

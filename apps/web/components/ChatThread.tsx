@@ -220,7 +220,9 @@ export function ChatThread({
   const recentMessageIdsRef = useRef(new Map<string, number>());
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [hasNewMessagesBelow, setHasNewMessagesBelow] = useState(false);
-  const [scrollReady, setScrollReady] = useState(false);
+  const [scrollReady, setScrollReady] = useState(
+    () => initialMessages.length > 0 && !messagesLoading && !initialFirstUnreadMessageId,
+  );
   const messageEnterDelays = useMessageEnterDelays(messages, scrollReady, conversationId);
 
   const {
@@ -517,7 +519,10 @@ export function ChatThread({
       pinnedToBottomRef.current = !initialFirstUnreadMessageId;
       initialScrollDoneRef.current = false;
       messageSnapshotRef.current = "";
-      setScrollReady(false);
+      const warmCachedThread =
+        initialMessages.length > 0 && !messagesLoading && !initialFirstUnreadMessageId;
+      setScrollReady(warmCachedThread);
+      initialScrollDoneRef.current = warmCachedThread;
       setShowScrollToBottom(false);
       setHasNewMessagesBelow(false);
       bottomSeenMessageIdRef.current = null;
@@ -1235,7 +1240,9 @@ export function ChatThread({
             className={[
               "chat-panel-body",
               scrollReady ? "chat-panel-body--scroll-ready" : "chat-panel-body--scroll-init",
-            ].join(" ")}
+            ]
+              .filter(Boolean)
+              .join(" ")}
             onScroll={handleScrollContainer}
           >
             <div className="chat-panel-messages-inner">{messageScrollContent}</div>
