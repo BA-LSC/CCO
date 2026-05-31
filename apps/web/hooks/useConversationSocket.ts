@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { closeWebSocketOnAppUpdate } from "@/lib/app-update-socket";
 import { apiFetch, type Message, type Reaction } from "@/lib/api";
 import { resolveWebSocketBase } from "@/lib/websocket-url";
 
@@ -84,8 +85,10 @@ export function useConversationSocket(
 
     let cancelled = false;
     let ws: WebSocket | null = null;
+    const wsRef = { current: null as WebSocket | null };
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryDelay = 1000;
+    const stopAppUpdateSocketReset = closeWebSocketOnAppUpdate(() => wsRef.current);
 
     function scheduleReconnect() {
       if (cancelled) return;
@@ -116,6 +119,7 @@ export function useConversationSocket(
       const wsBase = await fetchWebSocketBase();
       const url = `${wsBase}/v1/ws?conversationId=${conversationId}&token=${encodeURIComponent(token)}`;
       ws = new WebSocket(url);
+      wsRef.current = ws;
 
       ws.onopen = () => {
         if (cancelled) return;
@@ -147,8 +151,10 @@ export function useConversationSocket(
 
     return () => {
       cancelled = true;
+      stopAppUpdateSocketReset();
       clearTimeout(retryTimer);
       setConnected(false);
+      wsRef.current = null;
       ws?.close();
     };
   }, [conversationId]);

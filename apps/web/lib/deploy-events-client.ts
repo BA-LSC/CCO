@@ -3,6 +3,7 @@ import {
   checkAppVersion,
   clearDeployWait,
   DEPLOY_POLL_MS,
+  isClientBuildStale,
   isDeployOverlaySuppressed,
   isDeployPending,
   markDeployWait,
@@ -24,9 +25,13 @@ function markDeployUpdating(): void {
   markDeployWait({ showOverlay: !isDeployOverlaySuppressed() });
 }
 
-/** Finish a deploy: full reload when the update screen was shown, otherwise version-check only. */
+/** Finish a deploy: full reload when draining ended or the running bundle is stale. */
 async function finishDeployUpdate(): Promise<void> {
-  if (isDeployPending() || isUpdateOverlayVisible()) {
+  const clientVersion = getClientBuildVersion();
+  const { version: serverVersion, unavailable } = await probeServerAppVersion();
+  const versionStale = isClientBuildStale(serverVersion, unavailable, clientVersion);
+
+  if (isDeployPending() || isUpdateOverlayVisible() || versionStale) {
     if (!isDeployPending()) {
       markDeployUpdating();
     }
@@ -79,12 +84,7 @@ export function listenForDeployEvents(): () => void {
     }
     // Auto-update can finish before this tab observed draining — still refresh on new build.
     const clientVersion = getClientBuildVersion();
-    if (
-      !unavailable &&
-      serverVersion &&
-      clientVersion !== "dev" &&
-      serverVersion !== clientVersion
-    ) {
+    if (isClientBuildStale(serverVersion, unavailable, clientVersion)) {
       await finishDeployUpdateSafely();
     }
   };

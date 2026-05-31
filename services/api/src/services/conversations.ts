@@ -8,7 +8,7 @@ import {
   users,
 } from "../db/schema";
 import { canPostInConversation, isLeaderRole } from "../permissions";
-import { publishMessageEvent, publishMessageEventToMembers } from "../realtime/pubsub";
+import { publishMessageEventToMembers } from "../realtime/pubsub";
 import { unreadFlagsForConversations } from "./unread";
 
 export async function listConversationMemberUserIds(conversationId: string): Promise<string[]> {
@@ -36,12 +36,16 @@ export async function markConversationRead(
     .returning({ id: conversationMembers.id });
 
   if (updated[0]) {
-    await publishMessageEvent({
-      type: "conversation.read",
-      conversationId,
-      userId,
-      readAt: readAt.toISOString(),
-    });
+    const memberUserIds = await listConversationMemberUserIds(conversationId);
+    await publishMessageEventToMembers(
+      {
+        type: "conversation.read",
+        conversationId,
+        userId,
+        readAt: readAt.toISOString(),
+      },
+      memberUserIds,
+    );
   }
 
   return Boolean(updated[0]);

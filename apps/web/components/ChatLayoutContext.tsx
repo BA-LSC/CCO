@@ -16,6 +16,7 @@ import { useUserInboxSocket } from "@/hooks/useUserInboxSocket";
 import { apiFetch } from "@/lib/api";
 import { PresenceProvider } from "@/components/PresenceProvider";
 import { resolveActiveConversationId } from "@/lib/active-conversation-id";
+import { setMessageCacheUserId } from "@/lib/message-cache";
 
 export type ChatSessionInfo = {
   userId: string;
@@ -68,7 +69,11 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsToken, setWsToken] = useState<string | null>(null);
-  const [session, setSession] = useState<ChatSessionInfo | null>(() => readCachedSession());
+  const [session, setSession] = useState<ChatSessionInfo | null>(() => {
+    const cached = readCachedSession();
+    if (cached?.userId) setMessageCacheUserId(cached.userId);
+    return cached;
+  });
   const [sessionLoading, setSessionLoading] = useState(() => readCachedSession() === null);
   const listenersRef = useRef(new Set<(event: RealtimeEvent) => void>());
 
@@ -103,6 +108,10 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
     broadcastRealtimeEvent,
   );
   const realtimeConnected = roomConnected || inboxConnected;
+
+  useEffect(() => {
+    setMessageCacheUserId(session?.userId ?? null);
+  }, [session?.userId]);
 
   useEffect(() => {
     Promise.all([

@@ -7,6 +7,7 @@ import {
   getUpdateCheckIntervalMs,
   isAppUpdateInProgress,
   isAppVersionCurrent,
+  isClientBuildStale,
   isDeployWaitActive,
   isPostDeployGracePeriod,
   prepareAppUpdate,
@@ -143,7 +144,7 @@ export function listenForAppUpdates(onUpdating: () => Promise<void>): () => void
     if (await checkAppVersion(onUpdating)) return;
     const { version: serverVersion, unavailable } = await probeServerAppVersion();
     const clientVersion = getClientBuildVersion();
-    if (!unavailable && serverVersion && serverVersion !== clientVersion) {
+    if (isClientBuildStale(serverVersion, unavailable, clientVersion)) {
       void registration?.update();
     }
     syncDeployPoll();

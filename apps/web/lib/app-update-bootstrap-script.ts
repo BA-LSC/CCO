@@ -31,13 +31,26 @@ try{
     overlay.innerHTML=${overlayLiteral};
     (document.body||document.documentElement).appendChild(overlay);
   }
+  function armUpdating(){
+    window.__ccoApplyingUpdate=true;
+    window.__ccoDeployPending=true;
+    showOverlay();
+    try{window.dispatchEvent(new Event("cco:app-updating"))}catch(e){}
+  }
+  function shouldArm(data){
+    if(!data)return false;
+    var client=window.__ccoAppVersion;
+    if(data.updating)return true;
+    if(!data.version||!client||client==="dev")return false;
+    return data.version!==client;
+  }
   fetch("/api/app-version",{cache:"no-store",headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}})
     .then(function(res){return res.ok?res.json():null})
     .then(function(data){
-      if(!data||!data.updating)return;
-      window.__ccoApplyingUpdate=true;
-      window.__ccoDeployPending=true;
-      showOverlay();
+      if(!shouldArm(data))return;
+      armUpdating();
+      if(data.updating)return;
+      setTimeout(function(){window.location.reload()},500);
     })
     .catch(function(){});
 }catch(e){}

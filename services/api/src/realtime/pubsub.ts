@@ -21,18 +21,30 @@ type PubSubBackend = "memory" | "redis" | "cloudflare";
 
 let backend: PubSubBackend = "memory";
 
-export function configurePubSub(): void {
+/** Resolve pubsub backend; Cloudflare service bindings only exist inside a request scope. */
+function resolvePubSubBackend(): PubSubBackend {
   if (isCloudflarePubSubEnabled()) {
-    initCloudflarePubSub();
-    backend = "cloudflare";
-    return;
+    if (backend !== "cloudflare") {
+      initCloudflarePubSub();
+      backend = "cloudflare";
+    }
+    return "cloudflare";
   }
 
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
-    initRedisPubSub(redisUrl);
-    backend = "redis";
+    if (backend !== "redis") {
+      initRedisPubSub(redisUrl);
+      backend = "redis";
+    }
+    return "redis";
   }
+
+  return "memory";
+}
+
+export function configurePubSub(): void {
+  resolvePubSubBackend();
 }
 
 export type { RealtimeEvent } from "./events";
@@ -41,17 +53,19 @@ export function subscribeToConversation(
   conversationId: string,
   listener: (event: RealtimeEvent) => void,
 ): () => void {
-  if (backend === "cloudflare") return subscribeToConversationCloudflare(conversationId, listener);
-  if (backend === "redis") return subscribeToConversationRedis(conversationId, listener);
+  const activeBackend = resolvePubSubBackend();
+  if (activeBackend === "cloudflare") return subscribeToConversationCloudflare(conversationId, listener);
+  if (activeBackend === "redis") return subscribeToConversationRedis(conversationId, listener);
   return subscribeToConversationMemory(conversationId, listener);
 }
 
 export async function publishMessageEvent(event: RealtimeEvent): Promise<void> {
-  if (backend === "cloudflare") {
+  const activeBackend = resolvePubSubBackend();
+  if (activeBackend === "cloudflare") {
     await publishMessageEventCloudflare(event);
     return;
   }
-  if (backend === "redis") {
+  if (activeBackend === "redis") {
     await publishMessageEventRedis(event);
     return;
   }
@@ -63,8 +77,9 @@ export async function publishMessageEventToMembers(
   event: RealtimeEvent,
   memberUserIds: string[],
 ): Promise<void> {
+  const activeBackend = resolvePubSubBackend();
   await publishMessageEvent(event);
-  if (backend === "cloudflare") {
+  if (activeBackend === "cloudflare") {
     fireAndForgetPublishToUsers(memberUserIds, event);
   }
 }

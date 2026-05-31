@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { closeWebSocketOnAppUpdate } from "@/lib/app-update-socket";
 import { apiFetch } from "@/lib/api";
 import type { RealtimeEvent } from "@/hooks/useConversationSocket";
 import { resolveWebSocketBase } from "@/lib/websocket-url";
@@ -41,8 +42,10 @@ export function useUserInboxSocket(
 
     let cancelled = false;
     let ws: WebSocket | null = null;
+    const wsRef = { current: null as WebSocket | null };
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryDelay = 1000;
+    const stopAppUpdateSocketReset = closeWebSocketOnAppUpdate(() => wsRef.current);
 
     function scheduleReconnect() {
       if (cancelled) return;
@@ -74,6 +77,7 @@ export function useUserInboxSocket(
       const url = `${wsBase}/v1/ws/inbox?token=${encodeURIComponent(token)}`;
       ws?.close();
       ws = new WebSocket(url);
+      wsRef.current = ws;
 
       ws.onopen = () => {
         if (cancelled) return;
@@ -108,9 +112,11 @@ export function useUserInboxSocket(
 
     return () => {
       cancelled = true;
+      stopAppUpdateSocketReset();
       clearTimeout(retryTimer);
       clearInterval(tokenRefreshTimer);
       setConnected(false);
+      wsRef.current = null;
       ws?.close();
     };
   }, [userId]);

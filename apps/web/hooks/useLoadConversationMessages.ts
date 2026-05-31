@@ -1,39 +1,108 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 import { apiFetch, type MemberReadReceipt, type Message, type MessageListResponse, type PeerUser } from "@/lib/api";
 import type { CallTimelineEventDto } from "@/lib/call-timeline";
 import {
   getCachedMessages,
   invalidateConversation,
   setCachedMessages,
+  type CachedConversationMessages,
 } from "@/lib/message-cache";
 import { conversationMessagesPath } from "@/lib/messages";
 import { NOTIFICATION_ANCHOR_QUERY } from "@/lib/notification-navigation";
 
 export { NOTIFICATION_ANCHOR_QUERY } from "@/lib/notification-navigation";
 
+function readCachedConversation(conversationId: string | null): CachedConversationMessages | null {
+  if (!conversationId) return null;
+  return getCachedMessages(conversationId);
+}
+
+function applyCachedConversation(
+  cached: CachedConversationMessages,
+  conversationId: string,
+  setters: {
+    setMessages: (messages: Message[]) => void;
+    setCallEvents: (events: CallTimelineEventDto[]) => void;
+    setHasMore: (hasMore: boolean) => void;
+    setFirstUnreadMessageId: (id: string | null) => void;
+    setMessagesForConversationId: (id: string) => void;
+    setPeerLastReadAt: (value: string | null) => void;
+    setPeerUser: (value: PeerUser | null) => void;
+    setMemberReadReceipts: (value: MemberReadReceipt[]) => void;
+    setCanPost: (value: boolean | null) => void;
+    setMessagesLoading: (loading: boolean) => void;
+  },
+): void {
+  setters.setMessages(cached.messages);
+  setters.setCallEvents(cached.callEvents);
+  setters.setHasMore(cached.hasMore);
+  setters.setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
+  setters.setMessagesForConversationId(conversationId);
+  setters.setPeerLastReadAt(cached.peerLastReadAt ?? null);
+  setters.setPeerUser(cached.peerUser ?? null);
+  setters.setMemberReadReceipts(cached.memberReadReceipts ?? []);
+  setters.setCanPost(cached.canPost ?? null);
+  setters.setMessagesLoading(false);
+}
+
 export function useLoadConversationMessages(conversationId: string | null) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  useChatLayout(); // ensures message cache user id is scoped before reads
   const anchorHandledRef = useRef<string | null>(null);
   const anchorUnread = searchParams.get(NOTIFICATION_ANCHOR_QUERY) === "1";
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [callEvents, setCallEvents] = useState<CallTimelineEventDto[]>([]);
-  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null);
-  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
-    null,
+  const initialCached = readCachedConversation(conversationId);
+
+  const [messages, setMessages] = useState<Message[]>(() => initialCached?.messages ?? []);
+  const [callEvents, setCallEvents] = useState<CallTimelineEventDto[]>(
+    () => initialCached?.callEvents ?? [],
   );
-  const [hasMore, setHasMore] = useState(false);
-  const [messagesLoading, setMessagesLoading] = useState(Boolean(conversationId));
-  const [canPost, setCanPost] = useState<boolean | null>(null);
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(
+    () => initialCached?.firstUnreadMessageId ?? null,
+  );
+  const [messagesForConversationId, setMessagesForConversationId] = useState<string | null>(
+    () => (initialCached && conversationId ? conversationId : null),
+  );
+  const [hasMore, setHasMore] = useState(() => initialCached?.hasMore ?? false);
+  const [messagesLoading, setMessagesLoading] = useState(
+    () => Boolean(conversationId) && initialCached === null,
+  );
+  const [canPost, setCanPost] = useState<boolean | null>(() => initialCached?.canPost ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
-  const [peerUser, setPeerUser] = useState<PeerUser | null>(null);
-  const [memberReadReceipts, setMemberReadReceipts] = useState<MemberReadReceipt[]>([]);
+  const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(
+    () => initialCached?.peerLastReadAt ?? null,
+  );
+  const [peerUser, setPeerUser] = useState<PeerUser | null>(() => initialCached?.peerUser ?? null);
+  const [memberReadReceipts, setMemberReadReceipts] = useState<MemberReadReceipt[]>(
+    () => initialCached?.memberReadReceipts ?? [],
+  );
+
+  const cacheSetters = {
+    setMessages,
+    setCallEvents,
+    setHasMore,
+    setFirstUnreadMessageId,
+    setMessagesForConversationId,
+    setPeerLastReadAt,
+    setPeerUser,
+    setMemberReadReceipts,
+    setCanPost,
+    setMessagesLoading,
+  };
+
+  useLayoutEffect(() => {
+    if (!conversationId || anchorUnread) return;
+    const cached = getCachedMessages(conversationId);
+    if (cached) {
+      applyCachedConversation(cached, conversationId, cacheSetters);
+    }
+  }, [anchorUnread, conversationId]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -57,7 +126,6 @@ export function useLoadConversationMessages(conversationId: string | null) {
     }
 
     setLoadError(null);
-    setMessagesLoading(true);
 
     if (shouldAnchorUnread) {
       anchorHandledRef.current = conversationId;
@@ -67,20 +135,27 @@ export function useLoadConversationMessages(conversationId: string | null) {
       setHasMore(false);
       setFirstUnreadMessageId(null);
       setMessagesForConversationId(null);
+      setCanPost(null);
+      setPeerLastReadAt(null);
+      setPeerUser(null);
+      setMemberReadReceipts([]);
+      setMessagesLoading(true);
     } else {
       anchorHandledRef.current = null;
       const cached = getCachedMessages(conversationId);
       if (cached) {
-        setMessages(cached.messages);
-        setCallEvents(cached.callEvents);
-        setHasMore(cached.hasMore);
-        setFirstUnreadMessageId(cached.firstUnreadMessageId ?? null);
-        setMessagesForConversationId(conversationId);
+        applyCachedConversation(cached, conversationId, cacheSetters);
       } else {
         setMessages([]);
-      setCallEvents([]);
+        setCallEvents([]);
         setHasMore(false);
+        setFirstUnreadMessageId(null);
         setMessagesForConversationId(null);
+        setCanPost(null);
+        setPeerLastReadAt(null);
+        setPeerUser(null);
+        setMemberReadReceipts([]);
+        setMessagesLoading(true);
       }
     }
 
@@ -98,14 +173,16 @@ export function useLoadConversationMessages(conversationId: string | null) {
         setPeerLastReadAt(data.peerLastReadAt ?? null);
         setPeerUser(data.peerUser ?? null);
         setMemberReadReceipts(data.memberReadReceipts ?? []);
-        if (typeof data.canPost === "boolean") {
-          setCanPost(data.canPost);
-        }
+        setCanPost(typeof data.canPost === "boolean" ? data.canPost : null);
         setCachedMessages(conversationId, {
           messages: data.messages,
           callEvents: data.callEvents ?? [],
           hasMore: data.hasMore,
           firstUnreadMessageId: data.firstUnreadMessageId,
+          peerLastReadAt: data.peerLastReadAt ?? null,
+          peerUser: data.peerUser ?? null,
+          memberReadReceipts: data.memberReadReceipts ?? [],
+          canPost: typeof data.canPost === "boolean" ? data.canPost : null,
         });
 
         if (shouldAnchorUnread) {

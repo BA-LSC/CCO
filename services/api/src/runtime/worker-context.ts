@@ -208,6 +208,30 @@ function mirrorEnvVars(vars: WorkerEnvVars): void {
   }
 }
 
+const MIRRORED_RUNTIME_ENV_KEYS = [
+  "CCO_RUNTIME",
+  "UPLOAD_STORAGE",
+  "CF_PRESENCE_KV",
+  "CF_DEPLOY_KV",
+  "CF_PUSH_QUEUE_ENABLED",
+  ...MIRRORED_ENV_KEYS,
+] as const;
+
+function snapshotProcessEnv(keys: readonly string[]): Record<string, string | undefined> {
+  const snapshot: Record<string, string | undefined> = {};
+  for (const key of keys) {
+    snapshot[key] = process.env[key];
+  }
+  return snapshot;
+}
+
+function restoreProcessEnv(snapshot: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
 /** Run a handler with D1, R2, KV, Queue, and service bindings active. */
 export async function runWithWorkerContext<T>(
   bindings: WorkerBindings,
@@ -217,6 +241,11 @@ export async function runWithWorkerContext<T>(
 ): Promise<T> {
   const d1 = createD1Client(bindings.DB);
   const ctx: WorkerRuntimeContext = { bindings, vars, d1, executionCtx };
+  const envSnapshot = snapshotProcessEnv(MIRRORED_RUNTIME_ENV_KEYS);
   mirrorEnvVars(vars);
-  return storage.run(ctx, fn);
+  try {
+    return await storage.run(ctx, fn);
+  } finally {
+    restoreProcessEnv(envSnapshot);
+  }
 }

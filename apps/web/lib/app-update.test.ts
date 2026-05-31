@@ -1,10 +1,23 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   clearDeployWait,
+  isClientBuildStale,
   isDeployPending,
   markDeployWait,
   probeServerAppVersion,
 } from "./app-update";
+
+describe("isClientBuildStale", () => {
+  test("detects version mismatch", () => {
+    expect(isClientBuildStale("new-sha", false, "old-sha")).toBe(true);
+  });
+
+  test("ignores dev, unavailable, and matching builds", () => {
+    expect(isClientBuildStale("new-sha", false, "dev")).toBe(false);
+    expect(isClientBuildStale(null, true, "old-sha")).toBe(false);
+    expect(isClientBuildStale("same-sha", false, "same-sha")).toBe(false);
+  });
+});
 
 describe("probeServerAppVersion", () => {
   const originalFetch = globalThis.fetch;

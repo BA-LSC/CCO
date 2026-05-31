@@ -353,6 +353,16 @@ export async function isAppVersionCurrent(): Promise<boolean> {
   return Boolean(serverVersion && serverVersion === clientVersion);
 }
 
+/** True when the live server build id differs from the running JS bundle. */
+export function isClientBuildStale(
+  serverVersion: string | null,
+  unavailable: boolean,
+  clientVersion = getClientBuildVersion(),
+): boolean {
+  if (unavailable || !serverVersion || clientVersion === "dev") return false;
+  return serverVersion !== clientVersion;
+}
+
 export function shouldRunAppUpdateChecks(): boolean {
   return APP_BUILD_VERSION !== "dev";
 }
@@ -370,7 +380,7 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
 
   // Deploy draining — keep the update overlay up until the server clears the flag.
   if (updating) {
-    if (!unavailable && serverVersion && serverVersion !== clientVersion) {
+    if (isClientBuildStale(serverVersion, unavailable, clientVersion)) {
       await applyAppUpdate(onUpdating);
       return true;
     }
@@ -390,7 +400,7 @@ export async function checkAppVersion(onUpdating?: () => Promise<void>): Promise
     return false;
   }
 
-  if (!serverVersion || serverVersion === clientVersion) {
+  if (!isClientBuildStale(serverVersion, unavailable, clientVersion)) {
     return false;
   }
 

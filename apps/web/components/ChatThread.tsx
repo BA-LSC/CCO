@@ -35,6 +35,7 @@ import {
   scrollMessagesToBottom,
 } from "@/lib/chat-scroll";
 import { conversationMessagesPath, MESSAGE_PAGE_SIZE } from "@/lib/messages";
+import { mergeMemberReadReceipts, mergePeerLastReadAt } from "@/lib/read-receipts";
 import {
   saveComposerDraft,
   setSendInFlight,
@@ -184,7 +185,7 @@ export function ChatThread({
     initialMemberReadReceipts,
   );
   const unreadDividerRef = useRef<HTMLDivElement>(null);
-  const hasMarkedReadRef = useRef(false);
+  const lastMarkedLatestMessageIdRef = useRef<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const sendInFlightRef = useRef(false);
   const [sending, setSending] = useState(false);
@@ -256,12 +257,14 @@ export function ChatThread({
   }, []);
 
   const markConversationRead = useCallback(() => {
-    if (!conversationId || hasMarkedReadRef.current) return;
-    hasMarkedReadRef.current = true;
+    if (!conversationId) return;
+    const latestMessageId = messagesRef.current.at(-1)?.id ?? null;
+    if (latestMessageId === lastMarkedLatestMessageIdRef.current) return;
+    lastMarkedLatestMessageIdRef.current = latestMessageId;
     setFirstUnreadMessageId(null);
     void apiFetch(`/api/v1/conversations/${conversationId}/read`, { method: "POST" }).catch(
       () => {
-        hasMarkedReadRef.current = false;
+        lastMarkedLatestMessageIdRef.current = null;
       },
     );
     dispatchUnreadChanged({ conversationId, hasUnread: false });
@@ -524,7 +527,7 @@ export function ChatThread({
       setFirstUnreadMessageId(initialFirstUnreadMessageId);
       setPeerLastReadAt(initialPeerLastReadAt);
       setMemberReadReceipts(initialMemberReadReceipts);
-      hasMarkedReadRef.current = false;
+      lastMarkedLatestMessageIdRef.current = null;
       setMessages(sortMessagesByCreatedAt(initialMessages));
       setCallEvents(initialCallEvents);
       setHasMore(initialHasMore);
@@ -692,12 +695,13 @@ export function ChatThread({
       }
       if (
         event.type === "conversation.read" &&
+        event.conversationId === conversationId &&
         event.readAt &&
         event.userId &&
         event.userId !== resolvedUserId
       ) {
         if (isDirectMessage) {
-          setPeerLastReadAt(event.readAt);
+          setPeerLastReadAt((prev) => mergePeerLastReadAt(prev, event.readAt));
         } else {
           const readerUserId = event.userId;
           const readerReadAt = event.readAt;
@@ -705,7 +709,10 @@ export function ChatThread({
             const existingIndex = prev.findIndex((member) => member.userId === readerUserId);
             if (existingIndex >= 0) {
               const next = [...prev];
-              next[existingIndex] = { ...next[existingIndex]!, lastReadAt: readerReadAt };
+              next[existingIndex] = {
+                ...next[existingIndex]!,
+                lastReadAt: mergePeerLastReadAt(next[existingIndex]!.lastReadAt ?? null, readerReadAt),
+              };
               return next;
             }
             const rosterMember = members.find((member) => member.id === readerUserId);
@@ -786,14 +793,35 @@ export function ChatThread({
   );
 
   useEffect(() => subscribeRealtime(onEvent), [onEvent, subscribeRealtime]);
+  const handlePollReadReceipts = useCallback(
+    (data: { peerLastReadAt?: string | null; memberReadReceipts?: MemberReadReceipt[] }) => {
+      if (isDirectMessage) {
+        setPeerLastReadAt((prev) => mergePeerLastReadAt(prev, data.peerLastReadAt));
+        return;
+      }
+      setMemberReadReceipts((prev) => mergeMemberReadReceipts(prev, data.memberReadReceipts));
+    },
+    [isDirectMessage],
+  );
+
   useConversationPollFallback(
     conversationId,
     realtimeConnected && activeConversationId === conversationId,
     messagesLoading,
     setMessages,
-    { getMergeOptions: getPollMergeOptions },
+    { getMergeOptions: getPollMergeOptions, onPollData: handlePollReadReceipts },
     setCallEvents,
   );
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!pinnedToBottomRef.current) return;
+      markConversationRead();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [markConversationRead]);
 
   async function postMessage(payload: {
     body: string;

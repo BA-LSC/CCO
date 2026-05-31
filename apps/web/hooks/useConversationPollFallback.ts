@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { apiFetch, type Message } from "@/lib/api";
+import { apiFetch, type MemberReadReceipt, type Message, type MessageListResponse } from "@/lib/api";
 import type { CallTimelineEventDto } from "@/lib/call-timeline";
 import { mergeCallTimelineEvents, normalizeCallTimelineEvents } from "@/lib/call-timeline";
 import { mergeConversationMessages, type MergeConversationMessagesOptions } from "@/lib/message-reactions";
@@ -12,6 +12,7 @@ const POLL_MS_CONNECTED = 8000;
 
 export type ConversationPollMergeOptions = {
   getMergeOptions?: () => MergeConversationMessagesOptions;
+  onPollData?: (data: Pick<MessageListResponse, "peerLastReadAt" | "memberReadReceipts">) => void;
 };
 
 /** Keep messages and reactions in sync when the socket is down; light backup while connected. */
@@ -34,10 +35,12 @@ export function useConversationPollFallback(
 
     async function poll() {
       try {
-        const data = await apiFetch<{ messages: Message[]; callEvents?: CallTimelineEventDto[] }>(
+        const data = await apiFetch<MessageListResponse>(
           conversationMessagesPath(activeConversationId, { limit: 50 }),
         );
         if (cancelled) return;
+
+        pollMergeRef.current?.onPollData?.(data);
 
         const mergeOptions = pollMergeRef.current?.getMergeOptions?.();
         setMessages((prev) => mergeConversationMessages(prev, data.messages, mergeOptions));
