@@ -1,6 +1,6 @@
 import { prepareImageForUpload } from "./prepare-image-upload";
 import { prepareVideoForUpload } from "./prepare-video-upload";
-import { shouldUseMultipartUploadFallback } from "@/lib/cloudflare-deploy";
+import { isDirectR2UploadsEnabled, shouldUseMultipartUploadFallback } from "@/lib/cloudflare-deploy";
 import {
   isDeployOverlaySuppressed,
   markDeployWait,
@@ -197,6 +197,22 @@ async function uploadMediaMultipart(file: File, contentType: string): Promise<st
   return data.url;
 }
 
+function isStorageCorsBlockedError(err: unknown): boolean {
+  return getErrorMessage(err).includes(STORAGE_CORS_BLOCKED);
+}
+
+/** BYO Cloudflare: fall back to Worker R2 binding when presigned PUT fails. */
+function shouldRetryUploadViaMultipart(err: unknown): boolean {
+  if (!isDirectR2UploadsEnabled()) return false;
+  if (isStorageCorsBlockedError(err)) return true;
+  if (isPresignUnavailableError(err)) return true;
+  const msg = getErrorMessage(err);
+  return (
+    msg.includes("Upload to storage failed") ||
+    msg.includes("Upload service returned an invalid storage URL")
+  );
+}
+
 async function uploadPreparedMedia(
   file: File,
   contentType: string,
@@ -204,7 +220,7 @@ async function uploadPreparedMedia(
   try {
     return await uploadMediaViaPresign(file, contentType);
   } catch (presignErr) {
-    if (isStorageCorsBlockedError(presignErr)) {
+    if (shouldRetryUploadViaMultipart(presignErr)) {
       return uploadMediaMultipart(file, contentType);
     }
     if (shouldUseMultipartUploadFallback() && isPresignUnavailableError(presignErr)) {
@@ -212,10 +228,6 @@ async function uploadPreparedMedia(
     }
     throw presignErr;
   }
-}
-
-function isStorageCorsBlockedError(err: unknown): boolean {
-  return getErrorMessage(err).includes(STORAGE_CORS_BLOCKED);
 }
 
 export async function uploadImage(file: File): Promise<string> {

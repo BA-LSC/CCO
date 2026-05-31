@@ -32,10 +32,10 @@ type RealtimeFanoutConfig =
 
 let fanoutSubscriberStarted = false;
 
-async function publishToFanout(event: RealtimeEvent): Promise<void> {
-  const config = readFanoutConfig();
-  if (!config) return;
-
+async function publishToFanout(
+  config: RealtimeFanoutConfig,
+  event: RealtimeEvent,
+): Promise<void> {
   const requestInit: RequestInit = {
     method: "POST",
     headers: {
@@ -51,6 +51,29 @@ async function publishToFanout(event: RealtimeEvent): Promise<void> {
 
   if (!res.ok) {
     console.warn("Cloudflare fanout publish failed:", res.status, await res.text());
+  }
+}
+
+async function publishToUserInbox(
+  config: RealtimeFanoutConfig,
+  userId: string,
+  event: RealtimeEvent,
+): Promise<void> {
+  const requestInit: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.internalSecret}`,
+    },
+    body: JSON.stringify({ userId, ...event }),
+  };
+
+  const res = config.service
+    ? await config.service.fetch("https://realtime/internal/publish-user", requestInit)
+    : await fetch(`${config.baseUrl}/internal/publish-user`, requestInit);
+
+  if (!res.ok) {
+    console.warn("Cloudflare user inbox publish failed:", res.status, await res.text());
   }
 }
 
@@ -88,28 +111,6 @@ export function subscribeToConversationCloudflare(
 }
 
 /** Publish to in-process memory immediately; fanout runs in the background. */
-async function publishToUserInbox(userId: string, event: RealtimeEvent): Promise<void> {
-  const config = readFanoutConfig();
-  if (!config) return;
-
-  const requestInit: RequestInit = {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.internalSecret}`,
-    },
-    body: JSON.stringify({ userId, ...event }),
-  };
-
-  const res = config.service
-    ? await config.service.fetch("https://realtime/internal/publish-user", requestInit)
-    : await fetch(`${config.baseUrl}/internal/publish-user`, requestInit);
-
-  if (!res.ok) {
-    console.warn("Cloudflare user inbox publish failed:", res.status, await res.text());
-  }
-}
-
 export function fireAndForgetPublish(event: RealtimeEvent): void {
   publishMessageEventMemory(event);
   const config = readFanoutConfig();
@@ -117,9 +118,9 @@ export function fireAndForgetPublish(event: RealtimeEvent): void {
 
   const execCtx = getExecutionContext();
   if (execCtx) {
-    execCtx.waitUntil(publishToFanout(event));
+    execCtx.waitUntil(publishToFanout(config, event));
   } else {
-    void publishToFanout(event);
+    void publishToFanout(config, event);
   }
 }
 
@@ -132,7 +133,7 @@ export function fireAndForgetPublishToUsers(userIds: string[], event: RealtimeEv
   if (!config) return;
 
   const publishAll = async () => {
-    await Promise.all(unique.map((userId) => publishToUserInbox(userId, event)));
+    await Promise.all(unique.map((userId) => publishToUserInbox(config, userId, event)));
   };
 
   const execCtx = getExecutionContext();
