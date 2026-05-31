@@ -56,6 +56,8 @@ type ChatLayoutContextValue = {
   toggleSidebar: () => void;
   activeConversationId: string | null;
   realtimeConnected: boolean;
+  /** True when the active conversation room WebSocket is connected. */
+  conversationSocketConnected: boolean;
   subscribeRealtime: (listener: (event: RealtimeEvent) => void) => () => void;
   wsToken: string | null;
   session: ChatSessionInfo | null;
@@ -108,6 +110,7 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
     broadcastRealtimeEvent,
   );
   const realtimeConnected = roomConnected || inboxConnected;
+  const conversationSocketConnected = roomConnected;
 
   useEffect(() => {
     setMessageCacheUserId(session?.userId ?? null);
@@ -141,6 +144,7 @@ export function ChatLayoutProvider({ children }: { children: ReactNode }) {
         toggleSidebar,
         activeConversationId,
         realtimeConnected,
+        conversationSocketConnected,
         subscribeRealtime,
         wsToken,
         session,

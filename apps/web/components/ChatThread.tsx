@@ -171,7 +171,12 @@ export function ChatThread({
   const appUpdateBlocked = useAppUpdateGuard();
   const composerLocked = composerDisabled || appUpdateBlocked;
   const placeholder = composerPlaceholderForDevice(composerPlaceholder, coarsePointer);
-  const { subscribeRealtime, session, realtimeConnected, activeConversationId } = useChatLayout();
+  const {
+    subscribeRealtime,
+    session,
+    conversationSocketConnected,
+    activeConversationId,
+  } = useChatLayout();
   const messageActions = useMessageActionsReveal();
   const resolvedUserId = currentUserId ?? session?.userId;
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -771,6 +776,7 @@ export function ChatThread({
       }
       if (
         event.type === "typing" &&
+        event.conversationId === conversationId &&
         event.userId &&
         event.userId !== resolvedUserId &&
         (!isDirectMessage || !peerUser || event.userId === peerUser.id)
@@ -811,7 +817,7 @@ export function ChatThread({
 
   useConversationPollFallback(
     conversationId,
-    realtimeConnected && activeConversationId === conversationId,
+    conversationSocketConnected && activeConversationId === conversationId,
     messagesLoading,
     setMessages,
     { getMergeOptions: getPollMergeOptions, onPollData: handlePollReadReceipts },

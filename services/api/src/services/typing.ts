@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { publishMessageEvent } from "../realtime/pubsub";
+import { publishMessageEventToMembers } from "../realtime/pubsub";
 import { isConversationMember } from "./call-access";
+import { listConversationMemberUserIds } from "./conversations";
 
 export async function publishTypingIndicator(params: {
   conversationId: string;
@@ -18,13 +19,17 @@ export async function publishTypingIndicator(params: {
     .where(eq(users.id, params.userId))
     .limit(1);
 
-  await publishMessageEvent({
-    type: "typing",
-    conversationId: params.conversationId,
-    userId: params.userId,
-    displayName: userRow[0]?.displayName?.trim() || "Someone",
-    isTyping: params.isTyping,
-  });
+  const memberUserIds = await listConversationMemberUserIds(params.conversationId);
+  await publishMessageEventToMembers(
+    {
+      type: "typing",
+      conversationId: params.conversationId,
+      userId: params.userId,
+      displayName: userRow[0]?.displayName?.trim() || "Someone",
+      isTyping: params.isTyping,
+    },
+    memberUserIds,
+  );
 
   return { ok: true };
 }

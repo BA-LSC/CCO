@@ -75,15 +75,34 @@ export function isCloudflareWorkerRuntime(): boolean {
   return storage.getStore() != null;
 }
 
+/** Re-enter a captured worker context for waitUntil tasks (request scope has already ended). */
+async function runInCapturedWorkerContext(
+  captured: WorkerRuntimeContext,
+  fn: () => void | Promise<void>,
+): Promise<void> {
+  const envSnapshot = snapshotProcessEnv(MIRRORED_RUNTIME_ENV_KEYS);
+  mirrorEnvVars(captured.vars);
+  try {
+    await storage.run(captured, fn);
+  } finally {
+    restoreProcessEnv(envSnapshot);
+  }
+}
+
 /** Run work after the response via waitUntil when on Workers; otherwise fire-and-forget. */
 export function scheduleBackgroundWork(fn: () => void | Promise<void>): void {
-  const work = Promise.resolve().then(fn);
-  const executionCtx = getExecutionContext();
+  const captured = storage.getStore();
+  const work = captured
+    ? () => runInCapturedWorkerContext(captured, fn)
+    : () => Promise.resolve().then(fn);
+
+  const promise = Promise.resolve().then(work);
+  const executionCtx = captured?.executionCtx;
   if (executionCtx) {
-    executionCtx.waitUntil(work);
+    executionCtx.waitUntil(promise);
     return;
   }
-  void work.catch((err) => {
+  void promise.catch((err) => {
     console.warn(
       "[worker-context] Background work failed:",
       err instanceof Error ? err.message : err,
