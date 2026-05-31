@@ -2,8 +2,17 @@ import { and, eq, inArray } from "drizzle-orm";
 import Redis from "ioredis";
 import { db } from "../db";
 import { conversationMembers, users } from "../db/schema";
-import { kvMget, kvMgetBinding, kvPut, kvPutBinding, resolvePresenceKvConfig } from "../lib/cloudflare-kv";
-import { getWorkerBindings } from "../runtime/worker-context";
+import {
+  kvGet,
+  kvGetBinding,
+  kvMget,
+  kvMgetBinding,
+  kvPut,
+  kvPutBinding,
+  resolvePresenceKvConfig,
+} from "../lib/cloudflare-kv";
+import { fireAndForgetPublishToUsers } from "../realtime/pubsub-cloudflare";
+import { getWorkerBindings, scheduleBackgroundWork } from "../runtime/worker-context";
 import { PRESENCE_KEY_PREFIX, PRESENCE_TTL_SECONDS, presenceKey } from "../realtime/presence-keys";
 
 export { PRESENCE_TTL_SECONDS };
@@ -28,26 +37,93 @@ async function shouldUseKvPresence(): Promise<boolean> {
   }
 }
 
+function parsePresenceInCall(raw: string | null): string | null {
+  if (raw?.startsWith("call:")) return raw.slice("call:".length) || null;
+  return null;
+}
+
+/** Co-conversation members who may receive realtime presence updates. */
+export async function listPresenceNotificationTargets(userId: string): Promise<string[]> {
+  const conversations = await db
+    .select({ conversationId: conversationMembers.conversationId })
+    .from(conversationMembers)
+    .where(eq(conversationMembers.userId, userId));
+
+  const conversationIds = conversations.map((row) => row.conversationId);
+  if (conversationIds.length === 0) return [];
+
+  const members = await db
+    .select({ userId: conversationMembers.userId })
+    .from(conversationMembers)
+    .where(inArray(conversationMembers.conversationId, conversationIds));
+
+  const targets = new Set<string>();
+  for (const row of members) {
+    if (row.userId !== userId) targets.add(row.userId);
+  }
+  return [...targets];
+}
+
+function notifyPresenceWatchers(
+  userId: string,
+  wasOnline: boolean,
+  inCall: string | null,
+  previousInCall: string | null,
+): void {
+  if (wasOnline && previousInCall === inCall) return;
+
+  scheduleBackgroundWork(async () => {
+    const targets = await listPresenceNotificationTargets(userId);
+    if (targets.length === 0) return;
+    fireAndForgetPublishToUsers(targets, {
+      type: "presence.updated",
+      userId,
+      online: true,
+      inCall,
+    });
+  });
+}
+
 /** Mark a user as actively viewing the app (page visible). */
 export async function touchUserPresence(userId: string, callId?: string | null): Promise<void> {
   const value = callId ? `call:${callId}` : "1";
+  const inCall = callId ?? null;
+  const key = presenceKey(userId);
 
   if (await shouldUseKvPresence()) {
     const binding = getWorkerBindings()?.PRESENCE_KV;
     if (binding) {
-      await kvPutBinding(binding, presenceKey(userId), value, PRESENCE_TTL_SECONDS);
+      const previous = await kvGetBinding(binding, key);
+      const wasOnline = previous != null;
+      const previousInCall = parsePresenceInCall(previous);
+      await kvPutBinding(binding, key, value, PRESENCE_TTL_SECONDS);
+      if (!wasOnline || previousInCall !== inCall) {
+        notifyPresenceWatchers(userId, wasOnline, inCall, previousInCall);
+      }
       return;
     }
     const kv = await resolvePresenceKvConfig();
     if (kv) {
-      await kvPut(kv, presenceKey(userId), value, PRESENCE_TTL_SECONDS);
+      const previous = await kvGet(kv, key);
+      const wasOnline = previous != null;
+      const previousInCall = parsePresenceInCall(previous);
+      await kvPut(kv, key, value, PRESENCE_TTL_SECONDS);
+      if (!wasOnline || previousInCall !== inCall) {
+        notifyPresenceWatchers(userId, wasOnline, inCall, previousInCall);
+      }
       return;
     }
   }
 
   const client = getRedis();
   if (!client) return;
-  await client.set(presenceKey(userId), value, "EX", PRESENCE_TTL_SECONDS);
+  const previous = await client.get(key);
+  const wasOnline = previous != null;
+  const previousInCall = parsePresenceInCall(previous);
+  await client.set(key, value, "EX", PRESENCE_TTL_SECONDS);
+  if (!wasOnline || previousInCall !== inCall) {
+    notifyPresenceWatchers(userId, wasOnline, inCall, previousInCall);
+  }
 }
 
 /** Returns online map and optional active call ids per user. */

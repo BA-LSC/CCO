@@ -16,6 +16,9 @@ const MIME_BY_EXT: Record<string, string> = {
 const LEGACY_MIME_ALIASES: Record<string, string> = {
   "image/x-png": "image/png",
   "image/pjpeg": "image/jpeg",
+  "public.png": "image/png",
+  "public.jpeg": "image/jpeg",
+  "public.jpg": "image/jpeg",
 };
 
 function stripMimeParameters(type: string): string {
@@ -31,6 +34,39 @@ export function resolveBrowserImageMimeType(file: File): string | null {
   const ext = file.name.split(".").pop()?.toLowerCase();
   if (ext && MIME_BY_EXT[ext]) return MIME_BY_EXT[ext];
 
+  return null;
+}
+
+async function sniffBrowserImageMimeType(file: File): Promise<string | null> {
+  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (head.length >= 4 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) {
+    return "image/png";
+  }
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    head.length >= 6 &&
+    head[0] === 0x47 &&
+    head[1] === 0x49 &&
+    head[2] === 0x46 &&
+    head[3] === 0x38
+  ) {
+    return "image/gif";
+  }
+  if (
+    head.length >= 12 &&
+    head[0] === 0x52 &&
+    head[1] === 0x49 &&
+    head[2] === 0x46 &&
+    head[3] === 0x46 &&
+    head[8] === 0x57 &&
+    head[9] === 0x45 &&
+    head[10] === 0x42 &&
+    head[11] === 0x50
+  ) {
+    return "image/webp";
+  }
   return null;
 }
 
@@ -88,7 +124,8 @@ export async function prepareImageForUpload(file: File): Promise<File> {
     return convertHeicToJpeg(file);
   }
 
-  const resolvedType = resolveBrowserImageMimeType(file);
+  const resolvedType =
+    resolveBrowserImageMimeType(file) ?? (await sniffBrowserImageMimeType(file));
   if (resolvedType) {
     if (file.type === resolvedType) return file;
     return new File([file], file.name, { type: resolvedType });

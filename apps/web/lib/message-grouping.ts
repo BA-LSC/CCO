@@ -34,6 +34,7 @@ export function getMessageLayoutInfo(
   index: number,
   currentUserId?: string,
   previousLayouts?: MessageLayoutInfo[],
+  callBreakAfterIndices?: ReadonlySet<number>,
 ): MessageLayoutInfo {
   const message = messages[index];
   const previous = index > 0 ? messages[index - 1] : null;
@@ -63,12 +64,17 @@ export function getMessageLayoutInfo(
       gapFromPrevious >= FIVE_MINUTES_MS);
   const showAvatar = showAuthorName;
 
+  const hasCallBreakFromPrevious = callBreakAfterIndices?.has(index) ?? false;
+  const hasCallBreakToNext = callBreakAfterIndices?.has(index + 1) ?? false;
+
   const connectedToPrevious =
     sameAuthorAsPrevious &&
     spacing === "tight" &&
     !hasGapBreak &&
-    !previousLayout?.nextHasGapBreak;
-  const connectedToNext = sameAuthorAsNext && gapToNext < FIVE_MINUTES_MS;
+    !previousLayout?.nextHasGapBreak &&
+    !hasCallBreakFromPrevious;
+  const connectedToNext =
+    sameAuthorAsNext && gapToNext < FIVE_MINUTES_MS && !hasCallBreakToNext;
 
   let groupPosition: MessageGroupPosition = "single";
   if (connectedToPrevious && connectedToNext) {
@@ -96,10 +102,13 @@ export function getMessageLayoutInfo(
 export function buildMessageLayoutInfos(
   messages: MessageLike[],
   currentUserId?: string,
+  callBreakAfterIndices?: ReadonlySet<number>,
 ): MessageLayoutInfo[] {
   const layouts: MessageLayoutInfo[] = [];
   for (let index = 0; index < messages.length; index += 1) {
-    layouts.push(getMessageLayoutInfo(messages, index, currentUserId, layouts));
+    layouts.push(
+      getMessageLayoutInfo(messages, index, currentUserId, layouts, callBreakAfterIndices),
+    );
   }
   return layouts;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   applyCallEndedToTimelineEvents,
+  buildCallBreakMessageIndices,
   buildThreadTimeline,
   normalizeCallTimelineEvents,
 } from "./call-timeline";
@@ -122,5 +123,53 @@ describe("buildThreadTimeline", () => {
     );
 
     expect(timeline.filter((item) => item.kind === "call")).toHaveLength(2);
+  });
+});
+
+describe("buildCallBreakMessageIndices", () => {
+  test("breaks grouping for the message after an ended call divider", () => {
+    const messages = [
+      {
+        id: "msg-1",
+        authorId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        createdAt: "2026-05-28T17:00:00.000Z",
+      },
+      {
+        id: "msg-2",
+        authorId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        createdAt: "2026-05-28T17:00:40.000Z",
+      },
+    ] as never;
+
+    const breaks = buildCallBreakMessageIndices(messages, [
+      {
+        id: "call:ended",
+        callId: "11111111-1111-4111-8111-111111111111",
+        kind: "ended",
+        at: "2026-05-28T17:00:35.000Z",
+        durationSeconds: 35,
+      },
+    ]);
+
+    expect([...breaks]).toEqual([1]);
+  });
+
+  test("does not break messages with no call divider between them", () => {
+    const messages = [
+      {
+        id: "msg-1",
+        authorId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        createdAt: "2026-05-28T17:00:00.000Z",
+      },
+      {
+        id: "msg-2",
+        authorId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        createdAt: "2026-05-28T17:00:40.000Z",
+      },
+    ] as never;
+
+    const breaks = buildCallBreakMessageIndices(messages, []);
+
+    expect([...breaks]).toEqual([]);
   });
 });

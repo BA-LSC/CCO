@@ -514,15 +514,17 @@ export async function createMessage(params: {
     authorAvatarUrl: author[0]?.avatarUrl ?? null,
   });
 
-  const memberUserIds = await listConversationMemberUserIds(params.conversationId);
-  await publishMessageEventToMembers(
-    {
-      type: "message.created",
-      conversationId: params.conversationId,
-      message: dto,
-    },
-    memberUserIds,
-  );
+  scheduleBackgroundWork(async () => {
+    const memberUserIds = await listConversationMemberUserIds(params.conversationId);
+    await publishMessageEventToMembers(
+      {
+        type: "message.created",
+        conversationId: params.conversationId,
+        message: dto,
+      },
+      memberUserIds,
+    );
+  });
 
   scheduleBackgroundWork(() => markConversationRead(params.conversationId, params.userId));
 

@@ -122,7 +122,42 @@ export function useLoadConversationMessages(conversationId: string | null) {
 
     const shouldAnchorUnread = anchorUnread;
     if (!shouldAnchorUnread && anchorHandledRef.current === conversationId) {
-      return;
+      const cached = getCachedMessages(conversationId);
+      if (cached) {
+        applyCachedConversation(cached, conversationId, cacheSetters);
+      }
+      let cancelled = false;
+      void apiFetch<MessageListResponse>(
+        conversationMessagesPath(conversationId, { anchorUnread: false }),
+      )
+        .then((data) => {
+          if (cancelled) return;
+          setMessages(data.messages);
+          setCallEvents(data.callEvents ?? []);
+          setHasMore(data.hasMore);
+          setFirstUnreadMessageId(data.firstUnreadMessageId);
+          setMessagesForConversationId(conversationId);
+          setPeerLastReadAt(data.peerLastReadAt ?? null);
+          setPeerUser(data.peerUser ?? null);
+          setMemberReadReceipts(data.memberReadReceipts ?? []);
+          setCanPost(typeof data.canPost === "boolean" ? data.canPost : null);
+          setCachedMessages(conversationId, {
+            messages: data.messages,
+            callEvents: data.callEvents ?? [],
+            hasMore: data.hasMore,
+            firstUnreadMessageId: data.firstUnreadMessageId,
+            peerLastReadAt: data.peerLastReadAt ?? null,
+            peerUser: data.peerUser ?? null,
+            memberReadReceipts: data.memberReadReceipts ?? [],
+            canPost: typeof data.canPost === "boolean" ? data.canPost : null,
+          });
+        })
+        .catch(() => {
+          // Keep cached data on transient errors.
+        });
+      return () => {
+        cancelled = true;
+      };
     }
 
     setLoadError(null);
@@ -141,7 +176,6 @@ export function useLoadConversationMessages(conversationId: string | null) {
       setMemberReadReceipts([]);
       setMessagesLoading(true);
     } else {
-      anchorHandledRef.current = null;
       const cached = getCachedMessages(conversationId);
       if (cached) {
         applyCachedConversation(cached, conversationId, cacheSetters);
@@ -197,7 +231,10 @@ export function useLoadConversationMessages(conversationId: string | null) {
         setLoadError(err instanceof Error ? err.message : "Failed to load messages");
       })
       .finally(() => {
-        if (!cancelled) setMessagesLoading(false);
+        if (!cancelled) {
+          setMessagesLoading(false);
+          anchorHandledRef.current = conversationId;
+        }
       });
 
     return () => {

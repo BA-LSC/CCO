@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachmentImage } from "@/components/AttachmentImage";
 import { downloadAttachment } from "@/lib/download-attachment";
 import { useAnimatedDismiss } from "@/hooks/useAnimatedDismiss";
 
@@ -290,7 +291,7 @@ export function AttachmentLightbox({ src, alt, onClose }: Props) {
           if (event.target === event.currentTarget) requestClose();
         }}
       >
-        <img
+        <AttachmentImage
           src={src}
           alt={alt}
           className="attachment-lightbox-image"

@@ -107,4 +107,20 @@ describe("getMessageLayoutInfo", () => {
       spacing: "medium",
     });
   });
+
+  test("breaks grouped bubble corners when a call divider sits between messages", () => {
+    const messages = [
+      msg(userB, "2026-01-01T17:00:00.000Z"),
+      msg(userB, "2026-01-01T17:00:40.000Z"),
+    ];
+    const callBreakAfterIndices = new Set([1]);
+
+    expect(getMessageLayoutInfo(messages, 0, userA, undefined, callBreakAfterIndices)).toMatchObject({
+      groupPosition: "single",
+    });
+    expect(getMessageLayoutInfo(messages, 1, userA, undefined, callBreakAfterIndices)).toMatchObject({
+      groupPosition: "single",
+      spacing: "tight",
+    });
+  });
 });

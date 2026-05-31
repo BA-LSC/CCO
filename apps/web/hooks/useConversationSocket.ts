@@ -46,6 +46,12 @@ type RealtimeEvent =
       userId: string;
       displayName: string;
       isTyping: boolean;
+    }
+  | {
+      type: "presence.updated";
+      userId: string;
+      online: boolean;
+      inCall: string | null;
     };
 
 export type { RealtimeEvent };

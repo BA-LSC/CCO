@@ -2,7 +2,7 @@
 
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserPresenceDot } from "@/components/UserPresenceDot";
-import { resolvePresenceDotState, usePresence } from "@/components/PresenceProvider";
+import { usePresence } from "@/components/PresenceProvider";
 
 type Props = {
   userId?: string | null;
@@ -24,7 +24,7 @@ export function UserAvatarWithPresence({
   const { isUserOnline, getUserStatus } = usePresence();
   const online = showPresence && userId ? isUserOnline(userId) : false;
   const status = showPresence && userId ? getUserStatus(userId) : null;
-  const dotState = status ? resolvePresenceDotState(status.preset, online) : "offline";
+  const dotState = status ? (online ? "online" : "offline") : "offline";
 
   return (
     <span className={`avatar-with-presence avatar-with-presence--${size}`}>

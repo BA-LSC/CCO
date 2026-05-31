@@ -32,7 +32,7 @@ export function extractUploadFilename(urlOrPath: string): string | null {
   }
 }
 
-function readUploadSignatureParams(urlOrPath: string): { sig?: string; exp?: string } {
+export function readUploadSignatureParams(urlOrPath: string): { sig?: string; exp?: string } {
   try {
     const url = urlOrPath.startsWith("/")
       ? new URL(urlOrPath, "http://local")
@@ -94,11 +94,25 @@ export function attachmentCacheKey(attachmentUrl: string): string {
   return extractUploadFilename(attachmentUrl) ?? attachmentUrl;
 }
 
-function readUploadSignatureExpiry(attachmentUrl: string): number {
+/** Non-zero when attachment URL has a sig that has not expired yet (client-side exp check only). */
+export function uploadDisplaySignatureScore(
+  attachmentUrl: string,
+  nowSec = Math.floor(Date.now() / 1000),
+): number {
   const { sig, exp } = readUploadSignatureParams(attachmentUrl);
   if (!sig || !exp) return 0;
   const parsed = Number.parseInt(exp, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
+  if (!Number.isFinite(parsed) || parsed <= nowSec) return 0;
+  return parsed;
+}
+
+export function hasValidUploadDisplaySignature(attachmentUrl: string): boolean {
+  return uploadDisplaySignatureScore(attachmentUrl) > 0;
+}
+
+export function isCcoUploadDisplaySrc(src: string): boolean {
+  if (!src || src.startsWith("blob:")) return false;
+  return extractUploadFilename(src) !== null || src.startsWith(`${UPLOAD_DISPLAY_PATH}/`);
 }
 
 /** Resolve one display URL per attachment identity in a loaded message chunk. */
@@ -111,7 +125,7 @@ export function buildAttachmentDisplaySrcMap(
     if (!attachmentUrl) continue;
 
     const key = attachmentCacheKey(attachmentUrl);
-    const exp = readUploadSignatureExpiry(attachmentUrl);
+    const exp = uploadDisplaySignatureScore(attachmentUrl);
     const existing = resolved.get(key);
     if (existing) {
       const existingSigned = existing.exp > 0;

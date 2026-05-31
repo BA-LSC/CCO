@@ -10,7 +10,8 @@ import {
   orgUsesSecretsStore,
   upsertOrgSecretForOrganization,
 } from "./org-secrets";
-import { isCloudflareRuntime } from "../runtime/worker-context";
+import { getWorkerEnvVar, isCloudflareRuntime } from "../runtime/worker-context";
+import { invalidateOrgContextCache } from "./org-context-cache";
 
 export type VapidConfig = {
   publicKey: string;
@@ -39,6 +40,29 @@ export function parseVapidSubjectEmail(subject: string | null | undefined): stri
   return subject.startsWith("mailto:") ? subject.slice("mailto:".length) : subject;
 }
 
+/** Default VAPID contact when org keys exist but no subject was saved (greenfield installs). */
+export function defaultVapidSubject(): string {
+  const webUrl = getWorkerEnvVar("WEB_URL")?.trim() || process.env.WEB_URL?.trim();
+  if (webUrl) {
+    try {
+      return normalizeVapidSubject(`support@${new URL(webUrl).hostname}`);
+    } catch {
+      // Fall through to static default below.
+    }
+  }
+  return "mailto:support@example.com";
+}
+
+async function ensureDefaultVapidSubject(organizationId: string, subject: string | null): Promise<void> {
+  if (subject?.trim()) return;
+
+  await db
+    .update(organizations)
+    .set({ vapidSubject: defaultVapidSubject() })
+    .where(eq(organizations.id, organizationId));
+  invalidateOrgContextCache();
+}
+
 export async function ensureVapidKeys(
   organizationId: string,
   options?: { cloudflareApiToken?: string },
@@ -46,6 +70,7 @@ export async function ensureVapidKeys(
   const rows = await db
     .select({
       vapidPublicKey: organizations.vapidPublicKey,
+      vapidSubject: organizations.vapidSubject,
       vapidPrivateKeyEnc: organizations.vapidPrivateKeyEnc,
       vapidPrivateKeyConfigured: organizations.vapidPrivateKeyConfigured,
       cloudflareSecretsStoreId: organizations.cloudflareSecretsStoreId,
@@ -57,19 +82,26 @@ export async function ensureVapidKeys(
 
   const org = rows[0];
   if (!org) return;
-  if (isVapidPrivateKeyConfigured(org)) return;
+
+  if (isVapidPrivateKeyConfigured(org)) {
+    await ensureDefaultVapidSubject(organizationId, org.vapidSubject);
+    return;
+  }
 
   const keys = webpush.generateVAPIDKeys();
+  const vapidSubject = org.vapidSubject?.trim() ? org.vapidSubject : defaultVapidSubject();
 
   if (orgUsesSecretsStore(org) && isCloudflareRuntime()) {
     await db
       .update(organizations)
       .set({
         vapidPublicKey: keys.publicKey,
+        vapidSubject,
         vapidPrivateKeyConfigured: true,
         vapidPrivateKeyEnc: null,
       })
       .where(eq(organizations.id, organizationId));
+    invalidateOrgContextCache();
 
     await upsertOrgSecretForOrganization({
       organizationId,
@@ -85,9 +117,11 @@ export async function ensureVapidKeys(
     .update(organizations)
     .set({
       vapidPublicKey: keys.publicKey,
+      vapidSubject,
       vapidPrivateKeyEnc: encryptSecret(keys.privateKey),
     })
     .where(eq(organizations.id, organizationId));
+  invalidateOrgContextCache();
 }
 
 export async function updateOrganizationVapidSubject(params: {
@@ -119,7 +153,9 @@ function envVapidConfig(): VapidConfig | null {
 }
 
 function orgVapidConfig(org: typeof organizations.$inferSelect): VapidConfig | null {
-  if (!org.vapidPublicKey || !org.vapidSubject) return null;
+  if (!org.vapidPublicKey) return null;
+
+  const subject = org.vapidSubject?.trim() || defaultVapidSubject();
 
   if (orgUsesSecretsStore(org) && isCloudflareRuntime()) {
     const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
@@ -127,7 +163,7 @@ function orgVapidConfig(org: typeof organizations.$inferSelect): VapidConfig | n
     return {
       publicKey: org.vapidPublicKey,
       privateKey,
-      subject: org.vapidSubject,
+      subject,
     };
   }
 
@@ -136,7 +172,7 @@ function orgVapidConfig(org: typeof organizations.$inferSelect): VapidConfig | n
   return {
     publicKey: org.vapidPublicKey,
     privateKey: decryptSecret(org.vapidPrivateKeyEnc),
-    subject: org.vapidSubject,
+    subject,
   };
 }
 
@@ -152,10 +188,12 @@ export async function resolveVapidConfig(): Promise<VapidConfig | null> {
 
 export async function getOrganizationVapidStatus(org: typeof organizations.$inferSelect) {
   const keysConfigured = isVapidPrivateKeyConfigured(org) && Boolean(org.vapidPublicKey);
-  const subjectEmail = parseVapidSubjectEmail(org.vapidSubject);
+  const subjectEmail =
+    parseVapidSubjectEmail(org.vapidSubject) ||
+    (keysConfigured ? parseVapidSubjectEmail(defaultVapidSubject()) : "");
   return {
     vapidKeysConfigured: keysConfigured,
     vapidSubjectEmail: subjectEmail,
-    webPushConfigured: keysConfigured && Boolean(org.vapidSubject),
+    webPushConfigured: keysConfigured,
   };
 }

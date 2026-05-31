@@ -9,6 +9,7 @@ import {
 } from "../db/schema";
 import { canPostInConversation, isLeaderRole } from "../permissions";
 import { publishMessageEventToMembers } from "../realtime/pubsub";
+import { scheduleBackgroundWork } from "../runtime/worker-context";
 import { unreadFlagsForConversations } from "./unread";
 
 export async function listConversationMemberUserIds(conversationId: string): Promise<string[]> {
@@ -36,16 +37,18 @@ export async function markConversationRead(
     .returning({ id: conversationMembers.id });
 
   if (updated[0]) {
-    const memberUserIds = await listConversationMemberUserIds(conversationId);
-    await publishMessageEventToMembers(
-      {
-        type: "conversation.read",
-        conversationId,
-        userId,
-        readAt: readAt.toISOString(),
-      },
-      memberUserIds,
-    );
+    scheduleBackgroundWork(async () => {
+      const memberUserIds = await listConversationMemberUserIds(conversationId);
+      await publishMessageEventToMembers(
+        {
+          type: "conversation.read",
+          conversationId,
+          userId,
+          readAt: readAt.toISOString(),
+        },
+        memberUserIds,
+      );
+    });
   }
 
   return Boolean(updated[0]);

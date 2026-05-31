@@ -122,6 +122,30 @@ function groupConsecutiveMissedCallTimelineItems(
   return grouped;
 }
 
+/** Message indices that follow a call divider in the merged thread timeline. */
+export function buildCallBreakMessageIndices(
+  messages: Message[],
+  callEvents: CallTimelineEventDto[],
+): Set<number> {
+  if (messages.length === 0 || callEvents.length === 0) return new Set();
+
+  const timeline = buildThreadTimeline(messages, callEvents);
+  const indexById = new Map(messages.map((message, index) => [message.id, index]));
+  const breaks = new Set<number>();
+
+  for (let index = 1; index < timeline.length; index += 1) {
+    const item = timeline[index]!;
+    if (item.kind !== "message") continue;
+    if (timeline[index - 1]!.kind !== "call") continue;
+    const messageIndex = indexById.get(item.message.id);
+    if (messageIndex !== undefined && messageIndex > 0) {
+      breaks.add(messageIndex);
+    }
+  }
+
+  return breaks;
+}
+
 export function threadItemStartsNewDay(
   items: { at: string }[],
   index: number,

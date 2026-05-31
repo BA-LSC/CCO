@@ -20,9 +20,11 @@ import {
   type UserStatusPreset,
 } from "@cco/shared/user-status";
 import { apiFetch } from "@/lib/api";
+import { useChatLayout } from "@/components/ChatLayoutContext";
 
-const HEARTBEAT_MS = 15_000;
+const HEARTBEAT_MS = 8_000;
 const IDLE_MS = 5 * 60 * 1000;
+const MAX_PRESENCE_QUERY_IDS = 200;
 
 type PresenceContextValue = {
   pageActive: boolean;
@@ -34,6 +36,7 @@ type PresenceContextValue = {
   setMyStatus: (update: Partial<UserStatus>) => Promise<void>;
   markUserActive: () => void;
   refreshPresence: (userIds: string[]) => Promise<void>;
+  applyPresenceUpdate: (userId: string, online: boolean) => void;
 };
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
@@ -133,20 +136,27 @@ export function PresenceProvider({
     if (!unique.length) return;
 
     try {
-      const data = await apiFetch<{
-        online: Record<string, boolean>;
-        statuses: Record<string, UserStatus>;
-      }>("/api/v1/presence/query", {
-        method: "POST",
-        body: JSON.stringify({ userIds: unique }),
-      });
-      setOnlineByUserId((prev) => ({ ...prev, ...data.online }));
-      if (data.statuses) {
-        setStatusByUserId((prev) => ({ ...prev, ...data.statuses }));
+      for (let index = 0; index < unique.length; index += MAX_PRESENCE_QUERY_IDS) {
+        const chunk = unique.slice(index, index + MAX_PRESENCE_QUERY_IDS);
+        const data = await apiFetch<{
+          online: Record<string, boolean>;
+          statuses: Record<string, UserStatus>;
+        }>("/api/v1/presence/query", {
+          method: "POST",
+          body: JSON.stringify({ userIds: chunk }),
+        });
+        setOnlineByUserId((prev) => ({ ...prev, ...data.online }));
+        if (data.statuses) {
+          setStatusByUserId((prev) => ({ ...prev, ...data.statuses }));
+        }
       }
     } catch {
       // Ignore transient network errors.
     }
+  }, []);
+
+  const applyPresenceUpdate = useCallback((targetUserId: string, online: boolean) => {
+    setOnlineByUserId((prev) => ({ ...prev, [targetUserId]: online }));
   }, []);
 
   const refreshWatchedPresence = useCallback(async () => {
@@ -175,6 +185,15 @@ export function PresenceProvider({
     const intervalId = window.setInterval(() => void refreshWatchedPresence(), HEARTBEAT_MS);
     return () => window.clearInterval(intervalId);
   }, [pageActive, refreshWatchedPresence]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshWatchedPresence();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [refreshWatchedPresence]);
 
   const isUserOnline = useCallback(
     (targetUserId: string | null | undefined) => {
@@ -243,8 +262,10 @@ export function PresenceProvider({
       setMyStatus,
       markUserActive,
       refreshPresence,
+      applyPresenceUpdate,
     }),
     [
+      applyPresenceUpdate,
       effectivePreset,
       getUserStatus,
       idle,
@@ -260,10 +281,30 @@ export function PresenceProvider({
   return (
     <PresenceContext.Provider value={value}>
       <PresenceWatchRegistry watchedUserIdsRef={watchedUserIdsRef}>
+        <PresenceRealtimeSync />
         {children}
       </PresenceWatchRegistry>
     </PresenceContext.Provider>
   );
+}
+
+function PresenceRealtimeSync() {
+  const { subscribeRealtime } = useChatLayout();
+  const { applyPresenceUpdate, refreshPresence } = usePresence();
+  const watchedUserIdsRef = useContext(PresenceWatchRegistryContext);
+
+  useEffect(() => {
+    return subscribeRealtime((event) => {
+      if (event.type !== "presence.updated") return;
+      if (!watchedUserIdsRef?.current.has(event.userId)) return;
+      applyPresenceUpdate(event.userId, event.online);
+      if (event.online) {
+        void refreshPresence([event.userId]);
+      }
+    });
+  }, [applyPresenceUpdate, refreshPresence, subscribeRealtime, watchedUserIdsRef]);
+
+  return null;
 }
 
 const PresenceWatchRegistryContext = createContext<React.MutableRefObject<Set<string>> | null>(

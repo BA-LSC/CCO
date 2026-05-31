@@ -7,8 +7,8 @@ import { mergeCallTimelineEvents, normalizeCallTimelineEvents } from "@/lib/call
 import { mergeConversationMessages, type MergeConversationMessagesOptions } from "@/lib/message-reactions";
 import { conversationMessagesPath } from "@/lib/messages";
 
-const POLL_MS_DISCONNECTED = 4000;
-const POLL_MS_CONNECTED = 8000;
+const POLL_MS_DISCONNECTED = 3000;
+const POLL_MS_CONNECTED = 4000;
 
 export type ConversationPollMergeOptions = {
   getMergeOptions?: () => MergeConversationMessagesOptions;

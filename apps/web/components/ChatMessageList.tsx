@@ -8,7 +8,7 @@ import {
 import { MessageBody } from "@/components/MessageBody";
 import { MessageDeliveryStatus, findLastPeerReadMessageId, getMessageReaders } from "@/components/MessageDeliveryStatus";
 import { UserAvatar } from "@/components/UserAvatar";
-import { AttachmentVideoLightbox } from "@/components/AttachmentVideoLightbox";
+import { AttachmentImage } from "@/components/AttachmentImage";
 import { VideoAttachmentPreview } from "@/components/VideoAttachmentPreview";
 import {
   attachmentCacheKey,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/message-time";
 import { CallTimelineDivider } from "@/components/calls/CallTimelineDivider";
 import {
+  buildCallBreakMessageIndices,
   buildThreadTimeline,
   threadItemStartsNewDay,
   type CallTimelineEventDto,
@@ -107,14 +108,19 @@ function ChatMessageListInner({
   peerUser = null,
   memberReadReceipts = [],
 }: Props) {
-  const layoutInfos = useMemo(
-    () => buildMessageLayoutInfos(messages, resolvedUserId),
-    [messages, resolvedUserId],
-  );
-
   const timeline = useMemo(
     () => buildThreadTimeline(messages, callEvents),
     [messages, callEvents],
+  );
+
+  const callBreakAfterIndices = useMemo(
+    () => buildCallBreakMessageIndices(messages, callEvents),
+    [messages, callEvents],
+  );
+
+  const layoutInfos = useMemo(
+    () => buildMessageLayoutInfos(messages, resolvedUserId, callBreakAfterIndices),
+    [messages, resolvedUserId, callBreakAfterIndices],
   );
 
   const messageIndexById = useMemo(() => {
@@ -417,7 +423,7 @@ function ChatMessageListInner({
                                 });
                               }}
                             >
-                              <img
+                              <AttachmentImage
                                 src={messageAttachmentSrc(m)!}
                                 alt="Shared image"
                                 className="attachment"

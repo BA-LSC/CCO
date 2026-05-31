@@ -1,0 +1,52 @@
+import { afterEach, describe, expect, test, vi, type Mock } from "bun:test";
+import { isStandaloneDisplay } from "@/lib/add-to-homescreen";
+import {
+  resetUploadImageBlobCacheForTests,
+  uploadImageSrcNeedsCredentialFetch,
+} from "@/lib/attachment-image-src";
+
+vi.mock("@/lib/add-to-homescreen", () => ({
+  isStandaloneDisplay: vi.fn(() => false),
+}));
+
+const mockStandaloneDisplay = isStandaloneDisplay as Mock<() => boolean>;
+
+describe("uploadImageSrcNeedsCredentialFetch", () => {
+  afterEach(() => {
+    resetUploadImageBlobCacheForTests();
+    mockStandaloneDisplay.mockReturnValue(false);
+  });
+
+  test("skips blob preview URLs", () => {
+    expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(false);
+  });
+
+  test("requires credential fetch for unsigned upload URLs in browser tabs", () => {
+    expect(uploadImageSrcNeedsCredentialFetch("/api/v1/uploads/photo.png")).toBe(true);
+  });
+
+  test("allows signed upload URLs in browser tabs", () => {
+    expect(
+      uploadImageSrcNeedsCredentialFetch(
+        "/api/v1/uploads/photo.png?sig=deadbeef&exp=9999999999",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("uploadImageSrcNeedsCredentialFetch in standalone PWA", () => {
+  afterEach(() => {
+    resetUploadImageBlobCacheForTests();
+    mockStandaloneDisplay.mockReturnValue(false);
+  });
+
+  test("always credential-fetches upload URLs in standalone display mode", () => {
+    mockStandaloneDisplay.mockReturnValue(true);
+
+    expect(
+      uploadImageSrcNeedsCredentialFetch(
+        "/api/v1/uploads/photo.png?sig=deadbeef&exp=9999999999",
+      ),
+    ).toBe(true);
+  });
+});

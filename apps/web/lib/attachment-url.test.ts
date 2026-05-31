@@ -3,7 +3,9 @@ import {
   attachmentCacheKey,
   buildAttachmentDisplaySrcMap,
   extractUploadFilename,
+  hasValidUploadDisplaySignature,
   resolveAttachmentDisplayUrl,
+  uploadDisplaySignatureScore,
 } from "./attachment-url";
 
 describe("extractUploadFilename", () => {
@@ -95,29 +97,44 @@ describe("attachmentCacheKey", () => {
 });
 
 describe("buildAttachmentDisplaySrcMap", () => {
+  const futureExp = "9999999999";
+
   test("deduplicates upload attachments by filename", () => {
     const map = buildAttachmentDisplaySrcMap([
-      "https://api.example.com/uploads/abc.jpeg?sig=old&exp=1",
-      "https://api.example.com/uploads/abc.jpeg?sig=new&exp=999",
+      `https://api.example.com/uploads/abc.jpeg?sig=old&exp=1`,
+      `https://api.example.com/uploads/abc.jpeg?sig=new&exp=${futureExp}`,
     ]);
 
     expect(map.size).toBe(1);
-    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=new&exp=999");
+    expect(map.get("abc.jpeg")).toBe(`/api/v1/uploads/abc.jpeg?sig=new&exp=${futureExp}`);
   });
 
   test("prefers signed URLs over unsigned proxy paths for the same file", () => {
     const map = buildAttachmentDisplaySrcMap([
       "/api/v1/uploads/abc.jpeg",
-      "https://api.example.com/uploads/abc.jpeg?sig=fresh&exp=999",
+      `https://api.example.com/uploads/abc.jpeg?sig=fresh&exp=${futureExp}`,
     ]);
 
-    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=fresh&exp=999");
+    expect(map.get("abc.jpeg")).toBe(`/api/v1/uploads/abc.jpeg?sig=fresh&exp=${futureExp}`);
   });
 
   test("keeps unsigned URL only when no signed variant exists", () => {
     const map = buildAttachmentDisplaySrcMap(["/api/v1/uploads/abc.jpeg"]);
 
     expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg");
+  });
+
+  test("prefers fresh signed URL over expired signature for the same file", () => {
+    const expired = `https://api.example.com/uploads/abc.jpeg?sig=old&exp=1`;
+    const fresh = `https://api.example.com/uploads/abc.jpeg?sig=new&exp=9999999999`;
+    const map = buildAttachmentDisplaySrcMap([expired, fresh]);
+
+    expect(map.get("abc.jpeg")).toBe("/api/v1/uploads/abc.jpeg?sig=new&exp=9999999999");
+  });
+
+  test("uploadDisplaySignatureScore ignores expired signatures", () => {
+    expect(hasValidUploadDisplaySignature("/api/v1/uploads/a.png?sig=x&exp=1")).toBe(false);
+    expect(uploadDisplaySignatureScore("/api/v1/uploads/a.png?sig=x&exp=1")).toBe(0);
   });
 
   test("keeps distinct external attachment URLs separate", () => {

@@ -53,4 +53,10 @@ describe("resolveBrowserImageMimeType", () => {
       null,
     );
   });
+
+  test("normalizes iOS public.png MIME type", () => {
+    expect(resolveBrowserImageMimeType(new File([], "photo.png", { type: "public.png" }))).toBe(
+      "image/png",
+    );
+  });
 });
