@@ -21,6 +21,25 @@ import {
 
 describe("GET /uploads/:filename", () => {
   const publicBase = "http://localhost:3001/uploads";
+  let envSnapshot: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    envSnapshot = {
+      UPLOAD_STORAGE: process.env.UPLOAD_STORAGE,
+      CCO_RUNTIME: process.env.CCO_RUNTIME,
+      CLOUDFLARE_R2_BUCKET: process.env.CLOUDFLARE_R2_BUCKET,
+    };
+    process.env.UPLOAD_STORAGE = "local";
+    delete process.env.CCO_RUNTIME;
+    delete process.env.CLOUDFLARE_R2_BUCKET;
+  });
+
+  afterEach(() => {
+    for (const [key, value] of Object.entries(envSnapshot)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
 
   beforeAll(async () => {
     await mkdir(uploadDir, { recursive: true });
