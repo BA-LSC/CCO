@@ -151,11 +151,11 @@ uploadsRouter.post("/", requireAuth, async (c) => {
 
     if (r2) {
       const { putR2Object } = await import("../lib/r2-uploads");
-      const buffer = Buffer.from(await file.arrayBuffer());
+      const body = new Uint8Array(await file.arrayBuffer());
       await putR2Object({
         config: r2,
         objectKey: filename,
-        body: buffer,
+        body,
         contentType,
       });
       return c.json({

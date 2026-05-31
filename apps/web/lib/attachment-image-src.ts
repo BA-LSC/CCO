@@ -20,13 +20,12 @@ function cacheKeyForSrc(src: string): string {
 }
 
 /**
- * iOS PWA WebKit often fails plain <img> loads for upload proxy URLs and sometimes
- * for file-picker blob URLs. Load through fetch() and display a fresh blob URL instead.
+ * iOS PWA WebKit often fails plain <img> loads for upload proxy URLs. Load those
+ * through fetch() and display a fresh blob URL instead. Local file-picker blob:
+ * previews must stay on the original object URL (fetch(blob:) breaks on iOS PWA).
  */
 export function uploadImageSrcNeedsCredentialFetch(src: string): boolean {
-  if (src.startsWith("blob:")) {
-    return isStandaloneDisplay();
-  }
+  if (src.startsWith("blob:")) return false;
   if (!isCcoUploadDisplaySrc(src)) return false;
   if (isStandaloneDisplay()) return true;
   return !hasValidUploadDisplaySignature(src);

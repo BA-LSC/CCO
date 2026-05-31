@@ -18,13 +18,10 @@ describe("uploadImageSrcNeedsCredentialFetch", () => {
     mockStandaloneDisplay.mockReturnValue(false);
   });
 
-  test("skips blob preview URLs in browser tabs", () => {
+  test("uses blob preview URLs directly in browser tabs and standalone PWA", () => {
     expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(false);
-  });
-
-  test("refreshes blob preview URLs in standalone PWA", () => {
     mockStandaloneDisplay.mockReturnValue(true);
-    expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(true);
+    expect(uploadImageSrcNeedsCredentialFetch("blob:preview")).toBe(false);
   });
 
   test("requires credential fetch for unsigned upload URLs in browser tabs", () => {

@@ -19,7 +19,7 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
 
 export function AttachmentImage({ src, onError, className, alt, ...props }: Props) {
   const [displaySrc, setDisplaySrc] = useState(() => {
-    if (!uploadImageSrcNeedsCredentialFetch(src)) return src;
+    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) return src;
     return "";
   });
   const retriedRef = useRef(false);
@@ -33,12 +33,13 @@ export function AttachmentImage({ src, onError, className, alt, ...props }: Prop
     retriedRef.current = false;
     let cancelled = false;
 
-    if (!uploadImageSrcNeedsCredentialFetch(src)) {
+    if (src.startsWith("blob:") || !uploadImageSrcNeedsCredentialFetch(src)) {
       setDisplaySrc(src);
       return;
     }
 
-    if (previous.startsWith("blob:") && previous !== src) {
+    // Keep a composer/thread blob visible while the authenticated fetch runs.
+    if (previous.startsWith("blob:")) {
       setDisplaySrc(previous);
     } else {
       setDisplaySrc("");
